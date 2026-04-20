@@ -16,11 +16,11 @@ export default function CallCenterPage() {
   const [createOpen, setCreateOpen] = useState(false);
 
   return (
-    <div className="flex h-full flex-col gap-6 overflow-auto p-6">
-      <header className="flex items-baseline justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-primary">Call Center</h1>
-          <p className="mt-1 text-sm text-gray-500">
+    <div className="flex h-full flex-col gap-4 overflow-auto sm:gap-6">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-baseline sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold text-primary sm:text-2xl">Call Center</h1>
+          <p className="mt-0.5 text-xs text-gray-500 sm:mt-1 sm:text-sm">
             Manage your assigned orders — confirm, cancel, and follow up.
           </p>
         </div>
@@ -29,6 +29,7 @@ export default function CallCenterPage() {
             variant="primary"
             leftIcon={<Plus size={14} />}
             onClick={() => setCreateOpen(true)}
+            className="w-full sm:w-auto"
           >
             New manual order
           </CRMButton>

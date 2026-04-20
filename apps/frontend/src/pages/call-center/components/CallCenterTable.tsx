@@ -238,13 +238,199 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
   return (
     <div
       className={cn(
-        'group flex flex-col gap-2 rounded-card border border-transparent bg-white/60 px-3 py-2.5 transition',
-        'hover:border-primary/30 hover:bg-primary/5 hover:shadow-sm',
-        overdue && 'callback-pulse border-pink-300/70 bg-pink-50/60 hover:bg-pink-50',
+        'group rounded-card border border-transparent bg-white/60 transition',
+        'md:flex md:flex-col md:gap-2 md:px-3 md:py-2.5',
+        'md:hover:border-primary/30 md:hover:bg-primary/5 md:hover:shadow-sm',
+        overdue && 'callback-pulse border-pink-300/70 bg-pink-50/60 md:hover:bg-pink-50',
+        'shadow-card md:shadow-none',
       )}
     >
+      {/* ─── Mobile card (below md) ─────────────────────────────── */}
+      <div className="flex flex-col md:hidden">
+        {/* Header: ref + date + source + quick open */}
+        <button
+          type="button"
+          onClick={() => openOrder(order)}
+          className="flex items-center gap-2 rounded-t-card px-3 py-2 text-left active:bg-primary/5"
+        >
+          <OrderSourceIcon source={order.source} size={16} />
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-mono text-[12px] font-semibold text-gray-800">
+              <span className="text-gray-400">{prefix}</span>{seq}
+            </p>
+            <p className="text-[10px] text-gray-400">{date} · {time}</p>
+          </div>
+          <span
+            className={cn(
+              'inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary text-white shadow-sm',
+            )}
+          >
+            <Send size={12} />
+          </span>
+        </button>
+
+        <div className="h-px bg-gray-100" />
+
+        {/* Customer */}
+        <div className="flex items-start gap-2 px-3 py-2">
+          <div className="min-w-0 flex-1">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenCustomer(order.customer.id);
+              }}
+              className="truncate text-left text-sm font-semibold text-gray-900 hover:text-primary active:text-primary"
+            >
+              {order.customer.fullName}
+            </button>
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-gray-500">
+              <span className="font-mono">{order.customer.phoneDisplay}</span>
+              <span className="text-gray-300">·</span>
+              <span className="truncate">{order.customer.city}</span>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <a
+              href={`tel:${phoneDigits}`}
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary active:bg-primary/20"
+              title="Call"
+            >
+              <Phone size={13} />
+            </a>
+            <a
+              href={wa}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 active:bg-emerald-100"
+              title="WhatsApp"
+            >
+              <MessageCircle size={13} />
+            </a>
+          </div>
+        </div>
+
+        <div className="h-px bg-gray-100" />
+
+        {/* Products */}
+        <div className="flex items-start gap-2 px-3 py-2">
+          <div className="relative mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-btn bg-accent/60">
+            <Package size={12} className="text-primary" />
+            {totalItems > 1 && (
+              <span className="absolute -right-1 -top-1 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-white ring-2 ring-white">
+                {totalItems}
+              </span>
+            )}
+          </div>
+          <div className="min-w-0 flex-1 space-y-1">
+            {groups.length === 0 ? (
+              <p className="text-sm font-medium text-gray-400">—</p>
+            ) : (
+              groups.map((g, gi) => (
+                <div key={gi} className="min-w-0">
+                  <p
+                    className={cn(
+                      'text-[13px] font-medium leading-tight',
+                      g.unlinked ? 'text-red-600' : 'text-gray-800',
+                    )}
+                  >
+                    {g.name}
+                  </p>
+                  <div className="mt-0.5 flex flex-wrap gap-1">
+                    {g.variants.map((v, vi) => (
+                      <span
+                        key={vi}
+                        className={cn(
+                          'inline-flex items-center gap-1 rounded-badge px-1.5 py-0.5 text-[10px]',
+                          g.unlinked
+                            ? 'bg-red-50 text-red-600 ring-1 ring-red-200'
+                            : 'bg-gray-100 text-gray-600',
+                        )}
+                      >
+                        <span className={cn('font-medium', g.unlinked ? 'text-red-700' : 'text-gray-700')}>
+                          {v.label}
+                        </span>
+                        <span className={g.unlinked ? 'text-red-300' : 'text-gray-400'}>×</span>
+                        <span className={cn('font-bold', g.unlinked ? 'text-red-800' : 'text-gray-800')}>
+                          {v.quantity}
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <div className="shrink-0 text-right">
+            <p
+              className={cn(
+                'text-sm font-bold leading-tight',
+                hasUnlinked ? 'text-red-600' : 'text-gray-900',
+              )}
+            >
+              {order.total.toLocaleString('fr-MA')}
+            </p>
+            <p className={cn('text-[9px] uppercase tracking-wide', hasUnlinked ? 'text-red-400' : 'text-gray-400')}>
+              MAD
+            </p>
+          </div>
+        </div>
+
+        <div className="h-px bg-gray-100" />
+
+        {/* Status pills */}
+        <div
+          className="flex flex-col gap-1.5 px-3 py-2"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between gap-1.5">
+            <div className="flex min-w-0 flex-1 items-center gap-1">
+              <ConfirmationPill
+                order={order}
+                onOpenModal={() => openOrder(order)}
+                onRefresh={onRefresh}
+              />
+              <button
+                type="button"
+                onClick={() => onOpenLogs(order, 'confirmation')}
+                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-gray-400 active:bg-gray-100 active:text-primary"
+                title="Confirmation history"
+              >
+                <History size={12} />
+              </button>
+            </div>
+            <div className="flex min-w-0 items-center gap-1">
+              <ShippingPill order={order} />
+              <button
+                type="button"
+                onClick={() => onOpenLogs(order, 'shipping')}
+                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-gray-400 active:bg-gray-100 active:text-primary"
+                title="Shipping history"
+              >
+                <History size={12} />
+              </button>
+            </div>
+          </div>
+          {order.confirmationNote && (
+            <div className="flex items-start gap-1.5 rounded-btn bg-amber-50/70 px-2 py-1 text-[11px] text-amber-800">
+              <StickyNote size={11} className="mt-0.5 shrink-0" />
+              <p className="line-clamp-2">{order.confirmationNote}</p>
+            </div>
+          )}
+          {order.shippingInstruction && (
+            <div className="flex items-start gap-1.5 rounded-btn bg-blue-50/70 px-2 py-1 text-[11px] text-blue-800">
+              <Truck size={11} className="mt-0.5 shrink-0" />
+              <p className="line-clamp-2">{order.shippingInstruction}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ─── Desktop grid (md and up) ─────────────────────────── */}
       <div
-        className="grid cursor-pointer grid-cols-[120px_minmax(180px,1fr)_minmax(160px,1fr)_100px_minmax(240px,auto)_36px] items-center gap-3"
+        className="hidden cursor-pointer md:grid md:grid-cols-[120px_minmax(180px,1fr)_minmax(160px,1fr)_100px_minmax(240px,auto)_36px] md:items-center md:gap-3"
         onClick={() => openOrder(order)}
         role="button"
         tabIndex={0}
@@ -710,7 +896,7 @@ export function CallCenterTable() {
               : 'No orders match this filter'}
           </div>
         ) : (
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2.5 md:gap-1.5">
             {visible.map((o) => (
               <Row
                 key={o.id}

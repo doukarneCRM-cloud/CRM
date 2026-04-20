@@ -507,11 +507,11 @@ export function CallCenterOrderModal() {
       size="3xl"
       title={`${order.reference} · ${order.customer.fullName}`}
       footer={
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-[11px] text-gray-400">
+        <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+          <p className="order-2 text-[11px] text-gray-400 sm:order-1">
             {dirty ? 'You have unsaved changes' : 'No pending changes'}
           </p>
-          <div className="flex items-center gap-2">
+          <div className="order-1 ml-auto flex items-center gap-2 sm:order-2 sm:ml-0">
             <CRMButton variant="ghost" size="sm" onClick={closeOrder} disabled={saving}>
               Close
             </CRMButton>
@@ -559,7 +559,7 @@ export function CallCenterOrderModal() {
               <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-primary">
                 Customer
               </h3>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <CRMInput
                   label="Name *"
                   value={form.customerName}
@@ -570,7 +570,7 @@ export function CallCenterOrderModal() {
                   <div className="flex items-center gap-1">
                     <div
                       className={cn(
-                        'flex-1 rounded-input border px-2 py-1.5 font-mono text-[12px]',
+                        'flex-1 min-w-0 truncate rounded-input border px-2 py-1.5 font-mono text-[12px]',
                         phoneValid === false
                           ? 'border-red-300 bg-red-50 text-red-700'
                           : 'border-gray-200 bg-gray-50 text-gray-700',
@@ -580,7 +580,7 @@ export function CallCenterOrderModal() {
                     </div>
                     <a
                       href={`tel:${phoneDigits}`}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-btn bg-primary text-white hover:bg-primary-dark"
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-btn bg-primary text-white hover:bg-primary-dark"
                       title="Call"
                     >
                       <Phone size={12} />
@@ -589,7 +589,7 @@ export function CallCenterOrderModal() {
                       href={`https://wa.me/${phoneDigits}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-btn bg-emerald-500 text-white hover:bg-emerald-600"
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-btn bg-emerald-500 text-white hover:bg-emerald-600"
                       title="WhatsApp"
                     >
                       <MessageCircle size={12} />
@@ -664,26 +664,25 @@ export function CallCenterOrderModal() {
                             disabled={isLocked}
                           />
                         </div>
-                        {/* Row 2 — Color · Size · Qty stepper · Remove */}
-                        <div className="flex items-center gap-1.5">
-                          <div className="flex-1 min-w-0">
-                            <CRMSelect
-                              options={colorOpts}
-                              value={it.color ?? ''}
-                              onChange={(v) => handleColorChange(it.key, v as string)}
-                              placeholder={colorOpts.length === 0 ? '—' : 'Color'}
-                              disabled={isLocked || colorOpts.length === 0}
-                            />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <CRMSelect
-                              options={sizeOpts}
-                              value={it.size ?? ''}
-                              onChange={(v) => handleSizeChange(it.key, v as string)}
-                              placeholder={sizeOpts.length === 0 ? '—' : 'Size'}
-                              disabled={isLocked || sizeOpts.length === 0}
-                            />
-                          </div>
+                        {/* Row 2 — Color + Size */}
+                        <div className="mb-1.5 grid grid-cols-2 gap-1.5">
+                          <CRMSelect
+                            options={colorOpts}
+                            value={it.color ?? ''}
+                            onChange={(v) => handleColorChange(it.key, v as string)}
+                            placeholder={colorOpts.length === 0 ? '—' : 'Color'}
+                            disabled={isLocked || colorOpts.length === 0}
+                          />
+                          <CRMSelect
+                            options={sizeOpts}
+                            value={it.size ?? ''}
+                            onChange={(v) => handleSizeChange(it.key, v as string)}
+                            placeholder={sizeOpts.length === 0 ? '—' : 'Size'}
+                            disabled={isLocked || sizeOpts.length === 0}
+                          />
+                        </div>
+                        {/* Row 3 — Qty stepper + Remove */}
+                        <div className="flex items-center justify-between gap-1.5">
                           <div className="flex shrink-0 items-center gap-0.5">
                             <button
                               type="button"
@@ -691,7 +690,7 @@ export function CallCenterOrderModal() {
                               onClick={() =>
                                 updateItem(it.key, { quantity: Math.max(1, it.quantity - 1) })
                               }
-                              className="inline-flex h-7 w-6 items-center justify-center rounded-btn border border-gray-200 bg-white text-[13px] font-bold text-gray-500 hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-btn border border-gray-200 bg-white text-[14px] font-bold text-gray-500 hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
                               title="Decrease"
                             >
                               −
@@ -707,7 +706,7 @@ export function CallCenterOrderModal() {
                                   quantity: Math.max(1, parseInt(e.target.value, 10) || 1),
                                 })
                               }
-                              className="h-7 w-10 rounded-input border border-gray-200 bg-white text-center text-[12px] font-bold text-gray-800 focus:border-primary focus:outline-none"
+                              className="h-8 w-12 rounded-input border border-gray-200 bg-white text-center text-[13px] font-bold text-gray-800 focus:border-primary focus:outline-none"
                             />
                             <button
                               type="button"
@@ -717,7 +716,7 @@ export function CallCenterOrderModal() {
                                   quantity: Math.min(it.stock || 999, it.quantity + 1),
                                 })
                               }
-                              className="inline-flex h-7 w-6 items-center justify-center rounded-btn border border-gray-200 bg-white text-[13px] font-bold text-gray-500 hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-btn border border-gray-200 bg-white text-[14px] font-bold text-gray-500 hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
                               title="Increase"
                             >
                               +
@@ -727,10 +726,10 @@ export function CallCenterOrderModal() {
                             <button
                               type="button"
                               onClick={() => removeItem(it.key)}
-                              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-btn text-red-400 hover:bg-red-50 hover:text-red-600"
+                              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-btn text-red-400 hover:bg-red-50 hover:text-red-600"
                               title="Remove"
                             >
-                              <Trash2 size={12} />
+                              <Trash2 size={13} />
                             </button>
                           )}
                         </div>
@@ -873,7 +872,7 @@ export function CallCenterOrderModal() {
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-3 gap-1.5">
+                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
                     <CRMButton
                       variant="primary"
                       size="sm"
