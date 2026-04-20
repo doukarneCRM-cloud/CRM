@@ -143,10 +143,72 @@ function CRMTable<TData extends object>({
   const selectedCount = Object.keys(rowSelection).length;
   const showBulkBar = selectable && selectedCount > 0 && bulkActions.length > 0;
 
+  const rows = table.getRowModel().rows;
+
   return (
     <div className={cn('relative flex flex-col', className)}>
-      {/* Table wrapper */}
-      <div className="overflow-x-auto">
+      {/* ─── Mobile: card list (below md) ─────────────────────────── */}
+      <div className="flex flex-col gap-2 p-2 md:hidden">
+        {loading ? (
+          Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="rounded-card border border-gray-100 bg-white p-3">
+              <div className="skeleton h-4 w-1/2 rounded" />
+              <div className="skeleton mt-2 h-3 w-3/4 rounded" />
+              <div className="skeleton mt-2 h-3 w-2/3 rounded" />
+            </div>
+          ))
+        ) : rows.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-16 text-gray-400">
+            {emptyIcon && <div className="text-gray-300">{emptyIcon}</div>}
+            <p className="text-sm">{emptyMessage}</p>
+          </div>
+        ) : (
+          rows.map((row) => {
+            const visibleCells = row.getVisibleCells();
+            const selectCell = selectable
+              ? visibleCells.find((c) => c.column.id === '__select__')
+              : undefined;
+            const dataCells = visibleCells.filter((c) => c.column.id !== '__select__');
+            return (
+              <div
+                key={row.id}
+                className={cn(
+                  'rounded-card border bg-white p-3 shadow-sm transition-colors',
+                  row.getIsSelected() ? 'border-primary/40 bg-accent/40' : 'border-gray-100',
+                )}
+              >
+                {selectCell && (
+                  <div className="mb-2 flex items-center gap-2 border-b border-gray-50 pb-2">
+                    {flexRender(selectCell.column.columnDef.cell, selectCell.getContext())}
+                    <span className="text-xs font-medium text-gray-400">Select</span>
+                  </div>
+                )}
+                <div className="flex flex-col gap-1.5">
+                  {dataCells.map((cell) => {
+                    const headerDef = cell.column.columnDef.header;
+                    const headerCtx = table.getHeaderGroups()[0]?.headers.find((h) => h.column.id === cell.column.id);
+                    return (
+                      <div key={cell.id} className="flex items-start justify-between gap-3">
+                        <div className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                          {headerCtx && !headerCtx.isPlaceholder
+                            ? flexRender(headerDef, headerCtx.getContext())
+                            : null}
+                        </div>
+                        <div className="min-w-0 flex-1 text-right text-sm text-gray-700">
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* ─── Desktop: table (md and up) ─────────────────────────────── */}
+      <div className="hidden overflow-x-auto md:block">
         <table className="w-full min-w-[640px] border-collapse text-sm">
           {/* Sticky header */}
           <thead className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm">
@@ -257,8 +319,8 @@ function CRMTable<TData extends object>({
 
       {/* Bulk Action Bar — slides up when rows selected */}
       {showBulkBar && (
-        <div className="slide-up fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
-          <div className="glass flex items-center gap-3 px-5 py-3 shadow-hover">
+        <div className="slide-up fixed bottom-3 left-3 right-3 z-50 sm:bottom-6 sm:left-1/2 sm:right-auto sm:-translate-x-1/2">
+          <div className="glass flex flex-wrap items-center justify-center gap-2 px-3 py-2.5 shadow-hover sm:flex-nowrap sm:gap-3 sm:px-5 sm:py-3">
             <span className="text-sm font-semibold text-gray-700">
               {selectedCount} selected
             </span>
