@@ -600,10 +600,10 @@ export function OrdersTable({
   return (
     <div className="flex flex-col overflow-hidden rounded-card border border-gray-100 bg-white">
       {/* ─── Mobile: card list (below md) ──────────────────────────── */}
-      <div className="flex flex-col gap-2 p-2 md:hidden">
+      <div className="flex flex-col gap-3 p-3 md:hidden">
         {loading ? (
           Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="rounded-card border border-gray-100 bg-white p-3">
+            <div key={i} className="rounded-card border border-gray-100 bg-white p-4 shadow-card">
               <div className="skeleton h-4 w-1/2 rounded" />
               <div className="skeleton mt-2 h-3 w-3/4 rounded" />
               <div className="skeleton mt-2 h-3 w-2/3 rounded" />
@@ -619,55 +619,97 @@ export function OrdersTable({
           </div>
         ) : (
           rows.map((row) => {
-            const visibleCells = row.getVisibleCells();
-            const selectCell = visibleCells.find((c) => c.column.id === '__select__');
-            const actionsCell = visibleCells.find((c) => c.column.id === 'actions');
-            const dataCells = visibleCells.filter(
-              (c) => c.column.id !== '__select__' && c.column.id !== 'actions',
-            );
+            const byId = new Map(row.getVisibleCells().map((c) => [c.column.id, c]));
+            const get = (id: string) => byId.get(id);
+            const renderCell = (id: string) => {
+              const cell = get(id);
+              if (!cell) return null;
+              return flexRender(cell.column.columnDef.cell, cell.getContext());
+            };
+            const isSelected = selectedSet.has(row.original.id);
             return (
               <div
                 key={row.id}
                 className={cn(
-                  'rounded-card border bg-white p-3 shadow-sm transition-colors',
-                  selectedSet.has(row.original.id) ? 'border-primary/40 bg-accent/40' : 'border-gray-100',
+                  'rounded-card border bg-white shadow-card transition-shadow',
+                  isSelected ? 'border-primary/50 bg-accent/30 shadow-hover' : 'border-gray-100',
                 )}
               >
-                {/* Header row: checkbox + actions */}
-                {(selectCell || actionsCell) && (
-                  <div className="mb-2 flex items-center justify-between border-b border-gray-50 pb-2">
-                    {selectCell ? (
-                      <div onClick={(e) => e.stopPropagation()}>
-                        {flexRender(selectCell.column.columnDef.cell, selectCell.getContext())}
-                      </div>
-                    ) : <span />}
-                    {actionsCell && (
-                      <div>
-                        {flexRender(actionsCell.column.columnDef.cell, actionsCell.getContext())}
-                      </div>
-                    )}
+                {/* ── Header: checkbox + ref/date/agent + actions ── */}
+                <div className="flex items-start gap-2 p-3">
+                  <div className="mt-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    {renderCell('__select__')}
                   </div>
-                )}
-
-                {/* Data cells as label/value pairs */}
-                <div className="flex flex-col gap-1.5">
-                  {dataCells.map((cell) => {
-                    const headerDef = cell.column.columnDef.header;
-                    const headerCtx = table.getHeaderGroups()[0]?.headers.find((h) => h.column.id === cell.column.id);
-                    return (
-                      <div key={cell.id} className="flex items-start justify-between gap-3">
-                        <div className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
-                          {headerCtx
-                            ? flexRender(headerDef, headerCtx.getContext())
-                            : null}
-                        </div>
-                        <div className="min-w-0 flex-1 text-right text-sm text-gray-700">
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  <div className="min-w-0 flex-1">{renderCell('ref')}</div>
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    {renderCell('actions')}
+                  </div>
                 </div>
+
+                <div className="border-t border-gray-100" />
+
+                {/* ── Customer ── */}
+                <div className="px-3 py-2.5">
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Customer</p>
+                  {renderCell('customer')}
+                </div>
+
+                <div className="border-t border-gray-50" />
+
+                {/* ── Product ── */}
+                <div className="px-3 py-2.5">
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Product</p>
+                  {renderCell('product')}
+                </div>
+
+                <div className="border-t border-gray-50" />
+
+                {/* ── Price ── */}
+                <div className="flex items-center justify-between px-3 py-2.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Price</p>
+                  <div>{renderCell('price')}</div>
+                </div>
+
+                <div className="border-t border-gray-50" />
+
+                {/* ── Status ── */}
+                <div className="px-3 py-2.5">
+                  <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Status</p>
+                  {renderCell('status')}
+                </div>
+
+                {/* ── Meta row (source, coliix, notes) — compact, only if any has value ── */}
+                {(() => {
+                  const hasSource = get('source');
+                  const hasColiix = get('coliix');
+                  const hasNotes = get('notes');
+                  if (!hasSource && !hasColiix && !hasNotes) return null;
+                  return (
+                    <>
+                      <div className="border-t border-gray-50" />
+                      <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-[11px] text-gray-500">
+                        {hasSource && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Src</span>
+                            <div>{renderCell('source')}</div>
+                          </div>
+                        )}
+                        {hasColiix && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Coliix</span>
+                            <div>{renderCell('coliix')}</div>
+                          </div>
+                        )}
+                        {hasNotes && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Notes</span>
+                            <div>{renderCell('notes')}</div>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             );
           })
