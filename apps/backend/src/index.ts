@@ -1,0 +1,352 @@
+import 'dotenv/config';
+import path from 'node:path';
+import Fastify, { type FastifyError } from 'fastify';
+import cors from '@fastify/cors';
+import rateLimit from '@fastify/rate-limit';
+import multipart from '@fastify/multipart';
+import fastifyStatic from '@fastify/static';
+import { Prisma } from '@prisma/client';
+
+import { prisma } from './shared/prisma';
+import { redis } from './shared/redis';
+import { verifyJWT } from './shared/middleware/verifyJWT';
+import { initSocket, getOnlineUserIds } from './shared/socket';
+import { authRoutes } from './modules/auth/auth.routes';
+import { ordersRoutes } from './modules/orders/orders.routes';
+import { customersRoutes } from './modules/customers/customers.routes';
+import { productsRoutes } from './modules/products/products.routes';
+import { teamRoutes } from './modules/team/team.routes';
+import { integrationsRoutes } from './modules/integrations/integrations.routes';
+import { startOrderPoller } from './modules/integrations/orderPoller';
+import { listProvidersPublic } from './modules/integrations/providers.service';
+import { startColiixTracker } from './modules/integrations/coliixTracker';
+import { shippingCitiesRoutes } from './modules/shippingCities/shippingCities.routes';
+import { atelieRoutes } from './modules/atelie/atelie.routes';
+import { atelieStockRoutes } from './modules/atelieStock/atelieStock.routes';
+import { atelieTasksRoutes } from './modules/atelieTasks/atelieTasks.routes';
+import { analyticsRoutes } from './modules/analytics/analytics.routes';
+import { moneyRoutes } from './modules/money/money.routes';
+import { returnsRoutes } from './modules/returns/returns.routes';
+import { notificationsRoutes } from './modules/notifications/notifications.routes';
+import { startAttendanceCron } from './modules/atelie/weeklyAttendanceCron';
+import { simulateAssign } from './utils/autoAssign';
+import {
+  computeKPIsWithComparison,
+  computeAgentPerformance,
+  computeAgentCommission,
+  computeTopProducts,
+  computeTopCities,
+  computeOrderTrend,
+  computeStatusBreakdown,
+  computeAgentStatsByIds,
+} from './utils/kpiCalculator';
+import type { OrderFilterParams } from './utils/filterBuilder';
+
+// ─── Fastify app ──────────────────────────────────────────────────────────────
+const app = Fastify({
+  logger: {
+    level: process.env.NODE_ENV === 'production' ? 'warn' : 'info',
+    transport:
+      process.env.NODE_ENV !== 'production'
+        ? { target: 'pino-pretty', options: { colorize: true } }
+        : undefined,
+  },
+  trustProxy: true,
+});
+
+// ─── Decorate ─────────────────────────────────────────────────────────────────
+app.decorate('verifyJWT', verifyJWT);
+
+declare module 'fastify' {
+  interface FastifyInstance {
+    verifyJWT: typeof verifyJWT;
+  }
+}
+
+// ─── Plugins ──────────────────────────────────────────────────────────────────
+app.register(cors, {
+  origin: process.env.FRONTEND_URL ?? 'http://localhost:5173',
+  credentials: true,
+});
+
+app.register(rateLimit, {
+  max: 200,
+  timeWindow: '1 minute',
+  keyGenerator: (req) => req.ip,
+});
+
+// Multipart (file uploads) — 8 MB per file, images only enforced in handler
+app.register(multipart, {
+  limits: { fileSize: 8 * 1024 * 1024, files: 1 },
+});
+
+// Serve uploaded files statically under /uploads/*
+const UPLOADS_ROOT = path.resolve(process.cwd(), 'uploads');
+app.register(fastifyStatic, {
+  root: UPLOADS_ROOT,
+  prefix: '/uploads/',
+  decorateReply: false,
+});
+
+// ─── Global error handler ─────────────────────────────────────────────────────
+app.setErrorHandler((error: FastifyError, _request, reply) => {
+  app.log.error(error);
+
+  // Prisma known errors
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error.code === 'P2002') {
+      return reply.status(409).send({
+        error: {
+          code: 'DUPLICATE_ENTRY',
+          message: 'A record with this value already exists.',
+          statusCode: 409,
+        },
+      });
+    }
+    if (error.code === 'P2025') {
+      return reply.status(404).send({
+        error: { code: 'NOT_FOUND', message: 'Record not found.', statusCode: 404 },
+      });
+    }
+    return reply.status(400).send({
+      error: { code: 'DB_ERROR', message: error.message, statusCode: 400 },
+    });
+  }
+
+  // Validation errors (Zod / Fastify schema)
+  if (error.statusCode === 400) {
+    return reply.status(400).send({
+      error: { code: 'VALIDATION_ERROR', message: error.message, statusCode: 400 },
+    });
+  }
+
+  // Rate limit
+  if (error.statusCode === 429) {
+    return reply.status(429).send({
+      error: { code: 'RATE_LIMITED', message: 'Too many requests.', statusCode: 429 },
+    });
+  }
+
+  // Default: 500
+  return reply.status(500).send({
+    error: {
+      code: 'INTERNAL_ERROR',
+      message:
+        process.env.NODE_ENV === 'production'
+          ? 'An unexpected error occurred.'
+          : error.message,
+      statusCode: 500,
+    },
+  });
+});
+
+// ─── Routes ───────────────────────────────────────────────────────────────────
+
+// Health check
+app.get('/health', async () => ({
+  status: 'ok',
+  timestamp: new Date().toISOString(),
+  env: process.env.NODE_ENV ?? 'development',
+}));
+
+// Auth routes
+app.register(authRoutes, { prefix: '/api/v1/auth' });
+
+// Orders routes
+app.register(ordersRoutes, { prefix: '/api/v1/orders' });
+
+// Customers routes
+app.register(customersRoutes, { prefix: '/api/v1/customers' });
+
+// Products routes
+app.register(productsRoutes, { prefix: '/api/v1/products' });
+
+// Team routes (users, roles, assignment rules, commission)
+app.register(teamRoutes, { prefix: '/api/v1' });
+
+// Integrations (YouCan stores, imports, webhooks)
+app.register(integrationsRoutes, { prefix: '/api/v1/integrations' });
+
+// Assignment rule simulator — "what if 5 orders arrived now?"
+app.get('/api/v1/assignment-rules/simulate', { preHandler: [verifyJWT] }, async (request, reply) => {
+  const q = request.query as { count?: string };
+  const count = Math.max(1, Math.min(50, Number(q.count ?? 5)));
+  const sequence = await simulateAssign(count);
+  return reply.send({ count, sequence });
+});
+
+// Online users
+app.get('/api/v1/users/online', { preHandler: [verifyJWT] }, async (_request, reply) => {
+  const ids = getOnlineUserIds();
+  return reply.send({ onlineUserIds: ids, count: ids.length });
+});
+
+// Active agents (users with confirmation:view permission) — for assign picker
+app.get('/api/v1/users/agents', { preHandler: [verifyJWT] }, async (_request, reply) => {
+  const usersWithPerm = await prisma.user.findMany({
+    where: {
+      isActive: true,
+      role: { permissions: { some: { permission: { key: 'confirmation:view' } } } },
+    },
+    select: { id: true, name: true, email: true, role: { select: { name: true, label: true } } },
+    orderBy: { name: 'asc' },
+  });
+  return reply.send({ data: usersWithPerm });
+});
+
+// Commission for current user — supports ?from=YYYY-MM-DD&to=YYYY-MM-DD or ?all=true
+app.get('/api/v1/users/me/commission', { preHandler: [verifyJWT] }, async (request, reply) => {
+  const userId = request.user.sub;
+  const q = request.query as Record<string, string | undefined>;
+
+  const now = new Date();
+  const isAllTime = q.all === 'true';
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const from = isAllTime ? null : q.from ? new Date(q.from) : startOfDay;
+  const to = isAllTime
+    ? null
+    : q.to ? new Date(q.to) : new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
+  // Single source of truth — same helper powers the Team admin card.
+  const c = await computeAgentCommission(userId, { from, to });
+
+  return reply.send({
+    deliveredCount: c.deliveredCount,
+    paidCount: c.paidCount,
+    pendingCount: c.pendingCount,
+    onConfirmRate: c.onConfirmRate,
+    onDeliverRate: c.onDeliverRate,
+    paidTotal: c.paidTotal,
+    pendingTotal: c.pendingTotal,
+    unpaid: c.pendingTotal,
+    total: c.total,
+    allTime: isAllTime,
+    period: from && to ? { from: from.toISOString(), to: to.toISOString() } : null,
+  });
+});
+
+// Pipeline breakdown for current agent — delegates to the canonical helpers so
+// the same numbers appear on this card, the Team admin card, and the Dashboard.
+app.get('/api/v1/users/me/pipeline', { preHandler: [verifyJWT] }, async (request, reply) => {
+  const userId = request.user.sub;
+
+  const [breakdown, statsMap] = await Promise.all([
+    computeStatusBreakdown({ agentIds: [userId] }),
+    computeAgentStatsByIds([userId]),
+  ]);
+
+  const stats = statsMap.get(userId);
+  return reply.send({
+    todayCount: stats?.todayAssigned ?? 0,
+    confirmation: breakdown.confirmation,
+    shipping: breakdown.shipping,
+  });
+});
+
+// ── KPI Dashboard — all metrics for the dashboard page in one response ───────
+// Cached in Redis keyed by filter hash (30s TTL). Invalidated implicitly via TTL
+// — order event socket emits trigger the frontend to re-request, and the fresh
+// fetch bypasses cache within the same second thanks to short TTL alignment.
+app.get('/api/v1/kpi/dashboard', { preHandler: [verifyJWT] }, async (request, reply) => {
+  const q = request.query as Record<string, string | undefined>;
+  const filters: OrderFilterParams = {
+    agentIds: q.agentIds,
+    productIds: q.productIds,
+    cities: q.cities,
+    confirmationStatuses: q.confirmationStatuses,
+    shippingStatuses: q.shippingStatuses,
+    sources: q.sources,
+    dateFrom: q.dateFrom,
+    dateTo: q.dateTo,
+    search: q.search,
+    isArchived: q.isArchived,
+  };
+
+  // Optional explicit "compare to" window for the KPI cards only. The rest of
+  // the dashboard (trend, breakdowns) stays on the primary date range.
+  const compare =
+    q.compareFrom && q.compareTo ? { from: q.compareFrom, to: q.compareTo } : null;
+
+  const cacheKey = `kpi:dashboard:${JSON.stringify({ ...filters, compare })}`;
+  const cached = await redis.get(cacheKey).catch(() => null);
+  if (cached) {
+    return reply.send(JSON.parse(cached));
+  }
+
+  const [kpis, agents, topProducts, topCities, trend, breakdown] = await Promise.all([
+    computeKPIsWithComparison(filters, compare),
+    computeAgentPerformance(filters),
+    computeTopProducts(filters, 5),
+    computeTopCities(filters, 5),
+    computeOrderTrend(filters),
+    computeStatusBreakdown(filters),
+  ]);
+
+  const payload = { kpis, agents, topProducts, topCities, trend, breakdown };
+  await redis.set(cacheKey, JSON.stringify(payload), 'EX', 30).catch(() => {});
+
+  return reply.send(payload);
+});
+
+// Shipping cities (CRUD + CSV import). Lists active cities by default so the
+// legacy `/shipping-cities` callers keep working unchanged.
+app.register(shippingCitiesRoutes, { prefix: '/api/v1/shipping-cities' });
+
+// Atelie — Employees, Attendance, Salary (Phase 14.A)
+app.register(atelieRoutes, { prefix: '/api/v1/atelie' });
+
+// Atelie — Raw material stock & movements (Phase 14.B)
+app.register(atelieStockRoutes, { prefix: '/api/v1/atelie/materials' });
+
+// Atelie — Team tasks Kanban (Phase 14.C). No permission gate — every logged-in
+// user can create/see their own tasks and collaborate on shared ones.
+app.register(atelieTasksRoutes, { prefix: '/api/v1/atelie/tasks' });
+
+// Analytics — KPIs/charts/reports for delivery, confirmation, profit.
+app.register(analyticsRoutes, { prefix: '/api/v1/analytics' });
+
+// Money — expenses, commission payments, delivery invoice reconciliation.
+app.register(moneyRoutes, { prefix: '/api/v1/money' });
+
+// Returns — physical verification of bounced-back orders.
+app.register(returnsRoutes, { prefix: '/api/v1/returns' });
+
+// Notifications — per-user bell feed (assignment, confirmed, etc).
+app.register(notificationsRoutes, { prefix: '/api/v1/notifications' });
+
+// ─── Start ────────────────────────────────────────────────────────────────────
+const PORT = Number(process.env.PORT ?? 3001);
+
+async function start() {
+  try {
+    await app.listen({ port: PORT, host: '0.0.0.0' });
+
+    // Attach Socket.IO to Fastify's HTTP server AFTER listen()
+    initSocket(app);
+
+    // Near-instant order sync — polls every 15s for new YouCan orders on every
+    // connected store and broadcasts them to clients via socket.
+    startOrderPoller();
+
+    // Seed known shipping providers (Coliix, …) so the Integrations page has
+    // rows to render from the first boot. No-op if rows already exist.
+    listProvidersPublic().catch((err) => {
+      app.log.warn({ err }, 'Failed to seed shipping providers');
+    });
+
+    // Fallback tracker — webhooks are the primary (instant) path; this sweeps
+    // in-flight orders every 5 min in case a webhook is dropped.
+    startColiixTracker();
+
+    // Seed the current week's attendance rows for every active employee on
+    // boot + hourly (covers Monday rollover without a separate scheduler).
+    startAttendanceCron();
+
+    console.log(`🚀 Backend on http://localhost:${PORT}`);
+  } catch (err) {
+    app.log.error(err);
+    process.exit(1);
+  }
+}
+
+start();

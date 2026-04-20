@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "WeeklyAttendance" ADD COLUMN     "halfDaysMask" INTEGER NOT NULL DEFAULT 0,
+ALTER COLUMN "daysWorked" SET DEFAULT 0,
+ALTER COLUMN "daysWorked" SET DATA TYPE DOUBLE PRECISION;
+

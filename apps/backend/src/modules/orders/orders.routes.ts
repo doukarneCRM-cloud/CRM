@@ -1,0 +1,65 @@
+import type { FastifyInstance } from 'fastify';
+import { verifyJWT } from '../../shared/middleware/verifyJWT';
+import { requirePermission, requireAnyPermission } from '../../shared/middleware/rbac.middleware';
+import * as ctrl from './orders.controller';
+
+type WithId = { Params: { id: string } };
+
+export async function ordersRoutes(app: FastifyInstance) {
+  // ── GET /api/v1/orders ──────────────────────────────────────────────────
+  app.get('/', { preHandler: [verifyJWT, requirePermission('orders:view')] }, ctrl.listOrders);
+
+  // ── GET /api/v1/orders/summary — MUST be before /:id ──────────────────
+  app.get('/summary', { preHandler: [verifyJWT, requirePermission('orders:view')] }, ctrl.ordersSummary);
+
+  // ── POST /api/v1/orders/bulk — MUST be before /:id ─────────────────────
+  app.post('/bulk', { preHandler: [verifyJWT, requirePermission('orders:assign')] }, ctrl.bulkAction);
+
+  // ── GET /api/v1/orders/duplicates — MUST be before /:id ────────────────
+  app.get(
+    '/duplicates',
+    { preHandler: [verifyJWT, requirePermission('orders:view')] },
+    ctrl.listDuplicates,
+  );
+
+  // ── POST /api/v1/orders/merge — MUST be before /:id ────────────────────
+  app.post(
+    '/merge',
+    { preHandler: [verifyJWT, requirePermission('orders:edit')] },
+    ctrl.mergeOrders,
+  );
+
+  // ── GET /api/v1/orders/:id ──────────────────────────────────────────────
+  app.get<WithId>('/:id', { preHandler: [verifyJWT, requirePermission('orders:view')] }, ctrl.showOrder);
+
+  // ── GET /api/v1/orders/:id/logs ─────────────────────────────────────────
+  app.get<WithId>('/:id/logs', { preHandler: [verifyJWT, requirePermission('orders:view')] }, ctrl.showOrderLogs);
+
+  // ── POST /api/v1/orders ─────────────────────────────────────────────────
+  app.post('/', { preHandler: [verifyJWT, requirePermission('orders:create')] }, ctrl.createOrder);
+
+  // ── PATCH /api/v1/orders/:id ────────────────────────────────────────────
+  app.patch<WithId>('/:id', { preHandler: [verifyJWT, requirePermission('orders:edit')] }, ctrl.updateOrder);
+
+  // ── DELETE /api/v1/orders/:id — soft archive ────────────────────────────
+  app.delete<WithId>('/:id', { preHandler: [verifyJWT, requirePermission('orders:delete')] }, ctrl.deleteOrder);
+
+  // ── PATCH /api/v1/orders/:id/status ────────────────────────────────────
+  app.patch<WithId>(
+    '/:id/status',
+    {
+      preHandler: [
+        verifyJWT,
+        requireAnyPermission('confirmation:update_status', 'shipping:push', 'shipping:return_validate'),
+      ],
+    },
+    ctrl.updateStatus,
+  );
+
+  // ── PATCH /api/v1/orders/:id/assign ────────────────────────────────────
+  app.patch<WithId>(
+    '/:id/assign',
+    { preHandler: [verifyJWT, requirePermission('orders:assign')] },
+    ctrl.assignOrder,
+  );
+}

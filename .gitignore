@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+Thumbs.db
+
+# Local uploads folder — production uses R2
+apps/backend/uploads/
+
+# Editor / IDE
+.vscode/
+.idea/

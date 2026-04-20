@@ -1,0 +1,107 @@
+import { useEffect, useState } from 'react';
+import { Wallet, Truck, PackageSearch } from 'lucide-react';
+import { KPICard } from '@/components/ui/KPICard';
+import { useAuthStore } from '@/store/authStore';
+import { PERMISSIONS } from '@/constants/permissions';
+import { moneyApi } from '@/services/moneyApi';
+import { returnsApi } from '@/services/returnsApi';
+
+interface Stats {
+  unpaidCommissionMAD: number | null;
+  unpaidCarrierMAD: number | null;
+  pendingReturns: number | null;
+}
+
+const EMPTY: Stats = {
+  unpaidCommissionMAD: null,
+  unpaidCarrierMAD: null,
+  pendingReturns: null,
+};
+
+export function OperationsKpiRow() {
+  const canSeeMoney = useAuthStore((s) => s.hasPermission(PERMISSIONS.MONEY_VIEW));
+  const canSeeReturns = useAuthStore((s) => s.hasPermission(PERMISSIONS.RETURNS_VERIFY));
+  const [stats, setStats] = useState<Stats>(EMPTY);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!canSeeMoney && !canSeeReturns) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    Promise.all([
+      canSeeMoney
+        ? moneyApi
+            .listAgentCommissions()
+            .then((rows) => rows.reduce((s, r) => s + (r.pendingTotal ?? 0), 0))
+            .catch(() => null)
+        : Promise.resolve(null),
+      canSeeMoney
+        ? moneyApi
+            .listDeliveryInvoice({ paidOnly: 'unpaid' })
+            .then((r) => r.totals.unpaidFees)
+            .catch(() => null)
+        : Promise.resolve(null),
+      canSeeReturns
+        ? returnsApi
+            .list({ scope: 'pending', pageSize: 1 })
+            .then((r) => r.pagination.total)
+            .catch(() => null)
+        : Promise.resolve(null),
+    ]).then(([unpaidCommissionMAD, unpaidCarrierMAD, pendingReturns]) => {
+      if (cancelled) return;
+      setStats({ unpaidCommissionMAD, unpaidCarrierMAD, pendingReturns });
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [canSeeMoney, canSeeReturns]);
+
+  if (!canSeeMoney && !canSeeReturns) return null;
+
+  const fmtMAD = (n: number | null) =>
+    n === null ? '—' : n.toLocaleString('fr-MA', { maximumFractionDigits: 0 });
+
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {canSeeMoney && (
+        <KPICard
+          title="Unpaid commission"
+          value={loading ? '…' : fmtMAD(stats.unpaidCommissionMAD)}
+          unit="MAD"
+          subtitle="Owed to agents across all pending orders"
+          icon={Wallet}
+          iconColor="#D97706"
+        />
+      )}
+      {canSeeMoney && (
+        <KPICard
+          title="Unpaid to carrier"
+          value={loading ? '…' : fmtMAD(stats.unpaidCarrierMAD)}
+          unit="MAD"
+          subtitle="Delivered orders not yet settled"
+          icon={Truck}
+          iconColor="#7C3AED"
+        />
+      )}
+      {canSeeReturns && (
+        <KPICard
+          title="Pending returns"
+          value={
+            loading
+              ? '…'
+              : stats.pendingReturns === null
+                ? '—'
+                : stats.pendingReturns.toString()
+          }
+          subtitle="Returned / attempted / lost — awaiting physical check"
+          icon={PackageSearch}
+          iconColor="#DC2626"
+        />
+      )}
+    </div>
+  );
+}

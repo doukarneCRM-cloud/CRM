@@ -1,0 +1,44 @@
+:root {
+  /* Brand Colors */
+  --color-primary: #6B4226;
+  --color-primary-light: #9C6B4E;
+  --color-primary-dark: #3E2210;
+  --color-accent: #F5EFE6;
+  --color-bg: #FAFAF8;
+  --color-surface: rgba(255, 255, 255, 0.72);
+
+  /* Border Radius */
+  --radius-card: 20px;
+  --radius-btn: 12px;
+  --radius-input: 10px;
+  --radius-badge: 999px;
+
+  /* Shadows */
+  --shadow-card: 0 4px 24px rgba(107, 66, 38, 0.10);
+  --shadow-hover: 0 8px 32px rgba(107, 66, 38, 0.16);
+
+  /* Typography */
+  --font-family: 'Poppins', sans-serif;
+
+  /* Confirmation Status Colors */
+  --status-new: #6366F1;
+  --status-confirmed: #22C55E;
+  --status-callback: #F59E0B;
+  --status-unreachable: #EF4444;
+  --status-cancelled: #6B7280;
+  --status-duplicate: #8B5CF6;
+  --status-wrong-number: #EC4899;
+  --status-no-stock: #F97316;
+  --status-postponed: #14B8A6;
+
+  /* Shipping Status Colors */
+  --status-ready-to-ship: #3B82F6;
+  --status-in-transit: #A855F7;
+  --status-delivered: #16A34A;
+  --status-returned: #DC2626;
+  --status-return-validated: #059669;
+  --status-return-refused: #B91C1C;
+  --status-exchange: #D97706;
+  --status-lost: #374151;
+  --status-destroyed: #1F2937;
+}
