@@ -595,10 +595,87 @@ export function OrdersTable({
   const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const rangeEnd = Math.min(page * pageSize, total);
 
+  const rows = table.getRowModel().rows;
+
   return (
     <div className="flex flex-col overflow-hidden rounded-card border border-gray-100 bg-white">
-      {/* Table */}
-      <div className="overflow-x-auto">
+      {/* ─── Mobile: card list (below md) ──────────────────────────── */}
+      <div className="flex flex-col gap-2 p-2 md:hidden">
+        {loading ? (
+          Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="rounded-card border border-gray-100 bg-white p-3">
+              <div className="skeleton h-4 w-1/2 rounded" />
+              <div className="skeleton mt-2 h-3 w-3/4 rounded" />
+              <div className="skeleton mt-2 h-3 w-2/3 rounded" />
+            </div>
+          ))
+        ) : orders.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-16 text-gray-400">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2">
+              <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+              <rect x="9" y="3" width="6" height="4" rx="1" />
+            </svg>
+            <p className="text-sm">No orders found</p>
+          </div>
+        ) : (
+          rows.map((row) => {
+            const visibleCells = row.getVisibleCells();
+            const selectCell = visibleCells.find((c) => c.column.id === '__select__');
+            const actionsCell = visibleCells.find((c) => c.column.id === 'actions');
+            const dataCells = visibleCells.filter(
+              (c) => c.column.id !== '__select__' && c.column.id !== 'actions',
+            );
+            return (
+              <div
+                key={row.id}
+                className={cn(
+                  'rounded-card border bg-white p-3 shadow-sm transition-colors',
+                  selectedSet.has(row.original.id) ? 'border-primary/40 bg-accent/40' : 'border-gray-100',
+                )}
+              >
+                {/* Header row: checkbox + actions */}
+                {(selectCell || actionsCell) && (
+                  <div className="mb-2 flex items-center justify-between border-b border-gray-50 pb-2">
+                    {selectCell ? (
+                      <div onClick={(e) => e.stopPropagation()}>
+                        {flexRender(selectCell.column.columnDef.cell, selectCell.getContext())}
+                      </div>
+                    ) : <span />}
+                    {actionsCell && (
+                      <div>
+                        {flexRender(actionsCell.column.columnDef.cell, actionsCell.getContext())}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Data cells as label/value pairs */}
+                <div className="flex flex-col gap-1.5">
+                  {dataCells.map((cell) => {
+                    const headerDef = cell.column.columnDef.header;
+                    const headerCtx = table.getHeaderGroups()[0]?.headers.find((h) => h.column.id === cell.column.id);
+                    return (
+                      <div key={cell.id} className="flex items-start justify-between gap-3">
+                        <div className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                          {headerCtx
+                            ? flexRender(headerDef, headerCtx.getContext())
+                            : null}
+                        </div>
+                        <div className="min-w-0 flex-1 text-right text-sm text-gray-700">
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* ─── Desktop: table (md and up) ─────────────────────────────── */}
+      <div className="hidden overflow-x-auto md:block">
         <table className="w-full border-collapse text-sm">
           {/* Sticky header */}
           <thead className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm">
@@ -659,7 +736,7 @@ export function OrdersTable({
       </div>
 
       {/* Pagination footer */}
-      <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-y-2 border-t border-gray-100 px-3 py-3 sm:px-4">
         {/* Rows per page */}
         <div className="flex items-center gap-2 text-sm text-gray-500">
           <span className="text-xs">Rows per page:</span>
