@@ -146,8 +146,8 @@ function CRMTable<TData extends object>({
   return (
     <div className={cn('relative flex flex-col', className)}>
       {/* Table wrapper */}
-      <div className="overflow-auto">
-        <table className="w-full border-collapse text-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] border-collapse text-sm">
           {/* Sticky header */}
           <thead className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm">
             {table.getHeaderGroups().map((headerGroup) => (
@@ -196,10 +196,11 @@ function CRMTable<TData extends object>({
       </div>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-y-2 border-t border-gray-100 px-3 py-3 sm:px-4">
         {/* Page size */}
         <div className="flex items-center gap-2 text-sm text-gray-500">
-          <span>Rows per page:</span>
+          <span className="hidden sm:inline">Rows per page:</span>
+          <span className="sm:hidden">Rows:</span>
           <div className="relative">
             <select
               value={pagination.pageSize}

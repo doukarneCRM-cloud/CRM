@@ -1,6 +1,6 @@
 import { useCallback, useState, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ChevronDown, LogOut, User } from 'lucide-react';
+import { ChevronDown, LogOut, Menu, User } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { ROUTES } from '@/constants/routes';
 import { useAuthStore } from '@/store/authStore';
@@ -145,7 +145,12 @@ function UserDropdown() {
 }
 
 // ─── TopBar ──────────────────────────────────────────────────────────────────
-export function TopBar(_props: { sidebarCollapsed: boolean }) {
+interface TopBarProps {
+  sidebarCollapsed: boolean;
+  onMobileMenuOpen?: () => void;
+}
+
+export function TopBar({ onMobileMenuOpen }: TopBarProps) {
   const { pathname } = useLocation();
   const { user, hasRole } = useAuthStore();
 
@@ -154,7 +159,7 @@ export function TopBar(_props: { sidebarCollapsed: boolean }) {
 
   return (
     <header
-      className="flex h-14 items-center justify-between border-b border-gray-100 bg-white/90 px-5 backdrop-blur-sm"
+      className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-gray-100 bg-white/90 px-3 backdrop-blur-sm sm:px-5"
       style={{
         position: 'sticky',
         top: 0,
@@ -162,19 +167,30 @@ export function TopBar(_props: { sidebarCollapsed: boolean }) {
         marginLeft: 0,
       }}
     >
-      {/* Left: page title */}
-      <h1 className="text-base font-semibold text-gray-900">{pageTitle}</h1>
+      {/* Left: hamburger (mobile) + page title */}
+      <div className="flex min-w-0 items-center gap-2">
+        <button
+          onClick={onMobileMenuOpen}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-btn text-gray-500 hover:bg-accent hover:text-primary md:hidden"
+          aria-label="Open menu"
+        >
+          <Menu size={20} />
+        </button>
+        <h1 className="truncate text-base font-semibold text-gray-900">{pageTitle}</h1>
+      </div>
 
       {/* Right: search + online agents + bell + user */}
-      <div className="flex items-center gap-3">
-        {/* Global search */}
-        <GlobalSearch />
+      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        {/* Global search — hidden on very narrow screens */}
+        <div className="hidden sm:block">
+          <GlobalSearch />
+        </div>
 
-        {/* Online agents avatars (admin only) */}
+        {/* Online agents avatars (admin only) — desktop only */}
         {isAdmin && user && (
-          <div className="flex items-center gap-2">
+          <div className="hidden items-center gap-2 lg:flex">
             <OnlineAgents />
-            <span className="hidden text-xs text-gray-400 md:block">online</span>
+            <span className="text-xs text-gray-400">online</span>
           </div>
         )}
 
