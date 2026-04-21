@@ -12,7 +12,7 @@ interface CircleProgressProps {
 
 const CircleProgress = ({
   value,
-  color = '#6B4226',
+  color = '#56351E',
   size = 80,
   strokeWidth = 8,
   label,

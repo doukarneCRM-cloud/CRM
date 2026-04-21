@@ -1,8 +1,8 @@
 :root {
   /* Brand Colors */
-  --color-primary: #6B4226;
-  --color-primary-light: #9C6B4E;
-  --color-primary-dark: #3E2210;
+  --color-primary: #56351E;
+  --color-primary-light: #7D563E;
+  --color-primary-dark: #321B0D;
   --color-accent: #F5EFE6;
   --color-bg: #FAFAF8;
   --color-surface: rgba(255, 255, 255, 0.72);
@@ -14,8 +14,8 @@
   --radius-badge: 999px;
 
   /* Shadows */
-  --shadow-card: 0 4px 24px rgba(107, 66, 38, 0.10);
-  --shadow-hover: 0 8px 32px rgba(107, 66, 38, 0.16);
+  --shadow-card: 0 4px 24px rgba(86, 53, 30, 0.10);
+  --shadow-hover: 0 8px 32px rgba(86, 53, 30, 0.16);
 
   /* Typography */
   --font-family: 'Poppins', sans-serif;

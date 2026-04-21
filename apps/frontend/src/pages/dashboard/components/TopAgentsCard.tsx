@@ -51,7 +51,7 @@ export function TopAgentsCard({ agents, loading }: Props) {
                 />
                 <CircleProgress
                   value={a.deliveryRate}
-                  color="#6B4226"
+                  color="#56351E"
                   size={42}
                   strokeWidth={5}
                   label={`${Math.round(a.deliveryRate)}%`}

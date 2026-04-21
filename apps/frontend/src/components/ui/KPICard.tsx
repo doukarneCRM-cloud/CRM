@@ -68,7 +68,7 @@ const KPICard = ({
   subtitle,
   percentageChange,
   icon: Icon,
-  iconColor = '#6B4226',
+  iconColor = '#56351E',
   sparklineData,
   className,
 }: KPICardProps) => {

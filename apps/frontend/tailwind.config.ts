@@ -9,9 +9,9 @@ const config: Config = {
       },
       colors: {
         primary: {
-          DEFAULT: '#6B4226',
-          light: '#9C6B4E',
-          dark: '#3E2210',
+          DEFAULT: '#56351E',
+          light: '#7D563E',
+          dark: '#321B0D',
         },
         accent: '#F5EFE6',
         surface: 'rgba(255,255,255,0.72)',
@@ -46,9 +46,9 @@ const config: Config = {
         badge: '999px',
       },
       boxShadow: {
-        card: '0 4px 24px rgba(107,66,38,0.10)',
-        hover: '0 8px 32px rgba(107,66,38,0.16)',
-        glass: '0 4px 24px rgba(107,66,38,0.10)',
+        card: '0 4px 24px rgba(86,53,30,0.10)',
+        hover: '0 8px 32px rgba(86,53,30,0.16)',
+        glass: '0 4px 24px rgba(86,53,30,0.10)',
       },
       backdropBlur: {
         glass: '16px',

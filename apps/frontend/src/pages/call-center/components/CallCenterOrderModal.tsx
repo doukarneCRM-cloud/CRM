@@ -811,9 +811,9 @@ export function CallCenterOrderModal() {
                 </div>
                 <div className="text-right">
                   <p className="text-[9px] uppercase tracking-wider text-gray-400">Total</p>
-                  <p className="text-xl font-bold text-primary leading-none">
+                  <p className="text-lg font-bold text-primary leading-none">
                     {totals.total.toLocaleString('fr-MA')}
-                    <span className="ml-1 text-xs font-medium text-gray-400">MAD</span>
+                    <span className="ml-1 text-[10px] font-medium text-gray-400">MAD</span>
                   </p>
                 </div>
               </div>

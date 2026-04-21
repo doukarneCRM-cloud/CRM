@@ -562,7 +562,7 @@ export function OrderEditModal({ order, onClose, onSaved }: OrderEditModalProps)
               </div>
               <div className="text-right">
                 <span className="text-xs text-gray-400">Total</span>
-                <p className="text-xl font-bold text-gray-900">
+                <p className="text-lg font-bold text-gray-900">
                   {total.toLocaleString('fr-MA')} MAD
                 </p>
               </div>
