@@ -37,35 +37,36 @@ const AVATAR_COLORS = [
 function OnlineAgents() {
   const { onlineUsers } = useOnlineStore();
   const users = Array.from(onlineUsers.values());
-  const MAX_SHOWN = 5;
-  const shown = users.slice(0, MAX_SHOWN);
-  const overflow = users.length - MAX_SHOWN;
+  if (users.length === 0) return null;
 
   return (
-    <div className="flex items-center -space-x-2">
-      {shown.map((agent, i) => {
+    <div
+      className="flex min-w-0 items-center gap-1.5 overflow-x-auto py-0.5 pr-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      {users.map((agent, i) => {
+        const name = agent.name ?? agent.userId;
         const initials = agent.name
           ? getInitials(agent.name)
           : agent.userId.slice(0, 2).toUpperCase();
         return (
           <div
             key={agent.userId}
-            title={agent.name ?? agent.userId}
-            className={cn(
-              'relative flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-[10px] font-bold',
-              AVATAR_COLORS[i % AVATAR_COLORS.length],
-            )}
+            title={name}
+            className="flex shrink-0 items-center gap-1.5 rounded-full border-2 border-emerald-500/70 bg-white py-0.5 pl-0.5 pr-2 text-[11px] font-semibold text-gray-800 shadow-sm"
           >
-            {initials}
-            <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full border border-white bg-green-500" />
+            <span
+              className={cn(
+                'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold',
+                AVATAR_COLORS[i % AVATAR_COLORS.length],
+              )}
+            >
+              {initials}
+            </span>
+            <span className="whitespace-nowrap">{name}</span>
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_2px_rgba(16,185,129,0.2)]" />
           </div>
         );
       })}
-      {overflow > 0 && (
-        <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-gray-100 text-[10px] font-bold text-gray-600">
-          +{overflow}
-        </div>
-      )}
     </div>
   );
 }
@@ -167,8 +168,8 @@ export function TopBar({ onMobileMenuOpen }: TopBarProps) {
         marginLeft: 0,
       }}
     >
-      {/* Left: hamburger (mobile) + page title */}
-      <div className="flex min-w-0 items-center gap-2">
+      {/* Left: hamburger (mobile) + page title + online agents list */}
+      <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
         <button
           onClick={onMobileMenuOpen}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-btn text-gray-500 hover:bg-accent hover:text-primary md:hidden"
@@ -176,23 +177,20 @@ export function TopBar({ onMobileMenuOpen }: TopBarProps) {
         >
           <Menu size={20} />
         </button>
-        <h1 className="truncate text-base font-semibold text-gray-900">{pageTitle}</h1>
+        <h1 className="shrink-0 text-base font-semibold text-gray-900">{pageTitle}</h1>
+        {isAdmin && user && (
+          <div className="min-w-0 flex-1">
+            <OnlineAgents />
+          </div>
+        )}
       </div>
 
-      {/* Right: search + online agents + bell + user */}
+      {/* Right: search + bell + user */}
       <div className="flex shrink-0 items-center gap-2 sm:gap-3">
         {/* Global search — hidden on very narrow screens */}
         <div className="hidden sm:block">
           <GlobalSearch />
         </div>
-
-        {/* Online agents avatars (admin only) — desktop only */}
-        {isAdmin && user && (
-          <div className="hidden items-center gap-2 lg:flex">
-            <OnlineAgents />
-            <span className="text-xs text-gray-400">online</span>
-          </div>
-        )}
 
         {/* Notification bell */}
         <NotificationPanel />
