@@ -525,6 +525,13 @@ export default function OrdersPage() {
           open={assignPickerOpen}
           onClose={() => setAssignPickerOpen(false)}
           orderIds={selectedIds}
+          orderSummaries={orders
+            .filter((o) => selectedIds.includes(o.id))
+            .map((o) => ({
+              id: o.id,
+              reference: o.reference,
+              agentName: o.agent?.name ?? null,
+            }))}
           onSuccess={() => {
             setSelectedIds([]);
             setAssignPickerOpen(false);
