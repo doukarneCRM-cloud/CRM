@@ -139,6 +139,8 @@ export function CallCenterOrderModal() {
   const selectedOrder = useCallCenterStore((s) => s.selectedOrder);
   const closeOrder = useCallCenterStore((s) => s.closeOrder);
   const triggerRefresh = useCallCenterStore((s) => s.triggerRefresh);
+  const dismissedDuplicateOrderIds = useCallCenterStore((s) => s.dismissedDuplicateOrderIds);
+  const dismissDuplicatesFor = useCallCenterStore((s) => s.dismissDuplicatesFor);
 
   const [order, setOrder] = useState<Order | null>(null);
   const [form, setForm] = useState<FormState | null>(null);
@@ -190,15 +192,17 @@ export function CallCenterOrderModal() {
       shippingInstruction: selectedOrder.shippingInstruction ?? '',
     });
 
-    // Surface duplicates up-front, before the agent interacts with anything.
-    // Having the popup appear *as the modal opens* prevents the footgun where
-    // the agent confirms one order and only then realises a sibling exists.
-    ordersApi.pendingSiblings(selectedOrder.id).then((found) => {
-      if (found.length > 0) {
-        setSiblings(found);
-        setShowDuplicates(true);
-      }
-    }).catch(() => {});
+    // Surface duplicates up-front, before the agent interacts with anything —
+    // but only once per session: if the agent already dismissed the popup for
+    // this order (Skip/Cancel), don't nag them again every re-open.
+    if (!dismissedDuplicateOrderIds.has(selectedOrder.id)) {
+      ordersApi.pendingSiblings(selectedOrder.id).then((found) => {
+        if (found.length > 0) {
+          setSiblings(found);
+          setShowDuplicates(true);
+        }
+      }).catch(() => {});
+    }
 
     Promise.all([
       ordersApi.getById(selectedOrder.id).catch(() => null),
@@ -1077,10 +1081,12 @@ export function CallCenterOrderModal() {
         onSkip={() => {
           setShowDuplicates(false);
           setSiblings([]);
+          if (order) dismissDuplicatesFor(order.id);
         }}
         onCancel={() => {
           setShowDuplicates(false);
           setSiblings([]);
+          if (order) dismissDuplicatesFor(order.id);
         }}
       />
     </GlassModal>
