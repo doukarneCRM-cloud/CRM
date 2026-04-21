@@ -37,7 +37,7 @@ const AgentMiniCard = ({
   kpiValue,
   kpiLabel,
   progressValue,
-  progressColor = '#56351E',
+  progressColor = '#3C2515',
   percentageChange,
   className,
 }: AgentMiniCardProps) => {

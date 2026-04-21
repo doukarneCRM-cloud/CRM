@@ -41,7 +41,7 @@ export function DashboardKpiRow({ kpis, loading, className }: Props) {
         title="Orders"
         value={kpis.totalOrders}
         icon={ShoppingCart}
-        iconColor="#56351E"
+        iconColor="#3C2515"
         percentageChange={changes.totalOrders}
       />
       <KPICard

@@ -109,7 +109,7 @@ export function DeliveryTab() {
           value={fmt(kpis?.revenue ?? 0)}
           unit="MAD"
           icon={Banknote}
-          iconColor="#56351E"
+          iconColor="#3C2515"
           percentageChange={kpis?.percentageChanges.revenue}
         />
       </div>

@@ -59,7 +59,7 @@ function Logo() {
     <div className="flex flex-col items-center gap-2">
       <div
         className="flex h-14 w-14 items-center justify-center rounded-[18px] text-2xl font-bold text-white shadow-card"
-        style={{ background: 'linear-gradient(135deg, #56351E 0%, #7D563E 100%)' }}
+        style={{ background: 'linear-gradient(135deg, #3C2515 0%, #583C2B 100%)' }}
       >
         A
       </div>
@@ -135,17 +135,17 @@ export default function LoginPage() {
     <div
       className="flex min-h-screen items-center justify-center p-4"
       style={{
-        background: 'linear-gradient(135deg, #F5EFE6 0%, #E8D5C0 35%, #C49A72 70%, #56351E 100%)',
+        background: 'linear-gradient(135deg, #F5EFE6 0%, #E8D5C0 35%, #C49A72 70%, #3C2515 100%)',
       }}
     >
       {/* Decorative blurred orbs */}
       <div
         className="pointer-events-none fixed left-1/4 top-1/4 h-64 w-64 rounded-full opacity-20 blur-3xl"
-        style={{ background: '#56351E' }}
+        style={{ background: '#3C2515' }}
       />
       <div
         className="pointer-events-none fixed bottom-1/4 right-1/4 h-48 w-48 rounded-full opacity-15 blur-3xl"
-        style={{ background: '#321B0D' }}
+        style={{ background: '#231309' }}
       />
 
       {/* Glass card */}

@@ -89,9 +89,9 @@ function ToastCard({ toast }: { toast: Toast }) {
       onClick={handleClick}
       className={[
         'pointer-events-auto relative w-[320px] overflow-hidden rounded-2xl border border-gray-100',
-        'bg-white/95 shadow-[0_8px_32px_rgba(86,53,30,0.16)] backdrop-blur-md',
+        'bg-white/95 shadow-[0_8px_32px_rgba(60,37,21,0.16)] backdrop-blur-md',
         'transition-all duration-200 ease-out',
-        toast.href ? 'cursor-pointer hover:shadow-[0_10px_40px_rgba(86,53,30,0.22)]' : '',
+        toast.href ? 'cursor-pointer hover:shadow-[0_10px_40px_rgba(60,37,21,0.22)]' : '',
         transform,
       ].join(' ')}
     >
