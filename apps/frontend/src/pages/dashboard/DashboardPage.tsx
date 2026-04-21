@@ -73,7 +73,7 @@ export default function DashboardPage() {
   const prevPreset = useMemo(() => previousPeriod(dateRange), [dateRange]);
 
   return (
-    <div className="flex flex-col gap-4 p-4">
+    <div className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
