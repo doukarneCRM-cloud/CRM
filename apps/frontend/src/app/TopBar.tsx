@@ -26,6 +26,9 @@ const PAGE_TITLES: Record<string, string> = {
   [ROUTES.ANALYTICS]: 'Analytics',
   [ROUTES.INTEGRATIONS_STORE]: 'Integrations',
   [ROUTES.ATELIE_EMPLOYEES]: 'Atelie',
+  [ROUTES.PRODUCTION_DASHBOARD]: 'Production',
+  [ROUTES.PRODUCTION_TESTS]: 'Product Tests',
+  [ROUTES.PRODUCTION_RUNS]: 'Production Runs',
   [ROUTES.SETTINGS]: 'Settings',
 };
 

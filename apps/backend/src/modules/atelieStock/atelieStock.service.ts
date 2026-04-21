@@ -101,6 +101,20 @@ export async function recordMovement(
       data: { stock: newStock },
     });
 
+    // Expense mirror — an `in` movement with a known unitCost is a purchase,
+    // so reflect it in Money so cash flow stays accurate.
+    if (input.type === 'in' && material.unitCost && material.unitCost > 0) {
+      const amount = input.quantity * material.unitCost;
+      await tx.expense.create({
+        data: {
+          description: `Stock: ${material.name} — ${input.quantity} ${material.unit} × ${material.unitCost}`,
+          amount,
+          date: new Date(),
+          addedById: userId ?? null,
+        },
+      });
+    }
+
     // Fire outside the txn? Cheap enough to leave inside — socket emits are
     // non-blocking and we've already committed the row effectively.
     emitToRoom('admin', 'atelie:material:updated', {

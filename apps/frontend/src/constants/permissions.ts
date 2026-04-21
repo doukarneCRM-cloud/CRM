@@ -53,6 +53,17 @@ export const PERMISSIONS = {
   // Atelie
   ATELIE_VIEW: 'atelie:view',
   ATELIE_MANAGE: 'atelie:manage',
+  ATELIE_FABRIC_VIEW: 'atelie:fabric:view',
+  ATELIE_FABRIC_MANAGE: 'atelie:fabric:manage',
+  ATELIE_TESTS_VIEW: 'atelie:tests:view',
+  ATELIE_TESTS_MANAGE: 'atelie:tests:manage',
+  ATELIE_TESTS_VIEW_VIDEO: 'atelie:tests:view_video',
+
+  // Production
+  PRODUCTION_VIEW: 'production:view',
+  PRODUCTION_MANAGE: 'production:manage',
+  PRODUCTION_FINISH: 'production:finish',
+  PRODUCTION_COST_VIEW: 'production:cost:view',
 
   // Call Center
   CALL_CENTER_VIEW: 'call_center:view',
@@ -110,6 +121,12 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
   atelie: [
     PERMISSIONS.ATELIE_VIEW,
     PERMISSIONS.ATELIE_MANAGE,
+    PERMISSIONS.ATELIE_FABRIC_VIEW,
+    PERMISSIONS.ATELIE_FABRIC_MANAGE,
+    PERMISSIONS.ATELIE_TESTS_VIEW,
+    PERMISSIONS.ATELIE_TESTS_MANAGE,
+    PERMISSIONS.PRODUCTION_VIEW,
+    PERMISSIONS.PRODUCTION_MANAGE,
   ],
 };
 

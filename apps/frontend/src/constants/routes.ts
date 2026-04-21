@@ -43,6 +43,13 @@ export const ROUTES = {
   ATELIE_STOCK: '/atelie/stock',
   ATELIE_TASKS: '/atelie/tasks',
 
+  // Production
+  PRODUCTION_DASHBOARD: '/production',
+  PRODUCTION_TESTS: '/production/tests',
+  PRODUCTION_TEST_DETAIL: '/production/tests/:id',
+  PRODUCTION_RUNS: '/production/runs',
+  PRODUCTION_RUN_DETAIL: '/production/runs/:id',
+
   // Settings
   SETTINGS: '/settings',
 

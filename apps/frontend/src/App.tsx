@@ -26,6 +26,11 @@ import ReturnsPage from '@/pages/returns/ReturnsPage';
 import IntegrationsPage from '@/pages/integrations/IntegrationsPage';
 import OAuthCallbackPage from '@/pages/integrations/OAuthCallbackPage';
 import AteliePage from '@/pages/atelie/AteliePage';
+import ProductionDashboardPage from '@/pages/production/ProductionDashboardPage';
+import ProductTestsListPage from '@/pages/production/ProductTestsListPage';
+import ProductTestDetailPage from '@/pages/production/ProductTestDetailPage';
+import ProductionRunsListPage from '@/pages/production/ProductionRunsListPage';
+import ProductionRunDetailPage from '@/pages/production/ProductionRunDetailPage';
 import SettingsPage from '@/pages/settings/SettingsPage';
 
 // Dev
@@ -177,6 +182,47 @@ export default function App() {
               }
             />
           ))}
+
+          <Route
+            path={ROUTES.PRODUCTION_DASHBOARD}
+            element={
+              <PermissionGuard requires={PERMISSIONS.PRODUCTION_VIEW}>
+                <ProductionDashboardPage />
+              </PermissionGuard>
+            }
+          />
+          <Route
+            path={ROUTES.PRODUCTION_TESTS}
+            element={
+              <PermissionGuard requires={PERMISSIONS.ATELIE_TESTS_VIEW}>
+                <ProductTestsListPage />
+              </PermissionGuard>
+            }
+          />
+          <Route
+            path={ROUTES.PRODUCTION_TEST_DETAIL}
+            element={
+              <PermissionGuard requires={PERMISSIONS.ATELIE_TESTS_VIEW}>
+                <ProductTestDetailPage />
+              </PermissionGuard>
+            }
+          />
+          <Route
+            path={ROUTES.PRODUCTION_RUNS}
+            element={
+              <PermissionGuard requires={PERMISSIONS.PRODUCTION_VIEW}>
+                <ProductionRunsListPage />
+              </PermissionGuard>
+            }
+          />
+          <Route
+            path={ROUTES.PRODUCTION_RUN_DETAIL}
+            element={
+              <PermissionGuard requires={PERMISSIONS.PRODUCTION_VIEW}>
+                <ProductionRunDetailPage />
+              </PermissionGuard>
+            }
+          />
 
           <Route
             path={ROUTES.SETTINGS}

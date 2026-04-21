@@ -37,7 +37,6 @@ export default function AteliePage() {
     () => PATH_TO_TAB[location.pathname] ?? 'employees',
   );
 
-  // Keep tab state in sync with URL when user clicks a sidebar subitem.
   useEffect(() => {
     const fromPath = PATH_TO_TAB[location.pathname];
     if (fromPath && fromPath !== activeTab) setActiveTab(fromPath);
@@ -56,7 +55,7 @@ export default function AteliePage() {
       <div className="mb-4">
         <h1 className="text-lg font-bold text-gray-900">Atelie</h1>
         <p className="text-xs text-gray-400">
-          Workshop staff, raw material stock, and the team's task board.
+          Workshop staff, salary, stock (fabric rolls + accessories), and the team's task board.
         </p>
       </div>
 

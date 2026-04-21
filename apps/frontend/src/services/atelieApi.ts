@@ -125,6 +125,65 @@ export interface CreateMaterialPayload {
   notes?: string | null;
 }
 
+// ─── Fabric types & rolls ──────────────────────────────────────────────────
+
+export interface FabricType {
+  id: string;
+  name: string;
+  notes: string | null;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface FabricRoll {
+  id: string;
+  fabricTypeId: string;
+  color: string;
+  widthCm: number | null;
+  initialLength: number;
+  remainingLength: number;
+  unitCostPerMeter: number;
+  purchaseDate: string;
+  supplier: string | null;
+  reference: string | null;
+  notes: string | null;
+  isDepleted: boolean;
+  expenseId: string | null;
+  createdAt: string;
+  fabricType?: FabricType;
+}
+
+export interface FabricColorGroup {
+  color: string;
+  totalRemaining: number;
+  rolls: Array<Omit<FabricRoll, 'fabricTypeId' | 'color' | 'createdAt'>>;
+}
+
+export interface FabricTypeGroup {
+  typeId: string;
+  typeName: string;
+  totalRemaining: number;
+  colors: FabricColorGroup[];
+}
+
+export interface CreateFabricTypePayload {
+  name: string;
+  notes?: string | null;
+  isActive?: boolean;
+}
+
+export interface CreateFabricRollPayload {
+  fabricTypeId: string;
+  color: string;
+  widthCm?: number | null;
+  initialLength: number;
+  unitCostPerMeter: number;
+  purchaseDate: string;
+  supplier?: string | null;
+  reference?: string | null;
+  notes?: string | null;
+}
+
 // ─── Tasks ──────────────────────────────────────────────────────────────────
 
 export type TaskStatus = 'backlog' | 'processing' | 'done' | 'forgotten' | 'incomplete';
@@ -257,6 +316,40 @@ export const atelieApi = {
     api
       .get<{ data: MaterialMovement[] }>(`/atelie/materials/${id}/movements`, { params: { limit } })
       .then((r) => r.data.data),
+
+  // Fabric types
+  listFabricTypes: (includeInactive = false) =>
+    api
+      .get<{ data: FabricType[] }>('/atelie/fabric/types', { params: { includeInactive } })
+      .then((r) => r.data.data),
+
+  createFabricType: (payload: CreateFabricTypePayload) =>
+    api.post<FabricType>('/atelie/fabric/types', payload).then((r) => r.data),
+
+  updateFabricType: (id: string, payload: Partial<CreateFabricTypePayload>) =>
+    api.patch<FabricType>(`/atelie/fabric/types/${id}`, payload).then((r) => r.data),
+
+  deactivateFabricType: (id: string) => api.delete(`/atelie/fabric/types/${id}`),
+
+  // Fabric rolls
+  fabricRollsTree: () =>
+    api.get<{ data: FabricTypeGroup[] }>('/atelie/fabric/rolls/tree').then((r) => r.data.data),
+
+  listFabricRolls: (opts: { fabricTypeId?: string; color?: string; depleted?: boolean } = {}) =>
+    api
+      .get<{ data: FabricRoll[] }>('/atelie/fabric/rolls', { params: opts })
+      .then((r) => r.data.data),
+
+  createFabricRoll: (payload: CreateFabricRollPayload) =>
+    api.post<{ roll: FabricRoll; expense: unknown }>('/atelie/fabric/rolls', payload).then((r) => r.data),
+
+  updateFabricRoll: (id: string, payload: Partial<CreateFabricRollPayload>) =>
+    api.patch<FabricRoll>(`/atelie/fabric/rolls/${id}`, payload).then((r) => r.data),
+
+  adjustFabricRoll: (id: string, payload: { remainingLength: number; reason?: string }) =>
+    api.post<FabricRoll>(`/atelie/fabric/rolls/${id}/adjust`, payload).then((r) => r.data),
+
+  deleteFabricRoll: (id: string) => api.delete(`/atelie/fabric/rolls/${id}`),
 
   // Tasks
   listTasks: () =>

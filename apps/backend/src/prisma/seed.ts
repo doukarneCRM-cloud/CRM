@@ -37,6 +37,15 @@ const ALL_PERMISSIONS = [
   { key: 'settings:edit', label: 'Edit Settings' },
   { key: 'atelie:view', label: 'View Atelie' },
   { key: 'atelie:manage', label: 'Manage Atelie' },
+  { key: 'atelie:fabric:view', label: 'View Fabric Rolls' },
+  { key: 'atelie:fabric:manage', label: 'Manage Fabric Rolls' },
+  { key: 'atelie:tests:view', label: 'View Product Tests' },
+  { key: 'atelie:tests:manage', label: 'Manage Product Tests' },
+  { key: 'atelie:tests:view_video', label: 'View Product Test Video' },
+  { key: 'production:view', label: 'View Production Runs' },
+  { key: 'production:manage', label: 'Manage Production Runs' },
+  { key: 'production:finish', label: 'Finish Production Runs (locks cost)' },
+  { key: 'production:cost:view', label: 'View Production Cost Breakdown' },
   { key: 'call_center:view', label: 'View Call Center' },
   { key: 'money:view', label: 'View Money' },
   { key: 'money:manage', label: 'Manage Money (record payments, mark paid)' },
@@ -60,7 +69,16 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
     'shipping:view', 'shipping:push', 'shipping:return_validate',
     'orders:view', 'products:view', 'returns:verify',
   ],
-  atelie: ['atelie:view', 'atelie:manage'],
+  atelie: [
+    'atelie:view',
+    'atelie:manage',
+    'atelie:fabric:view',
+    'atelie:fabric:manage',
+    'atelie:tests:view',
+    'atelie:tests:manage',
+    'production:view',
+    'production:manage',
+  ],
 };
 
 const ROLES = [

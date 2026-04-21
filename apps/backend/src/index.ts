@@ -23,7 +23,10 @@ import { startColiixTracker } from './modules/integrations/coliixTracker';
 import { shippingCitiesRoutes } from './modules/shippingCities/shippingCities.routes';
 import { atelieRoutes } from './modules/atelie/atelie.routes';
 import { atelieStockRoutes } from './modules/atelieStock/atelieStock.routes';
+import { fabricRoutes } from './modules/atelieStock/fabric.routes';
 import { atelieTasksRoutes } from './modules/atelieTasks/atelieTasks.routes';
+import { atelieTestsRoutes } from './modules/atelieTests/atelieTests.routes';
+import { atelieProductionRoutes } from './modules/atelieProduction/atelieProduction.routes';
 import { analyticsRoutes } from './modules/analytics/analytics.routes';
 import { moneyRoutes } from './modules/money/money.routes';
 import { returnsRoutes } from './modules/returns/returns.routes';
@@ -321,9 +324,17 @@ app.register(atelieRoutes, { prefix: '/api/v1/atelie' });
 // Atelie — Raw material stock & movements (Phase 14.B)
 app.register(atelieStockRoutes, { prefix: '/api/v1/atelie/materials' });
 
+// Atelie — Fabric types & rolls (Phase 14.D). Separate from flat materials
+// because each physical roll is distinct (width/length/price/date vary).
+app.register(fabricRoutes, { prefix: '/api/v1/atelie/fabric' });
+
 // Atelie — Team tasks Kanban (Phase 14.C). No permission gate — every logged-in
 // user can create/see their own tasks and collaborate on shared ones.
 app.register(atelieTasksRoutes, { prefix: '/api/v1/atelie/tasks' });
+
+// Atelie — Product tests (prototypes) & Production runs (Phase 14.E).
+app.register(atelieTestsRoutes, { prefix: '/api/v1/atelie/tests' });
+app.register(atelieProductionRoutes, { prefix: '/api/v1/atelie/runs' });
 
 // Analytics — KPIs/charts/reports for delivery, confirmation, profit.
 app.register(analyticsRoutes, { prefix: '/api/v1/analytics' });

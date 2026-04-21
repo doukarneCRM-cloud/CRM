@@ -12,6 +12,7 @@ import {
   Factory,
   Wallet,
   PackageSearch,
+  Scissors,
   ChevronLeft,
   LogOut,
   X,
@@ -56,6 +57,7 @@ const NAV_SECTIONS: NavSection[] = [
     dividerBefore: true,
     items: [
       { label: 'Atelie', icon: Factory, to: ROUTES.ATELIE_EMPLOYEES, permission: PERMISSIONS.ATELIE_VIEW },
+      { label: 'Production', icon: Scissors, to: ROUTES.PRODUCTION_DASHBOARD, permission: PERMISSIONS.PRODUCTION_VIEW },
     ],
   },
   {

@@ -108,22 +108,22 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  role             Role               @relation(fields: [roleId], references: [id])
-  assignedOrders   Order[]            @relation("AgentOrders")
-  orderLogs        OrderLog[]
-  commissionRules  CommissionRule[]
-  weeklyAttendance WeeklyAttendance[] @relation("AttendanceRecorder")
-  salaryPayments   SalaryPayment[]    @relation("SalaryPayer")
-  refreshTokens    RefreshToken[]
-  atelieEmployee   AtelieEmployee?    @relation("AtelieUser")
-  ownedTasks       AtelieTask[]       @relation("TaskOwner")
-  taskComments     AtelieTaskComment[] @relation("TaskCommenter")
-  expenses            Expense[]          @relation("ExpenseAuthor")
+  role                Role                @relation(fields: [roleId], references: [id])
+  assignedOrders      Order[]             @relation("AgentOrders")
+  orderLogs           OrderLog[]
+  commissionRules     CommissionRule[]
+  weeklyAttendance    WeeklyAttendance[]  @relation("AttendanceRecorder")
+  salaryPayments      SalaryPayment[]     @relation("SalaryPayer")
+  refreshTokens       RefreshToken[]
+  atelieEmployee      AtelieEmployee?     @relation("AtelieUser")
+  ownedTasks          AtelieTask[]        @relation("TaskOwner")
+  taskComments        AtelieTaskComment[] @relation("TaskCommenter")
+  expenses            Expense[]           @relation("ExpenseAuthor")
   commissionPayments  CommissionPayment[] @relation("CommissionAgent")
   recordedCommissions CommissionPayment[] @relation("CommissionRecorder")
-  verifiedReturns     Order[]            @relation("ReturnVerifier")
+  verifiedReturns     Order[]             @relation("ReturnVerifier")
   notifications       Notification[]
-  assignedProducts    Product[]          @relation("ProductAssignedAgent")
+  assignedProducts    Product[]           @relation("ProductAssignedAgent")
 }
 
 model RefreshToken {
@@ -151,8 +151,8 @@ model Counter {
 model Customer {
   id           String      @id @default(cuid())
   fullName     String
-  phone        String      @unique  // normalized +212XXXXXXXXX
-  phoneDisplay String                // 06XXXXXXXX
+  phone        String      @unique // normalized +212XXXXXXXXX
+  phoneDisplay String // 06XXXXXXXX
   city         String
   address      String?
   tag          CustomerTag @default(normal)
@@ -169,42 +169,45 @@ model Customer {
 // ─── Products ────────────────────────────────────────────────────────────────
 
 model Product {
-  id               String   @id @default(cuid())
-  name             String
-  sku              String   @unique
-  description      String?
-  imageUrl         String?
-  basePrice        Float
-  isActive         Boolean  @default(true)
-  isPlaceholder    Boolean  @default(false)  // true when auto-created during order import; replaced on real product import
-  deletedAt        DateTime?                  // set when user hard-deletes from catalog; row is kept so historical orders still render (shown in red as "untracked")
-  storeId          String?
-  youcanId         String?
-  assignedAgentId  String?                    // optional default agent for "By Product" auto-assign strategy
+  id              String    @id @default(cuid())
+  name            String
+  sku             String    @unique
+  description     String?
+  imageUrl        String?
+  basePrice       Float
+  isActive        Boolean   @default(true)
+  isPlaceholder   Boolean   @default(false) // true when auto-created during order import; replaced on real product import
+  deletedAt       DateTime? // set when user hard-deletes from catalog; row is kept so historical orders still render (shown in red as "untracked")
+  storeId         String?
+  youcanId        String?
+  assignedAgentId String? // optional default agent for "By Product" auto-assign strategy
   // Free-form clothing-measurements chart agents share with clients.
   // Shape: { columns: string[], rows: string[][] } where rows[i].length === columns.length.
-  measurements     Json?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  measurements    Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  store         Store?           @relation(fields: [storeId], references: [id])
-  assignedAgent User?            @relation("ProductAssignedAgent", fields: [assignedAgentId], references: [id])
-  variants      ProductVariant[]
+  store          Store?           @relation(fields: [storeId], references: [id])
+  assignedAgent  User?            @relation("ProductAssignedAgent", fields: [assignedAgentId], references: [id])
+  variants       ProductVariant[]
+  productTests   ProductTest[]
+  productionRuns ProductionRun[]
 }
 
 model ProductVariant {
-  id            String  @id @default(cuid())
-  productId     String
-  color         String?
-  size          String?
-  sku           String  @unique
-  stock         Int     @default(0)
-  price         Float
-  costPrice     Float   @default(0)   // COGS per unit — used for profit-by-product analytics
-  youcanId      String? @unique
+  id        String  @id @default(cuid())
+  productId String
+  color     String?
+  size      String?
+  sku       String  @unique
+  stock     Int     @default(0)
+  price     Float
+  costPrice Float   @default(0) // COGS per unit — used for profit-by-product analytics
+  youcanId  String? @unique
 
-  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
-  orderItems OrderItem[]
+  product            Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItems         OrderItem[]
+  productionRunSizes ProductionRunSize[]
 
   @@index([productId])
 }
@@ -212,25 +215,25 @@ model ProductVariant {
 // ─── Stores (YouCan integration) ─────────────────────────────────────────────
 
 model Store {
-  id               String    @id @default(cuid())
-  name             String
-  slug             String?            // YouCan store slug
+  id             String    @id @default(cuid())
+  name           String
+  slug           String? // YouCan store slug
   // OAuth tokens (credentials are global env vars, tokens are per-store)
-  accessToken      String?
-  refreshToken     String?
-  tokenExpiresAt   DateTime?
+  accessToken    String?
+  refreshToken   String?
+  tokenExpiresAt DateTime?
   // Webhook
-  webhookSecret    String?
-  webhookId        String?            // resthook subscription id
+  webhookSecret  String?
+  webhookId      String? // resthook subscription id
   // Field mapping: JSON object mapping YouCan checkout fields → CRM fields
-  fieldMapping     Json?
+  fieldMapping   Json?
   // State
-  isActive         Boolean   @default(true)
-  isConnected      Boolean   @default(false)
-  lastSyncAt       DateTime?
-  lastError        String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  isActive       Boolean   @default(true)
+  isConnected    Boolean   @default(false)
+  lastSyncAt     DateTime?
+  lastError      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   products   Product[]
   orders     Order[]
@@ -243,10 +246,10 @@ model Store {
 // read via decryptSecret before handing to HTTP clients.
 model ShippingProvider {
   id            String    @id @default(cuid())
-  name          String    @unique            // "coliix"
+  name          String    @unique // "coliix"
   apiBaseUrl    String
-  apiKey        String?                      // encrypted (AES-256-GCM blob)
-  webhookSecret String                       // random path-segment secret
+  apiKey        String? // encrypted (AES-256-GCM blob)
+  webhookSecret String // random path-segment secret
   isActive      Boolean   @default(false)
   lastCheckedAt DateTime?
   lastError     String?
@@ -263,13 +266,13 @@ enum ImportLogLevel {
 model ImportLog {
   id        String         @id @default(cuid())
   storeId   String
-  type      String         // products_import, orders_import, webhook_order, sync, connection
+  type      String // products_import, orders_import, webhook_order, sync, connection
   level     ImportLogLevel @default(info)
   message   String
   imported  Int            @default(0)
   skipped   Int            @default(0)
   errors    Int            @default(0)
-  meta      Json?          // error details, order refs, etc.
+  meta      Json? // error details, order refs, etc.
   createdAt DateTime       @default(now())
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
@@ -326,10 +329,10 @@ model Order {
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 
-  customer         Customer @relation(fields: [customerId], references: [id])
-  agent            User?    @relation("AgentOrders", fields: [agentId], references: [id])
-  store            Store?   @relation(fields: [storeId], references: [id])
-  returnVerifiedBy User?    @relation("ReturnVerifier", fields: [returnVerifiedById], references: [id])
+  customer         Customer    @relation(fields: [customerId], references: [id])
+  agent            User?       @relation("AgentOrders", fields: [agentId], references: [id])
+  store            Store?      @relation(fields: [storeId], references: [id])
+  returnVerifiedBy User?       @relation("ReturnVerifier", fields: [returnVerifiedById], references: [id])
   items            OrderItem[]
   logs             OrderLog[]
 
@@ -367,13 +370,13 @@ model OrderLog {
   orderId     String
   type        OrderLogType @default(system)
   action      String
-  performedBy String       // display name or "System"
+  performedBy String // display name or "System"
   userId      String?
   meta        Json?
   createdAt   DateTime     @default(now())
 
-  order Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  user  User?  @relation(fields: [userId], references: [id])
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user  User? @relation(fields: [userId], references: [id])
 
   @@index([orderId])
   @@index([orderId, type])
@@ -406,21 +409,22 @@ model AtelieEmployee {
   name        String
   phone       String?
   role        String
-  baseSalary  Float    @default(0)           // weekly salary in MAD
-  workingDays Int      @default(6)           // divisor for daily rate
+  baseSalary  Float    @default(0) // weekly salary in MAD
+  workingDays Int      @default(6) // divisor for daily rate
   isActive    Boolean  @default(true)
   joinedAt    DateTime @default(now())
   userId      String?  @unique
 
-  user       User?              @relation("AtelieUser", fields: [userId], references: [id])
-  attendance WeeklyAttendance[]
-  payments   SalaryPayment[]
+  user                 User?                 @relation("AtelieUser", fields: [userId], references: [id])
+  attendance           WeeklyAttendance[]
+  payments             SalaryPayment[]
+  productionRunWorkers ProductionRunWorker[]
 }
 
 model WeeklyAttendance {
   id           String   @id @default(cuid())
   employeeId   String
-  weekStart    DateTime            // Monday 00:00 UTC of the week
+  weekStart    DateTime // Monday 00:00 UTC of the week
   daysMask     Int      @default(0) // full-day mask — bit 0=Mon … bit 6=Sun
   halfDaysMask Int      @default(0) // half-day mask — same bit layout; mutually exclusive with daysMask
   daysWorked   Float    @default(0) // full + half * 0.5 (denormalized for fast salary calc)
@@ -439,8 +443,8 @@ model WeeklyAttendance {
 model SalaryPayment {
   id         String    @id @default(cuid())
   employeeId String
-  weekStart  DateTime                        // matches WeeklyAttendance.weekStart
-  amount     Float                           // daysWorked × (baseSalary / workingDays)
+  weekStart  DateTime // matches WeeklyAttendance.weekStart
+  amount     Float // daysWorked × (baseSalary / workingDays)
   paidAmount Float     @default(0)
   isPaid     Boolean   @default(false)
   paidAt     DateTime?
@@ -488,7 +492,9 @@ model AtelieMaterial {
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 
-  movements MaterialMovement[]
+  movements              MaterialMovement[]
+  productTestAccessories ProductTestAccessory[]
+  productionConsumptions ProductionConsumption[]
 
   @@index([category])
 }
@@ -503,14 +509,204 @@ model MaterialMovement {
   id         String               @id @default(cuid())
   materialId String
   type       MaterialMovementType
-  quantity   Float                                // always positive; `type` dictates sign applied to stock
+  quantity   Float // always positive; `type` dictates sign applied to stock
   reason     String?
   userId     String?
   createdAt  DateTime             @default(now())
 
-  material AtelieMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  material              AtelieMaterial         @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  productionConsumption ProductionConsumption?
 
   @@index([materialId, createdAt])
+}
+
+// ─── Atelie — Fabric rolls & production runs ─────────────────────────────────
+
+enum ProductionRunStatus {
+  draft
+  active
+  finished
+  cancelled
+}
+
+enum ConsumptionSourceType {
+  fabric_roll
+  accessory
+}
+
+model FabricType {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  notes     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  rolls       FabricRoll[]
+  testFabrics ProductTestFabric[]
+  runFabrics  ProductionRunFabric[]
+}
+
+model FabricRoll {
+  id               String   @id @default(cuid())
+  fabricTypeId     String
+  color            String
+  widthCm          Float?
+  initialLength    Float
+  remainingLength  Float
+  unitCostPerMeter Float
+  purchaseDate     DateTime
+  supplier         String?
+  reference        String?
+  notes            String?
+  isDepleted       Boolean  @default(false)
+  expenseId        String?  @unique
+  createdAt        DateTime @default(now())
+
+  fabricType   FabricType              @relation(fields: [fabricTypeId], references: [id])
+  expense      Expense?                @relation(fields: [expenseId], references: [id])
+  consumptions ProductionConsumption[]
+
+  @@index([fabricTypeId, color])
+  @@index([isDepleted])
+}
+
+model ProductTest {
+  id                    String   @id @default(cuid())
+  name                  String
+  productId             String?
+  videoUrl              String?
+  estimatedCostPerPiece Float?
+  notes                 String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  product     Product?               @relation(fields: [productId], references: [id])
+  fabrics     ProductTestFabric[]
+  sizes       ProductTestSize[]
+  accessories ProductTestAccessory[]
+  runs        ProductionRun[]
+}
+
+model ProductTestFabric {
+  id           String @id @default(cuid())
+  testId       String
+  fabricTypeId String
+  role         String
+
+  test       ProductTest @relation(fields: [testId], references: [id], onDelete: Cascade)
+  fabricType FabricType  @relation(fields: [fabricTypeId], references: [id])
+
+  @@unique([testId, fabricTypeId, role])
+}
+
+model ProductTestSize {
+  id            String @id @default(cuid())
+  testId        String
+  size          String
+  tracingMeters Float
+
+  test ProductTest @relation(fields: [testId], references: [id], onDelete: Cascade)
+
+  @@unique([testId, size])
+}
+
+model ProductTestAccessory {
+  id               String @id @default(cuid())
+  testId           String
+  materialId       String
+  quantityPerPiece Float
+
+  test     ProductTest    @relation(fields: [testId], references: [id], onDelete: Cascade)
+  material AtelieMaterial @relation(fields: [materialId], references: [id])
+
+  @@unique([testId, materialId])
+}
+
+model ProductionRun {
+  id             String              @id @default(cuid())
+  reference      String              @unique
+  testId         String?
+  productId      String?
+  status         ProductionRunStatus @default(draft)
+  startDate      DateTime
+  endDate        DateTime?
+  expectedPieces Int                 @default(0)
+  actualPieces   Int                 @default(0)
+  materialsCost  Float               @default(0)
+  laborCost      Float               @default(0)
+  totalCost      Float               @default(0)
+  costPerPiece   Float               @default(0)
+  notes          String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  test         ProductTest?            @relation(fields: [testId], references: [id])
+  product      Product?                @relation(fields: [productId], references: [id])
+  fabrics      ProductionRunFabric[]
+  sizes        ProductionRunSize[]
+  consumptions ProductionConsumption[]
+  workers      ProductionRunWorker[]
+
+  @@index([status, startDate])
+}
+
+model ProductionRunFabric {
+  id           String @id @default(cuid())
+  runId        String
+  fabricTypeId String
+  role         String
+
+  run        ProductionRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  fabricType FabricType    @relation(fields: [fabricTypeId], references: [id])
+
+  @@unique([runId, fabricTypeId, role])
+}
+
+model ProductionRunSize {
+  id             String  @id @default(cuid())
+  runId          String
+  size           String
+  tracingMeters  Float
+  expectedPieces Int
+  actualPieces   Int     @default(0)
+  variantId      String?
+
+  run     ProductionRun   @relation(fields: [runId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id])
+
+  @@unique([runId, size])
+}
+
+model ProductionConsumption {
+  id           String                @id @default(cuid())
+  runId        String
+  sourceType   ConsumptionSourceType
+  fabricRollId String?
+  materialId   String?
+  movementId   String?               @unique
+  quantity     Float
+  unitCost     Float
+  createdAt    DateTime              @default(now())
+  createdById  String?
+
+  run        ProductionRun     @relation(fields: [runId], references: [id], onDelete: Cascade)
+  fabricRoll FabricRoll?       @relation(fields: [fabricRollId], references: [id])
+  material   AtelieMaterial?   @relation(fields: [materialId], references: [id])
+  movement   MaterialMovement? @relation(fields: [movementId], references: [id])
+
+  @@index([runId])
+}
+
+model ProductionRunWorker {
+  id         String  @id @default(cuid())
+  runId      String
+  employeeId String
+  role       String?
+
+  run      ProductionRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  employee AtelieEmployee @relation(fields: [employeeId], references: [id])
+
+  @@unique([runId, employeeId])
 }
 
 // ─── Atelie — Team Tasks ──────────────────────────────────────────────────────
@@ -536,7 +732,7 @@ model AtelieTask {
   status           AtelieTaskStatus     @default(backlog)
   visibility       AtelieTaskVisibility @default(private)
   color            String?
-  position         Float                                   // fractional indexing within column
+  position         Float // fractional indexing within column
   incompleteReason String?
   dueAt            DateTime?
   completedAt      DateTime?
@@ -607,13 +803,14 @@ model Expense {
   id          String   @id @default(cuid())
   description String
   amount      Float
-  date        DateTime                 // user-selected date of the expense (not createdAt)
-  fileUrl     String?                  // optional invoice / screenshot upload
+  date        DateTime // user-selected date of the expense (not createdAt)
+  fileUrl     String? // optional invoice / screenshot upload
   addedById   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  addedBy User? @relation("ExpenseAuthor", fields: [addedById], references: [id])
+  addedBy    User?       @relation("ExpenseAuthor", fields: [addedById], references: [id])
+  fabricRoll FabricRoll?
 
   @@index([date])
 }
@@ -623,17 +820,17 @@ model Expense {
 // (which may cover many orders); `orderIds` stores which orders the payment
 // cleared so we can mark `Order.commissionPaid = true` atomically.
 model CommissionPayment {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   agentId      String
   amount       Float
   periodFrom   DateTime?
   periodTo     DateTime?
-  paidAt       DateTime @default(now())
+  paidAt       DateTime  @default(now())
   notes        String?
   fileUrl      String?
-  orderIds     String[]              // order IDs cleared by this payment
+  orderIds     String[] // order IDs cleared by this payment
   recordedById String?
-  createdAt    DateTime @default(now())
+  createdAt    DateTime  @default(now())
 
   agent      User  @relation("CommissionAgent", fields: [agentId], references: [id])
   recordedBy User? @relation("CommissionRecorder", fields: [recordedById], references: [id])
@@ -659,7 +856,7 @@ model CommissionRule {
 model Notification {
   id        String    @id @default(cuid())
   userId    String
-  kind      String    // e.g. "order_assigned" | "order_confirmed" | "system"
+  kind      String // e.g. "order_assigned" | "order_confirmed" | "system"
   title     String
   body      String?
   href      String?
