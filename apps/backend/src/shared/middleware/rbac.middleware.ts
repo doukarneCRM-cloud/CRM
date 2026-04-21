@@ -2,6 +2,11 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 import { prisma } from '../prisma';
 import { getCachedRbac, setCachedRbac, type CachedRbac } from '../redis';
 
+export async function getUserPermissions(userId: string): Promise<Set<string>> {
+  const rbac = await loadRbac(userId);
+  return new Set(rbac?.permissions ?? []);
+}
+
 async function loadRbac(userId: string): Promise<CachedRbac | null> {
   const cached = await getCachedRbac(userId);
   if (cached) return cached;
