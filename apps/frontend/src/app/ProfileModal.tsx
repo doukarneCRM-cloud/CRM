@@ -42,6 +42,7 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
       const res = await authService.updateProfile({ name: nameTrimmed });
       updateUser(res.data as AuthUser);
       pushToast({ kind: 'success', title: 'Profile updated', body: 'Your display name was saved.' });
+      onClose();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Could not update profile';
       pushToast({ kind: 'error', title: 'Update failed', body: msg });

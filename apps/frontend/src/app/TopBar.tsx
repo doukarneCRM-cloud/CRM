@@ -1,4 +1,5 @@
 import { useCallback, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ChevronDown, LogOut, Menu, User } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -36,46 +37,125 @@ const AVATAR_COLORS = [
   'bg-teal-100 text-teal-700',
 ];
 
+interface AgentPillData {
+  userId: string;
+  name: string;
+  initials: string;
+  avatarSrc: string;
+  colorClass: string;
+  roleName?: string;
+}
+
+function AgentPill({ agent }: { agent: AgentPillData }) {
+  const pillRef = useRef<HTMLDivElement>(null);
+  const [card, setCard] = useState<{ top: number; left: number } | null>(null);
+
+  const showCard = () => {
+    const el = pillRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setCard({ top: r.bottom + 8, left: r.left + r.width / 2 });
+  };
+  const hideCard = () => setCard(null);
+
+  return (
+    <>
+      <div
+        ref={pillRef}
+        onMouseEnter={showCard}
+        onMouseLeave={hideCard}
+        onFocus={showCard}
+        onBlur={hideCard}
+        tabIndex={0}
+        className="flex shrink-0 items-center gap-1.5 rounded-full border-2 border-emerald-500/70 bg-white py-0.5 pl-0.5 pr-2 text-[11px] font-semibold text-gray-800 shadow-sm outline-none focus:ring-2 focus:ring-emerald-500/30"
+      >
+        {agent.avatarSrc ? (
+          <img
+            src={agent.avatarSrc}
+            alt={agent.name}
+            className="h-5 w-5 shrink-0 rounded-full object-cover"
+          />
+        ) : (
+          <span
+            className={cn(
+              'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold',
+              agent.colorClass,
+            )}
+          >
+            {agent.initials}
+          </span>
+        )}
+        <span className="whitespace-nowrap">{agent.name}</span>
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_2px_rgba(16,185,129,0.2)]" />
+      </div>
+
+      {card &&
+        createPortal(
+          <div
+            className="pointer-events-none fixed z-[60] w-56 -translate-x-1/2 rounded-xl border border-gray-100 bg-white p-3 shadow-xl"
+            style={{ top: card.top, left: card.left }}
+          >
+            <div className="flex items-center gap-3">
+              <div className="relative shrink-0">
+                {agent.avatarSrc ? (
+                  <img
+                    src={agent.avatarSrc}
+                    alt={agent.name}
+                    className="h-12 w-12 rounded-full object-cover"
+                  />
+                ) : (
+                  <span
+                    className={cn(
+                      'flex h-12 w-12 items-center justify-center rounded-full text-sm font-bold',
+                      agent.colorClass,
+                    )}
+                  >
+                    {agent.initials}
+                  </span>
+                )}
+                <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-500" />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-gray-900">{agent.name}</p>
+                {agent.roleName && (
+                  <p className="truncate text-[11px] capitalize text-gray-500">
+                    {agent.roleName}
+                  </p>
+                )}
+                <p className="mt-0.5 text-[10px] font-semibold text-emerald-600">● Online</p>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+    </>
+  );
+}
+
 function OnlineAgents() {
   const { onlineUsers } = useOnlineStore();
   const users = Array.from(onlineUsers.values());
   if (users.length === 0) return null;
 
   return (
-    <div
-      className="flex min-w-0 items-center gap-1.5 overflow-x-auto py-0.5 pr-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-    >
+    <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto py-0.5 pr-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {users.map((agent, i) => {
         const name = agent.name ?? agent.userId;
         const initials = agent.name
           ? getInitials(agent.name)
           : agent.userId.slice(0, 2).toUpperCase();
-        const avatarSrc = resolveImageUrl(agent.avatarUrl);
         return (
-          <div
+          <AgentPill
             key={agent.userId}
-            title={name}
-            className="flex shrink-0 items-center gap-1.5 rounded-full border-2 border-emerald-500/70 bg-white py-0.5 pl-0.5 pr-2 text-[11px] font-semibold text-gray-800 shadow-sm"
-          >
-            {avatarSrc ? (
-              <img
-                src={avatarSrc}
-                alt={name}
-                className="h-5 w-5 shrink-0 rounded-full object-cover"
-              />
-            ) : (
-              <span
-                className={cn(
-                  'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold',
-                  AVATAR_COLORS[i % AVATAR_COLORS.length],
-                )}
-              >
-                {initials}
-              </span>
-            )}
-            <span className="whitespace-nowrap">{name}</span>
-            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_2px_rgba(16,185,129,0.2)]" />
-          </div>
+            agent={{
+              userId: agent.userId,
+              name,
+              initials,
+              avatarSrc: resolveImageUrl(agent.avatarUrl),
+              colorClass: AVATAR_COLORS[i % AVATAR_COLORS.length],
+              roleName: agent.roleName,
+            }}
+          />
         );
       })}
     </div>
