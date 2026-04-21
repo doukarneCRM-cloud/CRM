@@ -15,7 +15,7 @@ const config: Config = {
         },
         accent: '#F5EFE6',
         surface: 'rgba(255,255,255,0.72)',
-        bg: '#FAFAF8',
+        bg: '#E8DFCC',
         status: {
           // Confirmation statuses
           'new': '#6366F1',
