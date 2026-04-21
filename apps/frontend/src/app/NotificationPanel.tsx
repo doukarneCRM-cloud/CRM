@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, CheckCircle2, UserPlus, Info, Inbox, ShoppingBag } from 'lucide-react';
+import {
+  Bell,
+  CheckCircle2,
+  UserPlus,
+  Info,
+  Inbox,
+  ShoppingBag,
+  Package,
+} from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/store/authStore';
 import { useClickOutside } from '@/hooks/useClickOutside';
@@ -165,6 +173,19 @@ export function NotificationPanel() {
                           <p className="truncate text-sm font-medium text-gray-900">{n.title}</p>
                           {n.body && (
                             <p className="mt-0.5 line-clamp-2 text-xs text-gray-500">{n.body}</p>
+                          )}
+                          {n.product && (
+                            <div className="mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5">
+                              <Package size={10} className="shrink-0 text-primary" />
+                              <span className="truncate text-[11px] font-semibold text-primary">
+                                {n.product.name}
+                              </span>
+                              {n.product.extraCount > 0 && (
+                                <span className="shrink-0 rounded-full bg-primary/20 px-1.5 py-0.5 text-[9px] font-bold text-primary">
+                                  +{n.product.extraCount}
+                                </span>
+                              )}
+                            </div>
                           )}
                           <p className="mt-1 text-[10px] text-gray-400">{timeAgo(n.createdAt)}</p>
                         </div>

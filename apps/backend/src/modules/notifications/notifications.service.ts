@@ -12,6 +12,40 @@ export interface CreateNotificationInput {
   orderId?: string;
 }
 
+export interface NotificationProductMeta {
+  name: string;
+  extraCount: number;
+}
+
+async function fetchOrderProductMeta(
+  orderId: string | null,
+): Promise<NotificationProductMeta | null> {
+  if (!orderId) return null;
+  const items = await prisma.orderItem.findMany({
+    where: { orderId },
+    select: {
+      variant: {
+        select: { product: { select: { name: true } } },
+      },
+    },
+  });
+  if (items.length === 0) return null;
+  const names: string[] = [];
+  for (const it of items) {
+    const n = it.variant?.product?.name;
+    if (n && !names.includes(n)) names.push(n);
+  }
+  if (names.length === 0) return null;
+  return { name: names[0], extraCount: Math.max(0, names.length - 1) };
+}
+
+async function attachProductMeta<T extends { orderId: string | null }>(
+  notif: T,
+): Promise<T & { product: NotificationProductMeta | null }> {
+  const product = await fetchOrderProductMeta(notif.orderId);
+  return { ...notif, product };
+}
+
 // Notifications are best-effort: callers fire-and-forget, and a DB or socket
 // failure here must never surface to the triggering API call. Errors are
 // logged so they aren't silently lost.
@@ -27,8 +61,9 @@ export async function createNotification(input: CreateNotificationInput) {
         orderId: input.orderId,
       },
     });
-    emitToUser(input.userId, 'notification:new', notif);
-    return notif;
+    const enriched = await attachProductMeta(notif);
+    emitToUser(input.userId, 'notification:new', enriched);
+    return enriched;
   } catch (err) {
     console.error('[notifications] createNotification failed', err);
     return null;
@@ -61,8 +96,10 @@ export async function createAdminNotification(
         }),
       ),
     );
+    // Product meta is the same across the fan-out since orderId is shared
+    const product = await fetchOrderProductMeta(input.orderId ?? null);
     for (const n of created) {
-      emitToUser(n.userId, 'notification:new', n);
+      emitToUser(n.userId, 'notification:new', { ...n, product });
     }
     return created;
   } catch (err) {
@@ -80,7 +117,8 @@ export async function listNotifications(userId: string) {
     }),
     prisma.notification.count({ where: { userId, readAt: null } }),
   ]);
-  return { items, unreadCount };
+  const enriched = await Promise.all(items.map(attachProductMeta));
+  return { items: enriched, unreadCount };
 }
 
 export async function markAllRead(userId: string) {

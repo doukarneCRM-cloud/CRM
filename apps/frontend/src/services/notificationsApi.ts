@@ -2,6 +2,11 @@ import { api } from './api';
 
 export type NotificationKind = 'order_assigned' | 'order_confirmed' | 'order_new';
 
+export interface NotificationProductMeta {
+  name: string;
+  extraCount: number;
+}
+
 export interface Notification {
   id: string;
   userId: string;
@@ -12,6 +17,7 @@ export interface Notification {
   orderId: string | null;
   readAt: string | null;
   createdAt: string;
+  product?: NotificationProductMeta | null;
 }
 
 export interface NotificationList {
