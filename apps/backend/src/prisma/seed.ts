@@ -63,7 +63,7 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
   ],
   agent: [
     'call_center:view', 'confirmation:view', 'confirmation:update_status',
-    'confirmation:add_note', 'products:view', 'orders:view',
+    'confirmation:add_note', 'products:view',
   ],
   shipping: [
     'shipping:view', 'shipping:push', 'shipping:return_validate',

@@ -6,11 +6,14 @@ import { useSocket } from '@/hooks/useSocket';
 import { useOrderNotifications } from '@/hooks/useOrderNotifications';
 import { unlockAudioOnFirstGesture } from '@/utils/sound';
 import { Toaster } from '@/components/ui/Toaster';
+import { authService } from '@/services/api';
+import { useAuthStore } from '@/store/authStore';
 
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { pathname } = useLocation();
+  const updateUser = useAuthStore((s) => s.updateUser);
 
   useSocket();
   useOrderNotifications();
@@ -18,6 +21,15 @@ export default function AppLayout() {
   useEffect(() => {
     unlockAudioOnFirstGesture();
   }, []);
+
+  // Refresh permissions on mount so role/perm changes made by an admin take
+  // effect on next navigation instead of waiting for logout/login.
+  useEffect(() => {
+    authService
+      .me()
+      .then((r) => updateUser(r.data))
+      .catch(() => {});
+  }, [updateUser]);
 
   useEffect(() => {
     setMobileOpen(false);
