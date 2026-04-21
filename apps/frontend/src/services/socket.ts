@@ -6,7 +6,10 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL ?? 'http://localhost:3001';
 let socket: Socket | null = null;
 
 export function getSocket(): Socket {
-  if (!socket) throw new Error('Socket not initialized. Call connectSocket() first.');
+  // Lazy-init: if a component mounts before AppLayout's useSocket effect has
+  // called connectSocket (e.g. a direct page refresh on /call-center), we
+  // bootstrap the connection here so listeners can attach immediately.
+  if (!socket) return connectSocket();
   return socket;
 }
 
