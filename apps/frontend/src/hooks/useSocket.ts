@@ -21,17 +21,30 @@ export function useSocket() {
     const socket = connectSocket();
 
     // Fetch initial online users from REST. Prefer the `users` array (name +
-    // role), fall back to raw ids for older backends.
+    // avatar + role), fall back to raw ids for older backends.
     api.get('/users/online').then((res) => {
-      const hydrated: Array<{ userId: string; name?: string; roleName?: string }> =
+      const hydrated: Array<{
+        userId: string;
+        name?: string;
+        avatarUrl?: string | null;
+        roleName?: string;
+      }> =
         res.data.users ??
         (res.data.onlineUserIds ?? []).map((id: string) => ({ userId: id }));
       setUsers(hydrated);
     }).catch(() => {});
 
-    socket.on('user:online', (data: { userId: string; name?: string; roleName?: string }) => {
-      addUser({ userId: data.userId, name: data.name, roleName: data.roleName });
-    });
+    socket.on(
+      'user:online',
+      (data: { userId: string; name?: string; avatarUrl?: string | null; roleName?: string }) => {
+        addUser({
+          userId: data.userId,
+          name: data.name,
+          avatarUrl: data.avatarUrl,
+          roleName: data.roleName,
+        });
+      },
+    );
 
     socket.on('user:offline', (data: { userId: string }) => {
       removeUser(data.userId);

@@ -88,13 +88,14 @@ export function initSocket(app: FastifyInstance) {
     const dbUser = await prisma.user.update({
       where: { id: user.sub },
       data: { isOnline: true, lastSeenAt: new Date() },
-      select: { name: true },
+      select: { name: true, avatarUrl: true },
     });
     lastPersistedAt.set(user.sub, Date.now());
 
     socket.to('admin').emit('user:online', {
       userId: user.sub,
       name: dbUser.name,
+      avatarUrl: dbUser.avatarUrl,
       roleName: user.roleName,
     });
 

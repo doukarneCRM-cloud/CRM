@@ -99,4 +99,14 @@ export const authService = {
     api.post('/auth/logout', { refreshToken }),
 
   me: () => api.get('/auth/me'),
+
+  updateProfile: (payload: { name?: string }) => api.patch('/auth/me', payload),
+
+  uploadAvatar: (file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return api.post('/auth/me/avatar', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 };

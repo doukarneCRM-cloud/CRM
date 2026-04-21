@@ -13,7 +13,10 @@ import {
   clearFailedLogins,
   MAX_FAILED_ATTEMPTS,
 } from '../../shared/redis';
-import { LoginBody, RefreshBody, LogoutBody } from './auth.schema';
+import { LoginBody, RefreshBody, LogoutBody, UpdateProfileBody } from './auth.schema';
+import { uploadFile } from '../../shared/storage';
+
+const AVATAR_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 
 const REMEMBER_ME_MS = 30 * 24 * 60 * 60 * 1000;
 const DEFAULT_REFRESH_MS = 7 * 24 * 60 * 60 * 1000;
@@ -196,5 +199,53 @@ export async function authRoutes(app: FastifyInstance) {
     const user = await loadUserWithPermissions(request.user.sub);
     if (!user) return errorReply(reply, 404, 'NOT_FOUND', 'User not found');
     return reply.status(200).send(toUserDTO(user));
+  });
+
+  // ── PATCH /api/v1/auth/me ───────────────────────────────────────────────
+  // Self-service profile edits (display name for now).
+  app.patch('/me', { preHandler: [app.verifyJWT] }, async (request, reply) => {
+    const parsed = UpdateProfileBody.safeParse(request.body);
+    if (!parsed.success) {
+      return errorReply(reply, 400, 'VALIDATION_ERROR', 'Invalid request body', { issues: parsed.error.issues });
+    }
+    const { name } = parsed.data;
+    if (name === undefined) {
+      const user = await loadUserWithPermissions(request.user.sub);
+      if (!user) return errorReply(reply, 404, 'NOT_FOUND', 'User not found');
+      return reply.send(toUserDTO(user));
+    }
+    await prisma.user.update({ where: { id: request.user.sub }, data: { name } });
+    const user = await loadUserWithPermissions(request.user.sub);
+    if (!user) return errorReply(reply, 404, 'NOT_FOUND', 'User not found');
+    return reply.send(toUserDTO(user));
+  });
+
+  // ── POST /api/v1/auth/me/avatar ─────────────────────────────────────────
+  // Multipart upload; stores file and saves the public URL on the user.
+  app.post('/me/avatar', { preHandler: [app.verifyJWT] }, async (request, reply) => {
+    const file = await request.file();
+    if (!file) {
+      return errorReply(reply, 400, 'NO_FILE', 'No file uploaded');
+    }
+    if (!AVATAR_MIME.has(file.mimetype)) {
+      return errorReply(reply, 400, 'UNSUPPORTED_FORMAT', 'Only PNG, JPEG, WebP, or GIF images are allowed');
+    }
+    try {
+      const { url } = await uploadFile({
+        folder: 'avatars',
+        mimeType: file.mimetype,
+        stream: file.file,
+      });
+      if (file.file.truncated) {
+        return errorReply(reply, 413, 'FILE_TOO_LARGE', 'Image exceeds the 8 MB limit');
+      }
+      await prisma.user.update({ where: { id: request.user.sub }, data: { avatarUrl: url } });
+      const user = await loadUserWithPermissions(request.user.sub);
+      if (!user) return errorReply(reply, 404, 'NOT_FOUND', 'User not found');
+      return reply.send(toUserDTO(user));
+    } catch (err) {
+      request.log.error({ err }, 'avatar upload failed');
+      return errorReply(reply, 500, 'UPLOAD_FAILED', 'Failed to store avatar');
+    }
   });
 }

@@ -184,11 +184,17 @@ app.get('/api/v1/users/online', { preHandler: [verifyJWT] }, async (_request, re
   }
   const rows = await prisma.user.findMany({
     where: { id: { in: ids } },
-    select: { id: true, name: true, role: { select: { name: true, label: true } } },
+    select: {
+      id: true,
+      name: true,
+      avatarUrl: true,
+      role: { select: { name: true, label: true } },
+    },
   });
   const users = rows.map((u) => ({
     userId: u.id,
     name: u.name,
+    avatarUrl: u.avatarUrl,
     roleName: u.role?.name ?? null,
   }));
   return reply.send({

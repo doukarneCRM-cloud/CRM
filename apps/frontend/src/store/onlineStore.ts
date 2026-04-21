@@ -3,6 +3,7 @@ import { create } from 'zustand';
 interface OnlineUser {
   userId: string;
   name?: string;
+  avatarUrl?: string | null;
   roleName?: string;
 }
 

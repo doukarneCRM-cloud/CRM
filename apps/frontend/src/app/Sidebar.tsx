@@ -21,6 +21,7 @@ import { ROUTES } from '@/constants/routes';
 import { PERMISSIONS } from '@/constants/permissions';
 import { useAuthStore } from '@/store/authStore';
 import { authService } from '@/services/api';
+import { resolveImageUrl } from '@/lib/imageUrl';
 
 // ─── Nav item config ──────────────────────────────────────────────────────────
 
@@ -194,12 +195,23 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
         <div className={cn('border-t border-gray-100 py-3', collapsed ? 'px-3 md:px-2' : 'px-3')}>
           {user && (
             <div className={cn('mb-2 flex items-center gap-2.5 rounded-btn px-2 py-2', collapsed && 'md:hidden')}>
-              <div
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
-                style={{ background: 'linear-gradient(135deg, #6B4226, #9C6B4E)' }}
-              >
-                {user.name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()}
-              </div>
+              {(() => {
+                const avatarSrc = resolveImageUrl(user.avatarUrl);
+                return avatarSrc ? (
+                  <img
+                    src={avatarSrc}
+                    alt={user.name}
+                    className="h-8 w-8 shrink-0 rounded-full object-cover"
+                  />
+                ) : (
+                  <div
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+                    style={{ background: 'linear-gradient(135deg, #6B4226, #9C6B4E)' }}
+                  >
+                    {user.name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()}
+                  </div>
+                );
+              })()}
               <div className="min-w-0">
                 <p className="truncate text-xs font-semibold text-gray-900">{user.name}</p>
                 <p className="truncate text-[10px] text-gray-400">{user.role.label}</p>

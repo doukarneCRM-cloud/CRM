@@ -14,6 +14,7 @@ interface AuthActions {
   setAuth: (user: AuthUser, accessToken: string, refreshToken: string) => void;
   setAccessToken: (token: string) => void;
   setRefreshToken: (token: string) => void;
+  updateUser: (user: AuthUser) => void;
   logout: () => void;
   hasPermission: (permission: string) => boolean;
   hasRole: (role: string) => boolean;
@@ -33,6 +34,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       setAccessToken: (token) => set({ accessToken: token }),
 
       setRefreshToken: (token) => set({ refreshToken: token }),
+
+      updateUser: (user) => set({ user }),
 
       logout: () =>
         set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false }),
