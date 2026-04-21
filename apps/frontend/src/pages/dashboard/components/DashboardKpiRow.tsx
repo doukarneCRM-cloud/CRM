@@ -1,4 +1,4 @@
-import { ShoppingCart, CheckCircle2, Truck, Undo2, Coins, TrendingUp } from 'lucide-react';
+import { ShoppingCart, CheckCircle2, Truck, Undo2, GitMerge, Coins, TrendingUp } from 'lucide-react';
 import { KPICard } from '@/components/ui/KPICard';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { cn } from '@/lib/cn';
@@ -23,8 +23,8 @@ interface Props {
 export function DashboardKpiRow({ kpis, loading, className }: Props) {
   if (loading || !kpis) {
     return (
-      <div className={cn('grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6', className)}>
-        {Array.from({ length: 6 }).map((_, i) => (
+      <div className={cn('grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7', className)}>
+        {Array.from({ length: 7 }).map((_, i) => (
           <SkeletonCard key={i} />
         ))}
       </div>
@@ -36,7 +36,7 @@ export function DashboardKpiRow({ kpis, loading, className }: Props) {
   const fmt = (n: number) => n.toLocaleString();
 
   return (
-    <div className={cn('grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6', className)}>
+    <div className={cn('grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7', className)}>
       <KPICard
         title="Orders"
         value={kpis.totalOrders}
@@ -70,6 +70,13 @@ export function DashboardKpiRow({ kpis, loading, className }: Props) {
         icon={Undo2}
         iconColor="#DC2626"
         percentageChange={changes.returnRate}
+      />
+      <KPICard
+        title="Merged"
+        value={`${fmt(c.merged)} · ${kpis.mergedRate.toFixed(1)}%`}
+        icon={GitMerge}
+        iconColor="#F59E0B"
+        percentageChange={changes.mergedRate}
       />
       <KPICard
         title="Revenue"

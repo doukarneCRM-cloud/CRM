@@ -5,6 +5,7 @@ export interface DashboardKPIs {
   confirmationRate: number;
   deliveryRate: number;
   returnRate: number;
+  mergedRate: number;
   revenue: number;
   profit: number;
   counts: {
@@ -14,12 +15,15 @@ export interface DashboardKPIs {
     deliveryDenom: number;
     returned: number;
     returnDenom: number;
+    merged: number;
+    mergedDenom: number;
   };
   percentageChanges: {
     totalOrders: number;
     confirmationRate: number;
     deliveryRate: number;
     returnRate: number;
+    mergedRate: number;
     revenue: number;
     profit: number;
   };

@@ -12,6 +12,7 @@ export interface KPIResult {
   confirmationRate: number;   // %
   deliveryRate: number;       // %
   returnRate: number;         // %
+  mergedRate: number;         // % — merged / (totalOrders + merged)
   revenue: number;            // MAD — delivered orders
   profit: number;             // MAD — revenue minus shipping costs
   // Numerator / denominator pairs behind each rate, so the UI can render the
@@ -23,6 +24,8 @@ export interface KPIResult {
     deliveryDenom: number;
     returned: number;
     returnDenom: number;
+    merged: number;
+    mergedDenom: number;
   };
 }
 
@@ -32,6 +35,7 @@ export interface KPIPeriodResult extends KPIResult {
     confirmationRate: number;
     deliveryRate: number;
     returnRate: number;
+    mergedRate: number;
     revenue: number;
     profit: number;
   };
@@ -53,17 +57,24 @@ export async function computeKPIs(filters: OrderFilterParams): Promise<KPIResult
 
   const totalOrders = await prisma.order.count({ where });
 
-  const [confirmedCount, deliveredCount, returnedCount] = await Promise.all([
+  // Merged orders are archived, so the default where clause excludes them —
+  // re-run the filter with isArchived:'all' to count them across the same scope.
+  const mergedWhere = buildOrderWhereClause({ ...filters, isArchived: 'all' });
+
+  const [confirmedCount, deliveredCount, returnedCount, mergedCount] = await Promise.all([
     prisma.order.count({ where: { ...where, confirmationStatus: 'confirmed' } }),
     prisma.order.count({ where: { ...where, shippingStatus: 'delivered' } }),
     prisma.order.count({
       where: { ...where, shippingStatus: { in: ['returned', 'return_validated'] } },
     }),
+    prisma.order.count({ where: { ...mergedWhere, mergedIntoId: { not: null } } }),
   ]);
 
   const confirmationRate = safeRate(confirmedCount, totalOrders);
   const deliveryRate = safeRate(deliveredCount, confirmedCount);
   const returnRate = safeRate(returnedCount, deliveredCount);
+  const mergedDenom = totalOrders + mergedCount;
+  const mergedRate = safeRate(mergedCount, mergedDenom);
 
   const denominatorCount = totalOrders;
   const deliveryDenomCount = confirmedCount;
@@ -89,6 +100,7 @@ export async function computeKPIs(filters: OrderFilterParams): Promise<KPIResult
     confirmationRate,
     deliveryRate,
     returnRate,
+    mergedRate,
     revenue,
     profit,
     counts: {
@@ -98,6 +110,8 @@ export async function computeKPIs(filters: OrderFilterParams): Promise<KPIResult
       deliveryDenom: deliveryDenomCount,
       returned: returnedCount,
       returnDenom: returnDenomCount,
+      merged: mergedCount,
+      mergedDenom,
     },
   };
 }
@@ -151,6 +165,7 @@ export async function computeKPIsWithComparison(
       confirmationRate: pctChange(current.confirmationRate, previous.confirmationRate),
       deliveryRate: pctChange(current.deliveryRate, previous.deliveryRate),
       returnRate: pctChange(current.returnRate, previous.returnRate),
+      mergedRate: pctChange(current.mergedRate, previous.mergedRate),
       revenue: pctChange(current.revenue, previous.revenue),
       profit: pctChange(current.profit, previous.profit),
     },
