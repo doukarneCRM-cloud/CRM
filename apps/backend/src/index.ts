@@ -175,10 +175,27 @@ app.get('/api/v1/assignment-rules/simulate', { preHandler: [verifyJWT] }, async 
   return reply.send({ count, sequence });
 });
 
-// Online users
+// Online users — returns names so the presence strip can render them without
+// waiting for a live `user:online` socket event.
 app.get('/api/v1/users/online', { preHandler: [verifyJWT] }, async (_request, reply) => {
   const ids = getOnlineUserIds();
-  return reply.send({ onlineUserIds: ids, count: ids.length });
+  if (ids.length === 0) {
+    return reply.send({ onlineUserIds: [], users: [], count: 0 });
+  }
+  const rows = await prisma.user.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, name: true, role: { select: { name: true, label: true } } },
+  });
+  const users = rows.map((u) => ({
+    userId: u.id,
+    name: u.name,
+    roleName: u.role?.name ?? null,
+  }));
+  return reply.send({
+    onlineUserIds: ids,
+    users,
+    count: ids.length,
+  });
 });
 
 // Active agents (users with confirmation:view permission) — for assign picker
