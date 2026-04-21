@@ -218,6 +218,55 @@ export async function getOrderLogs(orderId: string) {
   });
 }
 
+// Surfaces any *other* unshipped, unarchived pending orders the same customer
+// has placed in the last 3 days. Triggered right before the confirm popup so
+// an agent can roll duplicates into the one they're about to confirm.
+export async function getPendingSiblings(orderId: string) {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { id: true, customerId: true, shippingStatus: true },
+  });
+  if (!order) throw { statusCode: 404, code: 'NOT_FOUND', message: 'Order not found' };
+
+  const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+
+  const siblings = await prisma.order.findMany({
+    where: {
+      id: { not: orderId },
+      customerId: order.customerId,
+      isArchived: false,
+      mergedIntoId: null,
+      confirmationStatus: 'pending',
+      shippingStatus: 'not_shipped',
+      createdAt: { gte: threeDaysAgo },
+    },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      reference: true,
+      agentId: true,
+      total: true,
+      createdAt: true,
+      agent: { select: { id: true, name: true, email: true } },
+      items: {
+        select: {
+          quantity: true,
+          unitPrice: true,
+          variant: {
+            select: {
+              color: true,
+              size: true,
+              product: { select: { name: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return { data: siblings };
+}
+
 // ─── Service: Create ──────────────────────────────────────────────────────────
 
 export async function createOrder(input: CreateOrderInput, actor: JwtPayload) {
@@ -942,11 +991,14 @@ export async function getDuplicatePendingOrders() {
 
 // Merge rules:
 //  - All orders must belong to the same customer, be pending, and unarchived.
-//  - All orders must share the same agentId (or all unassigned) — caller
-//    reassigns first if not.
+//  - Any agent-mismatch is auto-resolved: merged orders get reassigned to the
+//    keeper's agent inside the same tx (so a call-center agent can merge a
+//    sibling that's currently owned by someone else without needing a separate
+//    unassign step).
 //  - Stock is NOT adjusted: items were allocated at creation; merging just
 //    consolidates that allocation into the keeper.
-//  - Merged orders are soft-archived with a log pointing to the keeper.
+//  - Merged orders are soft-archived AND point at the keeper via mergedIntoId
+//    so "% of orders merged" is a one-query stat.
 export async function mergeOrders(input: MergeOrdersInput, actor: JwtPayload) {
   const allIds = [input.keepOrderId, ...input.mergeOrderIds];
 
@@ -989,15 +1041,6 @@ export async function mergeOrders(input: MergeOrdersInput, actor: JwtPayload) {
       statusCode: 400,
       code: 'CUSTOMER_MISMATCH',
       message: 'All orders must belong to the same customer',
-    };
-  }
-
-  const agentIds = new Set(orders.map((o) => o.agentId ?? '__unassigned__'));
-  if (agentIds.size !== 1) {
-    throw {
-      statusCode: 409,
-      code: 'AGENT_MISMATCH',
-      message: 'Orders are assigned to different agents — reassign to one agent first',
     };
   }
 
@@ -1054,11 +1097,20 @@ export async function mergeOrders(input: MergeOrdersInput, actor: JwtPayload) {
       data: { subtotal, total },
     });
 
-    // Archive merge orders; drop their items so stock isn't duplicated
+    // Archive merge orders; drop their items so stock isn't duplicated.
+    // Reassign to keeper's agent so the merged row is attributable to whoever
+    // ran the merge, and flag mergedIntoId so we can count merges cheaply.
     for (const o of orders) {
       if (o.id === keeper.id) continue;
       await tx.orderItem.deleteMany({ where: { orderId: o.id } });
-      await tx.order.update({ where: { id: o.id }, data: { isArchived: true } });
+      await tx.order.update({
+        where: { id: o.id },
+        data: {
+          isArchived: true,
+          mergedIntoId: keeper.id,
+          agentId: keeper.agentId ?? null,
+        },
+      });
       await tx.orderLog.create({
         data: {
           orderId: o.id,

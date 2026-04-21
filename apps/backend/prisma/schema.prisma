@@ -326,6 +326,10 @@ model Order {
   trackingProvider    String?
   // Poller throttle — last time we asked the provider for a status update.
   lastTrackedAt       DateTime?
+  // When this order has been rolled into another (duplicate customer, unshipped),
+  // this points at the keeper. Set together with isArchived=true by mergeOrders.
+  // Kept as a FK so "how many orders get merged" is a one-query stat.
+  mergedIntoId        String?
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 
@@ -333,6 +337,8 @@ model Order {
   agent            User?       @relation("AgentOrders", fields: [agentId], references: [id])
   store            Store?      @relation(fields: [storeId], references: [id])
   returnVerifiedBy User?       @relation("ReturnVerifier", fields: [returnVerifiedById], references: [id])
+  mergedInto       Order?      @relation("OrderMerges", fields: [mergedIntoId], references: [id])
+  mergedFrom       Order[]     @relation("OrderMerges")
   items            OrderItem[]
   logs             OrderLog[]
 
@@ -342,6 +348,7 @@ model Order {
   @@index([customerId])
   @@index([createdAt])
   @@index([isArchived])
+  @@index([mergedIntoId])
   @@index([confirmationStatus, createdAt])
   @@index([shippingStatus, createdAt])
   @@index([agentId, confirmationStatus])

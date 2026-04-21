@@ -23,9 +23,11 @@ export async function ordersRoutes(app: FastifyInstance) {
   );
 
   // ── POST /api/v1/orders/merge — MUST be before /:id ────────────────────
+  // call_center:view agents can merge duplicates from the confirm popup; the
+  // service auto-reassigns siblings to the keeper's agent.
   app.post(
     '/merge',
-    { preHandler: [verifyJWT, requirePermission('orders:edit')] },
+    { preHandler: [verifyJWT, requireAnyPermission('orders:edit', 'call_center:view')] },
     ctrl.mergeOrders,
   );
 
@@ -34,6 +36,15 @@ export async function ordersRoutes(app: FastifyInstance) {
 
   // ── GET /api/v1/orders/:id/logs ─────────────────────────────────────────
   app.get<WithId>('/:id/logs', { preHandler: [verifyJWT, requireAnyPermission('orders:view', 'call_center:view')] }, ctrl.showOrderLogs);
+
+  // ── GET /api/v1/orders/:id/pending-siblings ─────────────────────────────
+  // Unshipped, unarchived pending orders for the same customer from the last
+  // 3 days — used by the call-center confirm flow to offer a merge step.
+  app.get<WithId>(
+    '/:id/pending-siblings',
+    { preHandler: [verifyJWT, requireAnyPermission('orders:view', 'call_center:view')] },
+    ctrl.showPendingSiblings,
+  );
 
   // ── POST /api/v1/orders ─────────────────────────────────────────────────
   app.post('/', { preHandler: [verifyJWT, requirePermission('orders:create')] }, ctrl.createOrder);

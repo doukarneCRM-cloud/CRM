@@ -9,11 +9,12 @@ import { CRMInput } from '@/components/ui/CRMInput';
 import { CRMSelect } from '@/components/ui/CRMSelect';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { ordersApi, supportApi, customersApi } from '@/services/ordersApi';
+import { ordersApi, supportApi, customersApi, type PendingSibling } from '@/services/ordersApi';
 import type { Order, Product, ShippingCity } from '@/types/orders';
 import { cn } from '@/lib/cn';
 import { apiErrorMessage } from '@/lib/apiError';
 import { useCallCenterStore } from '../callCenterStore';
+import { DuplicateOrdersDialog } from './DuplicateOrdersDialog';
 
 // Shipping statuses at or past "picked_up" — Coliix has the parcel, so items
 // can no longer be edited and confirmation can't change.
@@ -154,6 +155,12 @@ export function CallCenterOrderModal() {
   const [callbackAt, setCallbackAt] = useState('');
   const [pendingAction, setPendingAction] =
     useState<null | 'confirm' | 'cancel' | 'callback' | 'unreachable' | 'fake' | 'no-stock'>(null);
+
+  // Duplicate-detection state — shown before the confirm popup when the
+  // client has other unshipped orders from the last 3 days.
+  const [siblings, setSiblings] = useState<PendingSibling[]>([]);
+  const [showDuplicates, setShowDuplicates] = useState(false);
+  const [siblingCheckBusy, setSiblingCheckBusy] = useState(false);
 
   const isOpen = !!selectedOrder;
 
@@ -430,7 +437,7 @@ export function CallCenterOrderModal() {
     }
   };
 
-  const triggerStatus = (action: typeof pendingAction) => {
+  const triggerStatus = async (action: typeof pendingAction) => {
     const check = readinessFor(action);
     if (!check.ok) {
       setError(check.reasons[0]);
@@ -445,6 +452,26 @@ export function CallCenterOrderModal() {
         return;
       }
     }
+
+    // Before confirming, check whether this client already has other unshipped
+    // orders from the last 3 days — give the agent a chance to merge them
+    // into the one they're about to confirm.
+    if (action === 'confirm' && order) {
+      setSiblingCheckBusy(true);
+      try {
+        const found = await ordersApi.pendingSiblings(order.id);
+        if (found.length > 0) {
+          setSiblings(found);
+          setShowDuplicates(true);
+          return;
+        }
+      } catch {
+        // Non-fatal — just fall through to the normal confirm popup.
+      } finally {
+        setSiblingCheckBusy(false);
+      }
+    }
+
     setPendingAction(action);
   };
 
@@ -878,7 +905,8 @@ export function CallCenterOrderModal() {
                       size="sm"
                       leftIcon={<Check size={12} />}
                       onClick={() => triggerStatus('confirm')}
-                      disabled={statusBusy || !confirmReadiness.ok}
+                      disabled={statusBusy || siblingCheckBusy || !confirmReadiness.ok}
+                      loading={siblingCheckBusy}
                       title={!confirmReadiness.ok ? confirmReadiness.reasons[0] : undefined}
                     >
                       Confirm
@@ -1038,6 +1066,28 @@ export function CallCenterOrderModal() {
           </div>
         )}
       </div>
+
+      <DuplicateOrdersDialog
+        open={showDuplicates}
+        keeperOrderId={order.id}
+        keeperReference={order.reference}
+        keeperAgentName={order.agent?.name ?? null}
+        siblings={siblings}
+        onMerged={() => {
+          setShowDuplicates(false);
+          setSiblings([]);
+          setPendingAction('confirm');
+        }}
+        onSkip={() => {
+          setShowDuplicates(false);
+          setSiblings([]);
+          setPendingAction('confirm');
+        }}
+        onCancel={() => {
+          setShowDuplicates(false);
+          setSiblings([]);
+        }}
+      />
     </GlassModal>
   );
 }

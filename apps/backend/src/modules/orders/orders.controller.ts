@@ -86,6 +86,29 @@ export async function showOrderLogs(
   }
 }
 
+export async function showPendingSiblings(
+  request: FastifyRequest<{ Params: { id: string } }>,
+  reply: FastifyReply,
+) {
+  try {
+    const scope = await getCallCenterScope(request);
+    if (scope) {
+      const own = await prisma.order.findFirst({
+        where: { id: request.params.id, agentId: scope },
+        select: { id: true },
+      });
+      if (!own) {
+        return reply.status(403).send({
+          error: { code: 'INSUFFICIENT_PERMISSIONS', message: 'Order is not assigned to you', statusCode: 403 },
+        });
+      }
+    }
+    return reply.send(await svc.getPendingSiblings(request.params.id));
+  } catch (err) {
+    return replyError(reply, err);
+  }
+}
+
 export async function createOrder(request: FastifyRequest, reply: FastifyReply) {
   const data = validateBody(reply, CreateOrderSchema, request.body);
   if (!data) return reply;
@@ -191,6 +214,20 @@ export async function mergeOrders(request: FastifyRequest, reply: FastifyReply) 
   const data = validateBody(reply, MergeOrdersSchema, request.body);
   if (!data) return reply;
   try {
+    const scope = await getCallCenterScope(request);
+    if (scope) {
+      // call_center-only users can only merge *into* an order they own. The
+      // service itself will reassign siblings, so we don't check those here.
+      const keeperOwned = await prisma.order.findFirst({
+        where: { id: data.keepOrderId, agentId: scope },
+        select: { id: true },
+      });
+      if (!keeperOwned) {
+        return reply.status(403).send({
+          error: { code: 'INSUFFICIENT_PERMISSIONS', message: 'Keeper order is not assigned to you', statusCode: 403 },
+        });
+      }
+    }
     const order = await svc.mergeOrders(data, request.user);
     return reply.send(order);
   } catch (err) {

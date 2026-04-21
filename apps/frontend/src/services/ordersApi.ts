@@ -60,7 +60,28 @@ export const ordersApi = {
 
   merge: (payload: { keepOrderId: string; mergeOrderIds: string[] }) =>
     api.post<Order>('/orders/merge', payload).then((r) => r.data),
+
+  pendingSiblings: (id: string) =>
+    api.get<{ data: PendingSibling[] }>(`/orders/${id}/pending-siblings`).then((r) => r.data.data),
 };
+
+export interface PendingSibling {
+  id: string;
+  reference: string;
+  agentId: string | null;
+  total: number;
+  createdAt: string;
+  agent: { id: string; name: string; email: string } | null;
+  items: {
+    quantity: number;
+    unitPrice: number;
+    variant: {
+      color: string | null;
+      size: string | null;
+      product: { name: string };
+    };
+  }[];
+}
 
 // ─── Duplicate merge types ───────────────────────────────────────────────────
 
