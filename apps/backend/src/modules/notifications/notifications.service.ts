@@ -17,7 +17,7 @@ export interface NotificationProductMeta {
   extraCount: number;
 }
 
-async function fetchOrderProductMeta(
+export async function fetchOrderProductMeta(
   orderId: string | null,
 ): Promise<NotificationProductMeta | null> {
   if (!orderId) return null;

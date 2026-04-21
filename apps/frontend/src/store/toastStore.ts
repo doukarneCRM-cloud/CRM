@@ -2,12 +2,18 @@ import { create } from 'zustand';
 
 export type ToastKind = 'assignment' | 'confirmed' | 'new_order' | 'info' | 'success' | 'error';
 
+export interface ToastProductMeta {
+  name: string;
+  extraCount: number;
+}
+
 export interface Toast {
   id: string;
   kind: ToastKind;
   title: string;
   body?: string;
   href?: string; // optional click-through route
+  product?: ToastProductMeta | null;
   createdAt: number;
   durationMs: number;
 }
@@ -50,6 +56,7 @@ export const useToastStore = create<ToastState>((set, get) => ({
       title: input.title,
       body: input.body,
       href: input.href,
+      product: input.product,
       createdAt: Date.now(),
       durationMs: input.durationMs ?? DEFAULT_DURATION,
     };

@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, UserPlus, Info, AlertCircle, X, ShoppingBag } from 'lucide-react';
+import {
+  CheckCircle2,
+  UserPlus,
+  Info,
+  AlertCircle,
+  X,
+  ShoppingBag,
+  Package,
+} from 'lucide-react';
 import { useToastStore, type Toast, type ToastKind } from '@/store/toastStore';
 
 const ICONS: Record<ToastKind, typeof CheckCircle2> = {
@@ -95,6 +103,19 @@ function ToastCard({ toast }: { toast: Toast }) {
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-gray-900">{toast.title}</p>
           {toast.body && <p className="mt-0.5 line-clamp-2 text-xs text-gray-500">{toast.body}</p>}
+          {toast.product && (
+            <div className="mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5">
+              <Package size={10} className="shrink-0 text-primary" />
+              <span className="truncate text-[11px] font-semibold text-primary">
+                {toast.product.name}
+              </span>
+              {toast.product.extraCount > 0 && (
+                <span className="shrink-0 rounded-full bg-primary/20 px-1.5 py-0.5 text-[9px] font-bold text-primary">
+                  +{toast.product.extraCount}
+                </span>
+              )}
+            </div>
+          )}
         </div>
         <button
           onClick={(e) => {

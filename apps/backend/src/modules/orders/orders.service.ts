@@ -3,6 +3,7 @@ import { emitToRoom } from '../../shared/socket';
 import {
   createNotification,
   createAdminNotification,
+  fetchOrderProductMeta,
 } from '../notifications/notifications.service';
 import { buildOrderWhereClause } from '../../utils/filterBuilder';
 import { parsePagination, paginatedResponse } from '../../utils/pagination';
@@ -651,11 +652,13 @@ export async function updateOrderStatus(id: string, input: UpdateStatusInput, ac
     input.confirmationStatus === 'confirmed' &&
     order.confirmationStatus !== 'confirmed'
   ) {
+    const confirmedProduct = await fetchOrderProductMeta(id);
     emitToRoom('admin', 'order:confirmed', {
       orderId: id,
       reference: order.reference,
       customerName: order.customer.fullName,
       agentName: order.agent?.name ?? actorName,
+      product: confirmedProduct,
     });
     // Persist for the bell — fan out to every admin/supervisor so each has
     // their own read state.
@@ -707,11 +710,13 @@ export async function assignOrder(id: string, input: AssignOrderInput, actor: Jw
       }),
     ]);
 
+    const assignedProduct = await fetchOrderProductMeta(id);
     emitToRoom(`agent:${input.agentId}`, 'order:assigned', {
       orderId: id,
       reference: orderMeta?.reference,
       customerName: orderMeta?.customer.fullName,
       assignedBy: actorName,
+      product: assignedProduct,
     });
     void createNotification({
       userId: input.agentId,

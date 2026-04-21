@@ -11,6 +11,7 @@ interface AssignedPayload {
   reference?: string;
   customerName?: string;
   assignedBy?: string;
+  product?: { name: string; extraCount: number } | null;
 }
 
 interface ConfirmedPayload {
@@ -18,6 +19,7 @@ interface ConfirmedPayload {
   reference?: string;
   customerName?: string;
   agentName?: string;
+  product?: { name: string; extraCount: number } | null;
 }
 
 interface NotificationNewPayload {
@@ -27,6 +29,7 @@ interface NotificationNewPayload {
   body: string | null;
   href: string | null;
   orderId: string | null;
+  product?: { name: string; extraCount: number } | null;
 }
 
 /**
@@ -94,6 +97,7 @@ export function useOrderNotifications() {
           ? `Customer: ${payload.customerName}${payload.assignedBy ? ` · by ${payload.assignedBy}` : ''}`
           : 'Open it in your Call Center to start confirming.',
         href: ROUTES.CALL_CENTER,
+        product: payload.product ?? null,
       });
     };
 
@@ -111,6 +115,7 @@ export function useOrderNotifications() {
           .filter(Boolean)
           .join(' · ') || undefined,
         href: ROUTES.ORDERS,
+        product: payload.product ?? null,
       });
     };
 
@@ -127,6 +132,7 @@ export function useOrderNotifications() {
         title: payload.title,
         body: payload.body ?? undefined,
         href: payload.href ?? ROUTES.ORDERS,
+        product: payload.product ?? null,
       });
     };
 
