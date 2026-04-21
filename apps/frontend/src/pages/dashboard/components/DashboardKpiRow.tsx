@@ -73,7 +73,9 @@ export function DashboardKpiRow({ kpis, loading, className }: Props) {
       />
       <KPICard
         title="Merged"
-        value={`${fmt(c.merged)} · ${kpis.mergedRate.toFixed(1)}%`}
+        value={kpis.mergedRate}
+        unit="%"
+        subtitle={`${fmt(c.merged)} of ${fmt(c.mergedDenom)} merged`}
         icon={GitMerge}
         iconColor="#F59E0B"
         percentageChange={changes.mergedRate}
