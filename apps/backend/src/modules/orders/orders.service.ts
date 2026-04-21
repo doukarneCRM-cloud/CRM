@@ -517,6 +517,7 @@ export async function updateOrderStatus(id: string, input: UpdateStatusInput, ac
       confirmationStatus: true,
       shippingStatus: true,
       labelSent: true,
+      unreachableCount: true,
       customer: { select: { city: true, fullName: true } },
       agent: { select: { id: true, name: true } },
     },
@@ -587,6 +588,14 @@ export async function updateOrderStatus(id: string, input: UpdateStatusInput, ac
   // several times and expect the counter to climb with each failed try.
   if (input.confirmationStatus === 'unreachable') {
     updateData.unreachableCount = { increment: 1 };
+    // Auto-cancel after 9 failed contact attempts — the agent has exhausted
+    // reasonable retries and keeping the order open wastes pipeline capacity.
+    const nextCount = order.unreachableCount + 1;
+    if (nextCount >= 9) {
+      updateData.confirmationStatus = 'cancelled';
+      updateData.cancellationReason = `Auto-cancelled after ${nextCount} unreachable attempts`;
+      actionParts.push(`Auto-cancelled (${nextCount} unreachable attempts)`);
+    }
   }
 
   // ── Commission on delivery ───────────────────────────────────────────────
