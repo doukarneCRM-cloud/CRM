@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CalendarClock } from 'lucide-react';
 import { GlobalFilterBar, type FilterChipConfig } from '@/components/ui/GlobalFilterBar';
 import { FbDateRangePicker } from '@/components/ui/FbDateRangePicker';
@@ -7,6 +7,8 @@ import {
   SHIPPING_STATUS_OPTIONS,
   SOURCE_OPTIONS,
 } from '@/constants/statusColors';
+import { supportApi } from '@/services/ordersApi';
+import type { AgentOption } from '@/types/orders';
 import { useFilterStore } from '@/store/filterStore';
 import { useDashboard } from './hooks/useDashboard';
 import { DashboardKpiRow } from './components/DashboardKpiRow';
@@ -18,7 +20,7 @@ import { TopAgentsCard } from './components/TopAgentsCard';
 import { TopProductsCard } from './components/TopProductsCard';
 import { TopCitiesCard } from './components/TopCitiesCard';
 
-const FILTER_CONFIGS: FilterChipConfig[] = [
+const STATIC_FILTER_CONFIGS: FilterChipConfig[] = [
   {
     key: 'confirmationStatuses',
     label: 'Confirmation',
@@ -72,6 +74,25 @@ export default function DashboardPage() {
   const resolvedCompare = data?.kpis.compare;
   const prevPreset = useMemo(() => previousPeriod(dateRange), [dateRange]);
 
+  const [agents, setAgents] = useState<AgentOption[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    supportApi.agents().then((r) => { if (!cancelled) setAgents(r); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const filterConfigs = useMemo<FilterChipConfig[]>(() => {
+    if (agents.length === 0) return STATIC_FILTER_CONFIGS;
+    return [
+      ...STATIC_FILTER_CONFIGS,
+      {
+        key: 'agentIds',
+        label: 'Agent',
+        options: agents.map((a) => ({ value: a.id, label: a.name })),
+      },
+    ];
+  }, [agents]);
+
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between">
@@ -85,7 +106,7 @@ export default function DashboardPage() {
 
       <div className="flex flex-wrap items-center gap-3">
         <GlobalFilterBar
-          filterConfigs={FILTER_CONFIGS}
+          filterConfigs={filterConfigs}
           showDateRange
           sticky={false}
           className="flex-1 min-w-0"

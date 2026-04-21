@@ -97,14 +97,18 @@ export interface ConfirmationKPIs {
   cancelled: number;
   unreachable: number;
   pending: number;
+  merged: number;
   confirmationRate: number;
   cancellationRate: number;
+  mergedRate: number;
   avgConfirmationHours: number;
   percentageChanges: {
     totalOrders: number;
     confirmed: number;
     cancelled: number;
+    merged: number;
     confirmationRate: number;
+    mergedRate: number;
     avgConfirmationHours: number;
   };
 }

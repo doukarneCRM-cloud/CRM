@@ -11,7 +11,7 @@ import {
   SOURCE_OPTIONS,
 } from '@/constants/statusColors';
 import { PERMISSIONS } from '@/constants/permissions';
-import type { Order, Product } from '@/types/orders';
+import type { Order, Product, AgentOption } from '@/types/orders';
 import { cn } from '@/lib/cn';
 
 import { useOrders } from './hooks/useOrders';
@@ -166,8 +166,9 @@ export default function OrdersPage() {
   const [duplicateCount, setDuplicateCount] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
 
-  // Product filter options — loaded once so the filter chip can populate
+  // Product + agent filter options — loaded once so the filter chips can populate
   const [products, setProducts] = useState<Product[]>([]);
+  const [agents, setAgents] = useState<AgentOption[]>([]);
   useEffect(() => {
     let cancelled = false;
     supportApi
@@ -178,20 +179,35 @@ export default function OrdersPage() {
       .catch(() => {
         if (!cancelled) setProducts([]);
       });
+    supportApi
+      .agents()
+      .then((res) => {
+        if (!cancelled) setAgents(res);
+      })
+      .catch(() => {
+        if (!cancelled) setAgents([]);
+      });
     return () => { cancelled = true; };
   }, []);
 
   const filterConfigs = useMemo<FilterChipConfig[]>(() => {
-    if (products.length === 0) return STATIC_FILTER_CONFIGS;
-    return [
-      ...STATIC_FILTER_CONFIGS,
-      {
+    const extras: FilterChipConfig[] = [];
+    if (products.length > 0) {
+      extras.push({
         key: 'productIds',
         label: 'Product',
         options: products.map((p) => ({ value: p.id, label: p.name })),
-      },
-    ];
-  }, [products]);
+      });
+    }
+    if (agents.length > 0) {
+      extras.push({
+        key: 'agentIds',
+        label: 'Agent',
+        options: agents.map((a) => ({ value: a.id, label: a.name })),
+      });
+    }
+    return extras.length === 0 ? STATIC_FILTER_CONFIGS : [...STATIC_FILTER_CONFIGS, ...extras];
+  }, [products, agents]);
 
   // Coliix export state
   const [sendingIds, setSendingIds] = useState<string[]>([]);

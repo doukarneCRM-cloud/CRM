@@ -466,14 +466,18 @@ export interface ConfirmationKPIs {
   cancelled: number;
   unreachable: number;
   pending: number;
+  merged: number;             // orders absorbed into another via mergedIntoId
   confirmationRate: number;   // confirmed / (pending+awaiting+confirmed+cancelled+unreachable+fake)
   cancellationRate: number;
+  mergedRate: number;         // merged / (totalOrders + merged)
   avgConfirmationHours: number;
   percentageChanges: {
     totalOrders: number;
     confirmed: number;
     cancelled: number;
+    merged: number;
     confirmationRate: number;
+    mergedRate: number;
     avgConfirmationHours: number;
   };
 }
@@ -557,30 +561,36 @@ const CONFIRMATION_ORDER: Array<
 
 async function computeConfirmationCore(filters: OrderFilterParams) {
   const where = buildOrderWhereClause(filters);
+  // Merged orders are archived, so `where` (which excludes archived by default)
+  // won't include them — count them with the archive filter disabled.
+  const mergedWhere = buildOrderWhereClause({ ...filters, isArchived: 'all' });
 
-  const [total, confirmed, cancelled, unreachable, pending, confirmedSample] = await Promise.all([
-    prisma.order.count({ where }),
-    prisma.order.count({ where: { ...where, confirmationStatus: 'confirmed' } }),
-    prisma.order.count({ where: { ...where, confirmationStatus: 'cancelled' } }),
-    prisma.order.count({ where: { ...where, confirmationStatus: 'unreachable' } }),
-    prisma.order.count({
-      where: { ...where, confirmationStatus: { in: ['pending', 'awaiting', 'callback'] } },
-    }),
-    prisma.orderLog.findMany({
-      where: {
-        type: 'confirmation',
-        action: { contains: 'confirmed' },
-        order: { ...where, confirmationStatus: 'confirmed' },
-      },
-      select: { createdAt: true, order: { select: { createdAt: true } } },
-      take: 5000,
-    }),
-  ]);
+  const [total, confirmed, cancelled, unreachable, pending, merged, confirmedSample] =
+    await Promise.all([
+      prisma.order.count({ where }),
+      prisma.order.count({ where: { ...where, confirmationStatus: 'confirmed' } }),
+      prisma.order.count({ where: { ...where, confirmationStatus: 'cancelled' } }),
+      prisma.order.count({ where: { ...where, confirmationStatus: 'unreachable' } }),
+      prisma.order.count({
+        where: { ...where, confirmationStatus: { in: ['pending', 'awaiting', 'callback'] } },
+      }),
+      prisma.order.count({ where: { ...mergedWhere, mergedIntoId: { not: null } } }),
+      prisma.orderLog.findMany({
+        where: {
+          type: 'confirmation',
+          action: { contains: 'confirmed' },
+          order: { ...where, confirmationStatus: 'confirmed' },
+        },
+        select: { createdAt: true, order: { select: { createdAt: true } } },
+        take: 5000,
+      }),
+    ]);
 
   const decidedPool =
     confirmed + cancelled + unreachable + pending; // active + decided confirmations
   const confirmationRate = safeRate(confirmed, decidedPool);
   const cancellationRate = safeRate(cancelled, decidedPool);
+  const mergedRate = safeRate(merged, total + merged);
 
   let avgConfirmationHours = 0;
   if (confirmedSample.length > 0) {
@@ -597,8 +607,10 @@ async function computeConfirmationCore(filters: OrderFilterParams) {
     cancelled,
     unreachable,
     pending,
+    merged,
     confirmationRate,
     cancellationRate,
+    mergedRate,
     avgConfirmationHours,
   };
 }
@@ -805,7 +817,9 @@ export async function computeConfirmationTab(
       totalOrders: pctChange(current.totalOrders, previous.totalOrders),
       confirmed: pctChange(current.confirmed, previous.confirmed),
       cancelled: pctChange(current.cancelled, previous.cancelled),
+      merged: pctChange(current.merged, previous.merged),
       confirmationRate: pctChange(current.confirmationRate, previous.confirmationRate),
+      mergedRate: pctChange(current.mergedRate, previous.mergedRate),
       avgConfirmationHours: pctChange(current.avgConfirmationHours, previous.avgConfirmationHours),
     },
   };

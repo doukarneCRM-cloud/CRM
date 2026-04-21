@@ -6,6 +6,7 @@ import {
   PhoneOff,
   Hourglass,
   Timer,
+  GitMerge,
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
@@ -74,7 +75,7 @@ export function ConfirmationTab() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
         <KPICard
           title="Total Orders"
           value={fmt(kpis?.totalOrders ?? 0)}
@@ -101,6 +102,13 @@ export function ConfirmationTab() {
           value={fmt(kpis?.unreachable ?? 0)}
           icon={PhoneOff}
           iconColor="#EF4444"
+        />
+        <KPICard
+          title="Merged"
+          value={`${fmt(kpis?.merged ?? 0)} · ${kpis ? kpis.mergedRate.toFixed(1) : '0.0'}%`}
+          icon={GitMerge}
+          iconColor="#F59E0B"
+          percentageChange={kpis?.percentageChanges.merged}
         />
         <KPICard
           title="Confirmation Rate"

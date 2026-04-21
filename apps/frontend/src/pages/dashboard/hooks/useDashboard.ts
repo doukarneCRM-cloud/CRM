@@ -24,9 +24,8 @@ export function useDashboard(options: UseDashboardOptions = {}): UseDashboardRet
   const fetch = useCallback(async () => {
     setLoading(true);
     try {
-      // Dashboard KPIs are company-wide — never scoped by the agent filter. Any
-      // agent filter set elsewhere in the app is intentionally ignored here.
       const result = await dashboardApi.get({
+        agentIds: filters.agentIds.length ? filters.agentIds.join(',') : undefined,
         cities: filters.cities.length ? filters.cities.join(',') : undefined,
         productIds: filters.productIds.length ? filters.productIds.join(',') : undefined,
         confirmationStatuses: filters.confirmationStatuses.length
@@ -48,6 +47,7 @@ export function useDashboard(options: UseDashboardOptions = {}): UseDashboardRet
       setLoading(false);
     }
   }, [
+    filters.agentIds,
     filters.cities,
     filters.productIds,
     filters.confirmationStatuses,
