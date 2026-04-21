@@ -96,6 +96,7 @@ export function buildOrderWhereClause(
       { coliixTrackingId: { contains: q, mode: 'insensitive' } },
       { customer: { fullName: { contains: q, mode: 'insensitive' } } },
       { customer: { phone: { contains: q, mode: 'insensitive' } } },
+      { customer: { phoneDisplay: { contains: q, mode: 'insensitive' } } },
       { customer: { city: { contains: q, mode: 'insensitive' } } },
     ];
   }
