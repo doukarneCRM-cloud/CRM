@@ -208,12 +208,15 @@ export async function getOrderById(id: string) {
   return order;
 }
 
-export async function getOrderLogs(orderId: string) {
+export async function getOrderLogs(orderId: string, includeSystem: boolean) {
   const exists = await prisma.order.findUnique({ where: { id: orderId }, select: { id: true } });
   if (!exists) throw { statusCode: 404, code: 'NOT_FOUND', message: 'Order not found' };
 
   return prisma.orderLog.findMany({
-    where: { orderId },
+    where: {
+      orderId,
+      ...(includeSystem ? {} : { type: { in: ['confirmation', 'shipping'] } }),
+    },
     orderBy: { createdAt: 'desc' },
   });
 }

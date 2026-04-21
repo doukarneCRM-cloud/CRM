@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Truck, Settings, Clock } from 'lucide-react';
 import { GlassModal } from '@/components/ui/GlassModal';
 import { ordersApi } from '@/services/ordersApi';
 import type { OrderLog } from '@/types/orders';
 import { cn } from '@/lib/cn';
+import { useAuthStore } from '@/store/authStore';
+import { PERMISSIONS } from '@/constants/permissions';
 
 // ─── Log type config ──────────────────────────────────────────────────────────
 
@@ -93,9 +95,17 @@ export function OrderLogsModal({
   defaultFilter = 'all',
   onClose,
 }: OrderLogsModalProps) {
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  // Agents working from the call center (without orders:view) only see
+  // confirmation + shipping tabs — the backend also filters system entries
+  // out of their response, so this just avoids showing empty tabs.
+  const canSeeAll = hasPermission(PERMISSIONS.ORDERS_VIEW);
+
   const [logs, setLogs] = useState<OrderLog[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<LogFilter>(defaultFilter);
+  const [activeFilter, setActiveFilter] = useState<LogFilter>(
+    canSeeAll ? defaultFilter : 'confirmation',
+  );
 
   useEffect(() => {
     if (!orderId) return;
@@ -106,15 +116,22 @@ export function OrderLogsModal({
       .finally(() => setLoading(false));
   }, [orderId]);
 
-  const filtered =
-    activeFilter === 'all' ? logs : logs.filter((l) => l.type === activeFilter);
+  const filtered = useMemo(
+    () => (activeFilter === 'all' ? logs : logs.filter((l) => l.type === activeFilter)),
+    [logs, activeFilter],
+  );
 
-  const filters: { key: LogFilter; label: string; count: number }[] = [
-    { key: 'all', label: 'All', count: logs.length },
-    { key: 'confirmation', label: 'Confirmation', count: logs.filter((l) => l.type === 'confirmation').length },
-    { key: 'shipping', label: 'Shipping', count: logs.filter((l) => l.type === 'shipping').length },
-    { key: 'system', label: 'System', count: logs.filter((l) => l.type === 'system').length },
-  ];
+  const filters: { key: LogFilter; label: string; count: number }[] = canSeeAll
+    ? [
+        { key: 'all', label: 'All', count: logs.length },
+        { key: 'confirmation', label: 'Confirmation', count: logs.filter((l) => l.type === 'confirmation').length },
+        { key: 'shipping', label: 'Shipping', count: logs.filter((l) => l.type === 'shipping').length },
+        { key: 'system', label: 'System', count: logs.filter((l) => l.type === 'system').length },
+      ]
+    : [
+        { key: 'confirmation', label: 'Confirmation', count: logs.filter((l) => l.type === 'confirmation').length },
+        { key: 'shipping', label: 'Shipping', count: logs.filter((l) => l.type === 'shipping').length },
+      ];
 
   return (
     <GlassModal

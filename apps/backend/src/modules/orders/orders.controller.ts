@@ -79,7 +79,13 @@ export async function showOrderLogs(
         });
       }
     }
-    const logs = await svc.getOrderLogs(request.params.id);
+    // Only admins / supervisors (holders of orders:view) see system-level
+    // entries like assignments, archives, merges. Agents working only from
+    // the call center see confirmation + shipping history.
+    const userId = request.user?.sub;
+    const perms = userId ? await getUserPermissions(userId) : new Set<string>();
+    const includeSystem = perms.has('orders:view');
+    const logs = await svc.getOrderLogs(request.params.id, includeSystem);
     return reply.send({ data: logs });
   } catch (err) {
     return replyError(reply, err);
