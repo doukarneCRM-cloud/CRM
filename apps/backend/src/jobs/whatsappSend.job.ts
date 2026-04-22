@@ -171,7 +171,7 @@ async function mirrorToInboxThread(
     },
   });
 
-  await prisma.whatsAppMessage.create({
+  const created = await prisma.whatsAppMessage.create({
     data: {
       threadId: thread.id,
       direction: 'out',
@@ -182,6 +182,10 @@ async function mirrorToInboxThread(
       messageLogId,
     },
   });
+
+  // Fan out to agent + admin monitor so inbox UIs update live.
+  const { broadcastMessage } = await import('../modules/whatsapp/inbox.service');
+  await broadcastMessage(thread.id, created.id);
 }
 
 // ─── DLQ on final failure ────────────────────────────────────────────────

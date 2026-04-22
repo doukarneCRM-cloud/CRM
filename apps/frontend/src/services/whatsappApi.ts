@@ -72,7 +72,11 @@ export const whatsappApi = {
     api.delete<{ ok: true }>(`/whatsapp/sessions/${id}`).then((r) => r.data),
 
   inbox: {
-    listThreads: (params: { scope?: 'mine' | 'all'; status?: WhatsAppThreadStatus } = {}) =>
+    listThreads: (params: {
+      scope?: 'mine' | 'all';
+      status?: WhatsAppThreadStatus;
+      agentId?: string;
+    } = {}) =>
       api
         .get<{ data: InboxThread[] }>('/whatsapp/inbox/threads', { params })
         .then((r) => r.data.data),

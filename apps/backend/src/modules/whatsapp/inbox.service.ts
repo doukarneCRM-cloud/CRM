@@ -53,8 +53,32 @@ export async function handleInboundMessage(event: InboundEvent): Promise<void> {
     },
   });
 
-  if (assignedAgentId) emitToUser(assignedAgentId, 'whatsapp:inbound', { thread, message });
-  emitToRoom('whatsapp:monitor', 'whatsapp:inbound', { thread, message });
+  await broadcastMessage(thread.id, message.id);
+}
+
+// Reload thread + message with include relations and fan out. Used by both
+// inbound ingestion and outbound (manual reply / dispatcher). Keeps the
+// socket payload shape identical so the UI can apply the same merge logic.
+export async function broadcastMessage(threadId: string, messageId: string) {
+  const [thread, message] = await Promise.all([
+    prisma.whatsAppThread.findUnique({
+      where: { id: threadId },
+      include: threadInclude,
+    }),
+    prisma.whatsAppMessage.findUnique({
+      where: { id: messageId },
+      include: { author: { select: { id: true, name: true } } },
+    }),
+  ]);
+  if (!thread || !message) return;
+  const payload = { thread, message };
+  if (thread.assignedAgentId) emitToUser(thread.assignedAgentId, 'whatsapp:message', payload);
+  emitToRoom('whatsapp:monitor', 'whatsapp:message', payload);
+  // Backward-compat: older clients only listen to whatsapp:inbound.
+  if (message.direction === 'in') {
+    if (thread.assignedAgentId) emitToUser(thread.assignedAgentId, 'whatsapp:inbound', payload);
+    emitToRoom('whatsapp:monitor', 'whatsapp:inbound', payload);
+  }
 }
 
 const OPT_OUT_ACK = 'Safi, ma ghadi n3awdouch nsifto lik ay message. Choukran.';
@@ -115,6 +139,16 @@ async function upsertThread(params: {
 }
 
 // ─── Reads ─────────────────────────────────────────────────────────────
+const threadInclude = {
+  customer: { select: { id: true, fullName: true, phoneDisplay: true, city: true, whatsappOptOut: true } },
+  assignedAgent: { select: { id: true, name: true } },
+  messages: {
+    orderBy: { createdAt: 'desc' as const },
+    take: 1,
+    select: { body: true, direction: true, createdAt: true },
+  },
+} as const;
+
 export async function listThreads(params: {
   agentId?: string;
   status?: WhatsAppThreadStatus;
@@ -127,15 +161,7 @@ export async function listThreads(params: {
     },
     orderBy: { lastMessageAt: 'desc' },
     take: Math.min(params.limit ?? 100, 200),
-    include: {
-      customer: { select: { id: true, fullName: true, phoneDisplay: true, city: true, whatsappOptOut: true } },
-      assignedAgent: { select: { id: true, name: true } },
-      messages: {
-        orderBy: { createdAt: 'desc' },
-        take: 1,
-        select: { body: true, direction: true, createdAt: true },
-      },
-    },
+    include: threadInclude,
   });
 }
 
@@ -201,12 +227,12 @@ export async function sendReply(params: {
 
   // Attach an outgoing message record tied to this log so the UI shows it
   // optimistically before Evolution ack's it.
-  await prisma.whatsAppMessage.create({
+  const outMsg = await prisma.whatsAppMessage.create({
     data: {
       threadId: thread.id,
       direction: 'out',
       body: params.body,
-      fromPhone: thread.customerPhone,
+      fromPhone: '',
       toPhone: recipient,
       messageLogId: log.id,
       authorUserId: params.authorUserId,
@@ -218,6 +244,8 @@ export async function sendReply(params: {
     where: { id: thread.id },
     data: { lastMessageAt: new Date() },
   });
+
+  await broadcastMessage(thread.id, outMsg.id);
 
   return { logId: log.id };
 }

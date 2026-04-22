@@ -12,10 +12,17 @@ export async function inboxRoutes(app: FastifyInstance) {
     '/threads',
     { preHandler: [verifyJWT, requirePermission('whatsapp:view')] },
     async (req, reply) => {
-      const q = req.query as { status?: WhatsAppThreadStatus; scope?: 'mine' | 'all' };
+      const q = req.query as {
+        status?: WhatsAppThreadStatus;
+        scope?: 'mine' | 'all';
+        agentId?: string;
+      };
       const scope = q.scope ?? 'mine';
+      // Explicit agentId wins over scope so admin can drill into a specific
+      // agent's threads; mine keeps its own-id shortcut for non-admins.
+      const agentId = q.agentId ? q.agentId : scope === 'mine' ? req.user.sub : undefined;
       const rows = await inbox.listThreads({
-        agentId: scope === 'mine' ? req.user.sub : undefined,
+        agentId,
         status: q.status,
       });
       return reply.send({ data: rows });
