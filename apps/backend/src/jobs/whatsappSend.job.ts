@@ -1,7 +1,9 @@
 import { whatsappQueue, type WhatsAppSendJobData } from '../shared/queue';
 import { prisma } from '../shared/prisma';
-import * as evolution from '../modules/whatsapp/evolutionClient';
+import { getProvider } from '../modules/whatsapp/provider';
 import { getSystemSessionId } from '../modules/automation/automation.service';
+
+const provider = getProvider();
 
 // Worker for the whatsapp:send queue. One job = one message. Resolves the
 // sender session at send-time (not enqueue-time) so a session that reconnects
@@ -54,8 +56,8 @@ whatsappQueue.process(async (job) => {
   }
 
   try {
-    const sent = await evolution.sendText(instanceName, log.recipientPhone, log.body);
-    const providerId = sent.key?.id ?? sent.messageId ?? null;
+    const sent = await provider.sendText(instanceName, log.recipientPhone, log.body);
+    const providerId = sent.providerId ?? null;
     await prisma.messageLog.update({
       where: { id: messageLogId },
       data: {

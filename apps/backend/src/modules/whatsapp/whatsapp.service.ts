@@ -1,6 +1,9 @@
 import type { MessageLogStatus, WhatsAppSessionStatus } from '@prisma/client';
 import { prisma } from '../../shared/prisma';
-import * as evolution from './evolutionClient';
+import { getProvider } from './provider';
+import { EvolutionError } from './evolutionClient';
+
+const provider = getProvider();
 
 // Evolution instance names must be stable + unique. Tie them to user id (or
 // "system" when no user) so deleting a user naturally drops their instance.
@@ -15,33 +18,26 @@ export async function listSessions() {
   });
 }
 
-// Per-session in-memory cache of the QR returned by /instance/create — v2
-// delivers it there and /instance/connect often returns empty until a new
-// QR is needed, so we hand it back on the first poll.
-const pendingQrByInstance = new Map<string, { base64?: string; code?: string; pairingCode?: string }>();
+// Per-session in-memory cache of the QR returned by the provider's create
+// call — Evolution v2 returns it there and /connect often comes back empty
+// until a new QR is needed, so we hand it back on the first poll.
+const pendingQrByInstance = new Map<string, { base64?: string; pairingCode?: string }>();
 
 export async function createSession(userId: string | null) {
-  // One-session-per-user rule — hit the unique index on userId.
   if (userId) {
     const existing = await prisma.whatsAppSession.findUnique({ where: { userId } });
     if (existing) return existing;
   }
   const instanceName = instanceNameFor(userId);
-  const created = await evolution.createInstance(instanceName);
-  console.log('[EVOLUTION create response]', instanceName, JSON.stringify(created));
-  if (created.qrcode?.base64 || created.qrcode?.code) {
+  const created = await provider.createInstance(instanceName);
+  if (created.qrBase64 || created.qrCode) {
     pendingQrByInstance.set(instanceName, {
-      base64: created.qrcode.base64,
-      code: created.qrcode.code,
-      pairingCode: created.qrcode.pairingCode,
+      base64: created.qrBase64,
+      pairingCode: created.pairingCode ?? created.qrCode,
     });
   }
   return prisma.whatsAppSession.create({
-    data: {
-      userId,
-      instanceName,
-      status: 'connecting',
-    },
+    data: { userId, instanceName, status: 'connecting' },
   });
 }
 
@@ -49,42 +45,34 @@ export async function getSessionQr(id: string) {
   const session = await prisma.whatsAppSession.findUnique({ where: { id } });
   if (!session) throw { statusCode: 404, code: 'NOT_FOUND', message: 'Session not found' };
 
-  let result: evolution.ConnectInstanceResponse;
+  let connected;
   try {
-    result = await evolution.connectInstance(session.instanceName);
-    console.log('[EVOLUTION connect response]', session.instanceName, JSON.stringify(result));
+    connected = await provider.connect(session.instanceName);
   } catch (err) {
-    // If the instance doesn't exist on Evolution (stale row from a failed
-    // previous create), recreate it transparently.
-    if (err instanceof evolution.EvolutionError && (err.status === 404 || err.status === 400)) {
-      const created = await evolution.createInstance(session.instanceName);
-      if (created.qrcode?.base64 || created.qrcode?.code) {
+    // Stale row whose instance was purged on the Evolution side — recreate.
+    if (err instanceof EvolutionError && (err.status === 404 || err.status === 400)) {
+      const created = await provider.createInstance(session.instanceName);
+      if (created.qrBase64 || created.qrCode) {
         pendingQrByInstance.set(session.instanceName, {
-          base64: created.qrcode.base64,
-          code: created.qrcode.code,
-          pairingCode: created.qrcode.pairingCode,
+          base64: created.qrBase64,
+          pairingCode: created.pairingCode ?? created.qrCode,
         });
       }
-      result = await evolution.connectInstance(session.instanceName).catch(() => ({}));
+      connected = await provider.connect(session.instanceName).catch(() => ({
+        state: 'connecting' as const,
+        qrBase64: null,
+        pairingCode: null,
+      }));
     } else {
       throw err;
     }
   }
 
-  // Normalize v2 shapes: QR can live at the top level or under `qrcode`.
-  const base64 = result.base64 ?? result.qrcode?.base64 ?? null;
-  const code = result.code ?? result.qrcode?.code ?? null;
-  const pairingCode = result.pairingCode ?? result.qrcode?.pairingCode ?? null;
-  const state = result.state ?? result.instance?.state ?? null;
-
-  // Fall back to the cached QR from the create call if the connect call
-  // came back empty (common on the very first poll in v2).
   const cached = pendingQrByInstance.get(session.instanceName);
-  const finalBase64 = base64 ?? cached?.base64 ?? null;
-  const finalPairing = pairingCode ?? code ?? cached?.pairingCode ?? cached?.code ?? null;
+  const finalBase64 = connected.qrBase64 ?? cached?.base64 ?? null;
+  const finalPairing = connected.pairingCode ?? cached?.pairingCode ?? null;
 
-  // Once paired (state=open), clear the cached QR and mark the row connected.
-  if (state === 'open' || state === 'connected') {
+  if (connected.state === 'connected') {
     pendingQrByInstance.delete(session.instanceName);
     if (session.status !== 'connected') {
       await prisma.whatsAppSession.update({
@@ -99,7 +87,7 @@ export async function getSessionQr(id: string) {
   return {
     qrBase64: finalBase64,
     pairingCode: finalPairing,
-    state: state ?? 'connecting',
+    state: connected.state,
   };
 }
 
@@ -107,9 +95,9 @@ export async function disconnectSession(id: string) {
   const session = await prisma.whatsAppSession.findUnique({ where: { id } });
   if (!session) throw { statusCode: 404, code: 'NOT_FOUND', message: 'Session not found' };
   try {
-    await evolution.logoutInstance(session.instanceName);
+    await provider.disconnect(session.instanceName);
   } catch {
-    // Logout can fail if the device is already offline — we still mark disconnected.
+    // Logout can fail if the device is already offline — proceed anyway.
   }
   await prisma.whatsAppSession.update({
     where: { id },
@@ -122,64 +110,63 @@ export async function deleteSession(id: string) {
   const session = await prisma.whatsAppSession.findUnique({ where: { id } });
   if (!session) throw { statusCode: 404, code: 'NOT_FOUND', message: 'Session not found' };
   try {
-    await evolution.deleteInstance(session.instanceName);
+    await provider.deleteInstance(session.instanceName);
   } catch {
-    // Instance may already be gone on Evolution side — proceed with row delete.
+    // Instance may already be gone on the provider — proceed with row delete.
   }
   await prisma.whatsAppSession.delete({ where: { id } });
   return { ok: true };
 }
 
-// ── Webhook ingestion ─────────────────────────────────────────────────────
-// Evolution posts events like:
-//   { event: 'connection.update', instance: 'user_abc', data: { state: 'open', wuid: '212...' } }
-//   { event: 'messages.update', instance: 'user_abc', data: { keyId: '...', status: 'DELIVERY_ACK' } }
-// Keep this tolerant — payload shape differs slightly across Evolution versions.
-interface WebhookPayload {
-  event?: string;
-  instance?: string;
-  data?: Record<string, unknown>;
-}
+// ─── Webhook ingestion ─────────────────────────────────────────────────────
+// All webhook payloads go through provider.parseWebhook() → normalized event.
+// One handler drives both Evolution and (future) Meta Cloud payloads.
+export async function ingestWebhook(payload: unknown) {
+  const event = provider.parseWebhook(payload);
+  if (event.type === 'ignored') return;
 
-export async function ingestWebhook(payload: WebhookPayload) {
-  const event = payload.event ?? '';
-  const instanceName = payload.instance;
-  if (!instanceName) return;
-
-  if (event === 'connection.update' || event === 'CONNECTION_UPDATE') {
-    const data = payload.data ?? {};
-    const state = String(data.state ?? '');
-    const wuid = typeof data.wuid === 'string' ? data.wuid : undefined;
-    let status: WhatsAppSessionStatus = 'disconnected';
-    if (state === 'open') status = 'connected';
-    else if (state === 'connecting') status = 'connecting';
-    else if (state === 'close') status = 'disconnected';
-
+  if (event.type === 'session_connected') {
     await prisma.whatsAppSession.updateMany({
-      where: { instanceName },
+      where: { instanceName: event.instance },
       data: {
-        status,
+        status: 'connected' as WhatsAppSessionStatus,
         lastHeartbeat: new Date(),
-        ...(status === 'connected' ? { connectedAt: new Date() } : {}),
-        ...(wuid ? { phoneNumber: wuid.split('@')[0] } : {}),
+        connectedAt: new Date(),
+        ...(event.phoneNumber ? { phoneNumber: event.phoneNumber } : {}),
       },
     });
     return;
   }
 
-  if (event === 'messages.update' || event === 'MESSAGES_UPDATE') {
-    const data = payload.data ?? {};
-    const keyId = typeof data.keyId === 'string' ? data.keyId : undefined;
-    const status = String(data.status ?? '').toUpperCase();
-    if (!keyId) return;
+  if (event.type === 'session_disconnected') {
+    await prisma.whatsAppSession.updateMany({
+      where: { instanceName: event.instance },
+      data: {
+        status: 'disconnected' as WhatsAppSessionStatus,
+        lastHeartbeat: new Date(),
+      },
+    });
+    return;
+  }
+
+  if (event.type === 'outbound_status') {
     let mapped: MessageLogStatus | null = null;
-    if (status === 'SERVER_ACK' || status === 'SENT') mapped = 'sent';
-    else if (status === 'DELIVERY_ACK' || status === 'DELIVERED') mapped = 'delivered';
-    else if (status === 'READ') mapped = 'delivered';
+    if (event.status === 'sent') mapped = 'sent';
+    else if (event.status === 'delivered' || event.status === 'read') mapped = 'delivered';
+    else if (event.status === 'failed') mapped = 'failed';
     if (!mapped) return;
     await prisma.messageLog.updateMany({
-      where: { providerId: keyId },
+      where: { providerId: event.providerId },
       data: { status: mapped },
     });
+    return;
+  }
+
+  if (event.type === 'inbound_message') {
+    // Inbound handling is owned by the inbox module — dynamic import keeps
+    // this file independent of the inbox schema and avoids a require cycle.
+    const { handleInboundMessage } = await import('./inbox.service');
+    await handleInboundMessage(event);
+    return;
   }
 }
