@@ -124,6 +124,48 @@ app.register(fastifyStatic, {
 app.setErrorHandler((error: FastifyError, _request, reply) => {
   app.log.error(error);
 
+  // Evolution (WhatsApp gateway) errors — surface the underlying message
+  // and status so the UI shows a diagnosable error instead of a generic 500.
+  if (error.name === 'EvolutionError') {
+    const ev = error as FastifyError & { status?: number; body?: unknown };
+    const status = ev.status ?? 502;
+    return reply.status(status).send({
+      error: {
+        code: 'WHATSAPP_GATEWAY_ERROR',
+        message: `WhatsApp gateway: ${error.message}`,
+        statusCode: status,
+      },
+    });
+  }
+
+  // WhatsApp gateway not configured (missing EVOLUTION_API_URL etc.)
+  if (error.message?.includes('EVOLUTION_API_URL is not configured')) {
+    return reply.status(503).send({
+      error: {
+        code: 'WHATSAPP_NOT_CONFIGURED',
+        message:
+          'WhatsApp gateway is not configured. Set EVOLUTION_API_URL and EVOLUTION_API_KEY.',
+        statusCode: 503,
+      },
+    });
+  }
+
+  // Domain errors thrown with a literal { statusCode, code, message } shape
+  // by service layers (e.g. inbox/automation). Without this they fall through
+  // to the 500 branch and get masked in production.
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'statusCode' in error &&
+    'code' in error &&
+    typeof (error as { statusCode: unknown }).statusCode === 'number'
+  ) {
+    const e = error as { statusCode: number; code: string; message: string };
+    return reply
+      .status(e.statusCode)
+      .send({ error: { code: e.code, message: e.message, statusCode: e.statusCode } });
+  }
+
   // Prisma known errors
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === 'P2002') {
