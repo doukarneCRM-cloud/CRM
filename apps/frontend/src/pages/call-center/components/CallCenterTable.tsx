@@ -28,6 +28,19 @@ function isCallbackOverdue(order: Order) {
   return new Date(order.callbackAt).getTime() <= Date.now();
 }
 
+// "Today" = the local calendar day. Any callback scheduled for today needs an
+// action from the agent today, whether the time has passed yet or not.
+function isCallbackToday(order: Order) {
+  if (order.confirmationStatus !== 'callback' || !order.callbackAt) return false;
+  const at = new Date(order.callbackAt);
+  const now = new Date();
+  return (
+    at.getFullYear() === now.getFullYear() &&
+    at.getMonth() === now.getMonth() &&
+    at.getDate() === now.getDate()
+  );
+}
+
 // Group order items by product name. When the same product has multiple
 // variants (e.g. Beige/S and Noir/M) we show a single product name followed
 // by a chip per variation, keeping the row compact but complete.
@@ -231,6 +244,11 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
   const { prefix, seq } = formatRef(order.reference);
   const { date, time } = formatDate(order.createdAt);
   const overdue = isCallbackOverdue(order);
+  const callbackToday = isCallbackToday(order);
+  // Past-due callbacks from earlier days get the red pulse; today's pending
+  // callbacks get an amber "call me today" highlight so agents can triage by
+  // urgency at a glance.
+  const todayHighlight = callbackToday && !overdue;
 
   const phoneDigits = order.customer.phoneDisplay.replace(/\D/g, '');
   const wa = `https://wa.me/${phoneDigits}`;
@@ -242,6 +260,7 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
         'md:flex md:flex-col md:gap-2 md:px-3 md:py-2.5',
         'md:hover:border-primary/30 md:hover:bg-primary/5 md:hover:shadow-sm',
         overdue && 'callback-pulse border-pink-300/70 bg-pink-50/60 md:hover:bg-pink-50',
+        todayHighlight && 'border-amber-300/70 bg-amber-50/70 md:hover:bg-amber-50',
         'shadow-card md:shadow-none',
       )}
     >
@@ -644,6 +663,17 @@ function FilterPills({ section, orders, selected, onChange }: FilterPillsProps) 
     return map;
   }, [orders, section]);
 
+  // Count callbacks that need a call today (scheduled for today OR overdue from
+  // earlier). Shown as a secondary badge on the Callback pill so agents know
+  // how many calls are waiting before they even click the filter.
+  const callbackTodayCount = useMemo(() => {
+    if (section !== 'confirmation') return 0;
+    return orders.reduce(
+      (n, o) => (isCallbackToday(o) || isCallbackOverdue(o) ? n + 1 : n),
+      0,
+    );
+  }, [orders, section]);
+
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       <button
@@ -665,6 +695,7 @@ function FilterPills({ section, orders, selected, onChange }: FilterPillsProps) 
         const count = counts.get(status) ?? 0;
         if (count === 0) return null;
         const active = selected === status;
+        const showTodayBadge = status === 'callback' && callbackTodayCount > 0;
         return (
           <button
             key={status}
@@ -676,12 +707,18 @@ function FilterPills({ section, orders, selected, onChange }: FilterPillsProps) 
                 ? cn(cfg.bg, cfg.text, 'ring-2 ring-primary/40 shadow-sm')
                 : cn(cfg.bg, cfg.text, 'opacity-70 hover:opacity-100'),
             )}
+            title={showTodayBadge ? `${callbackTodayCount} to call today` : undefined}
           >
             <span className={cn('h-1.5 w-1.5 rounded-full', cfg.dot)} />
             {cfg.label}
             <span className="rounded-full bg-white/60 px-1.5 text-[10px] font-bold">
               {count}
             </span>
+            {showTodayBadge && (
+              <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                <Phone size={8} /> {callbackTodayCount} today
+              </span>
+            )}
           </button>
         );
       })}
