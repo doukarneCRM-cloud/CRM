@@ -442,7 +442,7 @@ export function OrdersTable({
               <button
                 onClick={() => onViewLogs(row.original, 'confirmation')}
                 title="View confirmation history"
-                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-gray-300 transition-colors hover:bg-gray-100 hover:text-gray-500"
+                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-gray-900 transition-colors hover:bg-gray-100 hover:text-gray-700"
               >
                 <History size={11} />
               </button>
@@ -454,7 +454,7 @@ export function OrdersTable({
               <button
                 onClick={() => onViewLogs(row.original, 'shipping')}
                 title="View shipping history"
-                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-gray-300 transition-colors hover:bg-gray-100 hover:text-gray-500"
+                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-gray-900 transition-colors hover:bg-gray-100 hover:text-gray-700"
               >
                 <History size={11} />
               </button>

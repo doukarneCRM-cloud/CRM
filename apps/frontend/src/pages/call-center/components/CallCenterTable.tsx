@@ -395,7 +395,7 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
               <button
                 type="button"
                 onClick={() => onOpenLogs(order, 'confirmation')}
-                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-gray-400 active:bg-gray-100 active:text-primary"
+                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-gray-900 active:bg-gray-100 active:text-primary"
                 title="Confirmation history"
               >
                 <History size={12} />
@@ -406,7 +406,7 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
               <button
                 type="button"
                 onClick={() => onOpenLogs(order, 'shipping')}
-                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-gray-400 active:bg-gray-100 active:text-primary"
+                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-gray-900 active:bg-gray-100 active:text-primary"
                 title="Shipping history"
               >
                 <History size={12} />
@@ -572,7 +572,7 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
             <button
               type="button"
               onClick={() => onOpenLogs(order, 'confirmation')}
-              className="inline-flex h-5 w-5 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-primary"
+              className="inline-flex h-5 w-5 items-center justify-center rounded-full text-gray-900 hover:bg-gray-100 hover:text-primary"
               title="Confirmation history"
             >
               <History size={11} />
@@ -581,7 +581,7 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
             <button
               type="button"
               onClick={() => onOpenLogs(order, 'shipping')}
-              className="inline-flex h-5 w-5 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-primary"
+              className="inline-flex h-5 w-5 items-center justify-center rounded-full text-gray-900 hover:bg-gray-100 hover:text-primary"
               title="Shipping history"
             >
               <History size={11} />
