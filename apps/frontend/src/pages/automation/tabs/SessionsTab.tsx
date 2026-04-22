@@ -85,12 +85,10 @@ export function SessionsTab() {
       setSessions((list) => [...list, created]);
       setQrSession(created);
       setNewUserId('');
-    } catch (e: any) {
-      pushToast({
-        kind: 'error',
-        title: 'Failed to create session',
-        body: e?.response?.data?.error ?? undefined,
-      });
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { error?: { message?: string } } }; message?: string };
+      const msg = err?.response?.data?.error?.message ?? err?.message ?? 'Unknown error';
+      pushToast({ kind: 'error', title: 'Failed to create session', body: msg });
     }
   };
 
