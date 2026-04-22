@@ -12,10 +12,34 @@ function instanceNameFor(userId: string | null): string {
 }
 
 export async function listSessions() {
-  return prisma.whatsAppSession.findMany({
+  const rows = await prisma.whatsAppSession.findMany({
     orderBy: { createdAt: 'asc' },
     include: { user: { select: { id: true, name: true, phone: true } } },
   });
+  // Reconcile sessions whose DB status lags the provider. Evolution's
+  // connection-update webhook can be missed (brief network blip, cold
+  // deploys) so we resync on every list; cheap because it's per-instance
+  // and only runs for rows not already marked connected.
+  await Promise.all(
+    rows
+      .filter((r) => r.status !== 'connected')
+      .map(async (r) => {
+        try {
+          const result = await provider.connect(r.instanceName);
+          if (result.state === 'connected' && r.status !== 'connected') {
+            await prisma.whatsAppSession.update({
+              where: { id: r.id },
+              data: { status: 'connected', connectedAt: new Date() },
+            });
+            r.status = 'connected';
+            r.connectedAt = new Date();
+          }
+        } catch {
+          /* provider unreachable — leave status as-is */
+        }
+      }),
+  );
+  return rows;
 }
 
 // Per-session in-memory cache of the latest QR. Evolution v2.2.3's HTTP
