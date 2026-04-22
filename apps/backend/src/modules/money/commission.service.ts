@@ -6,6 +6,7 @@
 
 import { prisma } from '../../shared/prisma';
 import { computeAgentCommission } from '../../utils/kpiCalculator';
+import { dispatchCommissionPaid } from '../automation/dispatcher';
 
 export interface AgentCommissionRow {
   agentId: string;
@@ -195,6 +196,10 @@ export async function recordCommissionPayment(
       },
     });
 
+    return payment;
+  }).then(async (payment) => {
+    // Automation — commission-paid WhatsApp DM to the agent (fire-and-forget).
+    void dispatchCommissionPaid(payment.id);
     return payment;
   });
 }

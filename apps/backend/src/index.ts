@@ -48,7 +48,13 @@ import { analyticsRoutes } from './modules/analytics/analytics.routes';
 import { moneyRoutes } from './modules/money/money.routes';
 import { returnsRoutes } from './modules/returns/returns.routes';
 import { notificationsRoutes } from './modules/notifications/notifications.routes';
+import { automationRoutes } from './modules/automation/automation.routes';
+import { whatsappRoutes } from './modules/whatsapp/whatsapp.routes';
+import { ensureDefaultTemplates } from './modules/automation/automation.service';
 import { startAttendanceCron } from './modules/atelie/weeklyAttendanceCron';
+// Bull workers — side-effect imports register .process() handlers.
+import './jobs/callbackAlert.job';
+import './jobs/whatsappSend.job';
 import { simulateAssign } from './utils/autoAssign';
 import {
   computeKPIsWithComparison,
@@ -93,6 +99,9 @@ app.register(rateLimit, {
   max: 200,
   timeWindow: '1 minute',
   keyGenerator: (req) => req.ip,
+  // Evolution can burst dozens of webhook events per second while a session
+  // is negotiating — the global 200/min limit isn't meant to apply to them.
+  allowList: (req) => req.url.startsWith('/api/v1/whatsapp/webhook'),
 });
 
 // Multipart (file uploads) — 8 MB per file, images only enforced in handler
@@ -365,6 +374,12 @@ app.register(returnsRoutes, { prefix: '/api/v1/returns' });
 // Notifications — per-user bell feed (assignment, confirmed, etc).
 app.register(notificationsRoutes, { prefix: '/api/v1/notifications' });
 
+// Automation — WhatsApp message templates, logs, and system-sender selector.
+app.register(automationRoutes, { prefix: '/api/v1/automation' });
+
+// WhatsApp — Evolution session lifecycle + gateway webhook ingestion.
+app.register(whatsappRoutes, { prefix: '/api/v1/whatsapp' });
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 const PORT = Number(process.env.PORT ?? 3001);
 
@@ -392,6 +407,12 @@ async function start() {
     // Seed the current week's attendance rows for every active employee on
     // boot + hourly (covers Monday rollover without a separate scheduler).
     startAttendanceCron();
+
+    // Automation — seed a disabled MessageTemplate row for every trigger so
+    // the UI has something to render on first boot.
+    ensureDefaultTemplates().catch((err) => {
+      app.log.warn({ err }, 'Failed to seed automation templates');
+    });
 
     console.log(`🚀 Backend on http://localhost:${PORT}`);
   } catch (err) {

@@ -50,6 +50,10 @@ const ALL_PERMISSIONS = [
   { key: 'money:view', label: 'View Money' },
   { key: 'money:manage', label: 'Manage Money (record payments, mark paid)' },
   { key: 'returns:verify', label: 'Verify Physical Returns' },
+  { key: 'automation:view', label: 'View Automation Board' },
+  { key: 'automation:manage', label: 'Manage Automation Templates' },
+  { key: 'whatsapp:view', label: 'View WhatsApp Sessions' },
+  { key: 'whatsapp:connect', label: 'Connect WhatsApp Sessions (QR)' },
 ];
 
 const ROLE_PERMISSION_MAP: Record<string, string[]> = {

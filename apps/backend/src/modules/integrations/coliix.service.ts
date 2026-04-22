@@ -19,6 +19,7 @@ import { emitToRoom } from '../../shared/socket';
 import { createParcel, ColiixError } from './coliixClient';
 import { mapColiixState } from './coliixStateMap';
 import type { JwtPayload } from '../../shared/jwt';
+import { dispatchOrderStatusChange } from '../automation/dispatcher';
 
 export interface ExportResult {
   orderId: string;
@@ -258,6 +259,7 @@ export async function ingestStatus(input: {
     select: {
       id: true,
       reference: true,
+      confirmationStatus: true,
       shippingStatus: true,
       deliveredAt: true,
     },
@@ -332,6 +334,12 @@ export async function ingestStatus(input: {
   // Instant UI refresh for everyone viewing orders.
   emitToRoom('orders:all', 'order:updated', { orderId: order.id });
   emitToRoom('dashboard', 'kpi:refresh', {});
+
+  // Automation — WhatsApp client notification for the new shipping state.
+  void dispatchOrderStatusChange(order.id, {
+    prev: { confirmation: order.confirmationStatus, shipping: order.shippingStatus },
+    next: { confirmation: order.confirmationStatus, shipping: mapped },
+  });
 
   return {
     matched: true,

@@ -10,6 +10,7 @@ import { parsePagination, paginatedResponse } from '../../utils/pagination';
 import { normalizePhone } from '../../utils/phoneNormalize';
 import { triggerOutOfStock } from '../../utils/stockEffects';
 import { autoAssign } from '../../utils/autoAssign';
+import { dispatchOrderStatusChange } from '../automation/dispatcher';
 import type { JwtPayload } from '../../shared/jwt';
 import { getActorName } from '../../shared/actorName';
 import type {
@@ -735,6 +736,16 @@ export async function updateOrderStatus(id: string, input: UpdateStatusInput, ac
     emitToRoom(`agent:${order.agent.id}`, 'order:updated', { orderId: id });
   }
   emitToRoom('dashboard', 'kpi:refresh', {});
+
+  // Automation — enqueues a WhatsApp message if the matching template is enabled.
+  // Fire-and-forget; dispatcher handles its own errors and idempotency.
+  void dispatchOrderStatusChange(id, {
+    prev: { confirmation: order.confirmationStatus, shipping: order.shippingStatus },
+    next: {
+      confirmation: (updateData.confirmationStatus as typeof order.confirmationStatus) ?? order.confirmationStatus,
+      shipping: (updateData.shippingStatus as typeof order.shippingStatus) ?? order.shippingStatus,
+    },
+  });
 
   // Toast/sound trigger for admin when an order transitions to confirmed
   if (
