@@ -745,8 +745,18 @@ export async function importSingleOrder(
   const defaultName = cust?.full_name ?? (`${cust?.first_name ?? ''} ${cust?.last_name ?? ''}`.trim() || 'YouCan Customer');
   const defaultPhone = cust?.phone ?? '';
   const defaultCity = cust?.city ?? 'Unknown';
-  const defaultAddress = [yo.shipping?.address?.first_line, yo.shipping?.address?.second_line]
-    .filter(Boolean).join(', ') || null;
+  // YouCan's checkout puts the street address in `customer.region` (their
+  // "region" field is what the merchant labels "Adresse" in the form). The
+  // documented `shipping.address.*` shape isn't actually returned by the live
+  // API, so treat those as last-resort fallbacks only.
+  const custAny = cust as Record<string, unknown> | undefined;
+  const defaultAddress =
+    (typeof custAny?.region === 'string' && custAny.region.trim()) ||
+    (typeof custAny?.location === 'string' && custAny.location.replace(/,\s*$/, '').trim()) ||
+    [yo.shipping?.address?.first_line, yo.shipping?.address?.second_line]
+      .filter(Boolean)
+      .join(', ') ||
+    null;
 
   const name = resolveField('name', yo, fieldMapping) || defaultName;
   const phone = resolveField('phone', yo, fieldMapping) || defaultPhone;
@@ -1085,8 +1095,11 @@ export interface CheckoutField {
 }
 
 // Map a YouCan checkout-field `name` → JSON dot-path inside an order payload.
-// Built-in fields land under customer.* or shipping.address.* (see order docs);
-// anything custom comes through under extra_fields.*.
+// The live YouCan API returns address-ish fields flattened under `customer.*`
+// (e.g. customer.city, customer.region — their "region" is actually the free-
+// text street/address line). The documented nested `shipping.address.*` shape
+// isn't returned in practice, so we map built-ins to customer.* paths.
+// Custom checkout fields still come through under extra_fields.*.
 const STANDARD_FIELD_PATHS: Record<string, string> = {
   full_name: 'customer.full_name',
   first_name: 'customer.first_name',
@@ -1096,28 +1109,28 @@ const STANDARD_FIELD_PATHS: Record<string, string> = {
   email: 'customer.email',
   company: 'customer.company',
 
-  address: 'shipping.address.first_line',
-  address_1: 'shipping.address.first_line',
-  address1: 'shipping.address.first_line',
-  first_line: 'shipping.address.first_line',
+  address: 'customer.region',
+  address_1: 'customer.region',
+  address1: 'customer.region',
+  first_line: 'customer.region',
 
-  address_2: 'shipping.address.second_line',
-  address2: 'shipping.address.second_line',
-  second_line: 'shipping.address.second_line',
+  address_2: 'customer.location',
+  address2: 'customer.location',
+  second_line: 'customer.location',
 
-  city: 'shipping.address.city',
-  region: 'shipping.address.region',
-  state: 'shipping.address.region',
-  province: 'shipping.address.region',
+  city: 'customer.city',
+  region: 'customer.region',
+  state: 'customer.region',
+  province: 'customer.region',
 
-  zip_code: 'shipping.address.zip_code',
-  zipcode: 'shipping.address.zip_code',
-  postal_code: 'shipping.address.zip_code',
-  postcode: 'shipping.address.zip_code',
-  zip: 'shipping.address.zip_code',
+  zip_code: 'customer.zip_code',
+  zipcode: 'customer.zip_code',
+  postal_code: 'customer.zip_code',
+  postcode: 'customer.zip_code',
+  zip: 'customer.zip_code',
 
-  country: 'shipping.address.country',
-  shipping_phone: 'shipping.address.phone',
+  country: 'customer.country',
+  shipping_phone: 'customer.phone',
 
   note: 'notes',
   notes: 'notes',
@@ -1156,11 +1169,9 @@ const DEFAULT_CHECKOUT_FIELDS: CheckoutField[] = [
   { path: 'customer.last_name', label: 'Customer → Last Name', sample: '' },
   { path: 'customer.phone', label: 'Customer → Phone', sample: '' },
   { path: 'customer.email', label: 'Customer → Email', sample: '' },
-  { path: 'shipping.address.first_line', label: 'Shipping → Address → First Line', sample: '' },
-  { path: 'shipping.address.second_line', label: 'Shipping → Address → Second Line', sample: '' },
-  { path: 'shipping.address.city', label: 'Shipping → Address → City', sample: '' },
-  { path: 'shipping.address.region', label: 'Shipping → Address → Region', sample: '' },
-  { path: 'shipping.address.zip_code', label: 'Shipping → Address → Zip Code', sample: '' },
+  { path: 'customer.region', label: 'Customer → Address (region)', sample: '' },
+  { path: 'customer.city', label: 'Customer → City', sample: '' },
+  { path: 'customer.country', label: 'Customer → Country', sample: '' },
   { path: 'notes', label: 'Notes', sample: '' },
 ];
 

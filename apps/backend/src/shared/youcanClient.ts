@@ -119,8 +119,12 @@ export interface YoucanOrder {
     email: string | null;
     phone: string | null;
     country: string | null;
+    // `region` is YouCan's checkout field that merchants typically label as
+    // the street/address line (not a province). Free-text from the form.
     region: string | null;
     city: string | null;
+    location: string | null;
+    zip_code?: string | null;
   };
   // YouCan order line items are nested: each entry is a line-item wrapper whose
   // `variant` field holds the real variant object, which in turn has a `product`
