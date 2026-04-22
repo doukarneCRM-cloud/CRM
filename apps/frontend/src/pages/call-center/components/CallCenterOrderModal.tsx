@@ -373,7 +373,7 @@ export function CallCenterOrderModal() {
 
   // ── Save (customer + items + fields) ─────────────────────────────────────
 
-  const persistDraft = async () => {
+  const persistDraft = async (opts: { skipItems?: boolean } = {}) => {
     if (!order || !form) return;
     const customerDirty =
       form.customerName !== order.customer.fullName ||
@@ -384,6 +384,7 @@ export function CallCenterOrderModal() {
       form.discountAmount !== (order.discountAmount != null ? String(order.discountAmount) : '') ||
       form.confirmationNote !== (order.confirmationNote ?? '') ||
       form.shippingInstruction !== (order.shippingInstruction ?? '');
+    const includeItems = itemsDirty && !opts.skipItems;
 
     const tasks: Promise<unknown>[] = [];
     if (customerDirty) {
@@ -395,14 +396,14 @@ export function CallCenterOrderModal() {
         }),
       );
     }
-    if (fieldsDirty || itemsDirty) {
+    if (fieldsDirty || includeItems) {
       const payload: Record<string, unknown> = {
         discountType: form.discountType || null,
         discountAmount: form.discountAmount ? parseFloat(form.discountAmount) : null,
         confirmationNote: form.confirmationNote || null,
         shippingInstruction: form.shippingInstruction || null,
       };
-      if (itemsDirty) {
+      if (includeItems) {
         payload.items = items.map((it) => ({
           variantId: it.variantId,
           quantity: it.quantity,
@@ -437,12 +438,20 @@ export function CallCenterOrderModal() {
 
   // Persist any pending edits, then apply the status change. Status actions
   // carry the confirmation note through so it lands on the log too.
+  // For non-fulfillment transitions (out_of_stock, cancelled, fake, unreachable)
+  // we skip item persistence: the agent only needs to flag the order, and a
+  // dirty item row that picked an OOS variant would otherwise be rejected by
+  // the stock-gated decrement in updateOrder.
+  const NON_FULFILLMENT = new Set(['out_of_stock', 'cancelled', 'fake', 'unreachable']);
   const runStatusUpdate = async (payload: Parameters<typeof ordersApi.updateStatus>[1]) => {
     if (!order) return;
     setStatusBusy(true);
     setError(null);
     try {
-      if (dirty) await persistDraft();
+      const skipItems = payload.confirmationStatus
+        ? NON_FULFILLMENT.has(payload.confirmationStatus)
+        : false;
+      if (dirty) await persistDraft({ skipItems });
       await ordersApi.updateStatus(order.id, payload);
       triggerRefresh();
       closeOrder();

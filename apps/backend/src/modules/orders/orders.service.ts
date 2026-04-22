@@ -572,6 +572,7 @@ export async function updateOrderStatus(id: string, input: UpdateStatusInput, ac
       unreachableCount: true,
       customer: { select: { city: true, fullName: true } },
       agent: { select: { id: true, name: true } },
+      items: { select: { variantId: true, quantity: true } },
     },
   });
   if (!order) throw { statusCode: 404, code: 'NOT_FOUND', message: 'Order not found' };
@@ -673,6 +674,12 @@ export async function updateOrderStatus(id: string, input: UpdateStatusInput, ac
     if (amount > 0) updateData.commissionAmount = amount;
   }
 
+  // Cancelling a previously-confirmed order releases the stock back to the
+  // pool — the items were effectively reserved once the agent confirmed, and
+  // the parcel never shipped, so nothing physically left the warehouse.
+  const restoringStock =
+    order.confirmationStatus === 'confirmed' && input.confirmationStatus === 'cancelled';
+
   await prisma.$transaction(async (tx) => {
     // Re-check labelSent inside the transaction: a Coliix webhook could
     // have flipped it between our initial read and this write.
@@ -688,6 +695,14 @@ export async function updateOrderStatus(id: string, input: UpdateStatusInput, ac
       };
     }
     await tx.order.update({ where: { id }, data: updateData });
+    if (restoringStock) {
+      for (const item of order.items) {
+        await tx.productVariant.update({
+          where: { id: item.variantId },
+          data: { stock: { increment: item.quantity } },
+        });
+      }
+    }
     await tx.orderLog.create({
       data: {
         orderId: id,
@@ -698,6 +713,19 @@ export async function updateOrderStatus(id: string, input: UpdateStatusInput, ac
         meta: input.note ? { note: input.note } : undefined,
       },
     });
+    if (restoringStock) {
+      await tx.orderLog.create({
+        data: {
+          orderId: id,
+          type: 'system',
+          action: `Stock restored for ${order.items.length} item(s) — order was confirmed, now cancelled`,
+          performedBy: 'System',
+          meta: {
+            restored: order.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity })),
+          },
+        },
+      });
+    }
   });
 
   const updatedOrder = await prisma.order.findUnique({ where: { id }, include: ORDER_FULL_INCLUDE });
