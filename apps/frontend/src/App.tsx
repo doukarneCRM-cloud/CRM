@@ -32,6 +32,7 @@ import ProductTestDetailPage from '@/pages/production/ProductTestDetailPage';
 import ProductionRunsListPage from '@/pages/production/ProductionRunsListPage';
 import ProductionRunDetailPage from '@/pages/production/ProductionRunDetailPage';
 import SettingsPage from '@/pages/settings/SettingsPage';
+import AutomationPage from '@/pages/automation/AutomationPage';
 
 // Dev
 import ComponentsPage from '@/pages/dev/ComponentsPage';
@@ -220,6 +221,15 @@ export default function App() {
             element={
               <PermissionGuard requires={PERMISSIONS.PRODUCTION_VIEW}>
                 <ProductionRunDetailPage />
+              </PermissionGuard>
+            }
+          />
+
+          <Route
+            path={ROUTES.AUTOMATION}
+            element={
+              <PermissionGuard requires={PERMISSIONS.AUTOMATION_VIEW}>
+                <AutomationPage />
               </PermissionGuard>
             }
           />

@@ -50,6 +50,9 @@ export const ROUTES = {
   PRODUCTION_RUNS: '/production/runs',
   PRODUCTION_RUN_DETAIL: '/production/runs/:id',
 
+  // Automation
+  AUTOMATION: '/automation',
+
   // Settings
   SETTINGS: '/settings',
 

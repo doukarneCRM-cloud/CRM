@@ -74,6 +74,12 @@ export const PERMISSIONS = {
 
   // Returns
   RETURNS_VERIFY: 'returns:verify',
+
+  // Automation
+  AUTOMATION_VIEW: 'automation:view',
+  AUTOMATION_MANAGE: 'automation:manage',
+  WHATSAPP_VIEW: 'whatsapp:view',
+  WHATSAPP_CONNECT: 'whatsapp:connect',
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

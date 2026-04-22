@@ -13,6 +13,7 @@ import {
   Wallet,
   PackageSearch,
   Scissors,
+  MessageCircle,
   ChevronLeft,
   LogOut,
   X,
@@ -63,6 +64,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     dividerBefore: true,
     items: [
+      { label: 'Automation', icon: MessageCircle, to: ROUTES.AUTOMATION, permission: PERMISSIONS.AUTOMATION_VIEW },
       { label: 'Settings', icon: Settings, to: ROUTES.SETTINGS, permission: PERMISSIONS.SETTINGS_VIEW },
     ],
   },
