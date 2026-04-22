@@ -56,15 +56,15 @@ export const CONFIRMATION_STATUS_COLORS: Record<ConfirmationStatus, StatusConfig
   },
   cancelled: {
     label: 'Cancelled',
-    bg: 'bg-gray-100',
-    text: 'text-gray-600',
-    dot: 'bg-gray-400',
-  },
-  unreachable: {
-    label: 'Unreachable',
     bg: 'bg-red-100',
     text: 'text-red-700',
     dot: 'bg-red-500',
+  },
+  unreachable: {
+    label: 'Unreachable',
+    bg: 'bg-[#FF962E]/15',
+    text: 'text-[#FF962E]',
+    dot: 'bg-[#FF962E]',
   },
   callback: {
     label: 'Callback',
