@@ -51,6 +51,7 @@ import { notificationsRoutes } from './modules/notifications/notifications.route
 import { automationRoutes } from './modules/automation/automation.routes';
 import { whatsappRoutes } from './modules/whatsapp/whatsapp.routes';
 import { ensureDefaultTemplates } from './modules/automation/automation.service';
+import { ensureAdminPermissions } from './shared/ensureAdminPermissions';
 import { startAttendanceCron } from './modules/atelie/weeklyAttendanceCron';
 // Bull workers — side-effect imports register .process() handlers.
 import './jobs/callbackAlert.job';
@@ -412,6 +413,13 @@ async function start() {
     // the UI has something to render on first boot.
     ensureDefaultTemplates().catch((err) => {
       app.log.warn({ err }, 'Failed to seed automation templates');
+    });
+
+    // Keep the admin role synced with the canonical permission list on every
+    // boot. Covers new perm keys added post-launch (the seed script doesn't
+    // auto-run on Railway deploys) and busts the RBAC cache for admin users.
+    ensureAdminPermissions().catch((err) => {
+      app.log.warn({ err }, 'Failed to sync admin permissions');
     });
 
     console.log(`🚀 Backend on http://localhost:${PORT}`);
