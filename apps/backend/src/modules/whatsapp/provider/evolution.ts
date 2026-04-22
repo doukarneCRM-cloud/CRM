@@ -62,6 +62,23 @@ export const evolutionProvider: WhatsAppProvider = {
     const instance = payload.instance;
     if (!instance) return { type: 'ignored' };
 
+    if (event === 'qrcode.updated' || event === 'QRCODE_UPDATED') {
+      const data = payload.data ?? {};
+      // Evolution v2 emits either a flat `qrcode` shape or the top-level
+      // fields. Accept both.
+      const qrcode = (data.qrcode ?? data) as {
+        base64?: string;
+        code?: string;
+        pairingCode?: string;
+      };
+      return {
+        type: 'qr_updated',
+        instance,
+        qrBase64: qrcode.base64,
+        pairingCode: qrcode.pairingCode ?? qrcode.code,
+      };
+    }
+
     if (event === 'connection.update' || event === 'CONNECTION_UPDATE') {
       const data = payload.data ?? {};
       const state = String(data.state ?? '');

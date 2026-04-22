@@ -70,7 +70,7 @@ export async function createInstance(instanceName: string): Promise<CreateInstan
     body.webhook = {
       url: WEBHOOK_URL,
       byEvents: false,
-      events: ['CONNECTION_UPDATE', 'MESSAGES_UPDATE'],
+      events: ['QRCODE_UPDATED', 'CONNECTION_UPDATE', 'MESSAGES_UPDATE', 'MESSAGES_UPSERT'],
     };
   }
   return request<CreateInstanceResponse>('POST', '/instance/create', body);

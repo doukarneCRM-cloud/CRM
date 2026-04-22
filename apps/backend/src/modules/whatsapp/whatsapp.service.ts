@@ -18,10 +18,19 @@ export async function listSessions() {
   });
 }
 
-// Per-session in-memory cache of the QR returned by the provider's create
-// call — Evolution v2 returns it there and /connect often comes back empty
-// until a new QR is needed, so we hand it back on the first poll.
+// Per-session in-memory cache of the latest QR. Evolution v2.2.3's HTTP
+// endpoints return `{count}` only — the actual QR arrives via the
+// `QRCODE_UPDATED` webhook event, so we cache it here as it comes in and
+// serve it to the UI poller.
 const pendingQrByInstance = new Map<string, { base64?: string; pairingCode?: string }>();
+
+export function cacheQrForInstance(instance: string, qr: { base64?: string; pairingCode?: string }) {
+  pendingQrByInstance.set(instance, qr);
+}
+
+export function clearQrForInstance(instance: string) {
+  pendingQrByInstance.delete(instance);
+}
 
 export async function createSession(userId: string | null) {
   if (userId) {
@@ -124,6 +133,16 @@ export async function deleteSession(id: string) {
 export async function ingestWebhook(payload: unknown) {
   const event = provider.parseWebhook(payload);
   if (event.type === 'ignored') return;
+
+  if (event.type === 'qr_updated') {
+    if (event.qrBase64 || event.pairingCode) {
+      pendingQrByInstance.set(event.instance, {
+        base64: event.qrBase64,
+        pairingCode: event.pairingCode,
+      });
+    }
+    return;
+  }
 
   if (event.type === 'session_connected') {
     await prisma.whatsAppSession.updateMany({

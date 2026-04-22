@@ -26,6 +26,7 @@ export interface SendTextResult {
 export type NormalizedEvent =
   | { type: 'session_connected'; instance: string; phoneNumber?: string }
   | { type: 'session_disconnected'; instance: string }
+  | { type: 'qr_updated'; instance: string; qrBase64?: string; pairingCode?: string }
   | {
       type: 'outbound_status';
       instance: string;
