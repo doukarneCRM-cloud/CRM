@@ -491,13 +491,100 @@ export async function computeAgentCommission(
 /**
  * Bulk variant — returns a Map<agentId, AgentCommission> for a set of agents.
  * Every id in the input appears in the output, even with zero orders.
+ *
+ * Uses 4 groupBy queries across all agents instead of 4×N serial queries.
+ * Prevents connection-pool exhaustion when the agent list grows.
  */
 export async function computeAgentCommissionByIds(
   userIds: string[],
 ): Promise<Map<string, AgentCommission>> {
   const out = new Map<string, AgentCommission>();
-  const results = await Promise.all(userIds.map((id) => computeAgentCommission(id)));
-  userIds.forEach((id, i) => out.set(id, results[i]));
+  for (const id of userIds) {
+    out.set(id, {
+      onConfirmRate: 0,
+      onDeliverRate: 0,
+      perOrderRate: 0,
+      deliveredCount: 0,
+      paidCount: 0,
+      pendingCount: 0,
+      paidTotal: 0,
+      pendingTotal: 0,
+      total: 0,
+    });
+  }
+  if (userIds.length === 0) return out;
+
+  const base = {
+    agentId: { in: userIds },
+    isArchived: false,
+    shippingStatus: 'delivered' as const,
+  };
+
+  const [rules, paidGroups, pendingGroups, pendingLegacyGroups] = await Promise.all([
+    prisma.commissionRule.findMany({
+      where: { agentId: { in: userIds } },
+      select: { agentId: true, type: true, value: true },
+    }),
+    prisma.order.groupBy({
+      by: ['agentId'],
+      where: { ...base, commissionPaid: true, commissionAmount: { not: null } },
+      _sum: { commissionAmount: true },
+      _count: { _all: true },
+    }),
+    prisma.order.groupBy({
+      by: ['agentId'],
+      where: { ...base, commissionPaid: false, commissionAmount: { not: null } },
+      _sum: { commissionAmount: true },
+      _count: { _all: true },
+    }),
+    prisma.order.groupBy({
+      by: ['agentId'],
+      where: { ...base, commissionPaid: false, commissionAmount: null },
+      _count: { _all: true },
+    }),
+  ]);
+
+  for (const r of rules) {
+    if (!r.agentId) continue;
+    const s = out.get(r.agentId);
+    if (!s) continue;
+    if (r.type === 'onConfirm') s.onConfirmRate = r.value;
+    if (r.type === 'onDeliver') s.onDeliverRate = r.value;
+  }
+  for (const s of out.values()) s.perOrderRate = s.onConfirmRate + s.onDeliverRate;
+
+  for (const g of paidGroups) {
+    if (!g.agentId) continue;
+    const s = out.get(g.agentId);
+    if (!s) continue;
+    s.paidCount = g._count._all;
+    s.paidTotal = g._sum.commissionAmount ?? 0;
+  }
+
+  for (const g of pendingGroups) {
+    if (!g.agentId) continue;
+    const s = out.get(g.agentId);
+    if (!s) continue;
+    s.pendingCount += g._count._all;
+    s.pendingTotal += g._sum.commissionAmount ?? 0;
+  }
+
+  // Legacy delivered orders (no stored commissionAmount) — valued at current rate.
+  for (const g of pendingLegacyGroups) {
+    if (!g.agentId) continue;
+    const s = out.get(g.agentId);
+    if (!s) continue;
+    s.pendingCount += g._count._all;
+    s.pendingTotal += g._count._all * s.perOrderRate;
+  }
+
+  for (const s of out.values()) {
+    s.deliveredCount = s.paidCount + s.pendingCount;
+    s.paidTotal = Math.round(s.paidTotal * 100) / 100;
+    s.pendingTotal = Math.round(s.pendingTotal * 100) / 100;
+    s.total = Math.round((s.paidTotal + s.pendingTotal) * 100) / 100;
+  }
+
   return out;
 }
 

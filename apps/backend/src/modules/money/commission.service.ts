@@ -5,7 +5,7 @@
  */
 
 import { prisma } from '../../shared/prisma';
-import { computeAgentCommission } from '../../utils/kpiCalculator';
+import { computeAgentCommissionByIds } from '../../utils/kpiCalculator';
 import { dispatchCommissionPaid } from '../automation/dispatcher';
 
 export interface AgentCommissionRow {
@@ -41,26 +41,24 @@ export async function listAgentCommissions(): Promise<AgentCommissionRow[]> {
     orderBy: { name: 'asc' },
   });
 
-  const rows = await Promise.all(
-    agents.map(async (a) => {
-      const c = await computeAgentCommission(a.id);
-      return {
-        agentId: a.id,
-        name: a.name,
-        email: a.email,
-        roleLabel: a.role.label,
-        deliveredCount: c.deliveredCount,
-        paidCount: c.paidCount,
-        pendingCount: c.pendingCount,
-        paidTotal: c.paidTotal,
-        pendingTotal: c.pendingTotal,
-        total: c.total,
-        perOrderRate: c.perOrderRate,
-      } satisfies AgentCommissionRow;
-    }),
-  );
+  const commissionMap = await computeAgentCommissionByIds(agents.map((a) => a.id));
 
-  return rows;
+  return agents.map((a) => {
+    const c = commissionMap.get(a.id)!;
+    return {
+      agentId: a.id,
+      name: a.name,
+      email: a.email,
+      roleLabel: a.role.label,
+      deliveredCount: c.deliveredCount,
+      paidCount: c.paidCount,
+      pendingCount: c.pendingCount,
+      paidTotal: c.paidTotal,
+      pendingTotal: c.pendingTotal,
+      total: c.total,
+      perOrderRate: c.perOrderRate,
+    } satisfies AgentCommissionRow;
+  });
 }
 
 export interface AgentPendingOrder {
