@@ -593,74 +593,74 @@ export function CallCenterOrderModal() {
               <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-primary">
                 Customer
               </h3>
-              <div className="flex gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    <CRMInput
-                      label="Name *"
-                      value={form.customerName}
-                      onChange={(e) => patch({ customerName: e.target.value })}
-                    />
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[11px] font-medium text-gray-600">Phone *</label>
-                      <div className="flex items-center gap-1">
-                        <div
-                          className={cn(
-                            'flex-1 min-w-0 truncate rounded-input border px-2 py-1.5 font-mono text-[12px]',
-                            phoneValid === false
-                              ? 'border-red-300 bg-red-50 text-red-700'
-                              : 'border-gray-200 bg-gray-50 text-gray-700',
-                          )}
-                        >
-                          {order.customer.phoneDisplay}
-                        </div>
-                        <a
-                          href={`tel:${phoneDigits}`}
-                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-btn bg-primary text-white hover:bg-primary-dark"
-                          title="Call"
-                        >
-                          <Phone size={12} />
-                        </a>
-                        <a
-                          href={`https://wa.me/${phoneDigits}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-btn bg-emerald-500 text-white hover:bg-emerald-600"
-                          title="WhatsApp"
-                        >
-                          <MessageCircle size={12} />
-                        </a>
+              <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start">
+                {/* Fields — stack vertically so values stay readable even when the
+                    modal splits into two columns and the QR sits alongside. */}
+                <div className="flex min-w-0 flex-1 flex-col gap-2">
+                  <CRMInput
+                    label="Name *"
+                    value={form.customerName}
+                    onChange={(e) => patch({ customerName: e.target.value })}
+                  />
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] font-medium text-gray-600">Phone *</label>
+                    <div className="flex items-center gap-1">
+                      <div
+                        className={cn(
+                          'flex-1 min-w-0 rounded-input border px-2 py-1.5 font-mono text-[12px]',
+                          phoneValid === false
+                            ? 'border-red-300 bg-red-50 text-red-700'
+                            : 'border-gray-200 bg-gray-50 text-gray-700',
+                        )}
+                      >
+                        {order.customer.phoneDisplay}
                       </div>
+                      <a
+                        href={`tel:${phoneDigits}`}
+                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-btn bg-primary text-white hover:bg-primary-dark"
+                        title="Call"
+                      >
+                        <Phone size={12} />
+                      </a>
+                      <a
+                        href={`https://wa.me/${phoneDigits}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-btn bg-emerald-500 text-white hover:bg-emerald-600"
+                        title="WhatsApp"
+                      >
+                        <MessageCircle size={12} />
+                      </a>
                     </div>
-                    <CRMSelect
-                      label="City *"
-                      options={cities.map((c) => ({ value: c.name, label: c.name }))}
-                      value={form.customerCity}
-                      onChange={(v) => patch({ customerCity: v as string })}
-                      searchable
-                      placeholder="Select a city"
-                    />
-                    <CRMInput
-                      label="Address *"
-                      value={form.customerAddress}
-                      onChange={(e) => patch({ customerAddress: e.target.value })}
-                    />
                   </div>
+                  <CRMSelect
+                    label="City *"
+                    options={cities.map((c) => ({ value: c.name, label: c.name }))}
+                    value={form.customerCity}
+                    onChange={(v) => patch({ customerCity: v as string })}
+                    searchable
+                    placeholder="Select a city"
+                  />
+                  <CRMInput
+                    label="Address *"
+                    value={form.customerAddress}
+                    onChange={(e) => patch({ customerAddress: e.target.value })}
+                  />
                 </div>
 
                 {/* QR — scan with phone to dial customer directly */}
                 {phoneValid !== false && phoneDigits && (
-                  <div className="flex shrink-0 flex-col items-center justify-center gap-1 rounded-btn border border-primary/10 bg-gradient-to-br from-white to-accent/30 p-2">
+                  <div className="flex w-full shrink-0 flex-row items-center justify-center gap-2 rounded-btn border border-primary/10 bg-gradient-to-br from-white to-accent/30 p-2 sm:w-[104px] sm:flex-col sm:self-stretch">
                     <div className="rounded-md bg-white p-1 ring-1 ring-gray-100">
                       <QRCodeSVG
                         value={`tel:+212${phoneDigits.replace(/^0/, '')}`}
-                        size={76}
+                        size={84}
                         level="M"
                         bgColor="#ffffff"
                         fgColor="#1e293b"
                       />
                     </div>
-                    <span className="text-center text-[8px] font-bold uppercase tracking-wider text-gray-500">
+                    <span className="text-center text-[9px] font-bold uppercase tracking-wider text-gray-500">
                       Scan to call
                     </span>
                   </div>
