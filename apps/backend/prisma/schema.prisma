@@ -124,6 +124,9 @@ model User {
   verifiedReturns     Order[]             @relation("ReturnVerifier")
   notifications       Notification[]
   assignedProducts    Product[]           @relation("ProductAssignedAgent")
+  whatsappSession     WhatsAppSession?
+  messageLogs         MessageLog[]        @relation("MessageLogAgent")
+  updatedTemplates    MessageTemplate[]   @relation("TemplateUpdater")
 }
 
 model RefreshToken {
@@ -341,6 +344,7 @@ model Order {
   mergedFrom       Order[]     @relation("OrderMerges")
   items            OrderItem[]
   logs             OrderLog[]
+  messageLogs      MessageLog[]
 
   @@index([confirmationStatus])
   @@index([shippingStatus])
@@ -875,4 +879,84 @@ model Notification {
 
   @@index([userId, createdAt])
   @@index([userId, readAt])
+}
+
+// ─── WhatsApp automation ────────────────────────────────────────────────────
+// Client & agent notifications sent automatically on order status transitions
+// and commission payouts. Every `MessageTemplate` has a unique trigger; the
+// dispatcher fans out to one `MessageLog` row per recipient, enqueued into the
+// Bull `whatsappQueue` and pushed through Evolution API per-agent sessions.
+enum AutomationTrigger {
+  confirmation_confirmed
+  confirmation_cancelled
+  confirmation_unreachable
+  shipping_picked_up
+  shipping_in_transit
+  shipping_out_for_delivery
+  shipping_delivered
+  shipping_returned
+  shipping_return_validated
+  commission_paid
+}
+
+enum WhatsAppSessionStatus {
+  disconnected
+  connecting
+  connected
+  error
+}
+
+enum MessageLogStatus {
+  queued
+  sending
+  sent
+  delivered
+  failed
+}
+
+model MessageTemplate {
+  id          String            @id @default(cuid())
+  trigger     AutomationTrigger @unique
+  enabled     Boolean           @default(false)
+  body        String
+  updatedById String?
+  updatedAt   DateTime          @updatedAt
+  createdAt   DateTime          @default(now())
+
+  updatedBy User? @relation("TemplateUpdater", fields: [updatedById], references: [id])
+}
+
+model WhatsAppSession {
+  id            String                @id @default(cuid())
+  userId        String?               @unique
+  instanceName  String                @unique
+  status        WhatsAppSessionStatus @default(disconnected)
+  phoneNumber   String?
+  lastHeartbeat DateTime?
+  connectedAt   DateTime?
+  createdAt     DateTime              @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+}
+
+model MessageLog {
+  id             String            @id @default(cuid())
+  trigger        AutomationTrigger
+  orderId        String?
+  agentId        String?
+  recipientPhone String
+  body           String
+  status         MessageLogStatus  @default(queued)
+  providerId     String?
+  error          String?
+  dedupeKey      String            @unique
+  createdAt      DateTime          @default(now())
+  sentAt         DateTime?
+
+  order Order? @relation(fields: [orderId], references: [id])
+  agent User?  @relation("MessageLogAgent", fields: [agentId], references: [id])
+
+  @@index([status, createdAt])
+  @@index([orderId])
+  @@index([trigger, createdAt])
 }
