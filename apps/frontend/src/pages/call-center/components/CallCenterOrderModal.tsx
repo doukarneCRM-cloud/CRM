@@ -126,6 +126,7 @@ function computeTotal(
 
 interface FormState {
   customerName: string;
+  customerPhone: string;
   customerCity: string;
   customerAddress: string;
   discountType: '' | 'fixed' | 'percentage';
@@ -185,6 +186,7 @@ export function CallCenterOrderModal() {
     setOrder(selectedOrder);
     setForm({
       customerName: selectedOrder.customer.fullName,
+      customerPhone: selectedOrder.customer.phoneDisplay,
       customerCity: selectedOrder.customer.city,
       customerAddress: selectedOrder.customer.address ?? '',
       discountType: (selectedOrder.discountType ?? '') as FormState['discountType'],
@@ -247,9 +249,9 @@ export function CallCenterOrderModal() {
   }, [form?.customerCity, cities]);
 
   const phoneValid = useMemo(() => {
-    if (!order) return null;
-    return MA_PHONE_RE.test(order.customer.phoneDisplay.replace(/\s/g, ''));
-  }, [order]);
+    if (!form) return null;
+    return MA_PHONE_RE.test(form.customerPhone.replace(/\s/g, ''));
+  }, [form?.customerPhone]);
 
   const totals = useMemo(() => {
     if (!form || !order) return { subtotal: 0, discount: 0, total: 0 };
@@ -263,6 +265,7 @@ export function CallCenterOrderModal() {
     if (!order || !form) return false;
     return (
       form.customerName !== order.customer.fullName ||
+      form.customerPhone !== order.customer.phoneDisplay ||
       form.customerCity !== order.customer.city ||
       form.customerAddress !== (order.customer.address ?? '') ||
       form.discountType !== ((order.discountType ?? '') as FormState['discountType']) ||
@@ -378,6 +381,7 @@ export function CallCenterOrderModal() {
     if (!order || !form) return;
     const customerDirty =
       form.customerName !== order.customer.fullName ||
+      form.customerPhone !== order.customer.phoneDisplay ||
       form.customerCity !== order.customer.city ||
       form.customerAddress !== (order.customer.address ?? '');
     const fieldsDirty =
@@ -392,6 +396,7 @@ export function CallCenterOrderModal() {
       tasks.push(
         customersApi.update(order.customer.id, {
           fullName: form.customerName,
+          phone: form.customerPhone,
           city: form.customerCity,
           address: form.customerAddress || null,
         }),
@@ -518,7 +523,7 @@ export function CallCenterOrderModal() {
 
   // ── UI ───────────────────────────────────────────────────────────────────
 
-  const phoneDigits = order.customer.phoneDisplay.replace(/\D/g, '');
+  const phoneDigits = (form?.customerPhone ?? order.customer.phoneDisplay).replace(/\D/g, '');
   const tagBadge = {
     normal: { label: 'Normal', className: 'bg-gray-100 text-gray-600' },
     vip: { label: 'VIP', className: 'bg-amber-100 text-amber-700' },
@@ -605,16 +610,19 @@ export function CallCenterOrderModal() {
                   <div className="flex flex-col gap-1">
                     <label className="text-[11px] font-medium text-gray-600">Phone *</label>
                     <div className="flex items-center gap-1">
-                      <div
+                      <input
+                        type="tel"
+                        inputMode="tel"
+                        value={form.customerPhone}
+                        onChange={(e) => patch({ customerPhone: e.target.value })}
+                        placeholder="06xxxxxxxx"
                         className={cn(
-                          'flex-1 min-w-0 rounded-input border px-2 py-1.5 font-mono text-[12px]',
+                          'h-8 flex-1 min-w-0 rounded-input border px-2 font-mono text-[12px] focus:outline-none focus:ring-2',
                           phoneValid === false
-                            ? 'border-red-300 bg-red-50 text-red-700'
-                            : 'border-gray-200 bg-gray-50 text-gray-700',
+                            ? 'border-red-300 bg-red-50 text-red-700 focus:ring-red-200'
+                            : 'border-gray-200 bg-white text-gray-800 focus:border-primary focus:ring-primary/20',
                         )}
-                      >
-                        {order.customer.phoneDisplay}
-                      </div>
+                      />
                       <a
                         href={`tel:${phoneDigits}`}
                         className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-btn bg-primary text-white hover:bg-primary-dark"
