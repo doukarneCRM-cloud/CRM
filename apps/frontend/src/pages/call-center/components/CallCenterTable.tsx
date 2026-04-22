@@ -700,9 +700,14 @@ export function CallCenterTable() {
   const [loading, setLoading] = useState(true);
   const [logsOrder, setLogsOrder] = useState<{ order: Order; type: 'confirmation' | 'shipping' } | null>(null);
   const [historyCustomerId, setHistoryCustomerId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<SectionKey>('confirmation');
-  const [confirmationFilter, setConfirmationFilter] = useState<string | null>(null);
-  const [shippingFilter, setShippingFilter] = useState<string | null>(null);
+  // Tab + status filter live in the zustand store so the KPI pipeline chips
+  // can drive them from outside this component.
+  const activeTab = useCallCenterStore((s) => s.activeTab);
+  const setActiveTab = useCallCenterStore((s) => s.setActiveTab);
+  const confirmationFilter = useCallCenterStore((s) => s.confirmationFilter);
+  const setConfirmationFilter = useCallCenterStore((s) => s.setConfirmationFilter);
+  const shippingFilter = useCallCenterStore((s) => s.shippingFilter);
+  const setShippingFilter = useCallCenterStore((s) => s.setShippingFilter);
   const [search, setSearch] = useState('');
 
   const fetchOrders = useCallback(async () => {
@@ -829,7 +834,7 @@ export function CallCenterTable() {
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div id="call-center-pipeline" className="flex flex-col gap-4 scroll-mt-4">
       <GlassCard padding="sm" className="flex flex-col gap-3">
         {/* Search bar */}
         <div className="flex h-9 items-center gap-2 rounded-input border border-gray-200 bg-white px-3 focus-within:border-primary">

@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import type { Order } from '@/types/orders';
 
+export type PipelineSection = 'confirmation' | 'shipping';
+
 interface CallCenterState {
   selectedOrder: Order | null;
   refreshKey: number;
@@ -8,6 +10,11 @@ interface CallCenterState {
   // this session. Prevents re-prompting on every re-open of the same order.
   // Cleared on full page reload.
   dismissedDuplicateOrderIds: Set<string>;
+  // Pipeline view state is owned here so the KPI cards can drive the table's
+  // active tab + status filter (click a chip → jump straight to that slice).
+  activeTab: PipelineSection;
+  confirmationFilter: string | null;
+  shippingFilter: string | null;
 }
 
 interface CallCenterActions {
@@ -15,12 +22,19 @@ interface CallCenterActions {
   closeOrder: () => void;
   triggerRefresh: () => void;
   dismissDuplicatesFor: (orderId: string) => void;
+  setActiveTab: (tab: PipelineSection) => void;
+  setConfirmationFilter: (status: string | null) => void;
+  setShippingFilter: (status: string | null) => void;
+  applyPipelineFilter: (section: PipelineSection, status: string | null) => void;
 }
 
 export const useCallCenterStore = create<CallCenterState & CallCenterActions>((set) => ({
   selectedOrder: null,
   refreshKey: 0,
   dismissedDuplicateOrderIds: new Set(),
+  activeTab: 'confirmation',
+  confirmationFilter: null,
+  shippingFilter: null,
 
   openOrder: (order) => set({ selectedOrder: order }),
   closeOrder: () => set({ selectedOrder: null }),
@@ -29,4 +43,13 @@ export const useCallCenterStore = create<CallCenterState & CallCenterActions>((s
     set((s) => ({
       dismissedDuplicateOrderIds: new Set(s.dismissedDuplicateOrderIds).add(orderId),
     })),
+  setActiveTab: (tab) => set({ activeTab: tab }),
+  setConfirmationFilter: (status) => set({ confirmationFilter: status }),
+  setShippingFilter: (status) => set({ shippingFilter: status }),
+  applyPipelineFilter: (section, status) =>
+    set(
+      section === 'confirmation'
+        ? { activeTab: 'confirmation', confirmationFilter: status }
+        : { activeTab: 'shipping', shippingFilter: status },
+    ),
 }));

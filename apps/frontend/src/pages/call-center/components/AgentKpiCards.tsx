@@ -10,6 +10,7 @@ import {
   type ShippingStatus,
 } from '@/constants/statusColors';
 import { cn } from '@/lib/cn';
+import { useCallCenterStore, type PipelineSection } from '../callCenterStore';
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 
@@ -53,23 +54,45 @@ interface StatusChipProps {
   bg: string;
   text: string;
   dot: string;
+  onClick?: () => void;
 }
 
-function StatusChip({ label, count, bg, text, dot }: StatusChipProps) {
-  return (
-    <div
-      className={cn(
-        'flex items-center justify-between gap-2 rounded-badge px-2.5 py-1.5',
-        bg,
-      )}
-    >
+function StatusChip({ label, count, bg, text, dot, onClick }: StatusChipProps) {
+  const className = cn(
+    'flex items-center justify-between gap-2 rounded-badge px-2.5 py-1.5 text-left',
+    bg,
+    onClick && 'cursor-pointer transition hover:brightness-95 active:scale-[0.98]',
+  );
+  const body = (
+    <>
       <div className="flex min-w-0 items-center gap-1.5">
         <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', dot)} />
         <span className={cn('truncate text-[11px] font-semibold', text)}>{label}</span>
       </div>
       <span className={cn('shrink-0 text-sm font-bold', text)}>{count}</span>
-    </div>
+    </>
   );
+  return onClick ? (
+    <button type="button" onClick={onClick} className={className}>
+      {body}
+    </button>
+  ) : (
+    <div className={className}>{body}</div>
+  );
+}
+
+// Scroll the pipeline table into view + set the matching filter so the agent
+// lands right on the slice they clicked.
+function useJumpToPipeline() {
+  const apply = useCallCenterStore((s) => s.applyPipelineFilter);
+  return (section: PipelineSection, status: string) => {
+    apply(section, status);
+    requestAnimationFrame(() => {
+      document
+        .getElementById('call-center-pipeline')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
 }
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -84,6 +107,7 @@ export function AgentKpiCards({ className }: AgentKpiCardsProps) {
   const [pipeline, setPipeline] = useState<MyPipeline | null>(null);
   const [commission, setCommission] = useState<MyCommission | null>(null);
   const [loading, setLoading] = useState(true);
+  const jumpToPipeline = useJumpToPipeline();
 
   const fetchAll = useCallback(async () => {
     try {
@@ -190,6 +214,7 @@ export function AgentKpiCards({ className }: AgentKpiCardsProps) {
                   bg={cfg.bg}
                   text={cfg.text}
                   dot={cfg.dot}
+                  onClick={() => jumpToPipeline('confirmation', status)}
                 />
               );
             })}
@@ -222,6 +247,7 @@ export function AgentKpiCards({ className }: AgentKpiCardsProps) {
                   bg={cfg.bg}
                   text={cfg.text}
                   dot={cfg.dot}
+                  onClick={() => jumpToPipeline('shipping', status)}
                 />
               );
             })}
