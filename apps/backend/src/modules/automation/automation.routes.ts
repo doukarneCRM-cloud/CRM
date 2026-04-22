@@ -5,6 +5,8 @@ import { requirePermission } from '../../shared/middleware/rbac.middleware';
 import * as svc from './automation.service';
 import * as rules from './rules.service';
 import { ALLOWED_FIELDS } from './conditionEvaluator';
+import { getOverviewSnapshot } from './overview.service';
+import { requireAnyPermission } from '../../shared/middleware/rbac.middleware';
 
 export async function automationRoutes(app: FastifyInstance) {
   app.get(
@@ -128,6 +130,31 @@ export async function automationRoutes(app: FastifyInstance) {
     async (req, reply) => {
       await rules.deleteRule(req.params.id);
       return reply.send({ ok: true });
+    },
+  );
+
+  // ── Overview (admin monitor) ─────────────────────────────────────────
+  app.get(
+    '/overview',
+    {
+      preHandler: [
+        verifyJWT,
+        requireAnyPermission('automation:monitor', 'automation:manage'),
+      ],
+    },
+    async (_req, reply) => {
+      const snapshot = await getOverviewSnapshot();
+      return reply.send(snapshot);
+    },
+  );
+
+  // DLQ requeue (same as retry but explicit path for Overview UI)
+  app.post<{ Params: { id: string } }>(
+    '/logs/:id/requeue',
+    { preHandler: [verifyJWT, requirePermission('automation:manage')] },
+    async (req, reply) => {
+      const result = await svc.retryLog(req.params.id);
+      return reply.send(result);
     },
   );
 }

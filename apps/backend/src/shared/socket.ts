@@ -81,6 +81,7 @@ export function initSocket(app: FastifyInstance) {
     ) {
       socket.join('dashboard');
       socket.join('admin');
+      socket.join('whatsapp:monitor');
     }
 
     // Mark online

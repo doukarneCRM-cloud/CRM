@@ -53,6 +53,7 @@ const CANONICAL_PERMISSIONS: Array<{ key: string; label: string }> = [
   { key: 'returns:verify', label: 'Verify Physical Returns' },
   { key: 'automation:view', label: 'View Automation Board' },
   { key: 'automation:manage', label: 'Manage Automation Templates' },
+  { key: 'automation:monitor', label: 'Monitor Automation (admin overview, live feed)' },
   { key: 'whatsapp:view', label: 'View WhatsApp Sessions' },
   { key: 'whatsapp:connect', label: 'Connect WhatsApp Sessions (QR)' },
 ];

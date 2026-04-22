@@ -50,6 +50,7 @@ import { returnsRoutes } from './modules/returns/returns.routes';
 import { notificationsRoutes } from './modules/notifications/notifications.routes';
 import { automationRoutes } from './modules/automation/automation.routes';
 import { whatsappRoutes } from './modules/whatsapp/whatsapp.routes';
+import { inboxRoutes } from './modules/whatsapp/inbox.routes';
 import { ensureDefaultTemplates } from './modules/automation/automation.service';
 import { ensureFallbackRules } from './modules/automation/rules.service';
 import { ensureAdminPermissions } from './shared/ensureAdminPermissions';
@@ -381,6 +382,7 @@ app.register(automationRoutes, { prefix: '/api/v1/automation' });
 
 // WhatsApp — Evolution session lifecycle + gateway webhook ingestion.
 app.register(whatsappRoutes, { prefix: '/api/v1/whatsapp' });
+app.register(inboxRoutes, { prefix: '/api/v1/whatsapp/inbox' });
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 const PORT = Number(process.env.PORT ?? 3001);

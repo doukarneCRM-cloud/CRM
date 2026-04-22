@@ -78,6 +78,7 @@ export const PERMISSIONS = {
   // Automation
   AUTOMATION_VIEW: 'automation:view',
   AUTOMATION_MANAGE: 'automation:manage',
+  AUTOMATION_MONITOR: 'automation:monitor',
   WHATSAPP_VIEW: 'whatsapp:view',
   WHATSAPP_CONNECT: 'whatsapp:connect',
 } as const;
@@ -107,6 +108,9 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     PERMISSIONS.CALL_CENTER_VIEW,
     PERMISSIONS.MONEY_VIEW,
     PERMISSIONS.RETURNS_VERIFY,
+    PERMISSIONS.AUTOMATION_VIEW,
+    PERMISSIONS.AUTOMATION_MONITOR,
+    PERMISSIONS.WHATSAPP_VIEW,
   ],
   agent: [
     PERMISSIONS.CALL_CENTER_VIEW,

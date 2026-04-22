@@ -107,4 +107,34 @@ export const automationApi = {
     api.patch<AutomationRule>(`/automation/rules/${id}`, patch).then((r) => r.data),
   deleteRule: (id: string) =>
     api.delete<{ ok: true }>(`/automation/rules/${id}`).then((r) => r.data),
+
+  getOverview: () =>
+    api.get<OverviewSnapshot>('/automation/overview').then((r) => r.data),
+  requeueLog: (id: string) =>
+    api.post<{ ok: true }>(`/automation/logs/${id}/requeue`).then((r) => r.data),
 };
+
+export interface OverviewSessionRow {
+  id: string;
+  instanceName: string;
+  status: string;
+  userId: string | null;
+  userName: string;
+  phoneNumber: string | null;
+  lastHeartbeat: string | null;
+  createdAt: string;
+  sentToday: number;
+  failedToday: number;
+  hourlyUsed: number;
+  hourlyLimit: number;
+  dailyUsed: number;
+  dailyLimit: number;
+}
+
+export interface OverviewSnapshot {
+  sessions: OverviewSessionRow[];
+  queue: { queued: number; sending: number; sent: number; delivered: number; failed: number; dead: number };
+  feed: MessageLogRow[];
+  topTriggers: Array<{ trigger: AutomationTrigger; count: number }>;
+  optOuts7d: number;
+}

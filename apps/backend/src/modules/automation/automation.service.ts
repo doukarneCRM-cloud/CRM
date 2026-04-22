@@ -92,11 +92,11 @@ export async function listLogs(filters: {
 export async function retryLog(id: string) {
   const log = await prisma.messageLog.findUnique({ where: { id } });
   if (!log) throw { statusCode: 404, code: 'NOT_FOUND', message: 'Log not found' };
-  if (log.status !== 'failed') {
+  if (log.status !== 'failed' && log.status !== 'dead') {
     throw {
       statusCode: 400,
       code: 'INVALID_STATE',
-      message: 'Only failed messages can be retried',
+      message: 'Only failed or dead messages can be retried',
     };
   }
   await prisma.messageLog.update({
