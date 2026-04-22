@@ -40,9 +40,14 @@ export interface CallbackAlertJobData {
   orderReference: string;
 }
 
+export interface WhatsAppSendJobData {
+  messageLogId: string;
+}
+
 export const youcanSyncQueue = createQueue<YoucanSyncJobData>('youcan:sync');
 export const coliixPushQueue = createQueue<ColiixPushJobData>('coliix:push');
 export const callbackAlertQueue = createQueue<CallbackAlertJobData>('callback:alert');
+export const whatsappQueue = createQueue<WhatsAppSendJobData>('whatsapp:send');
 
 // ─── Graceful shutdown ────────────────────────────────────────────────────────
 export async function closeQueues() {
@@ -50,5 +55,6 @@ export async function closeQueues() {
     youcanSyncQueue.close(),
     coliixPushQueue.close(),
     callbackAlertQueue.close(),
+    whatsappQueue.close(),
   ]);
 }

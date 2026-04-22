@@ -85,11 +85,20 @@ export function initSocket(app: FastifyInstance) {
 
     // Mark online
     onlineUsers.set(user.sub, { socketId: socket.id, lastHeartbeat: new Date() });
-    const dbUser = await prisma.user.update({
-      where: { id: user.sub },
-      data: { isOnline: true, lastSeenAt: new Date() },
-      select: { name: true, avatarUrl: true },
-    });
+    const dbUser = await prisma.user
+      .update({
+        where: { id: user.sub },
+        data: { isOnline: true, lastSeenAt: new Date() },
+        select: { name: true, avatarUrl: true },
+      })
+      .catch((err) => {
+        app.log.warn({ err, userId: user.sub }, '[Socket] user not found — disconnecting');
+        return null;
+      });
+    if (!dbUser) {
+      socket.disconnect(true);
+      return;
+    }
     lastPersistedAt.set(user.sub, Date.now());
 
     socket.to('admin').emit('user:online', {
