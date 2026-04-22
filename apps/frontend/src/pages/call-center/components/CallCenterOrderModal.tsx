@@ -4,7 +4,6 @@ import { QRCodeSVG } from 'qrcode.react';
 import {
   MessageCircle, Check, X, Phone, PhoneOff, Ban, Calendar,
   AlertTriangle, PackageX, Save, Lock, Clock, Plus, Trash2, Truck,
-  MapPin, User, Wallet, Package,
 } from 'lucide-react';
 import { GlassModal } from '@/components/ui/GlassModal';
 import { CRMInput } from '@/components/ui/CRMInput';
@@ -594,56 +593,78 @@ export function CallCenterOrderModal() {
               <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-primary">
                 Customer
               </h3>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <CRMInput
-                  label="Name *"
-                  value={form.customerName}
-                  onChange={(e) => patch({ customerName: e.target.value })}
-                />
-                <div className="flex flex-col gap-1">
-                  <label className="text-[11px] font-medium text-gray-600">Phone *</label>
-                  <div className="flex items-center gap-1">
-                    <div
-                      className={cn(
-                        'flex-1 min-w-0 truncate rounded-input border px-2 py-1.5 font-mono text-[12px]',
-                        phoneValid === false
-                          ? 'border-red-300 bg-red-50 text-red-700'
-                          : 'border-gray-200 bg-gray-50 text-gray-700',
-                      )}
-                    >
-                      {order.customer.phoneDisplay}
+              <div className="flex gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <CRMInput
+                      label="Name *"
+                      value={form.customerName}
+                      onChange={(e) => patch({ customerName: e.target.value })}
+                    />
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[11px] font-medium text-gray-600">Phone *</label>
+                      <div className="flex items-center gap-1">
+                        <div
+                          className={cn(
+                            'flex-1 min-w-0 truncate rounded-input border px-2 py-1.5 font-mono text-[12px]',
+                            phoneValid === false
+                              ? 'border-red-300 bg-red-50 text-red-700'
+                              : 'border-gray-200 bg-gray-50 text-gray-700',
+                          )}
+                        >
+                          {order.customer.phoneDisplay}
+                        </div>
+                        <a
+                          href={`tel:${phoneDigits}`}
+                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-btn bg-primary text-white hover:bg-primary-dark"
+                          title="Call"
+                        >
+                          <Phone size={12} />
+                        </a>
+                        <a
+                          href={`https://wa.me/${phoneDigits}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-btn bg-emerald-500 text-white hover:bg-emerald-600"
+                          title="WhatsApp"
+                        >
+                          <MessageCircle size={12} />
+                        </a>
+                      </div>
                     </div>
-                    <a
-                      href={`tel:${phoneDigits}`}
-                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-btn bg-primary text-white hover:bg-primary-dark"
-                      title="Call"
-                    >
-                      <Phone size={12} />
-                    </a>
-                    <a
-                      href={`https://wa.me/${phoneDigits}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-btn bg-emerald-500 text-white hover:bg-emerald-600"
-                      title="WhatsApp"
-                    >
-                      <MessageCircle size={12} />
-                    </a>
+                    <CRMSelect
+                      label="City *"
+                      options={cities.map((c) => ({ value: c.name, label: c.name }))}
+                      value={form.customerCity}
+                      onChange={(v) => patch({ customerCity: v as string })}
+                      searchable
+                      placeholder="Select a city"
+                    />
+                    <CRMInput
+                      label="Address *"
+                      value={form.customerAddress}
+                      onChange={(e) => patch({ customerAddress: e.target.value })}
+                    />
                   </div>
                 </div>
-                <CRMSelect
-                  label="City *"
-                  options={cities.map((c) => ({ value: c.name, label: c.name }))}
-                  value={form.customerCity}
-                  onChange={(v) => patch({ customerCity: v as string })}
-                  searchable
-                  placeholder="Select a city"
-                />
-                <CRMInput
-                  label="Address *"
-                  value={form.customerAddress}
-                  onChange={(e) => patch({ customerAddress: e.target.value })}
-                />
+
+                {/* QR — scan with phone to dial customer directly */}
+                {phoneValid !== false && phoneDigits && (
+                  <div className="flex shrink-0 flex-col items-center justify-center gap-1 rounded-btn border border-primary/10 bg-gradient-to-br from-white to-accent/30 p-2">
+                    <div className="rounded-md bg-white p-1 ring-1 ring-gray-100">
+                      <QRCodeSVG
+                        value={`tel:+212${phoneDigits.replace(/^0/, '')}`}
+                        size={76}
+                        level="M"
+                        bgColor="#ffffff"
+                        fgColor="#1e293b"
+                      />
+                    </div>
+                    <span className="text-center text-[8px] font-bold uppercase tracking-wider text-gray-500">
+                      Scan to call
+                    </span>
+                  </div>
+                )}
               </div>
               {(cityValid === false || phoneValid === false) && (
                 <div className="mt-2 flex items-start gap-1.5 rounded-btn bg-amber-50 px-2 py-1 text-[11px] text-amber-700">
@@ -945,203 +966,74 @@ export function CallCenterOrderModal() {
                 </>
               )}
 
-              {/* Status confirmation overlay — rendered via portal over the entire page.
-                  Two-column layout: customer summary + notes on the left, QR-to-dial
-                  + quick-action buttons on the right. Everything fits at a glance so
-                  the agent never needs to scroll before hitting confirm. */}
+              {/* Status confirmation overlay — rendered via portal over the entire page */}
               {pendingAction && createPortal(
                 <div
                   className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-                  style={{ backgroundColor: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(8px)' }}
+                  style={{ backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(6px)' }}
                   onClick={() => { if (!statusBusy) setPendingAction(null); }}
                 >
                   <div
                     onClick={(e) => e.stopPropagation()}
                     className={cn(
-                      'w-full max-w-2xl overflow-hidden rounded-3xl border bg-white shadow-2xl',
+                      'w-full max-w-sm rounded-2xl border bg-white p-5 shadow-2xl',
                       'animate-in fade-in zoom-in-95 duration-150',
                       pendingCopy[pendingAction].variant === 'danger'
                         ? 'border-red-200'
                         : 'border-gray-200',
                     )}
                   >
-                    {/* Header strip — action-colored accent line + title */}
-                    <div
-                      className={cn(
-                        'flex items-center justify-between gap-3 border-b px-5 py-3',
-                        pendingCopy[pendingAction].variant === 'danger'
-                          ? 'border-red-100 bg-gradient-to-r from-red-50 to-white'
-                          : 'border-primary/10 bg-gradient-to-r from-accent/40 to-white',
-                      )}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div
-                          className={cn(
-                            'flex h-9 w-9 items-center justify-center rounded-xl',
-                            pendingCopy[pendingAction].variant === 'danger'
-                              ? 'bg-red-100 text-red-600'
-                              : 'bg-primary/10 text-primary',
-                          )}
-                        >
-                          {pendingAction === 'confirm' && <Check size={18} />}
-                          {pendingAction === 'cancel' && <X size={18} />}
-                          {pendingAction === 'callback' && <Calendar size={18} />}
-                          {pendingAction === 'unreachable' && <PhoneOff size={18} />}
-                          {pendingAction === 'fake' && <Ban size={18} />}
-                          {pendingAction === 'no-stock' && <PackageX size={18} />}
-                        </div>
+                    <p className="text-base font-bold text-gray-900">
+                      {pendingCopy[pendingAction].title}
+                    </p>
+
+                    <div className="mt-4 flex flex-col gap-2.5">
+                      {/* Callback date picker */}
+                      {pendingAction === 'callback' && (
                         <div>
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                            {order.reference}
-                          </p>
-                          <p className="text-base font-bold leading-tight text-gray-900">
-                            {pendingCopy[pendingAction].title}
-                          </p>
+                          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                            Callback date &amp; time *
+                          </label>
+                          <div className="relative flex items-center">
+                            <Clock size={12} className="absolute left-2.5 text-gray-400" />
+                            <input
+                              type="datetime-local"
+                              value={callbackAt}
+                              onChange={(e) => setCallbackAt(e.target.value)}
+                              className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-8 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                            />
+                          </div>
                         </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => !statusBusy && setPendingAction(null)}
-                        disabled={statusBusy}
-                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-40"
-                      >
-                        <X size={16} />
-                      </button>
+                      )}
+
+                      {/* Show confirmation note */}
+                      {form.confirmationNote.trim() && (
+                        <div className="flex items-start gap-2.5 rounded-xl bg-gray-50 px-3.5 py-2.5">
+                          <MessageCircle size={14} className="mt-0.5 shrink-0 text-gray-400" />
+                          <div className="min-w-0">
+                            <span className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                              Note saved with this action
+                            </span>
+                            <p className="mt-1 text-sm text-gray-700">{form.confirmationNote}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Show delivery note */}
+                      {form.shippingInstruction.trim() && (
+                        <div className="flex items-start gap-2.5 rounded-xl bg-blue-50 px-3.5 py-2.5">
+                          <Truck size={14} className="mt-0.5 shrink-0 text-blue-400" />
+                          <div className="min-w-0">
+                            <span className="block text-[10px] font-bold uppercase tracking-wider text-blue-400">
+                              Delivery note
+                            </span>
+                            <p className="mt-1 text-sm text-blue-700">{form.shippingInstruction}</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Body — two columns on desktop, stacked on mobile */}
-                    <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-[1fr_auto]">
-                      {/* LEFT — customer summary + notes + callback */}
-                      <div className="flex flex-col gap-3">
-                        <div className="flex flex-col gap-2 rounded-2xl border border-gray-100 bg-gray-50/60 p-3">
-                          <div className="flex items-center gap-2 text-sm">
-                            <User size={13} className="shrink-0 text-gray-400" />
-                            <span className="truncate font-semibold text-gray-900">
-                              {form.customerName}
-                            </span>
-                            <span className={cn('ml-auto shrink-0 rounded-badge px-1.5 py-0.5 text-[9px] font-semibold', tagBadge.className)}>
-                              {tagBadge.label}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 text-[12px]">
-                            <Phone size={13} className="shrink-0 text-gray-400" />
-                            <span className="font-mono font-semibold text-gray-800">
-                              {order.customer.phoneDisplay}
-                            </span>
-                          </div>
-                          <div className="flex items-start gap-2 text-[12px] text-gray-700">
-                            <MapPin size={13} className="mt-0.5 shrink-0 text-gray-400" />
-                            <div className="min-w-0 leading-snug">
-                              <span className="font-semibold">{form.customerCity || '—'}</span>
-                              {form.customerAddress && (
-                                <span className="block truncate text-gray-500">
-                                  {form.customerAddress}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="mt-1 grid grid-cols-2 gap-2 border-t border-gray-200/70 pt-2">
-                            <div className="flex items-center gap-1.5 text-[11px] text-gray-600">
-                              <Package size={12} className="text-gray-400" />
-                              <span>
-                                <b className="text-gray-800">{items.length}</b>{' '}
-                                {items.length === 1 ? 'item' : 'items'}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1.5 text-[11px] text-gray-600">
-                              <Wallet size={12} className="text-gray-400" />
-                              <span>
-                                <b className="text-primary">{totals.total.toLocaleString('fr-MA')}</b>{' '}
-                                MAD
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Callback date picker */}
-                        {pendingAction === 'callback' && (
-                          <div>
-                            <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-amber-700">
-                              Callback date &amp; time *
-                            </label>
-                            <div className="relative flex items-center">
-                              <Clock size={12} className="absolute left-2.5 text-gray-400" />
-                              <input
-                                type="datetime-local"
-                                value={callbackAt}
-                                onChange={(e) => setCallbackAt(e.target.value)}
-                                className="w-full rounded-lg border border-amber-200 bg-amber-50/50 py-2 pl-8 pr-3 text-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400/20"
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Confirmation note */}
-                        {form.confirmationNote.trim() && (
-                          <div className="flex items-start gap-2 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
-                            <MessageCircle size={13} className="mt-0.5 shrink-0 text-gray-400" />
-                            <div className="min-w-0">
-                              <span className="block text-[9px] font-bold uppercase tracking-wider text-gray-400">
-                                Note
-                              </span>
-                              <p className="text-[12px] leading-snug text-gray-700 line-clamp-2">
-                                {form.confirmationNote}
-                              </p>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Delivery note */}
-                        {form.shippingInstruction.trim() && (
-                          <div className="flex items-start gap-2 rounded-xl border border-blue-100 bg-blue-50/60 px-3 py-2">
-                            <Truck size={13} className="mt-0.5 shrink-0 text-blue-500" />
-                            <div className="min-w-0">
-                              <span className="block text-[9px] font-bold uppercase tracking-wider text-blue-500">
-                                Delivery
-                              </span>
-                              <p className="text-[12px] leading-snug text-blue-700 line-clamp-2">
-                                {form.shippingInstruction}
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* RIGHT — QR to dial + quick-action buttons */}
-                      <div className="flex flex-col items-center gap-2 rounded-2xl border border-primary/10 bg-gradient-to-br from-white to-accent/20 p-3 sm:w-[180px]">
-                        <div className="rounded-xl bg-white p-2 shadow-sm ring-1 ring-gray-100">
-                          <QRCodeSVG
-                            value={`tel:+212${phoneDigits.replace(/^0/, '')}`}
-                            size={132}
-                            level="M"
-                            bgColor="#ffffff"
-                            fgColor="#1e293b"
-                          />
-                        </div>
-                        <p className="text-center text-[10px] font-semibold uppercase tracking-wider text-gray-500">
-                          Scan to call
-                        </p>
-                        <div className="flex w-full items-center gap-1.5">
-                          <a
-                            href={`tel:${phoneDigits}`}
-                            className="inline-flex flex-1 items-center justify-center gap-1 rounded-btn bg-primary py-1.5 text-[11px] font-semibold text-white transition hover:bg-primary-dark"
-                          >
-                            <Phone size={11} /> Call
-                          </a>
-                          <a
-                            href={`https://wa.me/${phoneDigits}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex flex-1 items-center justify-center gap-1 rounded-btn bg-emerald-500 py-1.5 text-[11px] font-semibold text-white transition hover:bg-emerald-600"
-                          >
-                            <MessageCircle size={11} /> WA
-                          </a>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Footer — actions */}
-                    <div className="flex items-center justify-end gap-2 border-t border-gray-100 bg-gray-50/50 px-5 py-3">
+                    <div className="mt-5 flex items-center justify-end gap-2">
                       <CRMButton
                         variant="ghost"
                         size="sm"
