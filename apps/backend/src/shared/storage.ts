@@ -14,6 +14,25 @@ const EXT_BY_MIME: Record<string, string> = {
   'image/jpeg': '.jpg',
   'image/webp': '.webp',
   'image/gif': '.gif',
+  // Audio — WhatsApp voice notes are `audio/ogg; codecs=opus`, regular audio
+  // is usually mp4 or mpeg. Keep the `; codec=...` form stripped by caller.
+  'audio/ogg': '.ogg',
+  'audio/mpeg': '.mp3',
+  'audio/mp4': '.m4a',
+  'audio/aac': '.aac',
+  'audio/wav': '.wav',
+  // Video
+  'video/mp4': '.mp4',
+  'video/webm': '.webm',
+  'video/3gpp': '.3gp',
+  // Documents (most common WA pass-throughs)
+  'application/pdf': '.pdf',
+  'application/zip': '.zip',
+  'application/msword': '.doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+  'application/vnd.ms-excel': '.xls',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+  'text/plain': '.txt',
 };
 
 export interface UploadOptions {

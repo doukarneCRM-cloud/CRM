@@ -1045,6 +1045,8 @@ model WhatsAppMessage {
   direction    WhatsAppMessageDirection
   body         String
   mediaUrl     String?
+  mediaType    String?                   // 'image' | 'audio' | 'video' | 'sticker' | 'document'
+  mediaMime    String?
   fromPhone    String
   toPhone      String
   providerId   String?

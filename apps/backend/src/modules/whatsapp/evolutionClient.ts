@@ -127,3 +127,25 @@ export async function sendText(instanceName: string, phone: string, text: string
     },
   );
 }
+
+// Fetch + decrypt a media attachment Evolution received. Called from the
+// inbound webhook pipeline — Evolution stores the encrypted blob referenced
+// by messageId; this endpoint decrypts it and returns base64 so we can
+// persist it into our own storage (R2 / local uploads).
+export interface MediaDownloadResponse {
+  base64?: string;
+  mediaType?: string;
+  mimetype?: string;
+  fileName?: string;
+}
+
+export async function getBase64FromMediaMessage(
+  instanceName: string,
+  messageKey: { id: string; remoteJid?: string; fromMe?: boolean },
+): Promise<MediaDownloadResponse> {
+  return request<MediaDownloadResponse>(
+    'POST',
+    `/chat/getBase64FromMediaMessage/${encodeURIComponent(instanceName)}`,
+    { message: { key: messageKey }, convertToMp4: false },
+  );
+}

@@ -1,7 +1,10 @@
+import { Readable } from 'node:stream';
 import type { WhatsAppThreadStatus } from '@prisma/client';
 import { prisma } from '../../shared/prisma';
 import { whatsappQueue } from '../../shared/queue';
 import { emitToUser, emitToRoom } from '../../shared/socket';
+import { uploadFile } from '../../shared/storage';
+import { getBase64FromMediaMessage } from './evolutionClient';
 import type { NormalizedEvent } from './provider';
 
 type InboundEvent = Extract<NormalizedEvent, { type: 'inbound_message' }>;
@@ -41,12 +44,38 @@ export async function handleInboundMessage(event: InboundEvent): Promise<void> {
     increment: true,
   });
 
+  // If the message carries media, fetch + decrypt via Evolution and persist
+  // into our own storage so the frontend has a stable public URL. Failure
+  // here degrades to "media missing" — we still record the text/caption.
+  let persistedMediaUrl: string | null = null;
+  let persistedMediaMime: string | null = null;
+  if (event.mediaType && event.messageKey) {
+    try {
+      const dl = await getBase64FromMediaMessage(event.instance, event.messageKey);
+      if (dl.base64) {
+        const mime = dl.mimetype ?? event.mediaMime ?? 'application/octet-stream';
+        const buf = Buffer.from(dl.base64, 'base64');
+        const result = await uploadFile({
+          folder: `whatsapp/${event.mediaType}`,
+          mimeType: mime.split(';')[0].trim(),
+          stream: Readable.from(buf),
+        });
+        persistedMediaUrl = result.url;
+        persistedMediaMime = mime;
+      }
+    } catch (err) {
+      console.error('[whatsapp] media download failed', err);
+    }
+  }
+
   const message = await prisma.whatsAppMessage.create({
     data: {
       threadId: thread.id,
       direction: 'in',
       body: event.body,
-      mediaUrl: event.mediaUrl ?? null,
+      mediaUrl: persistedMediaUrl ?? event.mediaUrl ?? null,
+      mediaType: event.mediaType ?? null,
+      mediaMime: persistedMediaMime ?? event.mediaMime ?? null,
       fromPhone: fromPhoneNormalized,
       toPhone: session?.phoneNumber ?? '',
       providerId: event.providerId,
@@ -145,7 +174,7 @@ const threadInclude = {
   messages: {
     orderBy: { createdAt: 'desc' as const },
     take: 1,
-    select: { body: true, direction: true, createdAt: true },
+    select: { body: true, direction: true, createdAt: true, mediaType: true },
   },
 } as const;
 

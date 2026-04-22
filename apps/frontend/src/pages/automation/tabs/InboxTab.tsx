@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Send, CheckCircle2, Clock3, Search, UserX, Check, CheckCheck } from 'lucide-react';
+import { Send, CheckCircle2, Clock3, Search, UserX, Check, CheckCheck, FileText, Download } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { useAuthStore } from '@/store/authStore';
 import { useToastStore } from '@/store/toastStore';
 import { getSocket } from '@/services/socket';
+import { resolveImageUrl } from '@/lib/imageUrl';
 import {
   whatsappApi,
   type InboxThread,
@@ -406,7 +407,9 @@ function ThreadRow({
         <div className="flex items-center justify-between gap-2">
           <span className="flex min-w-0 items-center gap-1 truncate text-xs text-gray-500">
             {last?.direction === 'out' && <CheckCheck size={11} className="shrink-0 text-gray-400" />}
-            <span className="truncate">{last?.body ?? (thread.customer?.phoneDisplay ?? thread.customerPhone)}</span>
+            <span className="truncate">
+              {last ? formatMessagePreview(last) : thread.customer?.phoneDisplay ?? thread.customerPhone}
+            </span>
           </span>
           {thread.unreadCount > 0 && (
             <span className="shrink-0 rounded-full bg-green-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
@@ -444,30 +447,105 @@ function MessageBubble({
   last: boolean;
 }) {
   const out = message.direction === 'out';
+  // Stickers aren't bubbles on WhatsApp — render bare so the transparent
+  // webp sits on the chat background like a real sticker would.
+  if (message.mediaType === 'sticker' && message.mediaUrl) {
+    return (
+      <div className={`flex ${out ? 'justify-end' : 'justify-start'} ${first ? 'mt-1.5' : ''}`}>
+        <div className="flex flex-col items-end">
+          <img
+            src={resolveImageUrl(message.mediaUrl)}
+            alt="sticker"
+            className="h-32 w-32 object-contain"
+          />
+          <span className="mt-0.5 text-[10px] text-gray-500">{formatTime(message.createdAt)}</span>
+        </div>
+      </div>
+    );
+  }
+
   // Tail radius: only on the first+last bubble of a run, corner points to sender side.
   const radius = out
     ? `rounded-2xl ${first ? 'rounded-tr-md' : ''} ${last ? 'rounded-br-sm' : ''}`
     : `rounded-2xl ${first ? 'rounded-tl-md' : ''} ${last ? 'rounded-bl-sm' : ''}`;
+  const hasMedia = !!message.mediaType && !!message.mediaUrl;
+  // Image/video bubbles hug the media so the bubble doesn't leak padding
+  // around the asset — captions still get inner padding underneath.
+  const inner = hasMedia && (message.mediaType === 'image' || message.mediaType === 'video')
+    ? 'p-1'
+    : 'px-3 py-1.5';
   return (
     <div className={`flex ${out ? 'justify-end' : 'justify-start'} ${first ? 'mt-1.5' : ''}`}>
       <div
-        className={`max-w-[72%] px-3 py-1.5 text-sm shadow-sm ${radius} ${
+        className={`max-w-[72%] text-sm shadow-sm ${radius} ${inner} ${
           out ? 'bg-[#DCF8C6] text-gray-900' : 'bg-white text-gray-900'
         }`}
       >
         {first && message.author?.name && out && (
-          <div className="mb-0.5 text-[10px] font-semibold text-emerald-700">
+          <div className={`${inner === 'p-1' ? 'px-2 pt-1' : ''} mb-0.5 text-[10px] font-semibold text-emerald-700`}>
             {message.author.name}
           </div>
         )}
-        <div className="whitespace-pre-wrap break-words">{message.body}</div>
-        <div className="mt-0.5 flex items-center justify-end gap-1 text-[10px] text-gray-500">
+        {hasMedia && <MediaBlock message={message} />}
+        {message.body && (
+          <div
+            className={`${inner === 'p-1' ? 'px-2 pb-1 pt-1' : ''} whitespace-pre-wrap break-words`}
+          >
+            {message.body}
+          </div>
+        )}
+        <div
+          className={`${
+            inner === 'p-1' ? 'px-2 pb-1' : 'mt-0.5'
+          } flex items-center justify-end gap-1 text-[10px] text-gray-500`}
+        >
           <span>{formatTime(message.createdAt)}</span>
           {out && <MessageTicks read={!!message.readAt} />}
         </div>
       </div>
     </div>
   );
+}
+
+// ─── Media renderers ───────────────────────────────────────────────────────
+function MediaBlock({ message }: { message: InboxMessage }) {
+  const url = resolveImageUrl(message.mediaUrl ?? '');
+  if (!url) return null;
+  switch (message.mediaType) {
+    case 'image':
+      return (
+        <a href={url} target="_blank" rel="noreferrer" className="block">
+          <img src={url} alt={message.body || 'image'} className="max-h-72 w-full rounded-lg object-cover" />
+        </a>
+      );
+    case 'video':
+      return (
+        <video controls src={url} className="max-h-72 w-full rounded-lg bg-black">
+          Your browser can't play this video.
+        </video>
+      );
+    case 'audio':
+      return (
+        <audio controls src={url} className="w-64 max-w-full">
+          Your browser can't play this audio.
+        </audio>
+      );
+    case 'document':
+      return (
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center gap-2 rounded-lg bg-black/5 p-2 text-xs hover:bg-black/10"
+        >
+          <FileText size={18} className="shrink-0 text-gray-600" />
+          <span className="flex-1 truncate">{message.body || 'document'}</span>
+          <Download size={14} className="shrink-0 text-gray-500" />
+        </a>
+      );
+    default:
+      return null;
+  }
 }
 
 function MessageTicks({ read }: { read: boolean }) {
@@ -539,6 +617,27 @@ function formatDayLabel(d: Date): string {
   if (target.getTime() === today.getTime()) return 'Today';
   if (target.getTime() === yesterday.getTime()) return 'Yesterday';
   return d.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function formatMessagePreview(last: {
+  body: string;
+  mediaType: InboxMessage['mediaType'];
+}): string {
+  if (last.body) return last.body;
+  switch (last.mediaType) {
+    case 'image':
+      return '📷 Photo';
+    case 'video':
+      return '🎥 Video';
+    case 'audio':
+      return '🎤 Voice message';
+    case 'sticker':
+      return 'Sticker';
+    case 'document':
+      return '📎 Document';
+    default:
+      return '';
+  }
 }
 
 function formatTime(iso: string): string {

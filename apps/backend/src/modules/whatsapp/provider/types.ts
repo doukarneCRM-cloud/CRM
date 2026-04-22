@@ -39,6 +39,12 @@ export type NormalizedEvent =
       fromPhone: string;
       body: string;
       mediaUrl?: string;
+      mediaType?: 'image' | 'audio' | 'video' | 'sticker' | 'document';
+      mediaMime?: string;
+      mediaFileName?: string;
+      // Raw message key used to download encrypted media from Evolution
+      // when the webhook payload only carries a reference.
+      messageKey?: { id: string; remoteJid?: string; fromMe?: boolean };
       providerId: string;
       timestamp: Date;
     }

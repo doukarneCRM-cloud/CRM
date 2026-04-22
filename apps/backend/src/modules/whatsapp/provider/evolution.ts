@@ -110,18 +110,59 @@ export const evolutionProvider: WhatsAppProvider = {
       const message = (data.message ?? {}) as {
         conversation?: string;
         extendedTextMessage?: { text?: string };
-        imageMessage?: { caption?: string; url?: string };
+        imageMessage?: { caption?: string; url?: string; mimetype?: string };
+        audioMessage?: { url?: string; mimetype?: string; seconds?: number; ptt?: boolean };
+        videoMessage?: { caption?: string; url?: string; mimetype?: string; seconds?: number };
+        stickerMessage?: { url?: string; mimetype?: string };
+        documentMessage?: {
+          url?: string;
+          mimetype?: string;
+          fileName?: string;
+          title?: string;
+        };
       };
-      const body =
-        message.conversation ??
-        message.extendedTextMessage?.text ??
-        message.imageMessage?.caption ??
-        '';
-      const mediaUrl = message.imageMessage?.url;
+      // Figure out media type + extract body + mimetype + fileName from the
+      // shape Baileys emits. Keep order: image/video captions become body,
+      // audio/sticker have no body, document falls back to file name.
+      let mediaType: 'image' | 'audio' | 'video' | 'sticker' | 'document' | undefined;
+      let mediaMime: string | undefined;
+      let mediaFileName: string | undefined;
+      let mediaUrl: string | undefined;
+      let body = '';
+      if (message.imageMessage) {
+        mediaType = 'image';
+        mediaMime = stripCodec(message.imageMessage.mimetype) ?? 'image/jpeg';
+        mediaUrl = message.imageMessage.url;
+        body = message.imageMessage.caption ?? '';
+      } else if (message.stickerMessage) {
+        mediaType = 'sticker';
+        mediaMime = stripCodec(message.stickerMessage.mimetype) ?? 'image/webp';
+        mediaUrl = message.stickerMessage.url;
+      } else if (message.audioMessage) {
+        mediaType = 'audio';
+        mediaMime = stripCodec(message.audioMessage.mimetype) ?? 'audio/ogg';
+        mediaUrl = message.audioMessage.url;
+      } else if (message.videoMessage) {
+        mediaType = 'video';
+        mediaMime = stripCodec(message.videoMessage.mimetype) ?? 'video/mp4';
+        mediaUrl = message.videoMessage.url;
+        body = message.videoMessage.caption ?? '';
+      } else if (message.documentMessage) {
+        mediaType = 'document';
+        mediaMime = stripCodec(message.documentMessage.mimetype) ?? 'application/octet-stream';
+        mediaUrl = message.documentMessage.url;
+        mediaFileName =
+          message.documentMessage.fileName ?? message.documentMessage.title ?? 'document';
+        body = mediaFileName;
+      } else {
+        body = message.conversation ?? message.extendedTextMessage?.text ?? '';
+      }
       const fromJid = key.remoteJid ?? '';
       const fromPhone = fromJid.split('@')[0];
       const providerId = key.id ?? '';
       if (!fromPhone || !providerId) return { type: 'ignored' };
+      // Skip empty events (plain pings/receipts Baileys sometimes surfaces).
+      if (!body && !mediaType) return { type: 'ignored' };
       const rawTs = (data as { messageTimestamp?: number | string }).messageTimestamp;
       const ts =
         typeof rawTs === 'number'
@@ -135,6 +176,10 @@ export const evolutionProvider: WhatsAppProvider = {
         fromPhone,
         body,
         mediaUrl,
+        mediaType,
+        mediaMime,
+        mediaFileName,
+        messageKey: { id: providerId, remoteJid: fromJid, fromMe: false },
         providerId,
         timestamp: ts,
       };
@@ -143,3 +188,10 @@ export const evolutionProvider: WhatsAppProvider = {
     return { type: 'ignored' };
   },
 };
+
+// WhatsApp mimetypes sometimes carry codec params (e.g. "audio/ogg; codecs=opus")
+// which break a naive mime→extension lookup. Keep only the primary type.
+function stripCodec(m: string | undefined): string | undefined {
+  if (!m) return undefined;
+  return m.split(';')[0].trim();
+}

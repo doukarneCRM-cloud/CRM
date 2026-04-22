@@ -40,8 +40,15 @@ export interface InboxThread {
     whatsappOptOut: boolean;
   } | null;
   assignedAgent?: { id: string; name: string } | null;
-  messages?: Array<{ body: string; direction: WhatsAppMessageDirection; createdAt: string }>;
+  messages?: Array<{
+    body: string;
+    direction: WhatsAppMessageDirection;
+    createdAt: string;
+    mediaType: WhatsAppMediaType | null;
+  }>;
 }
+
+export type WhatsAppMediaType = 'image' | 'audio' | 'video' | 'sticker' | 'document';
 
 export interface InboxMessage {
   id: string;
@@ -49,6 +56,8 @@ export interface InboxMessage {
   direction: WhatsAppMessageDirection;
   body: string;
   mediaUrl: string | null;
+  mediaType: WhatsAppMediaType | null;
+  mediaMime: string | null;
   fromPhone: string;
   toPhone: string;
   providerId: string | null;
