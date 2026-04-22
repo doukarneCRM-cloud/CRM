@@ -260,7 +260,7 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
         'md:flex md:flex-col md:gap-2 md:px-3 md:py-2.5',
         'md:hover:border-primary/30 md:hover:bg-primary/5 md:hover:shadow-sm',
         overdue && 'callback-pulse border-pink-300/70 bg-pink-50/60 md:hover:bg-pink-50',
-        todayHighlight && 'border-amber-300/70 bg-amber-50/70 md:hover:bg-amber-50',
+        todayHighlight && 'callback-today-pulse border-sky-300/70 bg-sky-50/70 md:hover:bg-sky-50',
         'shadow-card md:shadow-none',
       )}
     >
@@ -715,7 +715,7 @@ function FilterPills({ section, orders, selected, onChange }: FilterPillsProps) 
               {count}
             </span>
             {showTodayBadge && (
-              <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
+              <span className="callback-today-blink inline-flex items-center gap-0.5 rounded-full bg-sky-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
                 <Phone size={8} /> {callbackTodayCount} today
               </span>
             )}
