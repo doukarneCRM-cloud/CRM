@@ -15,6 +15,10 @@ export const DEFAULT_TEMPLATES: Record<AutomationTrigger, { body: string; label:
     label: 'Unreachable — please call back',
     body: 'Salam {{customer.name}}, hawlna nsyoubek 3la commande {{product.name}} wma l9inakch. 3afak 3awed tssifet lina.',
   },
+  shipping_label_created: {
+    label: 'Label created',
+    body: 'Salam {{customer.name}}, commande dyalek {{product.name}} t7ddat w rahi ghadia l livraison. Ghad nbdaw ntseyfto.',
+  },
   shipping_picked_up: {
     label: 'Picked up by carrier',
     body: 'Salam {{customer.name}}, commande dyalek {{product.name}} khrjat m 3andna w rahi f triq. Ghadi twsellek fi kam youm.',
@@ -50,6 +54,7 @@ export const TRIGGER_ORDER: AutomationTrigger[] = [
   'confirmation_confirmed',
   'confirmation_cancelled',
   'confirmation_unreachable',
+  'shipping_label_created',
   'shipping_picked_up',
   'shipping_in_transit',
   'shipping_out_for_delivery',

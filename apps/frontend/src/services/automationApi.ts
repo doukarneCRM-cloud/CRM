@@ -4,6 +4,7 @@ export type AutomationTrigger =
   | 'confirmation_confirmed'
   | 'confirmation_cancelled'
   | 'confirmation_unreachable'
+  | 'shipping_label_created'
   | 'shipping_picked_up'
   | 'shipping_in_transit'
   | 'shipping_out_for_delivery'
@@ -12,7 +13,35 @@ export type AutomationTrigger =
   | 'shipping_return_validated'
   | 'commission_paid';
 
-export type MessageLogStatus = 'queued' | 'sending' | 'sent' | 'delivered' | 'failed';
+export type MessageLogStatus = 'queued' | 'sending' | 'sent' | 'delivered' | 'failed' | 'dead';
+
+export type ConditionOp = 'eq' | 'neq' | 'in' | 'not_in' | 'gte' | 'lte' | 'contains';
+
+export interface Condition {
+  field: string;
+  op: ConditionOp;
+  value: string | number | string[] | number[];
+}
+
+export interface RuleConditions {
+  all?: Condition[];
+  any?: Condition[];
+}
+
+export interface AutomationRule {
+  id: string;
+  trigger: AutomationTrigger;
+  name: string;
+  priority: number;
+  enabled: boolean;
+  overlap: 'first' | 'all' | string;
+  conditions: RuleConditions;
+  templateId: string;
+  sendFromSystem: boolean;
+  createdAt: string;
+  updatedAt: string;
+  template?: { id: string; body: string; enabled: boolean };
+}
 
 export interface MessageTemplate {
   id: string;
@@ -65,4 +94,17 @@ export const automationApi = {
     api.get<{ sessionId: string | null }>('/automation/system-session').then((r) => r.data),
   setSystemSession: (sessionId: string | null) =>
     api.post<{ ok: true }>('/automation/system-session', { sessionId }).then((r) => r.data),
+
+  listRules: (trigger?: AutomationTrigger) =>
+    api
+      .get<{ data: AutomationRule[]; allowedFields: string[] }>('/automation/rules', {
+        params: trigger ? { trigger } : {},
+      })
+      .then((r) => r.data),
+  createRule: (payload: Partial<AutomationRule> & { trigger: AutomationTrigger; name: string; templateId: string }) =>
+    api.post<AutomationRule>('/automation/rules', payload).then((r) => r.data),
+  updateRule: (id: string, patch: Partial<AutomationRule>) =>
+    api.patch<AutomationRule>(`/automation/rules/${id}`, patch).then((r) => r.data),
+  deleteRule: (id: string) =>
+    api.delete<{ ok: true }>(`/automation/rules/${id}`).then((r) => r.data),
 };

@@ -2,10 +2,10 @@ import type { AutomationTrigger, ConfirmationStatus, ShippingStatus } from '@pri
 import { prisma } from '../../shared/prisma';
 import { whatsappQueue } from '../../shared/queue';
 import { render } from './templateEngine';
+import { evaluate, type RuleConditions, type EvalContext } from './conditionEvaluator';
 
 // Map a status transition to the automation trigger that should fire (or null).
-// Only fires on the *transition into* the target state, never on re-saves of
-// the same status — callers pass both prev and next.
+// Only fires on the *transition into* the target state.
 export function triggerForOrderTransition(
   prev: { confirmation: ConfirmationStatus; shipping: ShippingStatus },
   next: { confirmation: ConfirmationStatus; shipping: ShippingStatus },
@@ -16,6 +16,7 @@ export function triggerForOrderTransition(
     if (next.confirmation === 'unreachable') return 'confirmation_unreachable';
   }
   if (next.shipping !== prev.shipping) {
+    if (next.shipping === 'label_created') return 'shipping_label_created';
     if (next.shipping === 'picked_up') return 'shipping_picked_up';
     if (next.shipping === 'in_transit') return 'shipping_in_transit';
     if (next.shipping === 'out_for_delivery') return 'shipping_out_for_delivery';
@@ -26,24 +27,28 @@ export function triggerForOrderTransition(
   return null;
 }
 
-// Load the full context needed to render any order-side template. Uses the
-// first item for product/variant — multi-item orders are rare and this matches
-// how the OrderLog and existing notification system describe orders.
-async function loadOrderContext(orderId: string) {
-  const order = await prisma.order.findUnique({
+type LoadedOrderRow = NonNullable<Awaited<ReturnType<typeof loadOrder>>>;
+
+interface LoadedOrder {
+  order: LoadedOrderRow;
+  ctx: Record<string, unknown>;
+}
+
+async function loadOrder(orderId: string) {
+  return prisma.order.findUnique({
     where: { id: orderId },
     include: {
       customer: true,
       agent: { select: { id: true, name: true, phone: true } },
       items: {
-        include: {
-          variant: {
-            include: { product: { select: { name: true } } },
-          },
-        },
+        include: { variant: { include: { product: { select: { name: true } } } } },
       },
     },
   });
+}
+
+async function loadOrderContext(orderId: string): Promise<LoadedOrder | null> {
+  const order = await loadOrder(orderId);
   if (!order) return null;
 
   const firstItem = order.items[0];
@@ -58,6 +63,7 @@ async function loadOrderContext(orderId: string) {
         name: order.customer.fullName,
         phone: order.customer.phoneDisplay ?? order.customer.phone,
         city: order.customer.city,
+        tag: order.customer.tag,
       },
       order: {
         reference: order.reference,
@@ -68,18 +74,17 @@ async function loadOrderContext(orderId: string) {
       product: { name: product },
       variant: { size, color },
       agent: {
+        id: order.agentId ?? '',
         name: order.agent?.name ?? '',
         phone: order.agent?.phone ?? '',
       },
-    } as Record<string, unknown>,
+    },
   };
 }
 
-// Shared enqueue helper — creates a MessageLog row (idempotent via dedupeKey)
-// and pushes a Bull job that the worker will pick up. Called from all three
-// trigger sites.
 async function enqueueMessage(params: {
   trigger: AutomationTrigger;
+  ruleId?: string | null;
   dedupeKey: string;
   orderId?: string | null;
   agentId?: string | null;
@@ -90,6 +95,7 @@ async function enqueueMessage(params: {
     const log = await prisma.messageLog.create({
       data: {
         trigger: params.trigger,
+        ruleId: params.ruleId ?? null,
         dedupeKey: params.dedupeKey,
         orderId: params.orderId ?? null,
         agentId: params.agentId ?? null,
@@ -119,29 +125,49 @@ export async function dispatchOrderStatusChange(
   const trigger = triggerForOrderTransition(transition.prev, transition.next);
   if (!trigger) return;
 
-  const template = await prisma.messageTemplate.findUnique({ where: { trigger } });
-  if (!template || !template.enabled) return;
+  const rules = await prisma.automationRule.findMany({
+    where: { trigger, enabled: true },
+    orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
+    include: { template: true },
+  });
+  if (rules.length === 0) return;
 
   const loaded = await loadOrderContext(orderId);
   if (!loaded) return;
   const { order, ctx } = loaded;
 
-  const body = render(template.body, ctx);
-  await enqueueMessage({
-    trigger,
-    dedupeKey: `${orderId}:${trigger}`,
-    orderId,
-    agentId: order.agentId,
-    recipientPhone: order.customer.phone,
-    body,
-  });
+  // Respect opt-out — cast: Prisma client may not reflect the new field yet
+  // until the next generate, but the migration ships it.
+  const customer = order.customer as typeof order.customer & { whatsappOptOut?: boolean };
+  if (customer.whatsappOptOut) return;
+
+  for (const rule of rules) {
+    if (!rule.template.enabled) continue;
+    const passes = evaluate(rule.conditions as unknown as RuleConditions, ctx as EvalContext);
+    if (!passes) continue;
+
+    const body = render(rule.template.body, ctx);
+    await enqueueMessage({
+      trigger,
+      ruleId: rule.id,
+      dedupeKey: `${orderId}:${trigger}:${rule.id}`,
+      orderId,
+      agentId: order.agentId,
+      recipientPhone: order.customer.phone,
+      body,
+    });
+
+    if (rule.overlap !== 'all') break;
+  }
 }
 
 export async function dispatchCommissionPaid(paymentId: string): Promise<void> {
-  const template = await prisma.messageTemplate.findUnique({
-    where: { trigger: 'commission_paid' },
+  const rules = await prisma.automationRule.findMany({
+    where: { trigger: 'commission_paid', enabled: true },
+    orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
+    include: { template: true },
   });
-  if (!template || !template.enabled) return;
+  if (rules.length === 0) return;
 
   const payment = await prisma.commissionPayment.findUnique({
     where: { id: paymentId },
@@ -150,7 +176,7 @@ export async function dispatchCommissionPaid(paymentId: string): Promise<void> {
   if (!payment || !payment.agent?.phone) return;
 
   const ctx: Record<string, unknown> = {
-    agent: { name: payment.agent.name, phone: payment.agent.phone },
+    agent: { id: payment.agent.id, name: payment.agent.name, phone: payment.agent.phone },
     commission: {
       amount: Math.round(payment.amount),
       orderCount: payment.orderIds.length,
@@ -159,12 +185,21 @@ export async function dispatchCommissionPaid(paymentId: string): Promise<void> {
     },
   };
 
-  const body = render(template.body, ctx);
-  await enqueueMessage({
-    trigger: 'commission_paid',
-    dedupeKey: `${paymentId}:${payment.agent.id}`,
-    agentId: payment.agent.id,
-    recipientPhone: payment.agent.phone,
-    body,
-  });
+  for (const rule of rules) {
+    if (!rule.template.enabled) continue;
+    const passes = evaluate(rule.conditions as unknown as RuleConditions, ctx as EvalContext);
+    if (!passes) continue;
+
+    const body = render(rule.template.body, ctx);
+    await enqueueMessage({
+      trigger: 'commission_paid',
+      ruleId: rule.id,
+      dedupeKey: `${paymentId}:${payment.agent.id}:${rule.id}`,
+      agentId: payment.agent.id,
+      recipientPhone: payment.agent.phone,
+      body,
+    });
+
+    if (rule.overlap !== 'all') break;
+  }
 }

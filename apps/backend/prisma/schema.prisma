@@ -127,6 +127,9 @@ model User {
   whatsappSession     WhatsAppSession?
   messageLogs         MessageLog[]        @relation("MessageLogAgent")
   updatedTemplates    MessageTemplate[]   @relation("TemplateUpdater")
+  createdRules        AutomationRule[]    @relation("RuleAuthor")
+  assignedThreads     WhatsAppThread[]    @relation("ThreadAssignee")
+  whatsappMessages    WhatsAppMessage[]   @relation("MessageAuthor")
 }
 
 model RefreshToken {
@@ -152,18 +155,23 @@ model Counter {
 // ─── Customers ───────────────────────────────────────────────────────────────
 
 model Customer {
-  id           String      @id @default(cuid())
-  fullName     String
-  phone        String      @unique // normalized +212XXXXXXXXX
-  phoneDisplay String // 06XXXXXXXX
-  city         String
-  address      String?
-  tag          CustomerTag @default(normal)
-  notes        String?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  id              String      @id @default(cuid())
+  fullName        String
+  phone           String      @unique // normalized +212XXXXXXXXX
+  phoneDisplay    String // 06XXXXXXXX
+  city            String
+  address         String?
+  tag             CustomerTag @default(normal)
+  notes           String?
+  // Flipped when the customer replies STOP / توقف on WhatsApp. Dispatcher
+  // blocks all outbound messages to opted-out customers.
+  whatsappOptOut  Boolean     @default(false)
+  whatsappOptOutAt DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
-  orders Order[]
+  orders  Order[]
+  threads WhatsAppThread[]
 
   @@index([phone])
   @@index([city])
@@ -890,6 +898,7 @@ enum AutomationTrigger {
   confirmation_confirmed
   confirmation_cancelled
   confirmation_unreachable
+  shipping_label_created
   shipping_picked_up
   shipping_in_transit
   shipping_out_for_delivery
@@ -912,6 +921,18 @@ enum MessageLogStatus {
   sent
   delivered
   failed
+  dead // gave up after Bull exhausted retries — shown in DLQ, requeue-able
+}
+
+enum WhatsAppThreadStatus {
+  open
+  closed
+  snoozed
+}
+
+enum WhatsAppMessageDirection {
+  in
+  out
 }
 
 model MessageTemplate {
@@ -923,7 +944,35 @@ model MessageTemplate {
   updatedAt   DateTime          @updatedAt
   createdAt   DateTime          @default(now())
 
-  updatedBy User? @relation("TemplateUpdater", fields: [updatedById], references: [id])
+  updatedBy User?            @relation("TemplateUpdater", fields: [updatedById], references: [id])
+  rules     AutomationRule[]
+}
+
+// A rule layers condition-based routing on top of a template. Multiple rules
+// can fire for the same trigger with different conditions and priorities —
+// the dispatcher loads enabled rules for a trigger ordered by priority desc
+// and fires the first that matches (`overlap='first'`) or all matches
+// (`overlap='all'`). Conditions are a whitelisted JSON shape evaluated by
+// conditionEvaluator.ts (no arbitrary code).
+model AutomationRule {
+  id          String            @id @default(cuid())
+  trigger     AutomationTrigger
+  name        String
+  priority    Int               @default(0)
+  enabled     Boolean           @default(true)
+  overlap     String            @default("first") // "first" | "all"
+  conditions  Json              @default("{}")
+  templateId  String
+  sendFromSystem Boolean        @default(false)
+  createdById String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  template  MessageTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  createdBy User?           @relation("RuleAuthor", fields: [createdById], references: [id])
+  logs      MessageLog[]
+
+  @@index([trigger, enabled, priority])
 }
 
 model WhatsAppSession {
@@ -942,6 +991,7 @@ model WhatsAppSession {
 model MessageLog {
   id             String            @id @default(cuid())
   trigger        AutomationTrigger
+  ruleId         String?
   orderId        String?
   agentId        String?
   recipientPhone String
@@ -950,13 +1000,63 @@ model MessageLog {
   providerId     String?
   error          String?
   dedupeKey      String            @unique
+  attempts       Int               @default(0)
   createdAt      DateTime          @default(now())
   sentAt         DateTime?
 
-  order Order? @relation(fields: [orderId], references: [id])
-  agent User?  @relation("MessageLogAgent", fields: [agentId], references: [id])
+  rule  AutomationRule?  @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  order Order?           @relation(fields: [orderId], references: [id])
+  agent User?            @relation("MessageLogAgent", fields: [agentId], references: [id])
+
+  messages WhatsAppMessage[]
 
   @@index([status, createdAt])
   @@index([orderId])
   @@index([trigger, createdAt])
+}
+
+// Two-way inbox. One thread per customer ↔ agent-session pairing. Inbound
+// messages land here; automation-driven outbound messages are appended as
+// direction='out' so the agent sees the full history inline with their
+// manual replies.
+model WhatsAppThread {
+  id               String               @id @default(cuid())
+  customerId       String?
+  assignedAgentId  String?
+  customerPhone    String
+  lastMessageAt    DateTime             @default(now())
+  unreadCount      Int                  @default(0)
+  status           WhatsAppThreadStatus @default(open)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  customer      Customer? @relation(fields: [customerId], references: [id])
+  assignedAgent User?     @relation("ThreadAssignee", fields: [assignedAgentId], references: [id])
+  messages      WhatsAppMessage[]
+
+  @@unique([customerPhone, assignedAgentId])
+  @@index([assignedAgentId, status, lastMessageAt])
+  @@index([customerId])
+}
+
+model WhatsAppMessage {
+  id           String                    @id @default(cuid())
+  threadId     String
+  direction    WhatsAppMessageDirection
+  body         String
+  mediaUrl     String?
+  fromPhone    String
+  toPhone      String
+  providerId   String?
+  messageLogId String?
+  authorUserId String?
+  readAt       DateTime?
+  createdAt    DateTime                  @default(now())
+
+  thread     WhatsAppThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  messageLog MessageLog?    @relation(fields: [messageLogId], references: [id], onDelete: SetNull)
+  author     User?          @relation("MessageAuthor", fields: [authorUserId], references: [id])
+
+  @@index([threadId, createdAt])
+  @@index([providerId])
 }

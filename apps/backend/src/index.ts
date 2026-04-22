@@ -51,6 +51,7 @@ import { notificationsRoutes } from './modules/notifications/notifications.route
 import { automationRoutes } from './modules/automation/automation.routes';
 import { whatsappRoutes } from './modules/whatsapp/whatsapp.routes';
 import { ensureDefaultTemplates } from './modules/automation/automation.service';
+import { ensureFallbackRules } from './modules/automation/rules.service';
 import { ensureAdminPermissions } from './shared/ensureAdminPermissions';
 import { startAttendanceCron } from './modules/atelie/weeklyAttendanceCron';
 // Bull workers — side-effect imports register .process() handlers.
@@ -410,10 +411,14 @@ async function start() {
     startAttendanceCron();
 
     // Automation — seed a disabled MessageTemplate row for every trigger so
-    // the UI has something to render on first boot.
-    ensureDefaultTemplates().catch((err) => {
-      app.log.warn({ err }, 'Failed to seed automation templates');
-    });
+    // the UI has something to render on first boot. Then ensure every
+    // template has at least one catch-all rule (the dispatcher now fires
+    // through AutomationRule rows instead of templates directly).
+    ensureDefaultTemplates()
+      .then(() => ensureFallbackRules())
+      .catch((err) => {
+        app.log.warn({ err }, 'Failed to seed automation templates / rules');
+      });
 
     // Keep the admin role synced with the canonical permission list on every
     // boot. Covers new perm keys added post-launch (the seed script doesn't

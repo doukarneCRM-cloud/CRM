@@ -207,6 +207,11 @@ export async function exportOrder(orderId: string, actor: JwtPayload): Promise<E
 
     emitToRoom('orders:all', 'order:updated', { orderId: order.id });
 
+    void dispatchOrderStatusChange(order.id, {
+      prev: { confirmation: order.confirmationStatus, shipping: order.shippingStatus },
+      next: { confirmation: order.confirmationStatus, shipping: 'label_created' },
+    });
+
     return { orderId: order.id, reference: order.reference, ok: true, tracking: result.tracking };
   } catch (err) {
     const message =

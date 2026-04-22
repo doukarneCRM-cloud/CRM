@@ -1,26 +1,28 @@
 import { useState } from 'react';
-import { MessageSquare, Smartphone, ScrollText } from 'lucide-react';
+import { MessageSquare, Smartphone, ScrollText, SlidersHorizontal } from 'lucide-react';
 import { TemplatesTab } from './tabs/TemplatesTab';
 import { SessionsTab } from './tabs/SessionsTab';
 import { LogsTab } from './tabs/LogsTab';
+import { RulesTab } from './tabs/RulesTab';
 
-type TabKey = 'templates' | 'sessions' | 'logs';
+type TabKey = 'rules' | 'templates' | 'sessions' | 'logs';
 
 const TABS: { id: TabKey; label: string; icon: React.ElementType }[] = [
+  { id: 'rules', label: 'Rules', icon: SlidersHorizontal },
   { id: 'templates', label: 'Templates', icon: MessageSquare },
   { id: 'sessions', label: 'Sessions', icon: Smartphone },
   { id: 'logs', label: 'Logs', icon: ScrollText },
 ];
 
 export default function AutomationPage() {
-  const [tab, setTab] = useState<TabKey>('templates');
+  const [tab, setTab] = useState<TabKey>('rules');
 
   return (
     <div className="flex h-full flex-col gap-4 p-6">
       <header>
         <h1 className="text-2xl font-bold text-primary">Automation</h1>
         <p className="mt-1 text-sm text-gray-500">
-          WhatsApp templates, agent sessions, and delivery logs.
+          WhatsApp rules, templates, agent sessions, and delivery logs.
         </p>
       </header>
 
@@ -47,6 +49,7 @@ export default function AutomationPage() {
       </div>
 
       <div className="flex-1">
+        {tab === 'rules' && <RulesTab />}
         {tab === 'templates' && <TemplatesTab />}
         {tab === 'sessions' && <SessionsTab />}
         {tab === 'logs' && <LogsTab />}

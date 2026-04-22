@@ -16,6 +16,7 @@ const TRIGGER_LABELS: Record<AutomationTrigger, string> = {
   confirmation_confirmed: 'Order confirmed',
   confirmation_cancelled: 'Order cancelled',
   confirmation_unreachable: 'Client unreachable',
+  shipping_label_created: 'Label created',
   shipping_picked_up: 'Picked up',
   shipping_in_transit: 'In transit',
   shipping_out_for_delivery: 'Out for delivery',

@@ -36,6 +36,7 @@ const STATUS_OPTS: { value: MessageLogStatus | ''; label: string }[] = [
   { value: 'sent', label: 'Sent' },
   { value: 'delivered', label: 'Delivered' },
   { value: 'failed', label: 'Failed' },
+  { value: 'dead', label: 'Dead' },
 ];
 
 const STATUS_STYLES: Record<MessageLogStatus, string> = {
@@ -44,6 +45,7 @@ const STATUS_STYLES: Record<MessageLogStatus, string> = {
   sent: 'bg-indigo-100 text-indigo-700',
   delivered: 'bg-green-100 text-green-700',
   failed: 'bg-red-100 text-red-700',
+  dead: 'bg-neutral-900 text-white',
 };
 
 const PAGE_SIZE = 50;

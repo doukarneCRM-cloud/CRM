@@ -3,6 +3,8 @@ import type { AutomationTrigger, MessageLogStatus } from '@prisma/client';
 import { verifyJWT } from '../../shared/middleware/verifyJWT';
 import { requirePermission } from '../../shared/middleware/rbac.middleware';
 import * as svc from './automation.service';
+import * as rules from './rules.service';
+import { ALLOWED_FIELDS } from './conditionEvaluator';
 
 export async function automationRoutes(app: FastifyInstance) {
   app.get(
@@ -76,6 +78,55 @@ export async function automationRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const body = req.body as { sessionId: string | null };
       await svc.setSystemSessionId(body.sessionId ?? null);
+      return reply.send({ ok: true });
+    },
+  );
+
+  // ── Rules ────────────────────────────────────────────────────────────
+  app.get(
+    '/rules',
+    { preHandler: [verifyJWT, requirePermission('automation:view')] },
+    async (req, reply) => {
+      const q = req.query as { trigger?: AutomationTrigger };
+      const rows = await rules.listRules(q.trigger);
+      return reply.send({ data: rows, allowedFields: ALLOWED_FIELDS });
+    },
+  );
+
+  app.post(
+    '/rules',
+    { preHandler: [verifyJWT, requirePermission('automation:manage')] },
+    async (req, reply) => {
+      const body = req.body as {
+        trigger: AutomationTrigger;
+        name: string;
+        priority?: number;
+        enabled?: boolean;
+        overlap?: string;
+        conditions?: unknown;
+        templateId: string;
+        sendFromSystem?: boolean;
+      };
+      const created = await rules.createRule({ ...body, createdById: req.user.sub });
+      return reply.status(201).send(created);
+    },
+  );
+
+  app.patch<{ Params: { id: string } }>(
+    '/rules/:id',
+    { preHandler: [verifyJWT, requirePermission('automation:manage')] },
+    async (req, reply) => {
+      const body = req.body as Parameters<typeof rules.updateRule>[1];
+      const updated = await rules.updateRule(req.params.id, body);
+      return reply.send(updated);
+    },
+  );
+
+  app.delete<{ Params: { id: string } }>(
+    '/rules/:id',
+    { preHandler: [verifyJWT, requirePermission('automation:manage')] },
+    async (req, reply) => {
+      await rules.deleteRule(req.params.id);
       return reply.send({ ok: true });
     },
   );
