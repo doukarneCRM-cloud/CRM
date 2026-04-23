@@ -74,7 +74,13 @@ function calculateTotals(
   return { subtotal, total };
 }
 
-/** Find or create a customer from order creation payload. Returns customerId. */
+/** Find or create a customer from order creation payload. Returns customerId.
+ *
+ * Uses upsert so we never crash on a P2002 when the phone is already taken —
+ * the prior two-step find-then-create was racy (two concurrent order creates
+ * for the same new customer) and also brittle against any phone-format drift
+ * between the stored row and the freshly-normalized value. upsert hands both
+ * cases to Postgres atomically. */
 async function resolveCustomer(input: {
   customerId?: string;
   customerName?: string;
@@ -85,30 +91,26 @@ async function resolveCustomer(input: {
   if (input.customerId) return input.customerId;
 
   const { normalized, display } = normalizePhone(input.customerPhone!);
-  const existing = await prisma.customer.findUnique({ where: { phone: normalized } });
-  if (existing) {
-    // Update name/city in case they changed (upsert-like)
-    await prisma.customer.update({
-      where: { id: existing.id },
-      data: {
-        fullName: input.customerName ?? existing.fullName,
-        city: input.customerCity ?? existing.city,
-        address: input.customerAddress ?? existing.address,
-      },
-    });
-    return existing.id;
-  }
 
-  const created = await prisma.customer.create({
-    data: {
+  const customer = await prisma.customer.upsert({
+    where: { phone: normalized },
+    update: {
+      // Only overwrite fields the caller actually sent — keep whatever is
+      // on file otherwise so a thin "new order" form doesn't wipe prior data.
+      ...(input.customerName ? { fullName: input.customerName } : {}),
+      ...(input.customerCity ? { city: input.customerCity } : {}),
+      ...(input.customerAddress ? { address: input.customerAddress } : {}),
+    },
+    create: {
       fullName: input.customerName!,
       phone: normalized,
       phoneDisplay: display,
       city: input.customerCity!,
       address: input.customerAddress,
     },
+    select: { id: true },
   });
-  return created.id;
+  return customer.id;
 }
 
 /** Full include shape used for single-order responses */
