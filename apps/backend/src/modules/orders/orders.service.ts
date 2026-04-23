@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../shared/prisma';
 import { emitToRoom } from '../../shared/socket';
 import {
@@ -37,6 +38,45 @@ async function generateReference(): Promise<string> {
     update: { value: { increment: 1 } },
   });
   return `ORD-${year}-${String(counter.value).padStart(5, '0')}`;
+}
+
+// Self-heal when the Counter row drifts below reality — happens after
+// partial imports, manual INSERTs, or a Counter reset that left orders
+// behind. We scan for the largest live ORD-YY-XXXXX this year and jump
+// the counter past it so the next generateReference() starts from a
+// free slot in one hop (instead of burning a retry per stale row).
+async function healReferenceCounter(): Promise<void> {
+  const year = new Date().getFullYear().toString().slice(-2);
+  const key = `order_ref_${year}`;
+  const prefix = `ORD-${year}-`;
+  // Zero-padded 5-digit suffix means lexicographic sort matches numeric
+  // sort, so `orderBy reference desc` gives us the true max.
+  const latest = await prisma.order.findFirst({
+    where: { reference: { startsWith: prefix } },
+    orderBy: { reference: 'desc' },
+    select: { reference: true },
+  });
+  let maxSeq = 0;
+  if (latest) {
+    const m = latest.reference.match(/^ORD-\d{2}-(\d{5})$/);
+    if (m) maxSeq = parseInt(m[1], 10);
+  }
+  await prisma.counter.upsert({
+    where: { key },
+    create: { key, value: maxSeq },
+    update: { value: maxSeq },
+  });
+}
+
+// Narrow type guard — Prisma's P2002 with `target` pointing at the
+// Order.reference column is the only case we want to recover from.
+function isReferenceCollision(err: unknown): boolean {
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError)) return false;
+  if (err.code !== 'P2002') return false;
+  const target = (err.meta as { target?: unknown } | null | undefined)?.target;
+  if (Array.isArray(target)) return target.includes('reference');
+  if (typeof target === 'string') return target.includes('reference');
+  return false;
 }
 
 /**
@@ -277,7 +317,6 @@ export async function getPendingSiblings(orderId: string) {
 
 export async function createOrder(input: CreateOrderInput, actor: JwtPayload) {
   const customerId = await resolveCustomer(input);
-  const reference = await generateReference();
   const { subtotal, total } = calculateTotals(
     input.items,
     input.discountType,
@@ -287,71 +326,102 @@ export async function createOrder(input: CreateOrderInput, actor: JwtPayload) {
 
   const actorName = await getActorName(actor);
 
-  const order = await prisma.$transaction(async (tx) => {
-    const created = await tx.order.create({
-      data: {
-        reference,
-        customerId,
-        source: input.source,
-        storeId: input.storeId,
-        agentId: input.agentId,
-        assignedAt: input.agentId ? new Date() : undefined,
-        discountType: input.discountType,
-        discountAmount: input.discountAmount,
-        shippingPrice: input.shippingPrice ?? 0,
-        subtotal,
-        total,
-        confirmationNote: input.confirmationNote,
-        shippingInstruction: input.shippingInstruction,
-        items: {
-          create: input.items.map((item) => ({
-            variantId: item.variantId,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            total: item.quantity * item.unitPrice,
-          })),
-        },
-        logs: {
-          create: [
-            {
-              type: 'system' as const,
-              action: `Order created by ${actorName}`,
-              performedBy: actorName,
-              userId: actor.sub,
+  // Retry on reference collisions — the Counter can drift below reality
+  // after imports / manual INSERTs / partial resets. First collision runs
+  // healReferenceCounter() to jump past the true max in one hop; any
+  // subsequent collisions are pure bad luck and just re-roll.
+  const MAX_ATTEMPTS = 5;
+  let order: Awaited<ReturnType<typeof prisma.order.create>> | undefined;
+  let healedOnce = false;
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const reference = await generateReference();
+    try {
+      order = await prisma.$transaction(async (tx) => {
+        const created = await tx.order.create({
+          data: {
+            reference,
+            customerId,
+            source: input.source,
+            storeId: input.storeId,
+            agentId: input.agentId,
+            assignedAt: input.agentId ? new Date() : undefined,
+            discountType: input.discountType,
+            discountAmount: input.discountAmount,
+            shippingPrice: input.shippingPrice ?? 0,
+            subtotal,
+            total,
+            confirmationNote: input.confirmationNote,
+            shippingInstruction: input.shippingInstruction,
+            items: {
+              create: input.items.map((item) => ({
+                variantId: item.variantId,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                total: item.quantity * item.unitPrice,
+              })),
             },
-            ...(input.agentId
-              ? [
-                  {
-                    type: 'system' as const,
-                    action: `Assigned to agent on creation`,
-                    performedBy: actorName,
-                    userId: actor.sub,
-                  },
-                ]
-              : []),
-          ],
-        },
-      },
-      include: ORDER_FULL_INCLUDE,
-    });
+            logs: {
+              create: [
+                {
+                  type: 'system' as const,
+                  action: `Order created by ${actorName}`,
+                  performedBy: actorName,
+                  userId: actor.sub,
+                },
+                ...(input.agentId
+                  ? [
+                      {
+                        type: 'system' as const,
+                        action: `Assigned to agent on creation`,
+                        performedBy: actorName,
+                        userId: actor.sub,
+                      },
+                    ]
+                  : []),
+              ],
+            },
+          },
+          include: ORDER_FULL_INCLUDE,
+        });
 
-    // Gated decrement — DB refuses to go negative under concurrent creates.
-    for (const item of input.items) {
-      const res = await tx.productVariant.updateMany({
-        where: { id: item.variantId, stock: { gte: item.quantity } },
-        data: { stock: { decrement: item.quantity } },
+        // Gated decrement — DB refuses to go negative under concurrent creates.
+        for (const item of input.items) {
+          const res = await tx.productVariant.updateMany({
+            where: { id: item.variantId, stock: { gte: item.quantity } },
+            data: { stock: { decrement: item.quantity } },
+          });
+          if (res.count === 0) {
+            throw {
+              statusCode: 400,
+              code: 'INSUFFICIENT_STOCK',
+              message: 'Not enough stock for one of the selected variants',
+            };
+          }
+        }
+
+        return created;
       });
-      if (res.count === 0) {
-        throw {
-          statusCode: 400,
-          code: 'INSUFFICIENT_STOCK',
-          message: 'Not enough stock for one of the selected variants',
-        };
+      break; // success
+    } catch (err) {
+      if (isReferenceCollision(err)) {
+        if (!healedOnce) {
+          await healReferenceCounter();
+          healedOnce = true;
+        }
+        continue; // re-roll and try again
       }
+      throw err;
     }
+  }
 
-    return created;
-  });
+  if (!order) {
+    throw {
+      statusCode: 500,
+      code: 'REFERENCE_GEN_FAILED',
+      message: 'Could not generate a unique order reference after retries',
+    };
+  }
 
   // Trigger out-of-stock check outside transaction (needs fresh reads)
   await Promise.all(input.items.map((item) => triggerOutOfStock(item.variantId)));
