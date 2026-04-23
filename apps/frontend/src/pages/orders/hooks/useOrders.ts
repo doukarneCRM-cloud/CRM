@@ -122,11 +122,16 @@ export function useOrders(): UseOrdersReturn {
       socket.on('order:updated', handler);
       socket.on('order:archived', handler);
       socket.on('order:bulk_updated', handler);
+      // Stock-short broadcast: fired when a pending order's variant drops
+      // to 0. Refetching picks up the new hasStockWarning flag so the row's
+      // amber badge appears without a manual reload.
+      socket.on('order:stock_warning', handler);
       return () => {
         socket?.off('order:created', handler);
         socket?.off('order:updated', handler);
         socket?.off('order:archived', handler);
         socket?.off('order:bulk_updated', handler);
+        socket?.off('order:stock_warning', handler);
       };
     } catch {
       // Socket not initialized yet — no-op

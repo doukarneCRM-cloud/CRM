@@ -81,6 +81,13 @@ export interface Order {
   agent: OrderAgent | null;
   items: OrderItem[];
   logs?: OrderLog[];
+  /**
+   * Derived server-side: true when any item's variant.stock is below the
+   * requested quantity. Under the new stock policy, pending orders that run
+   * short on stock stay pending and surface this flag so the UI can show a
+   * "Stock short" badge — nothing is auto-flipped to out_of_stock anymore.
+   */
+  hasStockWarning?: boolean;
 }
 
 export interface Pagination {

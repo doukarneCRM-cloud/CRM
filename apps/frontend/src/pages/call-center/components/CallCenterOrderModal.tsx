@@ -589,6 +589,22 @@ export function CallCenterOrderModal() {
           )}
         </div>
 
+        {/* Stock-short warning strip — pending orders only. Under the new
+            policy the order stays pending even when its variant runs out;
+            we just tell the agent so they can wait, restock, or pick
+            "No stock" from the confirmation popup instead of confirming
+            and getting a 422. */}
+        {order.hasStockWarning && order.confirmationStatus === 'pending' && !isLocked && (
+          <div className="flex items-start gap-2 rounded-card border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+            <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-600" />
+            <p className="leading-snug">
+              <span className="font-semibold">Stock short on this order.</span>{' '}
+              One of the variants is below the requested quantity — confirming
+              will fail. Restock first, or pick <span className="font-semibold">No stock</span> from the status menu.
+            </p>
+          </div>
+        )}
+
         {/* ── TWO-COLUMN GRID ──────────────────────────────────────────── */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {/* LEFT COLUMN — Customer + Products */}

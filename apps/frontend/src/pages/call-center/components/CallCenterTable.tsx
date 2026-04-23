@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
   History, MessageCircle, Send, Package, Phone, StickyNote, PhoneOff, Truck, Search, X,
+  AlertTriangle,
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { OrderSourceIcon } from '@/components/ui/OrderSourceIcon';
@@ -432,6 +433,14 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
               </button>
             </div>
           </div>
+          {order.hasStockWarning && order.confirmationStatus === 'pending' && (
+            <div className="flex items-start gap-1.5 rounded-btn border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
+              <AlertTriangle size={11} className="mt-0.5 shrink-0 text-amber-600" />
+              <p className="line-clamp-2">
+                <span className="font-semibold">Stock short.</span> Confirming will fail — restock or pick "No stock".
+              </p>
+            </div>
+          )}
           {order.confirmationNote && (
             <div className="flex items-start gap-1.5 rounded-btn bg-amber-50/70 px-2 py-1 text-[11px] text-amber-800">
               <StickyNote size={11} className="mt-0.5 shrink-0" />
@@ -596,6 +605,15 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
             >
               <History size={11} />
             </button>
+            {order.hasStockWarning && order.confirmationStatus === 'pending' && (
+              <span
+                className="inline-flex items-center gap-1 rounded-badge border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
+                title="One of the variants on this order is short — confirming will fail until restocked."
+              >
+                <AlertTriangle size={9} className="shrink-0" />
+                Stock short
+              </span>
+            )}
             <ShippingPill order={order} />
             <button
               type="button"
@@ -777,12 +795,18 @@ export function CallCenterTable() {
       socket.on('order:created', handler);
       socket.on('order:archived', handler);
       socket.on('order:bulk_updated', handler);
+      // New: when a variant drops to 0, the backend broadcasts a warning for
+      // each pending order touching it. Refetching reshapes the order with
+      // hasStockWarning=true so the row/modal badge lights up without the
+      // agent needing to manually refresh.
+      socket.on('order:stock_warning', handler);
       return () => {
         socket.off('order:assigned', handler);
         socket.off('order:updated', handler);
         socket.off('order:created', handler);
         socket.off('order:archived', handler);
         socket.off('order:bulk_updated', handler);
+        socket.off('order:stock_warning', handler);
       };
     } catch {
       // socket not ready
