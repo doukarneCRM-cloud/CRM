@@ -48,26 +48,27 @@ export default function AutomationPage() {
         </p>
       </header>
 
-      <div className="flex items-center gap-2 overflow-x-auto rounded-card border border-gray-200 bg-white p-1.5 shadow-sm">
-        {visibleTabs.map((t) => {
-          const Icon = t.icon;
-          const active = tab === t.id;
-          return (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              style={
-                active
-                  ? { backgroundColor: '#3C2515', color: '#ffffff' }
-                  : { backgroundColor: 'transparent', color: '#6b7280' }
-              }
-              className="flex shrink-0 items-center gap-2 rounded-btn px-4 py-2 text-sm font-semibold transition-colors"
-            >
-              <Icon size={14} />
-              {t.label}
-            </button>
-          );
-        })}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex items-center gap-1 overflow-x-auto">
+          {visibleTabs.map((t) => {
+            const Icon = t.icon;
+            const active = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`group relative flex shrink-0 items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors ${
+                  active
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-gray-500 hover:border-gray-200 hover:text-gray-700'
+                }`}
+              >
+                <Icon size={15} strokeWidth={active ? 2.4 : 2} />
+                {t.label}
+              </button>
+            );
+          })}
+        </nav>
       </div>
 
       <div className="flex-1">
