@@ -16,8 +16,6 @@ import {
   File as FileIcon,
   X,
 } from 'lucide-react';
-import { GlassCard } from '@/components/ui/GlassCard';
-import { CRMButton } from '@/components/ui/CRMButton';
 import { useAuthStore } from '@/store/authStore';
 import { useToastStore } from '@/store/toastStore';
 import { getSocket } from '@/services/socket';
@@ -350,75 +348,60 @@ export function InboxTab() {
   const groupedMessages = useMemo(() => groupByDay(messages), [messages]);
 
   return (
-    <div className="grid h-[calc(100vh-220px)] grid-cols-[340px_1fr] gap-4">
+    <div className="grid h-[calc(100vh-180px)] grid-cols-[360px_1fr] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
       {/* ── Left: thread list ────────────────────────────────────────── */}
-      <GlassCard padding="none" className="flex flex-col overflow-hidden">
-        <div className="space-y-2 border-b border-gray-100 p-3">
-          {isAdmin && (
-            <div className="flex overflow-hidden rounded-btn border border-gray-200 text-xs">
-              <button
-                onClick={() => setScope('mine')}
-                style={
-                  scope === 'mine'
-                    ? { backgroundColor: '#3C2515', color: '#fff' }
-                    : { backgroundColor: 'transparent', color: '#6b7280' }
-                }
-                className="flex-1 px-3 py-1 font-semibold"
-              >
-                Mine
-              </button>
-              <button
-                onClick={() => setScope('all')}
-                style={
-                  scope === 'all'
-                    ? { backgroundColor: '#3C2515', color: '#fff' }
-                    : { backgroundColor: 'transparent', color: '#6b7280' }
-                }
-                className="flex-1 px-3 py-1 font-semibold"
-              >
-                All agents
-              </button>
-            </div>
-          )}
-          <div className="flex items-center gap-2">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as WhatsAppThreadStatus | 'all')}
-              className="flex-1 rounded-btn border border-gray-200 bg-white px-2 py-1.5 text-xs"
-            >
-              {STATUS_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-            {isAdmin && scope === 'all' && (
-              <select
-                value={agentFilter}
-                onChange={(e) => setAgentFilter(e.target.value)}
-                className="flex-1 rounded-btn border border-gray-200 bg-white px-2 py-1.5 text-xs"
-                title="Filter by agent"
-              >
-                <option value="">All agents</option>
-                {agents.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
+      <div className="flex flex-col overflow-hidden border-r border-gray-200 bg-white">
+        <div className="space-y-2 border-b border-gray-200 bg-[#F0F2F5] px-3 py-2.5">
           <div className="relative">
-            <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search name or phone"
-              className="w-full rounded-btn border border-gray-200 bg-white py-1.5 pl-7 pr-2 text-xs"
+              placeholder="Search or start a new chat"
+              className="w-full rounded-full border border-transparent bg-white py-2 pl-9 pr-3 text-xs outline-none focus:border-gray-300"
             />
           </div>
+          {isAdmin && (
+            <div className="flex gap-1">
+              <FilterChip
+                label="Mine"
+                active={scope === 'mine'}
+                onClick={() => setScope('mine')}
+              />
+              <FilterChip
+                label="All"
+                active={scope === 'all'}
+                onClick={() => setScope('all')}
+              />
+              {STATUS_OPTIONS.filter((o) => o.value !== 'all').map((o) => (
+                <FilterChip
+                  key={o.value}
+                  label={o.label}
+                  active={statusFilter === o.value}
+                  onClick={() =>
+                    setStatusFilter(statusFilter === o.value ? 'all' : (o.value as WhatsAppThreadStatus))
+                  }
+                />
+              ))}
+            </div>
+          )}
+          {isAdmin && scope === 'all' && (
+            <select
+              value={agentFilter}
+              onChange={(e) => setAgentFilter(e.target.value)}
+              className="w-full rounded-full border border-transparent bg-white px-3 py-1.5 text-xs outline-none focus:border-gray-300"
+              title="Filter by agent"
+            >
+              <option value="">All agents</option>
+              {agents.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto bg-white">
           {loadingThreads ? (
             <div className="p-4 text-sm text-gray-500">Loading…</div>
           ) : filteredThreads.length === 0 ? (
@@ -435,24 +418,33 @@ export function InboxTab() {
             ))
           )}
         </div>
-      </GlassCard>
+      </div>
 
       {/* ── Right: thread view ───────────────────────────────────────── */}
-      <GlassCard padding="none" className="flex flex-col overflow-hidden">
+      <div className="flex flex-col overflow-hidden">
         {!activeThread ? (
-          <div className="flex flex-1 items-center justify-center text-sm text-gray-500">
-            Select a conversation
+          <div className="flex flex-1 flex-col items-center justify-center bg-[#F0F2F5] text-center">
+            <div className="max-w-sm px-8">
+              <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full bg-white text-[#00A884] shadow-sm">
+                <Send size={36} />
+              </div>
+              <h3 className="mb-1 text-xl font-light text-gray-700">CRM WhatsApp Inbox</h3>
+              <p className="text-sm text-gray-500">
+                Select a conversation on the left to read the thread, send media, or record a
+                voice note.
+              </p>
+            </div>
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between border-b border-gray-100 bg-white/80 p-3 backdrop-blur">
+            <div className="flex items-center justify-between border-b border-gray-200 bg-[#F0F2F5] px-4 py-2.5">
               <div className="flex items-center gap-3">
-                <Avatar name={activeThread.customer?.fullName ?? activeThread.customerPhone} size={36} />
+                <Avatar name={activeThread.customer?.fullName ?? activeThread.customerPhone} size={40} />
                 <div>
-                  <div className="text-sm font-semibold text-primary">
+                  <div className="text-sm font-semibold text-gray-900">
                     {activeThread.customer?.fullName ?? activeThread.customerPhone}
                   </div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-[11px] text-gray-500">
                     {activeThread.customer?.phoneDisplay ?? activeThread.customerPhone}
                     {activeThread.customer?.city ? ` · ${activeThread.customer.city}` : ''}
                     {activeThread.assignedAgent ? ` · ${activeThread.assignedAgent.name}` : ''}
@@ -462,17 +454,17 @@ export function InboxTab() {
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => handleStatus('snoozed')}
-                  className="rounded-btn p-1.5 text-gray-500 hover:bg-gray-100"
+                  className="rounded-full p-2 text-gray-600 hover:bg-black/5"
                   title="Snooze"
                 >
-                  <Clock3 size={14} />
+                  <Clock3 size={16} />
                 </button>
                 <button
                   onClick={() => handleStatus('closed')}
-                  className="rounded-btn p-1.5 text-gray-500 hover:bg-gray-100"
+                  className="rounded-full p-2 text-gray-600 hover:bg-black/5"
                   title="Close"
                 >
-                  <CheckCircle2 size={14} />
+                  <CheckCircle2 size={16} />
                 </button>
               </div>
             </div>
@@ -508,9 +500,9 @@ export function InboxTab() {
               )}
             </div>
 
-            <div className="relative border-t border-gray-100 bg-white p-3">
+            <div className="relative bg-[#F0F2F5] px-3 py-2">
               {activeThread.customer?.whatsappOptOut && (
-                <div className="mb-2 rounded-btn bg-red-50 p-2 text-xs text-red-700">
+                <div className="mb-2 rounded-lg bg-red-50 p-2 text-xs text-red-700">
                   This customer opted out of WhatsApp. Replies are blocked.
                 </div>
               )}
@@ -540,17 +532,17 @@ export function InboxTab() {
               {/* Attachment preview strip — WhatsApp-Web-like: shows the
                   selected file, composer below becomes the caption. */}
               {pendingFile && (
-                <div className="mb-2 flex items-center gap-2 rounded-btn border border-gray-200 bg-gray-50 p-2">
+                <div className="mb-2 flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-2 shadow-sm">
                   {pendingPreview && pendingFile.type.startsWith('image/') ? (
                     <img
                       src={pendingPreview}
                       alt="preview"
-                      className="h-14 w-14 rounded object-cover"
+                      className="h-14 w-14 rounded-lg object-cover"
                     />
                   ) : pendingPreview && pendingFile.type.startsWith('video/') ? (
-                    <video src={pendingPreview} className="h-14 w-14 rounded bg-black object-cover" />
+                    <video src={pendingPreview} className="h-14 w-14 rounded-lg bg-black object-cover" />
                   ) : (
-                    <div className="flex h-14 w-14 items-center justify-center rounded bg-gray-200">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-[#F0F2F5]">
                       <FileText size={22} className="text-gray-500" />
                     </div>
                   )}
@@ -565,7 +557,7 @@ export function InboxTab() {
                   </div>
                   <button
                     onClick={clearPending}
-                    className="rounded-btn p-1 text-gray-500 hover:bg-gray-200"
+                    className="rounded-full p-1.5 text-gray-500 hover:bg-gray-100"
                     title="Remove"
                   >
                     <X size={14} />
@@ -575,28 +567,28 @@ export function InboxTab() {
 
               {/* Recording banner — replaces the composer while the mic is hot. */}
               {recording ? (
-                <div className="flex items-center gap-3 rounded-btn border border-red-200 bg-red-50 p-2">
+                <div className="flex items-center gap-3 rounded-full bg-white px-4 py-2.5 shadow-sm">
                   <span className="relative flex h-3 w-3">
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
                     <span className="relative inline-flex h-3 w-3 rounded-full bg-red-500" />
                   </span>
-                  <span className="text-sm font-semibold text-red-700">
-                    Recording… {formatDuration(recordElapsed)}
+                  <span className="text-sm font-medium text-gray-700">
+                    Recording · {formatDuration(recordElapsed)}
                   </span>
-                  <div className="ml-auto flex items-center gap-1">
+                  <div className="ml-auto flex items-center gap-2">
                     <button
                       onClick={() => stopRecording(false)}
-                      className="rounded-btn p-1.5 text-gray-600 hover:bg-white"
+                      className="rounded-full p-2 text-gray-500 hover:bg-gray-100"
                       title="Cancel"
                     >
-                      <X size={16} />
+                      <X size={18} />
                     </button>
                     <button
                       onClick={() => stopRecording(true)}
-                      className="rounded-btn bg-green-600 p-1.5 text-white hover:bg-green-700"
+                      className="flex h-10 w-10 items-center justify-center rounded-full bg-[#00A884] text-white shadow hover:bg-[#008f72]"
                       title="Send voice note"
                     >
-                      <Send size={16} />
+                      <Send size={18} />
                     </button>
                   </div>
                 </div>
@@ -607,25 +599,25 @@ export function InboxTab() {
                     <button
                       onClick={() => setAttachMenuOpen((v) => !v)}
                       disabled={!!activeThread.customer?.whatsappOptOut || sending}
-                      className="rounded-btn p-2 text-gray-500 hover:bg-gray-100 disabled:opacity-40"
+                      className="flex h-10 w-10 items-center justify-center rounded-full text-gray-500 hover:bg-black/5 disabled:opacity-40"
                       title="Attach"
                     >
-                      <Paperclip size={18} />
+                      <Paperclip size={22} />
                     </button>
                     {attachMenuOpen && (
-                      <div className="absolute bottom-11 left-0 z-10 w-44 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+                      <div className="absolute bottom-12 left-0 z-10 w-44 overflow-hidden rounded-lg border border-gray-100 bg-white shadow-xl">
                         <AttachOption
-                          icon={<ImageIcon size={15} className="text-pink-500" />}
+                          icon={<ImageIcon size={16} className="text-pink-500" />}
                           label="Photo"
                           onClick={() => pickFile('image')}
                         />
                         <AttachOption
-                          icon={<Film size={15} className="text-purple-500" />}
+                          icon={<Film size={16} className="text-purple-500" />}
                           label="Video"
                           onClick={() => pickFile('video')}
                         />
                         <AttachOption
-                          icon={<FileIcon size={15} className="text-blue-500" />}
+                          icon={<FileIcon size={16} className="text-blue-500" />}
                           label="Document"
                           onClick={() => pickFile('document')}
                         />
@@ -633,57 +625,84 @@ export function InboxTab() {
                     )}
                   </div>
 
-                  <textarea
-                    value={composer}
-                    onChange={(e) => setComposer(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        void handleSend();
+                  <div className="flex-1 rounded-full bg-white px-4 py-2 shadow-sm">
+                    <textarea
+                      value={composer}
+                      onChange={(e) => setComposer(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          void handleSend();
+                        }
+                      }}
+                      disabled={!!activeThread.customer?.whatsappOptOut}
+                      placeholder={
+                        pendingFile
+                          ? fileKind(pendingFile) === 'image' || fileKind(pendingFile) === 'video'
+                            ? 'Add a caption…'
+                            : 'Press send to deliver this file'
+                          : 'Type a message'
                       }
-                    }}
-                    disabled={!!activeThread.customer?.whatsappOptOut}
-                    placeholder={
-                      pendingFile
-                        ? fileKind(pendingFile) === 'image' || fileKind(pendingFile) === 'video'
-                          ? 'Add a caption…'
-                          : 'Press send to deliver this file'
-                        : 'Write a reply…'
-                    }
-                    rows={1}
-                    className="flex-1 resize-none rounded-full border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary disabled:opacity-50"
-                  />
+                      rows={1}
+                      className="block max-h-28 w-full resize-none border-0 bg-transparent p-0 text-sm leading-6 outline-none placeholder:text-gray-400 disabled:opacity-50"
+                    />
+                  </div>
 
                   {/* Mic when composer empty, Send when there's text or a file. */}
                   {!composer.trim() && !pendingFile ? (
                     <button
                       onClick={startRecording}
                       disabled={!!activeThread.customer?.whatsappOptOut || sending}
-                      className="rounded-full bg-primary p-2.5 text-white hover:opacity-90 disabled:opacity-40"
+                      className="flex h-10 w-10 items-center justify-center rounded-full bg-[#00A884] text-white shadow hover:bg-[#008f72] disabled:opacity-40"
                       title="Record voice note"
                     >
-                      <Mic size={16} />
+                      <Mic size={18} />
                     </button>
                   ) : (
-                    <CRMButton
+                    <button
                       onClick={handleSend}
                       disabled={
                         sending ||
                         !!activeThread.customer?.whatsappOptOut ||
                         (!composer.trim() && !pendingFile)
                       }
+                      className="flex h-10 w-10 items-center justify-center rounded-full bg-[#00A884] text-white shadow hover:bg-[#008f72] disabled:opacity-40"
+                      title="Send"
                     >
-                      <Send size={14} />
-                      Send
-                    </CRMButton>
+                      <Send size={18} />
+                    </button>
                   )}
                 </div>
               )}
             </div>
           </>
         )}
-      </GlassCard>
+      </div>
     </div>
+  );
+}
+
+// ─── Filter chip ───────────────────────────────────────────────────────────
+function FilterChip({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-full px-3 py-1 text-[11px] font-medium transition-colors ${
+        active
+          ? 'bg-[#00A884] text-white shadow-sm'
+          : 'bg-white text-gray-600 hover:bg-gray-100'
+      }`}
+    >
+      {label}
+    </button>
   );
 }
 
@@ -701,43 +720,46 @@ function ThreadRow({
 }) {
   const last = thread.messages?.[0];
   const name = thread.customer?.fullName ?? thread.customerPhone;
+  const hasUnread = thread.unreadCount > 0;
   return (
     <button
       onClick={onClick}
-      className={`flex w-full items-center gap-3 border-b border-gray-100 px-3 py-2.5 text-left transition-colors ${
-        active ? 'bg-primary/5' : 'hover:bg-gray-50'
+      className={`flex w-full items-center gap-3 px-3 py-3 text-left transition-colors ${
+        active ? 'bg-[#F0F2F5]' : 'hover:bg-[#F5F6F6]'
       }`}
     >
-      <Avatar name={name} size={40} />
-      <div className="min-w-0 flex-1">
+      <Avatar name={name} size={48} />
+      <div className="min-w-0 flex-1 border-b border-gray-100 pb-3">
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-sm font-semibold text-gray-900">{name}</span>
-          <span className="shrink-0 text-[10px] text-gray-400">
+          <span className="truncate text-[15px] font-normal text-gray-900">{name}</span>
+          <span
+            className={`shrink-0 text-[11px] ${hasUnread ? 'font-semibold text-[#00A884]' : 'text-gray-500'}`}
+          >
             {formatRelative(thread.lastMessageAt)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-2">
-          <span className="flex min-w-0 items-center gap-1 truncate text-xs text-gray-500">
-            {last?.direction === 'out' && <CheckCheck size={11} className="shrink-0 text-gray-400" />}
+          <span className="flex min-w-0 items-center gap-1 truncate text-[13px] text-gray-500">
+            {last?.direction === 'out' && <CheckCheck size={14} className="shrink-0 text-gray-400" />}
             <span className="truncate">
               {last ? formatMessagePreview(last) : thread.customer?.phoneDisplay ?? thread.customerPhone}
             </span>
           </span>
-          {thread.unreadCount > 0 && (
-            <span className="shrink-0 rounded-full bg-green-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+          {hasUnread && (
+            <span className="flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-[#00A884] px-1.5 text-[11px] font-semibold text-white">
               {thread.unreadCount}
             </span>
           )}
         </div>
         {(showAgent || thread.customer?.whatsappOptOut) && (
-          <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-gray-400">
+          <div className="mt-1 flex items-center gap-1.5 text-[10px] text-gray-400">
             {thread.customer?.whatsappOptOut && (
               <span className="flex items-center gap-0.5 text-red-500">
-                <UserX size={9} /> opted out
+                <UserX size={10} /> opted out
               </span>
             )}
             {thread.assignedAgent && showAgent && (
-              <span className="rounded-badge bg-gray-100 px-1.5 py-0.5 font-medium text-gray-600">
+              <span className="rounded-full bg-gray-100 px-2 py-0.5 font-medium text-gray-600">
                 {thread.assignedAgent.name}
               </span>
             )}
@@ -787,21 +809,23 @@ function MessageBubble({
     ? 'p-1'
     : 'px-3 py-1.5';
   return (
-    <div className={`flex ${out ? 'justify-end' : 'justify-start'} ${first ? 'mt-1.5' : ''}`}>
+    <div className={`flex ${out ? 'justify-end' : 'justify-start'} ${first ? 'mt-2' : ''}`}>
       <div
-        className={`max-w-[72%] text-sm shadow-sm ${radius} ${inner} ${
-          out ? 'bg-[#DCF8C6] text-gray-900' : 'bg-white text-gray-900'
+        className={`relative max-w-[65%] text-[14.2px] leading-[19px] ${radius} ${inner} ${
+          out
+            ? 'bg-[#D9FDD3] text-gray-900 shadow-[0_1px_0.5px_rgba(0,0,0,0.13)]'
+            : 'bg-white text-gray-900 shadow-[0_1px_0.5px_rgba(0,0,0,0.13)]'
         }`}
       >
         {first && message.author?.name && out && (
-          <div className={`${inner === 'p-1' ? 'px-2 pt-1' : ''} mb-0.5 text-[10px] font-semibold text-emerald-700`}>
+          <div className={`${inner === 'p-1' ? 'px-2 pt-1' : ''} mb-0.5 text-[11px] font-semibold text-[#06cf9c]`}>
             {message.author.name}
           </div>
         )}
         {hasMedia && <MediaBlock message={message} />}
         {message.body && (
           <div
-            className={`${inner === 'p-1' ? 'px-2 pb-1 pt-1' : ''} whitespace-pre-wrap break-words`}
+            className={`${inner === 'p-1' ? 'px-2 pb-0.5 pt-1' : ''} whitespace-pre-wrap break-words`}
           >
             {message.body}
           </div>
@@ -809,9 +833,9 @@ function MessageBubble({
         <div
           className={`${
             inner === 'p-1' ? 'px-2 pb-1' : 'mt-0.5'
-          } flex items-center justify-end gap-1 text-[10px] text-gray-500`}
+          } flex items-center justify-end gap-1 text-[11px] text-gray-500`}
         >
-          <span>{formatTime(message.createdAt)}</span>
+          <span className="opacity-70">{formatTime(message.createdAt)}</span>
           {out && <MessageTicks read={!!message.readAt} />}
         </div>
       </div>
