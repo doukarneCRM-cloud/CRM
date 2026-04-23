@@ -1,11 +1,11 @@
 :root {
   /* Brand Colors */
-  --color-primary: #3C2515;
-  --color-primary-light: #583C2B;
-  --color-primary-dark: #231309;
-  --color-accent: #F5EFE6;
-  --color-bg: #E8DFCC;
-  --color-surface: rgba(255, 255, 255, 0.72);
+  --color-primary: #18181B;
+  --color-primary-light: #27272A;
+  --color-primary-dark: #09090B;
+  --color-accent: #F4F4F5;
+  --color-bg: #F8F9FA;
+  --color-surface: rgba(255, 255, 255, 0.85);
 
   /* Border Radius */
   --radius-card: 20px;
@@ -14,8 +14,8 @@
   --radius-badge: 999px;
 
   /* Shadows */
-  --shadow-card: 0 4px 24px rgba(60, 37, 21, 0.10);
-  --shadow-hover: 0 8px 32px rgba(60, 37, 21, 0.16);
+  --shadow-card: 0 4px 24px rgba(16, 24, 40, 0.08);
+  --shadow-hover: 0 8px 32px rgba(16, 24, 40, 0.14);
 
   /* Typography */
   --font-family: 'Poppins', sans-serif;

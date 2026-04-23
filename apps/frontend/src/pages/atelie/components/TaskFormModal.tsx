@@ -5,8 +5,8 @@ import { atelieApi, type Task, type TaskVisibility } from '@/services/atelieApi'
 import { cn } from '@/lib/cn';
 
 const COLOR_SWATCHES = [
-  '#3C2515',
-  '#583C2B',
+  '#18181B',
+  '#52525B',
   '#C97B63',
   '#E09F3E',
   '#5B8E7D',

@@ -343,7 +343,7 @@ export default function ComponentsPage() {
         {/* ── Circle Progress ── */}
         <Section title="Circle Progress (Agent Performance)">
           <div className="flex items-center gap-6">
-            <CircleProgress value={82} color="#3C2515" size={80} label="82%" sublabel="Score" />
+            <CircleProgress value={82} color="#18181B" size={80} label="82%" sublabel="Score" />
             <CircleProgress value={65} color="#6366F1" size={80} label="65%" sublabel="Rate" />
             <CircleProgress value={93} color="#22C55E" size={80} label="93%" sublabel="Confirm" />
             <CircleProgress value={40} color="#EF4444" size={80} label="40%" sublabel="Return" />
@@ -359,7 +359,7 @@ export default function ComponentsPage() {
               kpiValue={142}
               kpiLabel="Confirmations"
               progressValue={82}
-              progressColor="#3C2515"
+              progressColor="#18181B"
               percentageChange={4.2}
             />
             <AgentMiniCard

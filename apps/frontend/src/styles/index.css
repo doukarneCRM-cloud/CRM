@@ -17,8 +17,8 @@
   }
 
   body {
-    background-color: #E8DFCC;
-    color: #1a1a1a;
+    background-color: #F8F9FA;
+    color: #18181B;
     margin: 0;
     padding: 0;
   }
@@ -43,9 +43,9 @@
 .skeleton {
   background: linear-gradient(
     90deg,
-    #f0ece8 25%,
-    #e8e2db 50%,
-    #f0ece8 75%
+    #F4F4F5 25%,
+    #E4E4E7 50%,
+    #F4F4F5 75%
   );
   background-size: 800px 100%;
   animation: shimmer 1.5s infinite;

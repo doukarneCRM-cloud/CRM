@@ -103,7 +103,7 @@ export function ProfitTab() {
           value={fmt(Math.round(kpis?.profit ?? 0))}
           unit="MAD"
           icon={PiggyBank}
-          iconColor="#3C2515"
+          iconColor="#18181B"
           percentageChange={kpis?.percentageChanges.profit}
         />
         <KPICard
@@ -175,7 +175,7 @@ function ProfitTrendCard({
                 formatter={(v: number) => [`${fmt(Math.round(v))} MAD`]}
               />
               <Bar dataKey="revenue" fill="#16A34A" radius={[4, 4, 0, 0]} opacity={0.4} />
-              <Line type="monotone" dataKey="profit" stroke="#3C2515" strokeWidth={2.5} dot={false} />
+              <Line type="monotone" dataKey="profit" stroke="#18181B" strokeWidth={2.5} dot={false} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>

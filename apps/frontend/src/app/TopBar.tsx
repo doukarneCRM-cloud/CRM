@@ -206,7 +206,7 @@ function UserDropdown() {
           ) : (
             <div
               className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white"
-              style={{ background: 'linear-gradient(135deg, #3C2515, #583C2B)' }}
+              style={{ background: 'linear-gradient(135deg, #18181B, #27272A)' }}
             >
               {initials}
             </div>
@@ -233,7 +233,7 @@ function UserDropdown() {
               ) : (
                 <div
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
-                  style={{ background: 'linear-gradient(135deg, #3C2515, #583C2B)' }}
+                  style={{ background: 'linear-gradient(135deg, #18181B, #27272A)' }}
                 >
                   {initials}
                 </div>

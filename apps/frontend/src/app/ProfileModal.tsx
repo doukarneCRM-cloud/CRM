@@ -124,7 +124,7 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
           ) : (
             <div
               className="flex h-full w-full items-center justify-center text-2xl font-bold text-white"
-              style={{ background: 'linear-gradient(135deg, #3C2515, #583C2B)' }}
+              style={{ background: 'linear-gradient(135deg, #18181B, #27272A)' }}
             >
               {initials}
             </div>

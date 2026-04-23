@@ -159,7 +159,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
         >
           <div
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-btn text-base font-bold text-white shadow-card"
-            style={{ background: 'linear-gradient(135deg, #3C2515 0%, #583C2B 100%)' }}
+            style={{ background: 'linear-gradient(135deg, #18181B 0%, #27272A 100%)' }}
           >
             A
           </div>
@@ -210,7 +210,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
                 ) : (
                   <div
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
-                    style={{ background: 'linear-gradient(135deg, #3C2515, #583C2B)' }}
+                    style={{ background: 'linear-gradient(135deg, #18181B, #27272A)' }}
                   >
                     {user.name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()}
                   </div>

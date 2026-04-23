@@ -9,13 +9,13 @@ const config: Config = {
       },
       colors: {
         primary: {
-          DEFAULT: '#3C2515',
-          light: '#583C2B',
-          dark: '#231309',
+          DEFAULT: '#18181B',
+          light: '#27272A',
+          dark: '#09090B',
         },
-        accent: '#F5EFE6',
-        surface: 'rgba(255,255,255,0.72)',
-        bg: '#E8DFCC',
+        accent: '#F4F4F5',
+        surface: 'rgba(255,255,255,0.85)',
+        bg: '#F8F9FA',
         status: {
           // Confirmation statuses
           'new': '#6366F1',
@@ -46,9 +46,9 @@ const config: Config = {
         badge: '999px',
       },
       boxShadow: {
-        card: '0 4px 24px rgba(60,37,21,0.10)',
-        hover: '0 8px 32px rgba(60,37,21,0.16)',
-        glass: '0 4px 24px rgba(60,37,21,0.10)',
+        card: '0 4px 24px rgba(16,24,40,0.08)',
+        hover: '0 8px 32px rgba(16,24,40,0.14)',
+        glass: '0 4px 24px rgba(16,24,40,0.08)',
       },
       backdropBlur: {
         glass: '16px',
