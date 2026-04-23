@@ -194,6 +194,21 @@ const ORDER_FULL_INCLUDE = {
   },
 } as const;
 
+// Derived "stock short" flag. True when any item on the order references a
+// variant whose current stock is below the quantity the agent needs. It is
+// a pure read-side computation — nothing mutates. The frontend gates the
+// visible badge to pending orders itself, so we emit the raw fact for any
+// status and let the UI decide; that also keeps the shape consistent for
+// confirmed/shipped views (where the value is effectively moot).
+function withStockWarning<
+  T extends { items: { quantity: number; variant: { stock: number } }[] },
+>(order: T): T & { hasStockWarning: boolean } {
+  return {
+    ...order,
+    hasStockWarning: order.items.some((it) => it.variant.stock < it.quantity),
+  };
+}
+
 // ─── Service: List ────────────────────────────────────────────────────────────
 
 export async function getOrders(query: OrderQueryInput) {
@@ -220,6 +235,7 @@ export async function getOrders(query: OrderQueryInput) {
                 id: true,
                 color: true,
                 size: true,
+                stock: true,
                 product: {
                   select: {
                     id: true,
@@ -240,7 +256,7 @@ export async function getOrders(query: OrderQueryInput) {
     prisma.order.count({ where }),
   ]);
 
-  return paginatedResponse(data, total, page, pageSize);
+  return paginatedResponse(data.map(withStockWarning), total, page, pageSize);
 }
 
 // ─── Service: Single ──────────────────────────────────────────────────────────
@@ -248,7 +264,7 @@ export async function getOrders(query: OrderQueryInput) {
 export async function getOrderById(id: string) {
   const order = await prisma.order.findUnique({ where: { id }, include: ORDER_FULL_INCLUDE });
   if (!order) throw { statusCode: 404, code: 'NOT_FOUND', message: 'Order not found' };
-  return order;
+  return withStockWarning(order);
 }
 
 export async function getOrderLogs(orderId: string, includeSystem: boolean) {
@@ -331,7 +347,11 @@ export async function createOrder(input: CreateOrderInput, actor: JwtPayload) {
   // healReferenceCounter() to jump past the true max in one hop; any
   // subsequent collisions are pure bad luck and just re-roll.
   const MAX_ATTEMPTS = 5;
-  let order: Awaited<ReturnType<typeof prisma.order.create>> | undefined;
+  // Typed to match the full include shape so downstream `withStockWarning`
+  // can read items/variant.stock without an any-cast.
+  let order:
+    | Prisma.OrderGetPayload<{ include: typeof ORDER_FULL_INCLUDE }>
+    | undefined;
   let healedOnce = false;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
@@ -429,7 +449,7 @@ export async function createOrder(input: CreateOrderInput, actor: JwtPayload) {
     });
   }
 
-  return order;
+  return withStockWarning(order);
 }
 
 // ─── Service: Update ──────────────────────────────────────────────────────────
@@ -601,7 +621,7 @@ export async function updateOrder(id: string, input: UpdateOrderInput, actor: Jw
   emitToRoom('orders:all', 'order:updated', { orderId: id });
   emitToRoom('dashboard', 'kpi:refresh', {});
 
-  return updated;
+  return withStockWarning(updated);
 }
 
 // ─── Service: Archive (soft-delete) ──────────────────────────────────────────
@@ -746,14 +766,23 @@ export async function updateOrderStatus(id: string, input: UpdateStatusInput, ac
   }
 
   // Stock accounting is tied to the confirmed state, not order creation:
-  //   reservingStock:  moving INTO confirmed   → gated decrement (or 422 if short)
-  //   restoringStock:  moving OUT of confirmed via cancel → increment back
-  // Auto-cancel (9× unreachable) also trips restoringStock because updateData
-  // rewrites confirmationStatus to 'cancelled' above.
+  //   reservingStock:  moving INTO confirmed           → gated decrement (or 422 if short)
+  //   restoringStock:  moving OUT of confirmed to ANY  → increment back
+  //                    other confirmation status
+  // Moving out of confirmed into any other confirmation status releases
+  // the reservation. Covers cancel, unreachable, callback, fake, duplicate,
+  // wrong_number, no_stock, postponed — the stock was held on the agent's
+  // "yes" and must be freed the moment that "yes" is withdrawn. Guarded by
+  // the labelSent check earlier in this function so a shipped parcel never
+  // falls through this path. Auto-cancel (9× unreachable) still trips it
+  // because updateData rewrites confirmationStatus to 'cancelled' above.
   const wasConfirmed = order.confirmationStatus === 'confirmed';
   const willBeConfirmed = updateData.confirmationStatus === 'confirmed';
   const reservingStock = !wasConfirmed && willBeConfirmed;
-  const restoringStock = wasConfirmed && updateData.confirmationStatus === 'cancelled';
+  const leavingConfirmed =
+    updateData.confirmationStatus !== undefined &&
+    updateData.confirmationStatus !== 'confirmed';
+  const restoringStock = wasConfirmed && leavingConfirmed;
 
   await prisma.$transaction(async (tx) => {
     // Re-check labelSent inside the transaction: a Coliix webhook could
@@ -825,7 +854,7 @@ export async function updateOrderStatus(id: string, input: UpdateStatusInput, ac
         data: {
           orderId: id,
           type: 'system',
-          action: `Stock restored for ${order.items.length} item(s) — order was confirmed, now cancelled`,
+          action: `Stock restored for ${order.items.length} item(s) — order moved from confirmed → ${updateData.confirmationStatus}`,
           performedBy: 'System',
           meta: {
             restored: order.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity })),
@@ -887,7 +916,7 @@ export async function updateOrderStatus(id: string, input: UpdateStatusInput, ac
     });
   }
 
-  return updatedOrder;
+  return updatedOrder ? withStockWarning(updatedOrder) : updatedOrder;
 }
 
 // ─── Service: Assign ──────────────────────────────────────────────────────────
@@ -1303,5 +1332,5 @@ export async function mergeOrders(input: MergeOrdersInput, actor: JwtPayload) {
     where: { id: keeper.id },
     include: ORDER_FULL_INCLUDE,
   });
-  return result;
+  return result ? withStockWarning(result) : result;
 }
