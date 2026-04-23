@@ -36,6 +36,7 @@ const CANONICAL_PERMISSIONS: Array<{ key: string; label: string }> = [
   { key: 'integrations:manage', label: 'Manage Integrations' },
   { key: 'settings:view', label: 'View Settings' },
   { key: 'settings:edit', label: 'Edit Settings' },
+  { key: 'settings:reset_crm', label: 'Reset Full CRM (destructive)' },
   { key: 'atelie:view', label: 'View Atelie' },
   { key: 'atelie:manage', label: 'Manage Atelie' },
   { key: 'atelie:fabric:view', label: 'View Fabric Rolls' },

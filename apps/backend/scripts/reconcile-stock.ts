@@ -69,7 +69,12 @@ async function main() {
     revertedOutOfStockCount: 0,
   };
 
-  await prisma.$transaction(async (tx) => {
+  // Bump the transaction timeout well beyond the 5s default — on a prod DB
+  // with many pending orders this single transaction may run hundreds of
+  // updates, and when we're connecting over the public proxy from a laptop
+  // round-trips are slower than inside the Railway network.
+  await prisma.$transaction(
+    async (tx) => {
     // ─── Pass 1 — release stock held by old pending non-shipped orders ──
     const ghosts = await tx.order.findMany({
       where: {
@@ -150,7 +155,9 @@ async function main() {
     }
 
     summary.revertedOutOfStockCount = stuck.length;
-  });
+    },
+    { maxWait: 10_000, timeout: 120_000 },
+  );
 
   console.log('\n── Stock reconciliation complete ──');
   console.log(`Pass 1: released stock from ${summary.releasedOrderCount} pending order(s)`);
