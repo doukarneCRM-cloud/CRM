@@ -385,20 +385,12 @@ export async function createOrder(input: CreateOrderInput, actor: JwtPayload) {
           include: ORDER_FULL_INCLUDE,
         });
 
-        // Gated decrement — DB refuses to go negative under concurrent creates.
-        for (const item of input.items) {
-          const res = await tx.productVariant.updateMany({
-            where: { id: item.variantId, stock: { gte: item.quantity } },
-            data: { stock: { decrement: item.quantity } },
-          });
-          if (res.count === 0) {
-            throw {
-              statusCode: 400,
-              code: 'INSUFFICIENT_STOCK',
-              message: 'Not enough stock for one of the selected variants',
-            };
-          }
-        }
+        // Stock is NOT decremented here — a freshly-created order is just a
+        // lead (confirmationStatus: pending). Stock only moves when an agent
+        // confirms the order via updateOrderStatus() → 'confirmed'. That
+        // mirrors the physical reality: pending orders can be cancelled,
+        // merged, or dropped as unreachable, and none of that should have
+        // touched inventory.
 
         return created;
       });
@@ -423,8 +415,8 @@ export async function createOrder(input: CreateOrderInput, actor: JwtPayload) {
     };
   }
 
-  // Trigger out-of-stock check outside transaction (needs fresh reads)
-  await Promise.all(input.items.map((item) => triggerOutOfStock(item.variantId)));
+  // No out-of-stock cascade at creation — stock hasn't moved yet. That fires
+  // from updateOrderStatus when the order actually gets confirmed.
 
   emitToRoom('orders:all', 'order:created', { orderId: order.id, reference: order.reference });
   emitToRoom('dashboard', 'kpi:refresh', {});
@@ -468,6 +460,7 @@ export async function updateOrder(id: string, input: UpdateOrderInput, actor: Jw
       discountAmount: true,
       shippingPrice: true,
       shippingStatus: true,
+      confirmationStatus: true,
       labelSent: true,
       items: { select: { variantId: true, quantity: true } },
     },
@@ -512,9 +505,12 @@ export async function updateOrder(id: string, input: UpdateOrderInput, actor: Jw
     shippingPrice,
   );
 
-  // Build stock-delta map: +oldQty restored, -newQty deducted (net per variant)
+  // Build stock-delta map: +oldQty restored, -newQty deducted (net per variant).
+  // Only material when the order has already been confirmed — pending orders
+  // don't hold stock reservations, so editing their items is free.
   const stockDelta = new Map<string, number>();
-  if (newItems) {
+  const orderHoldsStock = existing.confirmationStatus === 'confirmed';
+  if (newItems && orderHoldsStock) {
     for (const old of existing.items) {
       stockDelta.set(old.variantId, (stockDelta.get(old.variantId) ?? 0) + old.quantity);
     }
@@ -594,8 +590,10 @@ export async function updateOrder(id: string, input: UpdateOrderInput, actor: Jw
     return order;
   });
 
-  // Post-transaction: trigger out-of-stock cascade for any variant that hit 0
-  if (newItems) {
+  // Post-transaction: trigger out-of-stock cascade for any variant that hit 0.
+  // stockDelta is empty for pending orders (no reservation held), so this
+  // naturally skips them.
+  if (newItems && orderHoldsStock) {
     const touched = Array.from(stockDelta.keys());
     await Promise.all(touched.map((variantId) => triggerOutOfStock(variantId)));
   }
@@ -747,11 +745,15 @@ export async function updateOrderStatus(id: string, input: UpdateStatusInput, ac
     if (amount > 0) updateData.commissionAmount = amount;
   }
 
-  // Cancelling a previously-confirmed order releases the stock back to the
-  // pool — the items were effectively reserved once the agent confirmed, and
-  // the parcel never shipped, so nothing physically left the warehouse.
-  const restoringStock =
-    order.confirmationStatus === 'confirmed' && input.confirmationStatus === 'cancelled';
+  // Stock accounting is tied to the confirmed state, not order creation:
+  //   reservingStock:  moving INTO confirmed   → gated decrement (or 422 if short)
+  //   restoringStock:  moving OUT of confirmed via cancel → increment back
+  // Auto-cancel (9× unreachable) also trips restoringStock because updateData
+  // rewrites confirmationStatus to 'cancelled' above.
+  const wasConfirmed = order.confirmationStatus === 'confirmed';
+  const willBeConfirmed = updateData.confirmationStatus === 'confirmed';
+  const reservingStock = !wasConfirmed && willBeConfirmed;
+  const restoringStock = wasConfirmed && updateData.confirmationStatus === 'cancelled';
 
   await prisma.$transaction(async (tx) => {
     // Re-check labelSent inside the transaction: a Coliix webhook could
@@ -766,6 +768,25 @@ export async function updateOrderStatus(id: string, input: UpdateStatusInput, ac
         code: 'ORDER_LOCKED',
         message: 'Order has been sent to Coliix — status is now driven by the shipping provider.',
       };
+    }
+    if (reservingStock) {
+      // Gated decrement inside the transaction — if any variant is short,
+      // the whole confirmation rolls back and the agent sees a 422 instead
+      // of a half-applied state.
+      for (const item of order.items) {
+        const res = await tx.productVariant.updateMany({
+          where: { id: item.variantId, stock: { gte: item.quantity } },
+          data: { stock: { decrement: item.quantity } },
+        });
+        if (res.count === 0) {
+          throw {
+            statusCode: 422,
+            code: 'INSUFFICIENT_STOCK',
+            message:
+              'One of the variants on this order is out of stock — cannot confirm. Try "No stock" or restock first.',
+          };
+        }
+      }
     }
     await tx.order.update({ where: { id }, data: updateData });
     if (restoringStock) {
@@ -786,6 +807,19 @@ export async function updateOrderStatus(id: string, input: UpdateStatusInput, ac
         meta: input.note ? { note: input.note } : undefined,
       },
     });
+    if (reservingStock) {
+      await tx.orderLog.create({
+        data: {
+          orderId: id,
+          type: 'system',
+          action: `Stock reserved for ${order.items.length} item(s) — order confirmed`,
+          performedBy: 'System',
+          meta: {
+            reserved: order.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity })),
+          },
+        },
+      });
+    }
     if (restoringStock) {
       await tx.orderLog.create({
         data: {
@@ -800,6 +834,16 @@ export async function updateOrderStatus(id: string, input: UpdateStatusInput, ac
       });
     }
   });
+
+  // Post-transaction: if we just reserved stock, cascade the out-of-stock
+  // auto-flag so any OTHER pending orders sharing a now-zero variant get
+  // bumped to out_of_stock. (Restoration doesn't need this — stock just
+  // went UP, nothing can hit zero from an increment.)
+  if (reservingStock) {
+    await Promise.all(
+      order.items.map((item) => triggerOutOfStock(item.variantId)),
+    );
+  }
 
   const updatedOrder = await prisma.order.findUnique({ where: { id }, include: ORDER_FULL_INCLUDE });
 
