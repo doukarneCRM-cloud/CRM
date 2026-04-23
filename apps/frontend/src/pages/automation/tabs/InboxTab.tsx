@@ -1,5 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Send, CheckCircle2, Clock3, Search, UserX, Check, CheckCheck, FileText, Download } from 'lucide-react';
+import {
+  Send,
+  CheckCircle2,
+  Clock3,
+  Search,
+  UserX,
+  Check,
+  CheckCheck,
+  FileText,
+  Download,
+  Paperclip,
+  Mic,
+  Image as ImageIcon,
+  Film,
+  File as FileIcon,
+  X,
+} from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { useAuthStore } from '@/store/authStore';
@@ -28,7 +44,9 @@ export function InboxTab() {
   const isAdmin = roleName === 'admin' || roleName === 'supervisor';
 
   const [scope, setScope] = useState<'mine' | 'all'>(isAdmin ? 'all' : 'mine');
-  const [statusFilter, setStatusFilter] = useState<WhatsAppThreadStatus | 'all'>('open');
+  // Default to "All" so every conversation shows up without the admin
+  // fiddling with filters — they wanted "all messages, all agents" on load.
+  const [statusFilter, setStatusFilter] = useState<WhatsAppThreadStatus | 'all'>('all');
   const [agentFilter, setAgentFilter] = useState<string>('');
   const [search, setSearch] = useState('');
 
@@ -40,6 +58,19 @@ export function InboxTab() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [composer, setComposer] = useState('');
   const [sending, setSending] = useState(false);
+
+  // ── Attachment + voice-note state ─────────────────────────────────────
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingPreview, setPendingPreview] = useState<string | null>(null);
+  const [attachMenuOpen, setAttachMenuOpen] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [recordElapsed, setRecordElapsed] = useState(0);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recordChunksRef = useRef<Blob[]>([]);
+  const recordTimerRef = useRef<number | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const activeIdRef = useRef<string | null>(null);
@@ -149,13 +180,39 @@ export function InboxTab() {
     });
   }, [threads, search]);
 
+  const clearPending = useCallback(() => {
+    setPendingFile(null);
+    if (pendingPreview) URL.revokeObjectURL(pendingPreview);
+    setPendingPreview(null);
+  }, [pendingPreview]);
+
   const handleSend = async () => {
-    if (!activeThread || !composer.trim()) return;
+    if (!activeThread) return;
+    // Media path: caption comes from the composer text (image/video only).
+    if (pendingFile) {
+      setSending(true);
+      try {
+        const kind = fileKind(pendingFile);
+        await whatsappApi.inbox.sendMedia(activeThread.id, pendingFile, {
+          fileName: pendingFile.name,
+          caption: kind === 'image' || kind === 'video' ? composer.trim() : undefined,
+        });
+        setComposer('');
+        clearPending();
+        await refreshMessages(activeThread.id);
+      } catch (err) {
+        console.error(err);
+        pushToast({ kind: 'error', title: 'Send failed' });
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
+    if (!composer.trim()) return;
     setSending(true);
     try {
       await whatsappApi.inbox.reply(activeThread.id, composer.trim());
       setComposer('');
-      // Socket will push the message back; still refresh to catch any gap.
       await refreshMessages(activeThread.id);
     } catch (err) {
       console.error(err);
@@ -164,6 +221,119 @@ export function InboxTab() {
       setSending(false);
     }
   };
+
+  // ── File picker → preview ─────────────────────────────────────────────
+  const pickFile = (kind: 'image' | 'video' | 'document') => {
+    setAttachMenuOpen(false);
+    if (kind === 'image') imageInputRef.current?.click();
+    else if (kind === 'video') videoInputRef.current?.click();
+    else fileInputRef.current?.click();
+  };
+
+  const onFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    // Reset the input so picking the same file again still fires onChange.
+    e.target.value = '';
+    if (!f) return;
+    if (f.size > 50 * 1024 * 1024) {
+      pushToast({ kind: 'error', title: 'File too large (max 50 MB)' });
+      return;
+    }
+    if (pendingPreview) URL.revokeObjectURL(pendingPreview);
+    setPendingFile(f);
+    const previewable = f.type.startsWith('image/') || f.type.startsWith('video/');
+    setPendingPreview(previewable ? URL.createObjectURL(f) : null);
+  };
+
+  // ── Voice-note recording (WhatsApp PTT) ───────────────────────────────
+  const startRecording = async () => {
+    if (!activeThread) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Prefer Opus in WebM/OGG — what WhatsApp's voice-note pipeline expects.
+      // Evolution transcodes either way, but picking a supported mime first
+      // keeps the bytes small on the wire.
+      const mimeType =
+        MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus'
+          : MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
+            ? 'audio/ogg;codecs=opus'
+            : '';
+      const rec = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      recordChunksRef.current = [];
+      rec.ondataavailable = (ev) => {
+        if (ev.data.size > 0) recordChunksRef.current.push(ev.data);
+      };
+      rec.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        if (recordTimerRef.current != null) {
+          window.clearInterval(recordTimerRef.current);
+          recordTimerRef.current = null;
+        }
+        const type = rec.mimeType || 'audio/ogg';
+        const blob = new Blob(recordChunksRef.current, { type });
+        recordChunksRef.current = [];
+        if (blob.size === 0 || !activeIdRef.current) return;
+        // Send the voice note immediately — matches WhatsApp Web behavior:
+        // tap mic → talk → release / stop → ship.
+        setSending(true);
+        try {
+          const ext = type.includes('webm') ? 'webm' : type.includes('ogg') ? 'ogg' : 'bin';
+          await whatsappApi.inbox.sendMedia(activeIdRef.current, blob, {
+            fileName: `voice-${Date.now()}.${ext}`,
+            voiceNote: true,
+          });
+          await refreshMessages(activeIdRef.current);
+        } catch (err) {
+          console.error(err);
+          pushToast({ kind: 'error', title: 'Voice note failed' });
+        } finally {
+          setSending(false);
+        }
+      };
+      recorderRef.current = rec;
+      rec.start();
+      setRecording(true);
+      setRecordElapsed(0);
+      const started = Date.now();
+      recordTimerRef.current = window.setInterval(() => {
+        setRecordElapsed(Math.floor((Date.now() - started) / 1000));
+      }, 250);
+    } catch (err) {
+      console.error(err);
+      pushToast({ kind: 'error', title: 'Microphone permission denied' });
+    }
+  };
+
+  const stopRecording = (send: boolean) => {
+    const rec = recorderRef.current;
+    setRecording(false);
+    if (!rec) return;
+    if (send) {
+      rec.stop();
+    } else {
+      // Cancel: swap the onstop to a no-op so the chunks are discarded.
+      rec.onstop = () => {
+        rec.stream.getTracks().forEach((t) => t.stop());
+        recordChunksRef.current = [];
+        if (recordTimerRef.current != null) {
+          window.clearInterval(recordTimerRef.current);
+          recordTimerRef.current = null;
+        }
+      };
+      rec.stop();
+    }
+    recorderRef.current = null;
+  };
+
+  useEffect(() => {
+    return () => {
+      if (recordTimerRef.current != null) window.clearInterval(recordTimerRef.current);
+      recorderRef.current?.stream.getTracks().forEach((t) => t.stop());
+      if (pendingPreview) URL.revokeObjectURL(pendingPreview);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleStatus = async (status: WhatsAppThreadStatus) => {
     if (!activeThread) return;
@@ -338,35 +508,177 @@ export function InboxTab() {
               )}
             </div>
 
-            <div className="border-t border-gray-100 bg-white p-3">
+            <div className="relative border-t border-gray-100 bg-white p-3">
               {activeThread.customer?.whatsappOptOut && (
                 <div className="mb-2 rounded-btn bg-red-50 p-2 text-xs text-red-700">
                   This customer opted out of WhatsApp. Replies are blocked.
                 </div>
               )}
-              <div className="flex items-end gap-2">
-                <textarea
-                  value={composer}
-                  onChange={(e) => setComposer(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      void handleSend();
+
+              {/* Hidden file inputs — the paperclip menu triggers these. */}
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={onFileChosen}
+              />
+              <input
+                ref={videoInputRef}
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={onFileChosen}
+              />
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={onFileChosen}
+              />
+
+              {/* Attachment preview strip — WhatsApp-Web-like: shows the
+                  selected file, composer below becomes the caption. */}
+              {pendingFile && (
+                <div className="mb-2 flex items-center gap-2 rounded-btn border border-gray-200 bg-gray-50 p-2">
+                  {pendingPreview && pendingFile.type.startsWith('image/') ? (
+                    <img
+                      src={pendingPreview}
+                      alt="preview"
+                      className="h-14 w-14 rounded object-cover"
+                    />
+                  ) : pendingPreview && pendingFile.type.startsWith('video/') ? (
+                    <video src={pendingPreview} className="h-14 w-14 rounded bg-black object-cover" />
+                  ) : (
+                    <div className="flex h-14 w-14 items-center justify-center rounded bg-gray-200">
+                      <FileText size={22} className="text-gray-500" />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-xs font-semibold text-gray-800">
+                      {pendingFile.name}
+                    </div>
+                    <div className="text-[10px] text-gray-500">
+                      {formatBytes(pendingFile.size)}
+                      {pendingFile.type ? ` · ${pendingFile.type}` : ''}
+                    </div>
+                  </div>
+                  <button
+                    onClick={clearPending}
+                    className="rounded-btn p-1 text-gray-500 hover:bg-gray-200"
+                    title="Remove"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+
+              {/* Recording banner — replaces the composer while the mic is hot. */}
+              {recording ? (
+                <div className="flex items-center gap-3 rounded-btn border border-red-200 bg-red-50 p-2">
+                  <span className="relative flex h-3 w-3">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                    <span className="relative inline-flex h-3 w-3 rounded-full bg-red-500" />
+                  </span>
+                  <span className="text-sm font-semibold text-red-700">
+                    Recording… {formatDuration(recordElapsed)}
+                  </span>
+                  <div className="ml-auto flex items-center gap-1">
+                    <button
+                      onClick={() => stopRecording(false)}
+                      className="rounded-btn p-1.5 text-gray-600 hover:bg-white"
+                      title="Cancel"
+                    >
+                      <X size={16} />
+                    </button>
+                    <button
+                      onClick={() => stopRecording(true)}
+                      className="rounded-btn bg-green-600 p-1.5 text-white hover:bg-green-700"
+                      title="Send voice note"
+                    >
+                      <Send size={16} />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-end gap-2">
+                  {/* Paperclip + attach menu */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setAttachMenuOpen((v) => !v)}
+                      disabled={!!activeThread.customer?.whatsappOptOut || sending}
+                      className="rounded-btn p-2 text-gray-500 hover:bg-gray-100 disabled:opacity-40"
+                      title="Attach"
+                    >
+                      <Paperclip size={18} />
+                    </button>
+                    {attachMenuOpen && (
+                      <div className="absolute bottom-11 left-0 z-10 w-44 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+                        <AttachOption
+                          icon={<ImageIcon size={15} className="text-pink-500" />}
+                          label="Photo"
+                          onClick={() => pickFile('image')}
+                        />
+                        <AttachOption
+                          icon={<Film size={15} className="text-purple-500" />}
+                          label="Video"
+                          onClick={() => pickFile('video')}
+                        />
+                        <AttachOption
+                          icon={<FileIcon size={15} className="text-blue-500" />}
+                          label="Document"
+                          onClick={() => pickFile('document')}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <textarea
+                    value={composer}
+                    onChange={(e) => setComposer(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        void handleSend();
+                      }
+                    }}
+                    disabled={!!activeThread.customer?.whatsappOptOut}
+                    placeholder={
+                      pendingFile
+                        ? fileKind(pendingFile) === 'image' || fileKind(pendingFile) === 'video'
+                          ? 'Add a caption…'
+                          : 'Press send to deliver this file'
+                        : 'Write a reply…'
                     }
-                  }}
-                  disabled={!!activeThread.customer?.whatsappOptOut}
-                  placeholder="Write a reply… (Enter to send, Shift+Enter for new line)"
-                  rows={2}
-                  className="flex-1 resize-none rounded-btn border border-gray-200 bg-white p-2 text-sm outline-none focus:border-primary disabled:opacity-50"
-                />
-                <CRMButton
-                  onClick={handleSend}
-                  disabled={!composer.trim() || sending || !!activeThread.customer?.whatsappOptOut}
-                >
-                  <Send size={14} />
-                  Send
-                </CRMButton>
-              </div>
+                    rows={1}
+                    className="flex-1 resize-none rounded-full border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary disabled:opacity-50"
+                  />
+
+                  {/* Mic when composer empty, Send when there's text or a file. */}
+                  {!composer.trim() && !pendingFile ? (
+                    <button
+                      onClick={startRecording}
+                      disabled={!!activeThread.customer?.whatsappOptOut || sending}
+                      className="rounded-full bg-primary p-2.5 text-white hover:opacity-90 disabled:opacity-40"
+                      title="Record voice note"
+                    >
+                      <Mic size={16} />
+                    </button>
+                  ) : (
+                    <CRMButton
+                      onClick={handleSend}
+                      disabled={
+                        sending ||
+                        !!activeThread.customer?.whatsappOptOut ||
+                        (!composer.trim() && !pendingFile)
+                      }
+                    >
+                      <Send size={14} />
+                      Send
+                    </CRMButton>
+                  )}
+                </div>
+              )}
             </div>
           </>
         )}
@@ -655,4 +967,47 @@ function formatRelative(iso: string): string {
   const days = Math.floor(hrs / 24);
   if (days < 7) return `${days}d`;
   return new Date(iso).toLocaleDateString();
+}
+
+// ─── Attachment helpers ────────────────────────────────────────────────────
+function AttachOption({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-gray-50"
+    >
+      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100">
+        {icon}
+      </span>
+      <span className="font-medium text-gray-700">{label}</span>
+    </button>
+  );
+}
+
+function fileKind(f: File): 'image' | 'video' | 'audio' | 'document' {
+  const t = f.type.toLowerCase();
+  if (t.startsWith('image/')) return 'image';
+  if (t.startsWith('video/')) return 'video';
+  if (t.startsWith('audio/')) return 'audio';
+  return 'document';
+}
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
 }

@@ -128,6 +128,56 @@ export async function sendText(instanceName: string, phone: string, text: string
   );
 }
 
+// Evolution accepts base64 (no data-URI prefix) via /message/sendMedia for
+// image / video / document and /message/sendWhatsAppAudio for WhatsApp voice
+// notes (encoded as OGG/Opus + ptt:true on the wire). Keep the two helpers
+// separate so callers don't guess which endpoint to hit.
+export type EvolutionMediaKind = 'image' | 'video' | 'document';
+
+export interface SendMediaArgs {
+  instanceName: string;
+  phone: string;
+  mediaKind: EvolutionMediaKind;
+  mimeType: string;
+  base64: string;
+  caption?: string;
+  fileName?: string;
+}
+
+export async function sendMedia(args: SendMediaArgs) {
+  return request<{ key?: { id: string }; messageId?: string }>(
+    'POST',
+    `/message/sendMedia/${encodeURIComponent(args.instanceName)}`,
+    {
+      number: toJid(args.phone),
+      mediatype: args.mediaKind,
+      mimetype: args.mimeType,
+      caption: args.caption ?? '',
+      media: args.base64,
+      fileName: args.fileName ?? undefined,
+    },
+  );
+}
+
+export async function sendWhatsAppAudio(
+  instanceName: string,
+  phone: string,
+  base64: string,
+) {
+  return request<{ key?: { id: string }; messageId?: string }>(
+    'POST',
+    `/message/sendWhatsAppAudio/${encodeURIComponent(instanceName)}`,
+    {
+      number: toJid(phone),
+      audio: base64,
+      // encoding:true tells Evolution to transcode whatever we send into the
+      // OGG/Opus PTT format WhatsApp expects for voice notes. Without this,
+      // a browser-recorded webm arrives but renders as a file attachment.
+      encoding: true,
+    },
+  );
+}
+
 // Fetch + decrypt a media attachment Evolution received. Called from the
 // inbound webhook pipeline — Evolution stores the encrypted blob referenced
 // by messageId; this endpoint decrypts it and returns base64 so we can

@@ -99,6 +99,30 @@ export const whatsappApi = {
       api
         .post<{ logId: string }>(`/whatsapp/inbox/threads/${threadId}/reply`, { body })
         .then((r) => r.data),
+    // Upload + send media (image / video / audio voice-note / document) as
+    // a multipart/form-data POST. The `file` field is required; `caption` is
+    // only meaningful for image/video; `voiceNote="true"` makes an audio
+    // file render as a playable PTT bubble on the recipient's phone.
+    sendMedia: (
+      threadId: string,
+      file: File | Blob,
+      opts: { fileName?: string; caption?: string; voiceNote?: boolean } = {},
+    ) => {
+      const form = new FormData();
+      const name =
+        opts.fileName ??
+        (file instanceof File ? file.name : `voice-${Date.now()}.ogg`);
+      form.append('file', file, name);
+      if (opts.caption) form.append('caption', opts.caption);
+      if (opts.voiceNote) form.append('voiceNote', 'true');
+      return api
+        .post<{ logId: string; messageId: string; mediaUrl: string }>(
+          `/whatsapp/inbox/threads/${threadId}/reply-media`,
+          form,
+          { headers: { 'Content-Type': 'multipart/form-data' } },
+        )
+        .then((r) => r.data);
+    },
     updateThread: (threadId: string, patch: { status?: WhatsAppThreadStatus; assignedAgentId?: string | null }) =>
       api.patch<InboxThread>(`/whatsapp/inbox/threads/${threadId}`, patch).then((r) => r.data),
   },

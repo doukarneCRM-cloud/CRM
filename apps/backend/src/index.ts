@@ -107,9 +107,11 @@ app.register(rateLimit, {
   allowList: (req) => req.url.startsWith('/api/v1/whatsapp/webhook'),
 });
 
-// Multipart (file uploads) — 8 MB per file, images only enforced in handler
+// Multipart (file uploads) — 50 MB per file to cover WhatsApp voice notes,
+// videos, and documents. Per-route handlers enforce stricter limits when
+// needed (product images still reject >8 MB in their mime-filter path).
 app.register(multipart, {
-  limits: { fileSize: 8 * 1024 * 1024, files: 1 },
+  limits: { fileSize: 50 * 1024 * 1024, files: 1 },
 });
 
 // Serve uploaded files statically under /uploads/*

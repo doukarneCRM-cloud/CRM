@@ -4,6 +4,8 @@ import type {
   CreateInstanceResult,
   ConnectResult,
   SendTextResult,
+  SendMediaInput,
+  SendMediaResult,
   NormalizedEvent,
 } from './types';
 
@@ -49,6 +51,33 @@ export const evolutionProvider: WhatsAppProvider = {
 
   async sendText(instanceName: string, phone: string, body: string): Promise<SendTextResult> {
     const sent = await client.sendText(instanceName, phone, body);
+    return { providerId: sent.key?.id ?? sent.messageId ?? null };
+  },
+
+  async sendMedia(
+    instanceName: string,
+    phone: string,
+    media: SendMediaInput,
+  ): Promise<SendMediaResult> {
+    const base64 = media.buffer.toString('base64');
+    // Voice notes have their own endpoint on Evolution — sendMedia with
+    // mediatype:'audio' uploads but WhatsApp shows a file pill instead of a
+    // playable voice-note bubble. sendWhatsAppAudio fixes that.
+    if (media.kind === 'audio' && media.voiceNote !== false) {
+      const sent = await client.sendWhatsAppAudio(instanceName, phone, base64);
+      return { providerId: sent.key?.id ?? sent.messageId ?? null };
+    }
+    const evolutionKind: 'image' | 'video' | 'document' =
+      media.kind === 'image' || media.kind === 'video' ? media.kind : 'document';
+    const sent = await client.sendMedia({
+      instanceName,
+      phone,
+      mediaKind: evolutionKind,
+      mimeType: media.mimeType,
+      base64,
+      caption: media.caption,
+      fileName: media.fileName,
+    });
     return { providerId: sent.key?.id ?? sent.messageId ?? null };
   },
 

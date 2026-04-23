@@ -73,4 +73,78 @@ export async function inboxRoutes(app: FastifyInstance) {
       return reply.status(201).send(result);
     },
   );
+
+  // Media reply — multipart/form-data with a single `file` field plus
+  // optional `caption` and `voiceNote` ("true"/"false") form fields.
+  // Voice notes are sent via Evolution's /sendWhatsAppAudio so they render
+  // as a playable PTT bubble on the recipient's phone.
+  app.post<{ Params: { id: string } }>(
+    '/threads/:id/reply-media',
+    { preHandler: [verifyJWT, requirePermission('whatsapp:view')] },
+    async (req, reply) => {
+      if (!req.isMultipart()) {
+        return reply.status(400).send({
+          error: { code: 'EXPECT_MULTIPART', message: 'multipart/form-data required' },
+        });
+      }
+      const file = await req.file();
+      if (!file) {
+        return reply
+          .status(400)
+          .send({ error: { code: 'NO_FILE', message: 'A media file is required' } });
+      }
+
+      // Accumulate the file to a Buffer — provider.sendMedia needs the full
+      // bytes for base64 encoding anyway, and we also need to upload a copy
+      // to our own storage.
+      const chunks: Buffer[] = [];
+      for await (const chunk of file.file) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      const buf = Buffer.concat(chunks);
+      if (file.file.truncated) {
+        return reply.status(413).send({
+          error: { code: 'FILE_TOO_LARGE', message: 'File exceeds the 50 MB limit' },
+        });
+      }
+
+      // Form fields come back via `file.fields`. A field can be undefined,
+      // an array (when repeated), or a single Multipart entry which is
+      // either a file part or a scalar value — only the value shape has
+      // `.value`. Narrow manually.
+      const readField = (name: string): string => {
+        const entry = (file.fields as Record<string, unknown>)[name];
+        const first = Array.isArray(entry) ? entry[0] : entry;
+        if (first && typeof first === 'object' && 'value' in first) {
+          const v = (first as { value: unknown }).value;
+          if (typeof v === 'string') return v;
+        }
+        return '';
+      };
+      const caption = readField('caption');
+      const voiceNoteRaw = readField('voiceNote');
+      const asVoiceNote = voiceNoteRaw === 'true' || voiceNoteRaw === '1';
+
+      try {
+        const result = await inbox.sendMediaReply({
+          threadId: req.params.id,
+          authorUserId: req.user.sub,
+          fileBuffer: buf,
+          fileMime: file.mimetype,
+          fileName: file.filename,
+          caption,
+          asVoiceNote,
+        });
+        return reply.status(201).send(result);
+      } catch (err) {
+        const e = err as { statusCode?: number; code?: string; message?: string };
+        if (e.statusCode && e.code) {
+          return reply
+            .status(e.statusCode)
+            .send({ error: { code: e.code, message: e.message ?? 'Send failed' } });
+        }
+        throw err;
+      }
+    },
+  );
 }

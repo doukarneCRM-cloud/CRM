@@ -50,6 +50,29 @@ export type NormalizedEvent =
     }
   | { type: 'ignored' };
 
+// ─── Outbound media ──────────────────────────────────────────────────────
+// We accept media as a Buffer at the provider boundary so each provider can
+// encode it however it wants (Evolution = base64 in JSON, Meta = pre-uploaded
+// media_id). Callers (inbox.service / whatsappSend.job) load the bytes from
+// R2 / local disk once and pass them in.
+export type OutboundMediaKind = 'image' | 'video' | 'audio' | 'document';
+
+export interface SendMediaInput {
+  kind: OutboundMediaKind;
+  buffer: Buffer;
+  mimeType: string;
+  fileName?: string;
+  caption?: string;
+  // WhatsApp "voice note" vs regular audio attachment. Voice notes render as
+  // a playable mic bubble; non-PTT audio renders as a file row. Ignored for
+  // non-audio kinds.
+  voiceNote?: boolean;
+}
+
+export interface SendMediaResult {
+  providerId?: string | null;
+}
+
 export interface WhatsAppProvider {
   readonly name: 'evolution' | 'meta';
 
@@ -59,6 +82,7 @@ export interface WhatsAppProvider {
   deleteInstance(instanceName: string): Promise<void>;
 
   sendText(instanceName: string, phone: string, body: string): Promise<SendTextResult>;
+  sendMedia(instanceName: string, phone: string, media: SendMediaInput): Promise<SendMediaResult>;
 
   parseWebhook(payload: unknown): NormalizedEvent;
 }

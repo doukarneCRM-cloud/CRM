@@ -4,6 +4,8 @@ import {
   type CreateInstanceResult,
   type ConnectResult,
   type SendTextResult,
+  type SendMediaInput,
+  type SendMediaResult,
   type NormalizedEvent,
 } from './types';
 
@@ -31,6 +33,13 @@ export const metaProvider: WhatsAppProvider = {
   },
   async sendText(_instanceName: string, _phone: string, _body: string): Promise<SendTextResult> {
     throw new NotImplementedError('meta', 'sendText');
+  },
+  async sendMedia(
+    _instanceName: string,
+    _phone: string,
+    _media: SendMediaInput,
+  ): Promise<SendMediaResult> {
+    throw new NotImplementedError('meta', 'sendMedia');
   },
   parseWebhook(_raw: unknown): NormalizedEvent {
     return { type: 'ignored' };

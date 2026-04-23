@@ -5,7 +5,9 @@ import { whatsappQueue } from '../../shared/queue';
 import { emitToUser, emitToRoom } from '../../shared/socket';
 import { uploadFile } from '../../shared/storage';
 import { getBase64FromMediaMessage } from './evolutionClient';
-import type { NormalizedEvent } from './provider';
+import { getProvider, type NormalizedEvent, type OutboundMediaKind } from './provider';
+import { getSystemSessionId } from '../automation/automation.service';
+import { recordSend } from '../../shared/rateLimit';
 
 type InboundEvent = Extract<NormalizedEvent, { type: 'inbound_message' }>;
 
@@ -277,4 +279,128 @@ export async function sendReply(params: {
   await broadcastMessage(thread.id, outMsg.id);
 
   return { logId: log.id };
+}
+
+// ─── Manual agent media reply ───────────────────────────────────────────
+// Media is sent synchronously (not through the queue) so the agent sees
+// immediate success/failure and the bubble renders with the stored URL
+// right away. We still upload a copy to our storage so the thread has a
+// stable URL even if WhatsApp cycles its CDN references.
+export async function sendMediaReply(params: {
+  threadId: string;
+  authorUserId: string;
+  fileBuffer: Buffer;
+  fileMime: string;
+  fileName: string;
+  caption?: string;
+  // 'ptt' = push-to-talk (voice note). Distinct from a regular audio file
+  // attachment — renders as the playable mic bubble on the phone.
+  asVoiceNote?: boolean;
+}) {
+  const thread = await prisma.whatsAppThread.findUnique({
+    where: { id: params.threadId },
+    include: { customer: { select: { whatsappOptOut: true, phone: true } } },
+  });
+  if (!thread) throw { statusCode: 404, code: 'NOT_FOUND', message: 'Thread not found' };
+  if (thread.customer?.whatsappOptOut) {
+    throw { statusCode: 400, code: 'OPTED_OUT', message: 'Customer has opted out of WhatsApp' };
+  }
+
+  const recipient = thread.customer?.phone ?? thread.customerPhone;
+
+  // Resolve the sending session: agent's own first, fall back to system.
+  const agentSession = await prisma.whatsAppSession.findUnique({
+    where: { userId: params.authorUserId },
+  });
+  let session = agentSession && agentSession.status === 'connected' ? agentSession : null;
+  if (!session) {
+    const systemId = await getSystemSessionId();
+    if (systemId) {
+      const sys = await prisma.whatsAppSession.findUnique({ where: { id: systemId } });
+      if (sys && sys.status === 'connected') session = sys;
+    }
+  }
+  if (!session) {
+    throw { statusCode: 400, code: 'NO_SESSION', message: 'No connected WhatsApp session' };
+  }
+
+  // Map mime → media kind. Anything we don't recognize is sent as document
+  // so the recipient still gets the file.
+  const kind = kindFromMime(params.fileMime, params.asVoiceNote);
+  const cleanMime = params.fileMime.split(';')[0].trim();
+
+  // Archive the outbound media so our UI can render it forever (WhatsApp
+  // CDN URLs rotate). Upload first — if this fails we don't want to send.
+  const uploaded = await uploadFile({
+    folder: `whatsapp/out/${kind}`,
+    mimeType: cleanMime,
+    stream: Readable.from(params.fileBuffer),
+  });
+
+  // Send through the provider. sendMedia picks the right Evolution endpoint
+  // (sendMedia vs sendWhatsAppAudio) based on kind + voiceNote.
+  const provider = getProvider();
+  const sent = await provider.sendMedia(session.instanceName, recipient, {
+    kind,
+    buffer: params.fileBuffer,
+    mimeType: cleanMime,
+    fileName: params.fileName,
+    caption: kind === 'image' || kind === 'video' ? params.caption ?? '' : undefined,
+    voiceNote: kind === 'audio' ? params.asVoiceNote !== false : undefined,
+  });
+
+  // Record-send updates the rate-limit counter so the Overview tab reflects
+  // manual media sends too.
+  await recordSend(session.id);
+
+  // Audit trail entry in MessageLog. Marked sent immediately since the send
+  // just succeeded — retry isn't meaningful for manual media.
+  const log = await prisma.messageLog.create({
+    data: {
+      trigger: 'confirmation_confirmed',
+      recipientPhone: recipient,
+      body: params.caption ?? `[${kind}]`,
+      status: 'sent',
+      agentId: params.authorUserId,
+      providerId: sent.providerId ?? undefined,
+      sentAt: new Date(),
+      dedupeKey: `manual-media:${params.threadId}:${Date.now()}`,
+    },
+  });
+
+  const outMsg = await prisma.whatsAppMessage.create({
+    data: {
+      threadId: thread.id,
+      direction: 'out',
+      body: params.caption ?? '',
+      mediaUrl: uploaded.url,
+      mediaType: kind === 'audio' && params.asVoiceNote !== false ? 'audio' : kind,
+      mediaMime: cleanMime,
+      fromPhone: session.phoneNumber ?? '',
+      toPhone: recipient,
+      providerId: sent.providerId ?? undefined,
+      messageLogId: log.id,
+      authorUserId: params.authorUserId,
+    },
+  });
+
+  await prisma.whatsAppThread.update({
+    where: { id: thread.id },
+    data: { lastMessageAt: new Date() },
+  });
+
+  await broadcastMessage(thread.id, outMsg.id);
+
+  return { logId: log.id, messageId: outMsg.id, mediaUrl: uploaded.url };
+}
+
+function kindFromMime(mime: string, voiceNoteHint?: boolean): OutboundMediaKind {
+  const m = mime.toLowerCase();
+  if (m.startsWith('image/')) return 'image';
+  if (m.startsWith('video/')) return 'video';
+  if (m.startsWith('audio/')) return 'audio';
+  // WhatsApp voice-note hint takes precedence when the browser reports e.g.
+  // "application/octet-stream" (some Safari recordings do this).
+  if (voiceNoteHint) return 'audio';
+  return 'document';
 }

@@ -2,7 +2,13 @@ import { evolutionProvider } from './evolution';
 import { metaProvider } from './meta';
 import type { WhatsAppProvider } from './types';
 
-export type { WhatsAppProvider, NormalizedEvent } from './types';
+export type {
+  WhatsAppProvider,
+  NormalizedEvent,
+  SendMediaInput,
+  SendMediaResult,
+  OutboundMediaKind,
+} from './types';
 
 // Chosen at boot from WHATSAPP_PROVIDER env. Default = evolution (current
 // production). Swap to 'meta' only after Meta Business onboarding is done.
