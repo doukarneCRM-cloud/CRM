@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState, useCallback, useRef, type MouseEvent } from 'react';
 import {
   History, MessageCircle, Send, Package, Phone, StickyNote, PhoneOff, Truck, Search, X,
-  AlertTriangle, Copy, Check,
+  AlertTriangle, Copy, Check, Plus,
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
+import { CRMButton } from '@/components/ui/CRMButton';
 import { OrderSourceIcon } from '@/components/ui/OrderSourceIcon';
 import { ordersApi } from '@/services/ordersApi';
 import { getSocket } from '@/services/socket';
@@ -788,7 +789,7 @@ function FilterPills({ section, orders, selected, onChange }: FilterPillsProps) 
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
-export function CallCenterTable() {
+export function CallCenterTable({ onCreate }: { onCreate?: () => void } = {}) {
   const user = useAuthStore((s) => s.user);
   const refreshKey = useCallCenterStore((s) => s.refreshKey);
   const triggerRefresh = useCallCenterStore((s) => s.triggerRefresh);
@@ -919,10 +920,20 @@ export function CallCenterTable() {
 
   if (orders.length === 0) {
     return (
-      <GlassCard padding="md" className="flex min-h-[200px] flex-col items-center justify-center gap-2">
+      <GlassCard padding="md" className="flex min-h-[200px] flex-col items-center justify-center gap-3">
         <Package size={28} className="text-gray-300" />
         <p className="text-sm font-semibold text-gray-500">No orders assigned to you yet</p>
         <p className="text-xs text-gray-400">New orders will appear here in real time.</p>
+        {onCreate && (
+          <CRMButton
+            variant="primary"
+            leftIcon={<Plus size={14} />}
+            onClick={onCreate}
+            className="mt-1"
+          >
+            New order
+          </CRMButton>
+        )}
       </GlassCard>
     );
   }
@@ -990,12 +1001,24 @@ export function CallCenterTable() {
           ))}
         </div>
 
-        <FilterPills
-          section={activeTab}
-          orders={tabOrders}
-          selected={selectedFilter}
-          onChange={setSelectedFilter}
-        />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <FilterPills
+            section={activeTab}
+            orders={tabOrders}
+            selected={selectedFilter}
+            onChange={setSelectedFilter}
+          />
+          {onCreate && (
+            <CRMButton
+              variant="primary"
+              leftIcon={<Plus size={14} />}
+              onClick={onCreate}
+              className="w-full shrink-0 sm:w-auto"
+            >
+              New order
+            </CRMButton>
+          )}
+        </div>
 
         {visible.length === 0 ? (
           <div className="py-6 text-center text-xs text-gray-400">
