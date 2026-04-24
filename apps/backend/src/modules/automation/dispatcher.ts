@@ -3,6 +3,7 @@ import { prisma } from '../../shared/prisma';
 import { whatsappQueue } from '../../shared/queue';
 import { render } from './templateEngine';
 import { evaluate, type RuleConditions, type EvalContext } from './conditionEvaluator';
+import { normalizePhone } from '../../utils/phoneNormalize';
 
 // Map a status transition to the automation trigger that should fire (or null).
 // Only fires on the *transition into* the target state.
@@ -175,6 +176,15 @@ export async function dispatchCommissionPaid(paymentId: string): Promise<void> {
   });
   if (!payment || !payment.agent?.phone) return;
 
+  // User.phone is stored raw (unlike Customer.phone). Normalize to +212… so
+  // Evolution's toJid yields a valid WhatsApp JID (bare `06…` → 400).
+  let agentPhoneE164: string;
+  try {
+    agentPhoneE164 = normalizePhone(payment.agent.phone).normalized;
+  } catch {
+    return;
+  }
+
   const ctx: Record<string, unknown> = {
     agent: { id: payment.agent.id, name: payment.agent.name, phone: payment.agent.phone },
     commission: {
@@ -196,7 +206,7 @@ export async function dispatchCommissionPaid(paymentId: string): Promise<void> {
       ruleId: rule.id,
       dedupeKey: `${paymentId}:${payment.agent.id}:${rule.id}`,
       agentId: payment.agent.id,
-      recipientPhone: payment.agent.phone,
+      recipientPhone: agentPhoneE164,
       body,
     });
 
