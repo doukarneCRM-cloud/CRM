@@ -1,4 +1,5 @@
 import { useEffect, useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CalendarDays, CheckCircle2, Truck, Coins, TrendingUp } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { meApi, type MyCommission, type MyPipeline } from '@/services/ordersApi';
@@ -104,6 +105,7 @@ interface AgentKpiCardsProps {
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 export function AgentKpiCards({ className }: AgentKpiCardsProps) {
+  const { t } = useTranslation();
   const [pipeline, setPipeline] = useState<MyPipeline | null>(null);
   const [commission, setCommission] = useState<MyCommission | null>(null);
   const [loading, setLoading] = useState(true);
@@ -175,7 +177,7 @@ export function AgentKpiCards({ className }: AgentKpiCardsProps) {
       {/* 1 — Today's Orders */}
       <GlassCard className="flex flex-col gap-3">
         <CardHeader
-          title="Today's Orders"
+          title={t('callCenter.kpi.todaysOrders')}
           icon={CalendarDays}
           iconBg="bg-primary/10"
           iconColor="text-primary"
@@ -184,22 +186,22 @@ export function AgentKpiCards({ className }: AgentKpiCardsProps) {
           <span className="text-3xl font-bold leading-none text-gray-900">
             {pipeline?.todayCount ?? 0}
           </span>
-          <span className="mb-0.5 text-sm font-medium text-gray-400">assigned</span>
+          <span className="mb-0.5 text-sm font-medium text-gray-400">{t('callCenter.kpi.assigned')}</span>
         </div>
-        <div className="text-xs text-gray-500">Orders assigned to you today</div>
+        <div className="text-xs text-gray-500">{t('callCenter.kpi.assignedToday')}</div>
       </GlassCard>
 
       {/* 2 — Confirmation Pipeline */}
       <GlassCard className="flex flex-col gap-3">
         <CardHeader
-          title="Confirmation Pipeline"
+          title={t('callCenter.kpi.confirmationPipeline')}
           icon={CheckCircle2}
           iconBg="bg-blue-50"
           iconColor="text-blue-600"
         />
         {confirmationEntries.length === 0 ? (
           <div className="flex flex-1 items-center text-xs text-gray-400">
-            No confirmation orders yet
+            {t('callCenter.kpi.noConfirmationYet')}
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-1.5">
@@ -225,14 +227,14 @@ export function AgentKpiCards({ className }: AgentKpiCardsProps) {
       {/* 3 — Shipping Pipeline */}
       <GlassCard className="flex flex-col gap-3">
         <CardHeader
-          title="Shipping Pipeline"
+          title={t('callCenter.kpi.shippingPipeline')}
           icon={Truck}
           iconBg="bg-purple-50"
           iconColor="text-purple-600"
         />
         {shippingEntries.length === 0 ? (
           <div className="flex flex-1 items-center text-xs text-gray-400">
-            No shipping orders yet
+            {t('callCenter.kpi.noShippingYet')}
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-1.5">
@@ -258,7 +260,7 @@ export function AgentKpiCards({ className }: AgentKpiCardsProps) {
       {/* 4 — Commission (all-time earnings) */}
       <GlassCard className="flex flex-col gap-3">
         <CardHeader
-          title="Commission"
+          title={t('callCenter.kpi.commission')}
           icon={Coins}
           iconBg="bg-amber-50"
           iconColor="text-amber-600"
@@ -270,7 +272,7 @@ export function AgentKpiCards({ className }: AgentKpiCardsProps) {
           <span className="mb-0.5 text-sm font-medium text-gray-400">MAD</span>
         </div>
         <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400">
-          All-time earnings
+          {t('callCenter.kpi.allTimeEarnings')}
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -278,7 +280,7 @@ export function AgentKpiCards({ className }: AgentKpiCardsProps) {
             <div className="flex min-w-0 items-center gap-1.5">
               <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
               <span className="truncate text-[11px] font-semibold text-emerald-700">
-                Paid · {paidCount} orders
+                {t('callCenter.kpi.paidLine', { count: paidCount })}
               </span>
             </div>
             <span className="shrink-0 text-sm font-bold text-emerald-700">
@@ -290,7 +292,7 @@ export function AgentKpiCards({ className }: AgentKpiCardsProps) {
             <div className="flex min-w-0 items-center gap-1.5">
               <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
               <span className="truncate text-[11px] font-semibold text-red-700">
-                Unpaid · {pendingCount} orders
+                {t('callCenter.kpi.unpaidLine', { count: pendingCount })}
               </span>
             </div>
             <span className="shrink-0 text-sm font-bold text-red-700">
@@ -303,7 +305,7 @@ export function AgentKpiCards({ className }: AgentKpiCardsProps) {
           <div className="flex items-center gap-1 text-emerald-600">
             <TrendingUp size={11} />
             <span className="text-[11px] font-semibold">
-              {((commission?.onConfirmRate ?? 0) + (commission?.onDeliverRate ?? 0))} MAD / delivered order
+              {t('callCenter.kpi.perDelivered', { amount: (commission?.onConfirmRate ?? 0) + (commission?.onDeliverRate ?? 0) })}
             </span>
           </div>
         )}

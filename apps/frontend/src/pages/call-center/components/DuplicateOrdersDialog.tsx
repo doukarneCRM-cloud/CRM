@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, Copy, UserRound, Package } from 'lucide-react';
 import { CRMButton } from '@/components/ui/CRMButton';
@@ -27,6 +28,7 @@ export function DuplicateOrdersDialog({
   onSkip,
   onCancel,
 }: Props) {
+  const { t } = useTranslation();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +64,7 @@ export function DuplicateOrdersDialog({
       });
       onMerged();
     } catch (e) {
-      setError(apiErrorMessage(e, 'Merge failed'));
+      setError(apiErrorMessage(e, t('callCenter.duplicates.mergeFailed')));
     } finally {
       setBusy(false);
     }
@@ -87,10 +89,13 @@ export function DuplicateOrdersDialog({
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-base font-bold text-gray-900">
-              Duplicate orders detected
+              {t('callCenter.duplicates.title')}
             </p>
             <p className="mt-0.5 text-[12px] text-gray-500">
-              This client has {siblings.length} other unshipped order{siblings.length === 1 ? '' : 's'} from the last 3 days. Merge them into {keeperReference} so the confirmed one keeps the full amount and the rest are counted as merged.
+              {t('callCenter.duplicates.intro', {
+                count: siblings.length,
+                reference: keeperReference,
+              })}
             </p>
           </div>
         </div>
@@ -128,19 +133,26 @@ export function DuplicateOrdersDialog({
                   <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-500">
                     <Package size={11} />
                     <span className="truncate">
-                      {s.items.length} item{s.items.length === 1 ? '' : 's'} ·{' '}
-                      {s.items.slice(0, 2).map((it) => it.variant.product.name).join(', ')}
-                      {s.items.length > 2 && ` +${s.items.length - 2}`}
+                      {s.items.length > 2
+                        ? t('callCenter.duplicates.itemsSummaryExtra', {
+                            count: s.items.length,
+                            products: s.items.slice(0, 2).map((it) => it.variant.product.name).join(', '),
+                            extra: s.items.length - 2,
+                          })
+                        : t('callCenter.duplicates.itemsSummary', {
+                            count: s.items.length,
+                            products: s.items.map((it) => it.variant.product.name).join(', '),
+                          })}
                     </span>
                   </div>
                   <div className="mt-1 flex items-center gap-1 text-[11px]">
                     <UserRound size={11} className={mismatched ? 'text-amber-600' : 'text-gray-400'} />
                     <span className={mismatched ? 'font-semibold text-amber-700' : 'text-gray-500'}>
-                      {s.agent?.name ?? 'Unassigned'}
+                      {s.agent?.name ?? t('callCenter.duplicates.unassigned')}
                     </span>
                     {mismatched && (
                       <span className="rounded-badge bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-700">
-                        Will be reassigned
+                        {t('callCenter.duplicates.willBeReassigned')}
                       </span>
                     )}
                   </div>
@@ -152,9 +164,7 @@ export function DuplicateOrdersDialog({
 
         <div className="mt-3 flex items-start gap-2 rounded-btn bg-blue-50 px-2.5 py-1.5 text-[11px] text-blue-700">
           <AlertTriangle size={11} className="mt-0.5 shrink-0" />
-          <span>
-            Merged orders stay in the system counted as "merged" (not re-confirmed). The keeper wins the confirmation.
-          </span>
+          <span>{t('callCenter.duplicates.mergedNote')}</span>
         </div>
 
         {error && (
@@ -166,11 +176,11 @@ export function DuplicateOrdersDialog({
 
         <div className="mt-5 flex items-center justify-between gap-2">
           <CRMButton variant="ghost" size="sm" onClick={onCancel} disabled={busy}>
-            Cancel
+            {t('common.cancel')}
           </CRMButton>
           <div className="flex items-center gap-2">
             <CRMButton variant="secondary" size="sm" onClick={onSkip} disabled={busy}>
-              Skip &amp; continue
+              {t('callCenter.duplicates.skipContinue')}
             </CRMButton>
             <CRMButton
               variant="primary"
@@ -179,7 +189,7 @@ export function DuplicateOrdersDialog({
               loading={busy}
               disabled={selected.size === 0}
             >
-              Merge {selected.size} &amp; continue
+              {t('callCenter.duplicates.mergeContinue', { count: selected.size })}
             </CRMButton>
           </div>
         </div>

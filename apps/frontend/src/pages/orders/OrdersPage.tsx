@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { UserPlus, ArchiveX, X, GitMerge, Plus, Send, Search } from 'lucide-react';
 import { GlobalFilterBar, type FilterChipConfig } from '@/components/ui/GlobalFilterBar';
 import { CRMButton } from '@/components/ui/CRMButton';
@@ -25,26 +26,6 @@ import { MergeDuplicatesModal } from './components/MergeDuplicatesModal';
 import { OrderCreateModal } from './components/OrderCreateModal';
 import { ColiixExportResultModal } from './components/ColiixExportResultModal';
 
-// ─── Filter configs for GlobalFilterBar ──────────────────────────────────────
-
-const STATIC_FILTER_CONFIGS: FilterChipConfig[] = [
-  {
-    key: 'confirmationStatuses',
-    label: 'Confirmation',
-    options: CONFIRMATION_STATUS_OPTIONS,
-  },
-  {
-    key: 'shippingStatuses',
-    label: 'Shipping',
-    options: SHIPPING_STATUS_OPTIONS,
-  },
-  {
-    key: 'sources',
-    label: 'Source',
-    options: SOURCE_OPTIONS,
-  },
-];
-
 // ─── Bulk action bar ──────────────────────────────────────────────────────────
 
 interface BulkBarProps {
@@ -61,6 +42,7 @@ interface BulkBarProps {
 }
 
 function BulkBar({ count, canAssign, canShip, onAssign, onUnassign, onArchive, onSendColiix, onClear, loading, shipping }: BulkBarProps) {
+  const { t } = useTranslation();
   return (
     <div className="slide-up fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
       <div className="glass flex items-center gap-3 px-5 py-3 shadow-hover">
@@ -69,7 +51,7 @@ function BulkBar({ count, canAssign, canShip, onAssign, onUnassign, onArchive, o
             {count}
           </span>
           <span className="text-sm font-semibold text-gray-700">
-            order{count !== 1 ? 's' : ''} selected
+            {t('orders.selected', { count })}
           </span>
         </div>
         <div className="h-5 w-px bg-gray-200" />
@@ -81,7 +63,7 @@ function BulkBar({ count, canAssign, canShip, onAssign, onUnassign, onArchive, o
             onClick={onAssign}
             loading={loading}
           >
-            Assign
+            {t('orders.bulkAssign')}
           </CRMButton>
         )}
         {canAssign && (
@@ -92,7 +74,7 @@ function BulkBar({ count, canAssign, canShip, onAssign, onUnassign, onArchive, o
             onClick={onUnassign}
             loading={loading}
           >
-            Unassign
+            {t('orders.bulkUnassign')}
           </CRMButton>
         )}
         {canShip && (
@@ -103,7 +85,7 @@ function BulkBar({ count, canAssign, canShip, onAssign, onUnassign, onArchive, o
             onClick={onSendColiix}
             loading={shipping}
           >
-            Send to Coliix
+            {t('orders.bulkSendColiix')}
           </CRMButton>
         )}
         <CRMButton
@@ -113,13 +95,13 @@ function BulkBar({ count, canAssign, canShip, onAssign, onUnassign, onArchive, o
           onClick={onArchive}
           loading={loading}
         >
-          Archive
+          {t('orders.bulkArchive')}
         </CRMButton>
         <button
           onClick={onClear}
           className="ml-1 text-xs text-gray-400 hover:text-gray-600"
         >
-          Clear
+          {t('orders.bulkClear')}
         </button>
       </div>
     </div>
@@ -129,6 +111,7 @@ function BulkBar({ count, canAssign, canShip, onAssign, onUnassign, onArchive, o
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function OrdersPage() {
+  const { t } = useTranslation();
   const { hasPermission } = useAuthStore();
   const canAssign = hasPermission(PERMISSIONS.ORDERS_ASSIGN);
   const canDelete = hasPermission(PERMISSIONS.ORDERS_DELETE);
@@ -191,23 +174,40 @@ export default function OrdersPage() {
   }, []);
 
   const filterConfigs = useMemo<FilterChipConfig[]>(() => {
+    const base: FilterChipConfig[] = [
+      {
+        key: 'confirmationStatuses',
+        label: t('orders.filterConfirmation'),
+        options: CONFIRMATION_STATUS_OPTIONS,
+      },
+      {
+        key: 'shippingStatuses',
+        label: t('orders.filterShipping'),
+        options: SHIPPING_STATUS_OPTIONS,
+      },
+      {
+        key: 'sources',
+        label: t('orders.filterSource'),
+        options: SOURCE_OPTIONS,
+      },
+    ];
     const extras: FilterChipConfig[] = [];
     if (products.length > 0) {
       extras.push({
         key: 'productIds',
-        label: 'Product',
+        label: t('orders.filterProduct'),
         options: products.map((p) => ({ value: p.id, label: p.name })),
       });
     }
     if (agents.length > 0) {
       extras.push({
         key: 'agentIds',
-        label: 'Agent',
+        label: t('orders.filterAgent'),
         options: agents.map((a) => ({ value: a.id, label: a.name })),
       });
     }
-    return extras.length === 0 ? STATIC_FILTER_CONFIGS : [...STATIC_FILTER_CONFIGS, ...extras];
-  }, [products, agents]);
+    return [...base, ...extras];
+  }, [products, agents, t]);
 
   // Coliix export state
   const [sendingIds, setSendingIds] = useState<string[]>([]);
@@ -240,7 +240,7 @@ export default function OrdersPage() {
   const handleArchive = useCallback(
     async (order: Order) => {
       if (!canDelete) return;
-      if (!window.confirm(`Archive order ${order.reference}? This can be undone.`)) return;
+      if (!window.confirm(t('orders.confirmArchiveOne', { reference: order.reference }))) return;
       try {
         await ordersApi.archive(order.id);
         refresh();
@@ -248,7 +248,7 @@ export default function OrdersPage() {
         // ignore
       }
     },
-    [canDelete, refresh],
+    [canDelete, refresh, t],
   );
 
   const handleAssignSingle = useCallback((order: Order) => {
@@ -294,7 +294,7 @@ export default function OrdersPage() {
 
   const handleBulkArchive = useCallback(async () => {
     if (selectedIds.length === 0) return;
-    if (!window.confirm(`Archive ${selectedIds.length} orders? This can be undone.`)) return;
+    if (!window.confirm(t('orders.confirmArchiveMany', { count: selectedIds.length }))) return;
     setBulkLoading(true);
     try {
       await ordersApi.bulk({ orderIds: selectedIds, action: 'archive' });
@@ -305,7 +305,7 @@ export default function OrdersPage() {
     } finally {
       setBulkLoading(false);
     }
-  }, [selectedIds, setSelectedIds, refresh]);
+  }, [selectedIds, setSelectedIds, refresh, t]);
 
   // ── Coliix export ─────────────────────────────────────────────────────────
 
@@ -321,7 +321,7 @@ export default function OrdersPage() {
         });
         refresh();
       } catch (e: any) {
-        const message = e?.response?.data?.error?.message ?? e?.response?.data?.error ?? 'Export failed';
+        const message = e?.response?.data?.error?.message ?? e?.response?.data?.error ?? t('orders.exportFailed');
         setColiixResult({
           results: [{ orderId: order.id, reference: order.reference, ok: false, error: String(message) }],
           summary: { total: 1, ok: 0, failed: 1 },
@@ -330,12 +330,12 @@ export default function OrdersPage() {
         setSendingIds((prev) => prev.filter((id) => id !== order.id));
       }
     },
-    [canShip, refresh],
+    [canShip, refresh, t],
   );
 
   const handleBulkSendColiix = useCallback(async () => {
     if (!canShip || selectedIds.length === 0) return;
-    if (!window.confirm(`Send ${selectedIds.length} order${selectedIds.length === 1 ? '' : 's'} to Coliix?`)) return;
+    if (!window.confirm(t('orders.confirmSendColiix', { count: selectedIds.length }))) return;
     setColiixShipping(true);
     setSendingIds(selectedIds);
     try {
@@ -344,16 +344,16 @@ export default function OrdersPage() {
       setSelectedIds([]);
       refresh();
     } catch (e: any) {
-      const message = e?.response?.data?.error?.message ?? 'Bulk export failed';
+      const message = e?.response?.data?.error?.message ?? t('orders.bulkExportFailed');
       setColiixResult({
-        results: selectedIds.map((id) => ({ orderId: id, reference: '?', ok: false, error: String(message) })),
+        results: selectedIds.map((id) => ({ orderId: id, reference: t('orders.unknownReference'), ok: false, error: String(message) })),
         summary: { total: selectedIds.length, ok: 0, failed: selectedIds.length },
       });
     } finally {
       setColiixShipping(false);
       setSendingIds([]);
     }
-  }, [canShip, selectedIds, setSelectedIds, refresh]);
+  }, [canShip, selectedIds, setSelectedIds, refresh, t]);
 
   const showBulkBar = selectedIds.length > 0;
 
@@ -363,9 +363,9 @@ export default function OrdersPage() {
       {canCreate && (
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-primary">Orders</h1>
+            <h1 className="text-2xl font-bold text-primary">{t('orders.title')}</h1>
             <p className="mt-1 text-sm text-gray-500">
-              Browse, assign, and manage orders across all sources.
+              {t('orders.subtitle')}
             </p>
           </div>
           <CRMButton
@@ -373,7 +373,7 @@ export default function OrdersPage() {
             leftIcon={<Plus size={14} />}
             onClick={() => setCreateOpen(true)}
           >
-            New order
+            {t('orders.newOrder')}
           </CRMButton>
         </div>
       )}
@@ -393,15 +393,15 @@ export default function OrdersPage() {
             </div>
             <div>
               <p className="text-sm font-semibold text-amber-900">
-                {duplicateCount} customer{duplicateCount !== 1 ? 's' : ''} with duplicate pending orders
+                {t('orders.duplicatesBanner', { count: duplicateCount })}
               </p>
               <p className="text-[11px] text-amber-700/80">
-                Review and merge to keep KPIs clean — merged orders count as one.
+                {t('orders.duplicatesBannerSub')}
               </p>
             </div>
           </div>
           <span className="rounded-btn bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors group-hover:bg-amber-700">
-            Review
+            {t('orders.review')}
           </span>
         </button>
       )}
@@ -414,7 +414,7 @@ export default function OrdersPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by reference, name, phone, city, tracking…"
+            placeholder={t('orders.searchPlaceholder')}
             className="w-full bg-transparent text-sm text-gray-900 outline-none placeholder-gray-400"
           />
           {search && (
@@ -422,7 +422,7 @@ export default function OrdersPage() {
               type="button"
               onClick={() => setSearch('')}
               className="text-gray-400 hover:text-gray-600"
-              aria-label="Clear search"
+              aria-label={t('orders.clearSearch')}
             >
               <X size={13} />
             </button>

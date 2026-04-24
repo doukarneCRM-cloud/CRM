@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import {
   useReactTable,
@@ -57,6 +58,7 @@ interface QuickImportButtonProps {
 }
 
 function QuickImportButton({ storeId, youcanId, productName, onImported }: QuickImportButtonProps) {
+  const { t } = useTranslation();
   const [state, setState] = useState<'idle' | 'busy' | 'done' | 'error'>('idle');
 
   const run = async (e: ReactMouseEvent<HTMLButtonElement>) => {
@@ -75,10 +77,10 @@ function QuickImportButton({ storeId, youcanId, productName, onImported }: Quick
   };
 
   const titleByState: Record<typeof state, string> = {
-    idle: `Import "${productName}" into the catalog and auto-link this order`,
-    busy: 'Importing…',
-    done: 'Imported! Refreshing…',
-    error: 'Import failed — click to retry',
+    idle: t('orders.quickImport.idle', { productName }),
+    busy: t('orders.quickImport.busy'),
+    done: t('orders.quickImport.done'),
+    error: t('orders.quickImport.error'),
   };
 
   return (
@@ -173,6 +175,7 @@ export function OrdersTable({
   onSendColiix,
   sendingIds,
 }: OrdersTableProps) {
+  const { t } = useTranslation();
   // Track selection state as Set for O(1) lookup
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const sendingSet = useMemo(() => new Set(sendingIds ?? []), [sendingIds]);
@@ -223,7 +226,7 @@ export function OrdersTable({
       // ── Col 1: Ref / Date / Agent ─────────────────────────────────────────
       {
         id: 'ref',
-        header: 'REF / DATE',
+        header: t('orders.columns.refDate'),
         size: 160,
         cell: ({ row }) => {
           const { prefix, seq } = formatRef(row.original.reference);
@@ -257,7 +260,7 @@ export function OrdersTable({
                   })()
                 ) : (
                   <span className="text-[9px] font-semibold uppercase tracking-wide text-orange-500">
-                    Unassigned
+                    {t('orders.unassigned')}
                   </span>
                 )}
               </div>
@@ -269,7 +272,7 @@ export function OrdersTable({
       // ── Col 3: Customer (name + phone + city + address) ──────────────────
       {
         id: 'customer',
-        header: 'CUSTOMER',
+        header: t('orders.columns.customer'),
         size: 240,
         cell: ({ row }) => {
           const { customer } = row.original;
@@ -290,7 +293,7 @@ export function OrdersTable({
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
                   className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-green-600 transition-colors hover:bg-green-50"
-                  title="WhatsApp"
+                  title={t('orders.whatsapp')}
                 >
                   <MessageCircle size={11} />
                 </a>
@@ -316,7 +319,7 @@ export function OrdersTable({
       // ── Col 5: Product ────────────────────────────────────────────────────
       {
         id: 'product',
-        header: 'PRODUCT',
+        header: t('orders.columns.product'),
         size: 160,
         cell: ({ row }) => {
           const items = row.original.items;
@@ -330,9 +333,9 @@ export function OrdersTable({
           const youcanId = first.variant.product.youcanId ?? null;
           const extra = items.length - 1;
           const hoverTitle = isDeleted
-            ? 'Product was deleted from catalog — import it again to track stock'
+            ? t('orders.deletedProductBadge')
             : isPlaceholder
-              ? 'Not in CRM catalog — stock is not tracked'
+              ? t('orders.unlinkedProductBadge')
               : undefined;
           return (
             <div>
@@ -388,7 +391,7 @@ export function OrdersTable({
                 </span>
                 {extra > 0 && (
                   <span className="rounded-badge bg-gray-100 px-1.5 py-0.5 text-[9px] text-gray-500">
-                    +{extra} more
+                    {t('orders.extraMore', { count: extra })}
                   </span>
                 )}
               </div>
@@ -400,7 +403,7 @@ export function OrdersTable({
       // ── Col 6: Price ──────────────────────────────────────────────────────
       {
         id: 'price',
-        header: 'PRICE',
+        header: t('orders.columns.price'),
         size: 90,
         cell: ({ row }) => {
           const unlinked = row.original.items.some(
@@ -410,7 +413,7 @@ export function OrdersTable({
             <div className="text-right">
               <span
                 className={cn('text-sm font-bold', unlinked ? 'text-red-600' : 'text-gray-900')}
-                title={unlinked ? 'Contains an unlinked or deleted product — stock untracked' : undefined}
+                title={unlinked ? t('orders.untrackedUnitTooltip') : undefined}
               >
                 {row.original.total.toLocaleString('fr-MA')}
               </span>
@@ -423,7 +426,7 @@ export function OrdersTable({
       // ── Col 7: Status (confirmation stacked above shipping) ──────────────
       {
         id: 'status',
-        header: 'STATUS',
+        header: t('orders.columns.status'),
         size: 170,
         cell: ({ row }) => {
           const hasDeletedProduct = row.original.items.some((i) => i.variant.product.deletedAt);
@@ -443,23 +446,23 @@ export function OrdersTable({
               {showStockWarning && (
                 <span
                   className="inline-flex items-center gap-1 rounded-badge border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-700"
-                  title="One of the variants on this order is short — confirming will fail until restocked."
+                  title={t('orders.stockShortTooltip')}
                 >
                   <AlertTriangle size={9} className="shrink-0" />
-                  Stock short
+                  {t('orders.stockShort')}
                 </span>
               )}
               {hasDeletedProduct && (
                 <span
                   className="inline-flex items-center rounded-badge border border-red-200 bg-red-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-red-600"
-                  title="A product in this order was deleted from the catalog — stock is no longer tracked."
+                  title={t('orders.notTrackedTooltip')}
                 >
-                  Not tracked
+                  {t('orders.notTracked')}
                 </span>
               )}
               <button
                 onClick={() => onViewLogs(row.original, 'confirmation')}
-                title="View confirmation history"
+                title={t('orders.viewConfirmationHistory')}
                 className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-gray-900 transition-colors hover:bg-gray-100 hover:text-gray-700"
               >
                 <History size={11} />
@@ -471,7 +474,7 @@ export function OrdersTable({
               <StatusBadge status={row.original.shippingStatus} size="sm" showDot />
               <button
                 onClick={() => onViewLogs(row.original, 'shipping')}
-                title="View shipping history"
+                title={t('orders.viewShippingHistory')}
                 className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-gray-900 transition-colors hover:bg-gray-100 hover:text-gray-700"
               >
                 <History size={11} />
@@ -485,7 +488,7 @@ export function OrdersTable({
       // ── Col 9: Notes ──────────────────────────────────────────────────────
       {
         id: 'notes',
-        header: 'NOTES',
+        header: t('orders.columns.notes'),
         size: 160,
         cell: ({ row }) => {
           const { confirmationNote, shippingInstruction } = row.original;
@@ -519,7 +522,7 @@ export function OrdersTable({
       // ── Col 10: Source ────────────────────────────────────────────────────
       {
         id: 'source',
-        header: 'SRC',
+        header: t('orders.columns.source'),
         size: 50,
         cell: ({ row }) => (
           <OrderSourceIcon source={row.original.source} size={13} />
@@ -529,7 +532,7 @@ export function OrdersTable({
       // ── Col 11: Coliix ───────────────────────────────────────────────────
       {
         id: 'coliix',
-        header: 'COLIIX',
+        header: t('orders.columns.coliix'),
         size: 80,
         cell: ({ row }) => {
           const order = row.original;
@@ -537,14 +540,14 @@ export function OrdersTable({
             return (
               <span
                 className="flex items-center gap-1 text-xs font-semibold text-green-600"
-                title={order.coliixTrackingId ? `Tracking: ${order.coliixTrackingId}` : 'Sent to Coliix'}
+                title={order.coliixTrackingId ? t('orders.coliixTrackingTooltip', { tracking: order.coliixTrackingId }) : t('orders.coliixSentTooltip')}
               >
-                <Check size={10} /> Sent
+                <Check size={10} /> {t('orders.sent')}
               </span>
             );
           }
           if (order.confirmationStatus !== 'confirmed') {
-            return <span className="text-xs text-gray-200" title="Only confirmed orders can be sent">—</span>;
+            return <span className="text-xs text-gray-200" title={t('orders.onlyConfirmedCanSend')}>—</span>;
           }
           const sending = sendingSet.has(order.id);
           return (
@@ -556,10 +559,10 @@ export function OrdersTable({
               }}
               disabled={sending || !onSendColiix}
               className="flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-500 transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
-              title="Send to Coliix"
+              title={t('orders.sendingTooltip')}
             >
               {sending ? <Loader2 size={10} className="animate-spin" /> : <Send size={10} />}
-              {sending ? 'Sending…' : 'Send'}
+              {sending ? t('orders.sending') : t('orders.send')}
             </button>
           );
         },
@@ -574,21 +577,21 @@ export function OrdersTable({
           <div className="flex items-center gap-0.5">
             <button
               onClick={() => onEdit(row.original)}
-              title="Edit order"
+              title={t('orders.editOrder')}
               className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-300 transition-colors hover:bg-gray-100 hover:text-gray-600"
             >
               <Edit2 size={13} />
             </button>
             <button
               onClick={() => onAssign(row.original)}
-              title="Assign agent"
+              title={t('orders.assignAgent')}
               className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-300 transition-colors hover:bg-accent hover:text-primary"
             >
               <UserPlus size={13} />
             </button>
             <button
               onClick={() => onArchive(row.original)}
-              title="Archive order"
+              title={t('orders.archiveOrder')}
               className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-300 transition-colors hover:bg-red-50 hover:text-red-500"
             >
               <Archive size={13} />
@@ -598,7 +601,7 @@ export function OrdersTable({
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [orders, selectedIds, selectedSet],
+    [orders, selectedIds, selectedSet, t],
   );
 
   const table = useReactTable({
@@ -633,7 +636,7 @@ export function OrdersTable({
               <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
               <rect x="9" y="3" width="6" height="4" rx="1" />
             </svg>
-            <p className="text-sm">No orders found</p>
+            <p className="text-sm">{t('orders.noOrdersFound')}</p>
           </div>
         ) : (
           rows.map((row) => {
@@ -668,7 +671,7 @@ export function OrdersTable({
 
                 {/* ── Customer ── */}
                 <div className="px-3 py-2.5">
-                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Customer</p>
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">{t('orders.columns.customer')}</p>
                   {renderCell('customer')}
                 </div>
 
@@ -676,7 +679,7 @@ export function OrdersTable({
 
                 {/* ── Product ── */}
                 <div className="px-3 py-2.5">
-                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Product</p>
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">{t('orders.columns.product')}</p>
                   {renderCell('product')}
                 </div>
 
@@ -684,7 +687,7 @@ export function OrdersTable({
 
                 {/* ── Price ── */}
                 <div className="flex items-center justify-between px-3 py-2.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Price</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">{t('orders.columns.price')}</p>
                   <div>{renderCell('price')}</div>
                 </div>
 
@@ -692,7 +695,7 @@ export function OrdersTable({
 
                 {/* ── Status ── */}
                 <div className="px-3 py-2.5">
-                  <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Status</p>
+                  <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">{t('orders.columns.status')}</p>
                   {renderCell('status')}
                 </div>
 
@@ -708,19 +711,19 @@ export function OrdersTable({
                       <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-[11px] text-gray-500">
                         {hasSource && (
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Src</span>
+                            <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">{t('orders.columns.source')}</span>
                             <div>{renderCell('source')}</div>
                           </div>
                         )}
                         {hasColiix && (
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Coliix</span>
+                            <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">{t('orders.columns.coliix')}</span>
                             <div>{renderCell('coliix')}</div>
                           </div>
                         )}
                         {hasNotes && (
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Notes</span>
+                            <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">{t('orders.columns.notes')}</span>
                             <div>{renderCell('notes')}</div>
                           </div>
                         )}
@@ -767,7 +770,7 @@ export function OrdersTable({
                       <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
                       <rect x="9" y="3" width="6" height="4" rx="1" />
                     </svg>
-                    <p className="text-sm">No orders found</p>
+                    <p className="text-sm">{t('orders.noOrdersFound')}</p>
                   </div>
                 </td>
               </tr>
@@ -799,7 +802,7 @@ export function OrdersTable({
       <div className="flex flex-wrap items-center justify-between gap-y-2 border-t border-gray-100 px-3 py-3 sm:px-4">
         {/* Rows per page */}
         <div className="flex items-center gap-2 text-sm text-gray-500">
-          <span className="text-xs">Rows per page:</span>
+          <span className="text-xs">{t('orders.rowsPerPage')}</span>
           <div className="relative">
             <select
               value={pageSize}
@@ -816,7 +819,7 @@ export function OrdersTable({
 
         {/* Page info + navigation */}
         <div className="flex items-center gap-3 text-xs text-gray-500">
-          <span>{rangeStart} – {rangeEnd} of {total.toLocaleString()}</span>
+          <span>{t('orders.pageRange', { start: rangeStart, end: rangeEnd, total: total.toLocaleString() })}</span>
           <div className="flex items-center gap-1">
             <button
               onClick={() => onPageChange(page - 1)}

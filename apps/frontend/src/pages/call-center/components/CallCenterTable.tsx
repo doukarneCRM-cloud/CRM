@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback, useRef, type MouseEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   History, MessageCircle, Send, Package, Phone, StickyNote, PhoneOff, Truck, Search, X,
   AlertTriangle, Copy, Check, Plus,
@@ -99,14 +100,14 @@ function groupItems(order: Order): ProductGroup[] {
 const QUICK_CONFIRMATION_TRANSITIONS: Array<{
   from: ConfirmationStatus[];
   to: ConfirmationStatus;
-  label: string;
+  labelKey: 'quickConfirmed' | 'quickUnreachablePlus1' | 'quickPending';
 }> = [
-  { from: ['pending', 'callback', 'unreachable'], to: 'confirmed', label: 'Confirmed' },
+  { from: ['pending', 'callback', 'unreachable'], to: 'confirmed', labelKey: 'quickConfirmed' },
   // Allow repeat "unreachable" from the unreachable state itself so agents can
   // log another failed attempt in one click; the backend increments the counter
   // on every submission regardless of current status.
-  { from: ['pending', 'callback', 'unreachable'], to: 'unreachable', label: 'Unreachable +1' },
-  { from: ['unreachable', 'callback'], to: 'pending', label: 'Pending' },
+  { from: ['pending', 'callback', 'unreachable'], to: 'unreachable', labelKey: 'quickUnreachablePlus1' },
+  { from: ['unreachable', 'callback'], to: 'pending', labelKey: 'quickPending' },
 ];
 
 // ─── Pill: colorful, clickable confirmation status ───────────────────────────
@@ -118,6 +119,7 @@ interface ConfirmationPillProps {
 }
 
 function ConfirmationPill({ order, onOpenModal, onRefresh }: ConfirmationPillProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -125,8 +127,8 @@ function ConfirmationPill({ order, onOpenModal, onRefresh }: ConfirmationPillPro
 
   useClickOutside(ref, () => setOpen(false), open);
 
-  const quickActions = QUICK_CONFIRMATION_TRANSITIONS.filter((t) =>
-    t.from.includes(order.confirmationStatus as ConfirmationStatus),
+  const quickActions = QUICK_CONFIRMATION_TRANSITIONS.filter((q) =>
+    q.from.includes(order.confirmationStatus as ConfirmationStatus),
   );
 
   const apply = async (to: ConfirmationStatus) => {
@@ -161,7 +163,7 @@ function ConfirmationPill({ order, onOpenModal, onRefresh }: ConfirmationPillPro
           'hover:ring-2 hover:ring-primary/20',
           busy && 'opacity-60',
         )}
-        title="Change confirmation status"
+        title={t('callCenter.row.changeConfirmationStatus')}
       >
         <span className={cn('h-1.5 w-1.5 rounded-full', cfg.dot)} />
         {cfg.label}
@@ -188,7 +190,7 @@ function ConfirmationPill({ order, onOpenModal, onRefresh }: ConfirmationPillPro
                 className="flex items-center gap-2 rounded-btn px-2 py-1.5 text-left text-xs font-medium text-gray-700 hover:bg-accent"
               >
                 <span className={cn('h-1.5 w-1.5 rounded-full', target.dot)} />
-                {act.label}
+                {t(`callCenter.row.${act.labelKey}` as const)}
               </button>
             );
           })}
@@ -202,7 +204,7 @@ function ConfirmationPill({ order, onOpenModal, onRefresh }: ConfirmationPillPro
             className="flex items-center gap-2 rounded-btn bg-primary/10 px-2 py-1.5 text-left text-xs font-semibold text-primary hover:bg-primary/20"
           >
             <Send size={11} />
-            Open full actions…
+            {t('callCenter.row.openFullActions')}
           </button>
         </div>
       )}
@@ -213,6 +215,7 @@ function ConfirmationPill({ order, onOpenModal, onRefresh }: ConfirmationPillPro
 // ─── Pill: shipping status (read-only display in call center) ────────────────
 
 function ShippingPill({ order }: { order: Order }) {
+  const { t } = useTranslation();
   const cfg = SHIPPING_STATUS_COLORS[order.shippingStatus as ShippingStatus];
   if (!cfg) return null;
   return (
@@ -222,7 +225,7 @@ function ShippingPill({ order }: { order: Order }) {
         cfg.bg,
         cfg.text,
       )}
-      title={`Shipping · ${cfg.label}`}
+      title={t('callCenter.row.shippingTooltip', { label: cfg.label })}
     >
       <span className={cn('h-1.5 w-1.5 rounded-full', cfg.dot)} />
       {cfg.label}
@@ -240,6 +243,7 @@ interface RowProps {
 }
 
 function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
+  const { t } = useTranslation();
   const openOrder = useCallCenterStore((s) => s.openOrder);
   const groups = useMemo(() => groupItems(order), [order]);
   const totalItems = groups.reduce((n, g) => n + g.totalQty, 0);
@@ -334,7 +338,7 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
               href={`tel:${phoneDigits}`}
               onClick={(e) => e.stopPropagation()}
               className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary active:bg-primary/20"
-              title="Call"
+              title={t('callCenter.row.call')}
             >
               <Phone size={13} />
             </a>
@@ -347,7 +351,7 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
                   ? 'bg-emerald-500 text-white'
                   : 'bg-gray-100 text-gray-600 active:bg-gray-200',
               )}
-              title={phoneCopied ? 'Copied!' : 'Copy phone'}
+              title={phoneCopied ? t('callCenter.row.copied') : t('callCenter.row.copyPhone')}
             >
               {phoneCopied ? <Check size={13} /> : <Copy size={13} />}
             </button>
@@ -357,7 +361,7 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
               className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-sm active:from-emerald-600 active:to-emerald-700"
-              title="Open WhatsApp"
+              title={t('callCenter.row.openWhatsapp')}
             >
               <MessageCircle size={18} strokeWidth={2.2} />
             </a>
@@ -448,7 +452,7 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
                 type="button"
                 onClick={() => onOpenLogs(order, 'confirmation')}
                 className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-gray-900 active:bg-gray-100 active:text-primary"
-                title="Confirmation history"
+                title={t('callCenter.row.confirmationHistory')}
               >
                 <History size={12} />
               </button>
@@ -459,7 +463,7 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
                 type="button"
                 onClick={() => onOpenLogs(order, 'shipping')}
                 className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-gray-900 active:bg-gray-100 active:text-primary"
-                title="Shipping history"
+                title={t('callCenter.row.shippingHistory')}
               >
                 <History size={12} />
               </button>
@@ -469,7 +473,7 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
             <div className="flex items-start gap-1.5 rounded-btn border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
               <AlertTriangle size={11} className="mt-0.5 shrink-0 text-amber-600" />
               <p className="line-clamp-2">
-                <span className="font-semibold">Stock short.</span> Confirming will fail — restock or pick "No stock".
+                <span className="font-semibold">{t('callCenter.row.stockShort')}</span> {t('callCenter.row.stockShortHint')}
               </p>
             </div>
           )}
@@ -520,7 +524,7 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
                   onOpenCustomer(order.customer.id);
                 }}
                 className="truncate text-left text-sm font-semibold text-gray-900 hover:text-primary hover:underline"
-                title="View client history"
+                title={t('callCenter.row.viewClientHistory')}
               >
                 {order.customer.fullName}
               </button>
@@ -532,7 +536,7 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
                 href={`tel:${phoneDigits}`}
                 onClick={(e) => e.stopPropagation()}
                 className="inline-flex h-4 w-4 items-center justify-center rounded-full text-primary hover:bg-primary/10"
-                title="Call"
+                title={t('callCenter.row.call')}
               >
                 <Phone size={10} />
               </a>
@@ -545,7 +549,7 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
                     ? 'bg-emerald-500 text-white'
                     : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700',
                 )}
-                title={phoneCopied ? 'Copied!' : 'Copy phone'}
+                title={phoneCopied ? t('callCenter.row.copied') : t('callCenter.row.copyPhone')}
               >
                 {phoneCopied ? <Check size={10} /> : <Copy size={10} />}
               </button>
@@ -558,7 +562,7 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
             className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-btn bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-sm transition hover:from-emerald-600 hover:to-emerald-700 hover:shadow-md"
-            title="Open WhatsApp"
+            title={t('callCenter.row.openWhatsapp')}
           >
             <MessageCircle size={16} strokeWidth={2.2} />
           </a>
@@ -587,9 +591,9 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
                     )}
                     title={
                       g.isDeleted
-                        ? 'Product was deleted from catalog — stock is not tracked. Ask an admin to import it again.'
+                        ? t('callCenter.row.deletedProductTooltip')
                         : g.unlinked
-                          ? 'Not in CRM catalog — stock is not tracked. Ask an admin to import this product.'
+                          ? t('callCenter.row.unlinkedProductTooltip')
                           : undefined
                     }
                   >
@@ -629,7 +633,7 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
               'text-sm font-bold',
               hasUnlinked ? 'text-red-600' : 'text-gray-900',
             )}
-            title={hasUnlinked ? 'Contains an unlinked product — stock untracked' : undefined}
+            title={hasUnlinked ? t('callCenter.row.unlinkedTooltip') : undefined}
           >
             {order.total.toLocaleString('fr-MA')}
           </p>
@@ -651,17 +655,17 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
               type="button"
               onClick={() => onOpenLogs(order, 'confirmation')}
               className="inline-flex h-5 w-5 items-center justify-center rounded-full text-gray-900 hover:bg-gray-100 hover:text-primary"
-              title="Confirmation history"
+              title={t('callCenter.row.confirmationHistory')}
             >
               <History size={11} />
             </button>
             {order.hasStockWarning && order.confirmationStatus === 'pending' && (
               <span
                 className="inline-flex items-center gap-1 rounded-badge border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
-                title="One of the variants on this order is short — confirming will fail until restocked."
+                title={t('callCenter.row.stockShortTooltip')}
               >
                 <AlertTriangle size={9} className="shrink-0" />
-                Stock short
+                {t('callCenter.row.stockShort').replace(/\.$/, '')}
               </span>
             )}
             <ShippingPill order={order} />
@@ -669,7 +673,7 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
               type="button"
               onClick={() => onOpenLogs(order, 'shipping')}
               className="inline-flex h-5 w-5 items-center justify-center rounded-full text-gray-900 hover:bg-gray-100 hover:text-primary"
-              title="Shipping history"
+              title={t('callCenter.row.shippingHistory')}
             >
               <History size={11} />
             </button>
@@ -697,7 +701,7 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
               openOrder(order);
             }}
             className="inline-flex h-7 w-7 items-center justify-center rounded-btn bg-primary text-white transition hover:bg-primary-dark"
-            title="Open action panel"
+            title={t('callCenter.row.openActionPanel')}
           >
             <Send size={13} />
           </button>
@@ -720,6 +724,7 @@ interface FilterPillsProps {
 }
 
 function FilterPills({ section, orders, selected, onChange }: FilterPillsProps) {
+  const { t } = useTranslation();
   const colors = section === 'confirmation' ? CONFIRMATION_STATUS_COLORS : SHIPPING_STATUS_COLORS;
 
   const counts = useMemo(() => {
@@ -754,7 +759,7 @@ function FilterPills({ section, orders, selected, onChange }: FilterPillsProps) 
             : 'bg-white/70 text-gray-600 hover:bg-white',
         )}
       >
-        All
+        {t('callCenter.all')}
         <span className="rounded-full bg-black/10 px-1.5 text-[10px] font-bold">
           {orders.length}
         </span>
@@ -775,7 +780,7 @@ function FilterPills({ section, orders, selected, onChange }: FilterPillsProps) 
                 ? cn(cfg.bg, cfg.text, 'ring-2 ring-primary/40 shadow-sm')
                 : cn(cfg.bg, cfg.text, 'opacity-70 hover:opacity-100'),
             )}
-            title={showTodayBadge ? `${callbackTodayCount} to call today` : undefined}
+            title={showTodayBadge ? t('callCenter.toCallToday', { count: callbackTodayCount }) : undefined}
           >
             <span className={cn('h-1.5 w-1.5 rounded-full', cfg.dot)} />
             {cfg.label}
@@ -784,7 +789,7 @@ function FilterPills({ section, orders, selected, onChange }: FilterPillsProps) 
             </span>
             {showTodayBadge && (
               <span className="callback-today-blink inline-flex items-center gap-0.5 rounded-full bg-sky-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
-                <Phone size={8} /> {callbackTodayCount} today
+                <Phone size={8} /> {t('callCenter.todayBadge', { count: callbackTodayCount })}
               </span>
             )}
           </button>
@@ -797,6 +802,7 @@ function FilterPills({ section, orders, selected, onChange }: FilterPillsProps) 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 export function CallCenterTable({ onCreate }: { onCreate?: () => void } = {}) {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const refreshKey = useCallCenterStore((s) => s.refreshKey);
   const triggerRefresh = useCallCenterStore((s) => s.triggerRefresh);
@@ -920,7 +926,7 @@ export function CallCenterTable({ onCreate }: { onCreate?: () => void } = {}) {
   if (loading) {
     return (
       <GlassCard padding="md" className="flex min-h-[200px] items-center justify-center">
-        <span className="text-sm text-gray-400">Loading your pipeline…</span>
+        <span className="text-sm text-gray-400">{t('callCenter.loadingPipeline')}</span>
       </GlassCard>
     );
   }
@@ -929,8 +935,8 @@ export function CallCenterTable({ onCreate }: { onCreate?: () => void } = {}) {
     return (
       <GlassCard padding="md" className="flex min-h-[200px] flex-col items-center justify-center gap-3">
         <Package size={28} className="text-gray-300" />
-        <p className="text-sm font-semibold text-gray-500">No orders assigned to you yet</p>
-        <p className="text-xs text-gray-400">New orders will appear here in real time.</p>
+        <p className="text-sm font-semibold text-gray-500">{t('callCenter.noOrdersAssigned')}</p>
+        <p className="text-xs text-gray-400">{t('callCenter.newOrdersAppear')}</p>
         {onCreate && (
           <CRMButton
             variant="primary"
@@ -938,7 +944,7 @@ export function CallCenterTable({ onCreate }: { onCreate?: () => void } = {}) {
             onClick={onCreate}
             className="mt-1"
           >
-            New order
+            {t('callCenter.newOrder')}
           </CRMButton>
         )}
       </GlassCard>
@@ -964,7 +970,7 @@ export function CallCenterTable({ onCreate }: { onCreate?: () => void } = {}) {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, phone, city, reference, or tracking…"
+            placeholder={t('callCenter.searchPlaceholder')}
             className="w-full bg-transparent text-sm text-gray-800 outline-none placeholder-gray-400"
           />
           {search && (
@@ -972,7 +978,7 @@ export function CallCenterTable({ onCreate }: { onCreate?: () => void } = {}) {
               type="button"
               onClick={() => setSearch('')}
               className="text-gray-400 hover:text-gray-600"
-              aria-label="Clear search"
+              aria-label={t('callCenter.clearSearch')}
             >
               <X size={13} />
             </button>
@@ -993,7 +999,7 @@ export function CallCenterTable({ onCreate }: { onCreate?: () => void } = {}) {
                   : 'text-gray-500 hover:text-gray-700',
               )}
             >
-              {key === 'confirmation' ? 'Confirmation' : 'Shipping'}
+              {key === 'confirmation' ? t('callCenter.tabConfirmation') : t('callCenter.tabShipping')}
               <span
                 className={cn(
                   'ml-2 rounded-full px-1.5 py-0.5 text-[10px] font-bold',
@@ -1022,7 +1028,7 @@ export function CallCenterTable({ onCreate }: { onCreate?: () => void } = {}) {
               onClick={onCreate}
               className="w-full shrink-0 sm:w-auto"
             >
-              New order
+              {t('callCenter.newOrder')}
             </CRMButton>
           )}
         </div>
@@ -1030,8 +1036,8 @@ export function CallCenterTable({ onCreate }: { onCreate?: () => void } = {}) {
         {visible.length === 0 ? (
           <div className="py-6 text-center text-xs text-gray-400">
             {activeTab === 'shipping' && shippingOrders.length === 0
-              ? 'No orders exported to Coliix yet. Confirmed orders will appear here once their shipping label is sent.'
-              : 'No orders match this filter'}
+              ? t('callCenter.noShippingYet')
+              : t('callCenter.noOrdersMatch')}
           </div>
         ) : (
           <div className="flex flex-col gap-2.5 md:gap-1.5">

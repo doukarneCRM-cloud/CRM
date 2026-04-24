@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { Search, UserCheck, AlertTriangle } from 'lucide-react';
 import { GlassModal } from '@/components/ui/GlassModal';
 import { CRMButton } from '@/components/ui/CRMButton';
@@ -36,6 +37,7 @@ export function AgentPickerModal({
   orderSummaries,
   onSuccess,
 }: AgentPickerModalProps) {
+  const { t } = useTranslation();
   const [agents, setAgents] = useState<AgentOption[]>([]);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
@@ -145,8 +147,10 @@ export function AgentPickerModal({
       onClose={onClose}
       title={
         step === 'confirm-reassign'
-          ? 'Confirm reassignment'
-          : `Assign Agent${count > 1 ? ` (${count} orders)` : ''}`
+          ? t('orders.agentPicker.confirmReassign')
+          : count > 1
+            ? t('orders.agentPicker.titleBulk', { count })
+            : t('orders.agentPicker.titleSingle')
       }
       size="sm"
     >
@@ -159,7 +163,7 @@ export function AgentPickerModal({
               autoFocus
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search agent..."
+              placeholder={t('orders.agentPicker.searchPlaceholder')}
               className="w-full bg-transparent text-sm text-gray-700 outline-none placeholder-gray-400"
             />
           </div>
@@ -179,7 +183,7 @@ export function AgentPickerModal({
                 ))}
               </div>
             ) : filtered.length === 0 ? (
-              <div className="py-8 text-center text-sm text-gray-400">No agents found</div>
+              <div className="py-8 text-center text-sm text-gray-400">{t('orders.agentPicker.noAgentsFound')}</div>
             ) : (
               <ul>
                 {filtered.map((agent) => (
@@ -211,16 +215,17 @@ export function AgentPickerModal({
               <AlertTriangle size={14} className="mt-0.5 shrink-0" />
               <p>
                 {unassignedIds.length > 0 ? (
-                  <>
-                    <b>{unassignedIds.length}</b> unassigned will be assigned.{' '}
-                    <b>{alreadyAssigned.length}</b> are already assigned — you'll pick which to
-                    reassign on the next step.
-                  </>
+                  <Trans
+                    i18nKey="orders.agentPicker.splitHintMixed"
+                    values={{ unassigned: unassignedIds.length, alreadyAssigned: alreadyAssigned.length }}
+                    components={{ b: <b /> }}
+                  />
                 ) : (
-                  <>
-                    All <b>{alreadyAssigned.length}</b> selected orders are already assigned —
-                    you'll confirm reassignment on the next step.
-                  </>
+                  <Trans
+                    i18nKey="orders.agentPicker.splitHintAllAssigned"
+                    values={{ count: alreadyAssigned.length }}
+                    components={{ b: <b /> }}
+                  />
                 )}
               </p>
             </div>
@@ -229,7 +234,7 @@ export function AgentPickerModal({
           {/* Actions */}
           <div className="mt-4 flex gap-2">
             <CRMButton variant="secondary" className="flex-1" onClick={onClose}>
-              Cancel
+              {t('common.cancel')}
             </CRMButton>
             <CRMButton
               variant="primary"
@@ -238,7 +243,7 @@ export function AgentPickerModal({
               loading={submitting}
               onClick={handleAssignClick}
             >
-              {alreadyAssigned.length > 0 ? 'Next' : 'Assign'}
+              {alreadyAssigned.length > 0 ? t('orders.agentPicker.next') : t('orders.agentPicker.assign')}
             </CRMButton>
           </div>
         </>
@@ -249,31 +254,39 @@ export function AgentPickerModal({
           <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-800">
             {unassignedIds.length > 0 && (
               <p className="mb-1">
-                <b>{unassignedIds.length}</b> unassigned order{unassignedIds.length === 1 ? '' : 's'} will
-                be assigned to{' '}
-                <b>{selectedAgent?.name ?? 'the selected agent'}</b>.
+                <Trans
+                  i18nKey="orders.agentPicker.reassignUnassignedLine"
+                  values={{
+                    count: unassignedIds.length,
+                    agent: selectedAgent?.name ?? t('orders.agentPicker.theSelectedAgent'),
+                  }}
+                  components={{ b: <b /> }}
+                />
               </p>
             )}
             <p>
-              The following <b>{alreadyAssigned.length}</b> already have an agent. Tick the ones you
-              really want to reassign.
+              <Trans
+                i18nKey="orders.agentPicker.reassignTickHint"
+                values={{ count: alreadyAssigned.length }}
+                components={{ b: <b /> }}
+              />
             </p>
           </div>
 
           <div className="mb-2 flex items-center justify-between px-1 text-xs font-medium text-gray-500">
-            <span>Already assigned</span>
+            <span>{t('orders.agentPicker.alreadyAssigned')}</span>
             <div className="flex gap-3">
               <button
                 className="text-primary hover:underline"
                 onClick={() => toggleAllReassign(true)}
               >
-                Select all
+                {t('orders.agentPicker.selectAll')}
               </button>
               <button
                 className="text-gray-500 hover:underline"
                 onClick={() => toggleAllReassign(false)}
               >
-                Clear
+                {t('orders.agentPicker.clear')}
               </button>
             </div>
           </div>
@@ -299,7 +312,11 @@ export function AgentPickerModal({
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-gray-900">#{o.reference}</p>
                       <p className="truncate text-[11px] text-gray-500">
-                        Currently assigned to <b>{o.agentName}</b>
+                        <Trans
+                          i18nKey="orders.agentPicker.currentlyAssignedTo"
+                          values={{ agent: o.agentName ?? '' }}
+                          components={{ b: <b /> }}
+                        />
                       </p>
                     </div>
                   </label>
@@ -310,7 +327,7 @@ export function AgentPickerModal({
 
           <div className="mt-4 flex gap-2">
             <CRMButton variant="secondary" className="flex-1" onClick={() => setStep('pick')}>
-              Back
+              {t('common.back')}
             </CRMButton>
             <CRMButton
               variant="primary"
@@ -319,7 +336,7 @@ export function AgentPickerModal({
               disabled={totalToAssign === 0}
               onClick={handleConfirmReassign}
             >
-              Assign {totalToAssign} order{totalToAssign === 1 ? '' : 's'}
+              {t('orders.agentPicker.assignCount', { count: totalToAssign })}
             </CRMButton>
           </div>
         </>

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Phone, MapPin, ShoppingBag, ChevronRight, Tag,
 } from 'lucide-react';
@@ -9,10 +10,10 @@ import type { CustomerDetail, Order, Pagination } from '@/types/orders';
 import { cn } from '@/lib/cn';
 import { formatDateShort } from '@/lib/orderFormat';
 
-const TAG_CONFIG = {
-  normal: { label: 'Normal', bg: 'bg-gray-100', text: 'text-gray-600' },
-  vip: { label: 'VIP', bg: 'bg-amber-100', text: 'text-amber-700' },
-  blacklisted: { label: 'Blacklisted', bg: 'bg-red-100', text: 'text-red-700' },
+const TAG_STYLE = {
+  normal: { bg: 'bg-gray-100', text: 'text-gray-600' },
+  vip: { bg: 'bg-amber-100', text: 'text-amber-700' },
+  blacklisted: { bg: 'bg-red-100', text: 'text-red-700' },
 };
 
 // ─── Stats row ────────────────────────────────────────────────────────────────
@@ -62,6 +63,7 @@ interface CustomerHistoryModalProps {
 }
 
 export function CustomerHistoryModal({ customerId, onClose }: CustomerHistoryModalProps) {
+  const { t } = useTranslation();
   const [customer, setCustomer] = useState<CustomerDetail | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
@@ -99,7 +101,10 @@ export function CustomerHistoryModal({ customerId, onClose }: CustomerHistoryMod
     }
   }, [customerId]);
 
-  const tagConfig = customer ? TAG_CONFIG[customer.tag] : TAG_CONFIG.normal;
+  const tagConfig = customer ? TAG_STYLE[customer.tag] : TAG_STYLE.normal;
+  const tagLabel = customer
+    ? t(`orders.customerHistory.tag${customer.tag.charAt(0).toUpperCase()}${customer.tag.slice(1)}` as const)
+    : t('orders.customerHistory.tagNormal');
 
   // Compute quick stats from visible orders (simplified)
   const delivered = orders.filter((o) => o.shippingStatus === 'delivered').length;
@@ -110,7 +115,7 @@ export function CustomerHistoryModal({ customerId, onClose }: CustomerHistoryMod
     <GlassModal
       open={!!customerId}
       onClose={onClose}
-      title="Customer History"
+      title={t('orders.customerHistory.title')}
       size="lg"
     >
       {loading && !customer ? (
@@ -132,7 +137,7 @@ export function CustomerHistoryModal({ customerId, onClose }: CustomerHistoryMod
                 <h3 className="text-base font-bold text-gray-900">{customer.fullName}</h3>
                 <span className={cn('rounded-badge px-2.5 py-0.5 text-[11px] font-semibold', tagConfig.bg, tagConfig.text)}>
                   <Tag size={9} className="mr-1 inline-block" />
-                  {tagConfig.label}
+                  {tagLabel}
                 </span>
               </div>
               <div className="mt-1 flex items-center gap-3 text-xs text-gray-400">
@@ -150,11 +155,11 @@ export function CustomerHistoryModal({ customerId, onClose }: CustomerHistoryMod
 
           {/* Stats */}
           <div className="mb-4 grid grid-cols-4 gap-3">
-            <StatBox label="Total Orders" value={total} />
-            <StatBox label="Delivered" value={delivered} color="text-green-600" />
-            <StatBox label="Cancelled" value={cancelled} color="text-red-600" />
+            <StatBox label={t('orders.customerHistory.totalOrders')} value={total} />
+            <StatBox label={t('orders.customerHistory.delivered')} value={delivered} color="text-green-600" />
+            <StatBox label={t('orders.customerHistory.cancelled')} value={cancelled} color="text-red-600" />
             <StatBox
-              label="Return Rate"
+              label={t('orders.customerHistory.returnRate')}
               value={delivered > 0 ? Math.round((orders.filter((o) => o.shippingStatus === 'returned').length / delivered) * 100) : 0}
               color="text-orange-600"
             />
@@ -165,7 +170,7 @@ export function CustomerHistoryModal({ customerId, onClose }: CustomerHistoryMod
             {orders.length === 0 ? (
               <div className="py-8 text-center text-sm text-gray-400">
                 <ShoppingBag size={32} className="mx-auto mb-2 text-gray-200" />
-                No orders yet
+                {t('orders.customerHistory.noOrdersYet')}
               </div>
             ) : (
               <>
@@ -181,7 +186,7 @@ export function CustomerHistoryModal({ customerId, onClose }: CustomerHistoryMod
                       onClick={() => setPage((p) => p - 1)}
                       className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:border-primary hover:text-primary disabled:opacity-40"
                     >
-                      Previous
+                      {t('common.previous')}
                     </button>
                     <span className="text-xs text-gray-400">
                       {page} / {pagination.totalPages}
@@ -191,7 +196,7 @@ export function CustomerHistoryModal({ customerId, onClose }: CustomerHistoryMod
                       onClick={() => setPage((p) => p + 1)}
                       className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:border-primary hover:text-primary disabled:opacity-40"
                     >
-                      Next
+                      {t('common.next')}
                     </button>
                   </div>
                 )}

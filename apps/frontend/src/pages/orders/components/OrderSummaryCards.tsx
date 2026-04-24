@@ -1,4 +1,5 @@
 import { useEffect, useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Clock, CheckCircle, Truck, PackageCheck, DollarSign,
 } from 'lucide-react';
@@ -80,6 +81,7 @@ interface OrderSummaryCardsProps {
 }
 
 export function OrderSummaryCards({ className }: OrderSummaryCardsProps) {
+  const { t } = useTranslation();
   const filters = useFilterStore();
   const [summary, setSummary] = useState<OrdersSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -149,7 +151,7 @@ export function OrderSummaryCards({ className }: OrderSummaryCardsProps) {
     <div className={cn('grid grid-cols-2 gap-4 lg:grid-cols-5', className)}>
       {/* 1 — Pending */}
       <SummaryCard
-        title="Pending"
+        title={t('orders.summary.pending')}
         value={s.pending.total}
         icon={Clock}
         iconBg="bg-indigo-50"
@@ -157,11 +159,11 @@ export function OrderSummaryCards({ className }: OrderSummaryCardsProps) {
         subtitle={
           <div className="flex items-center gap-3">
             <span className="text-gray-500">
-              <span className="font-semibold text-gray-700">{s.pending.assigned}</span> assigned
+              {t('orders.summary.assigned', { count: s.pending.assigned })}
             </span>
             {s.pending.unassigned > 0 && (
               <span className="rounded-badge bg-orange-100 px-2 py-0.5 font-semibold text-orange-700">
-                {s.pending.unassigned} free
+                {t('orders.summary.free', { count: s.pending.unassigned })}
               </span>
             )}
           </div>
@@ -170,47 +172,47 @@ export function OrderSummaryCards({ className }: OrderSummaryCardsProps) {
 
       {/* 2 — Confirmed */}
       <SummaryCard
-        title="Confirmed"
+        title={t('orders.summary.confirmed')}
         value={s.confirmed.total}
         icon={CheckCircle}
         iconBg="bg-green-50"
         iconColor="text-green-600"
         valueColor="text-green-700"
-        subtitle={<span className="text-gray-400">Ready for shipping</span>}
+        subtitle={<span className="text-gray-400">{t('orders.summary.readyForShipping')}</span>}
       />
 
       {/* 3 — Out for Delivery */}
       <SummaryCard
-        title="Out for Delivery"
+        title={t('orders.summary.outForDelivery')}
         value={s.outForDelivery.total}
         icon={Truck}
         iconBg="bg-blue-50"
         iconColor="text-blue-600"
         valueColor="text-blue-700"
-        subtitle={<span className="text-gray-400">In transit today</span>}
+        subtitle={<span className="text-gray-400">{t('orders.summary.inTransitToday')}</span>}
       />
 
       {/* 4 — Delivered */}
       <SummaryCard
-        title="Delivered"
+        title={t('orders.summary.delivered')}
         value={s.delivered.total}
         icon={PackageCheck}
         iconBg="bg-emerald-50"
         iconColor="text-emerald-600"
         valueColor="text-emerald-700"
-        subtitle={<span className="text-gray-400">Successfully delivered</span>}
+        subtitle={<span className="text-gray-400">{t('orders.summary.successfullyDelivered')}</span>}
       />
 
       {/* 5 — Revenue */}
       <SummaryCard
-        title="Revenue"
+        title={t('orders.summary.revenue')}
         value={s.delivered.revenue}
         unit="MAD"
         icon={DollarSign}
         iconBg="bg-amber-50"
         iconColor="text-amber-600"
         valueColor="text-amber-700"
-        subtitle={<span className="text-gray-400">From delivered orders</span>}
+        subtitle={<span className="text-gray-400">{t('orders.summary.fromDelivered')}</span>}
       />
     </div>
   );

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import {
@@ -138,6 +139,7 @@ interface FormState {
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 export function CallCenterOrderModal() {
+  const { t } = useTranslation();
   const selectedOrder = useCallCenterStore((s) => s.selectedOrder);
   const closeOrder = useCallCenterStore((s) => s.closeOrder);
   const triggerRefresh = useCallCenterStore((s) => s.triggerRefresh);
@@ -286,42 +288,44 @@ export function CallCenterOrderModal() {
   // callback, unreachable, fake, or no-stock. This lets the agent record the
   // outcome without first chasing a complete profile.
   const baseReadiness = useMemo(() => {
-    if (!form || !order) return { ok: false, reasons: ['Loading…'] };
+    if (!form || !order) return { ok: false, reasons: [t('callCenter.modal.reasons.loading')] };
     const reasons: string[] = [];
-    if (!form.customerName.trim()) reasons.push('Customer name is required.');
-    if (phoneValid === false) reasons.push('Customer phone is not a valid Moroccan mobile.');
-    if (items.length === 0) reasons.push('Order must contain at least one product.');
+    if (!form.customerName.trim()) reasons.push(t('callCenter.modal.reasons.customerNameRequired'));
+    if (phoneValid === false) reasons.push(t('callCenter.modal.reasons.phoneInvalid'));
+    if (items.length === 0) reasons.push(t('callCenter.modal.reasons.atLeastOneProduct'));
     for (const it of items) {
       if (!it.variantId) {
-        reasons.push('Every product must have a selected variant.');
+        reasons.push(t('callCenter.modal.reasons.variantRequired'));
         break;
       }
       if (it.quantity < 1) {
-        reasons.push('Every product must have quantity ≥ 1.');
+        reasons.push(t('callCenter.modal.reasons.quantityRequired'));
         break;
       }
     }
     return { ok: reasons.length === 0, reasons };
-  }, [form, order, items, phoneValid]);
+  }, [form, order, items, phoneValid, t]);
 
   // Stricter check for the "Confirm" transition — once an order is confirmed
   // it goes to shipping, so we must have a deliverable address, a valid
   // shipping city, and enough stock for every line.
   const confirmReadiness = useMemo(() => {
     if (!baseReadiness.ok) return baseReadiness;
-    if (!form || !order) return { ok: false, reasons: ['Loading…'] };
+    if (!form || !order) return { ok: false, reasons: [t('callCenter.modal.reasons.loading')] };
     const reasons: string[] = [];
-    if (!form.customerCity.trim()) reasons.push('Customer city is required to confirm.');
-    if (!form.customerAddress.trim()) reasons.push('Customer address is required to confirm.');
-    if (cityValid === false) reasons.push('Customer city is not in the shipping list.');
+    if (!form.customerCity.trim()) reasons.push(t('callCenter.modal.reasons.cityRequired'));
+    if (!form.customerAddress.trim()) reasons.push(t('callCenter.modal.reasons.addressRequired'));
+    if (cityValid === false) reasons.push(t('callCenter.modal.reasons.cityNotInShipping'));
     for (const it of items) {
       if (it.stock < it.quantity) {
-        reasons.push(`"${products.find((p) => p.id === it.productId)?.name ?? 'Product'}" is out of stock.`);
+        reasons.push(t('callCenter.modal.reasons.outOfStockProduct', {
+          product: products.find((p) => p.id === it.productId)?.name ?? t('callCenter.modal.reasons.product'),
+        }));
         break;
       }
     }
     return { ok: reasons.length === 0, reasons };
-  }, [baseReadiness, form, order, items, cityValid, products]);
+  }, [baseReadiness, form, order, items, cityValid, products, t]);
 
   const readinessFor = (action: typeof pendingAction) =>
     action === 'confirm' ? confirmReadiness : baseReadiness;
@@ -428,7 +432,7 @@ export function CallCenterOrderModal() {
   const handleSave = async () => {
     if (!order || !form) return;
     if (items.length === 0) {
-      setError('Order must contain at least one product');
+      setError(t('callCenter.modal.atLeastOneProduct'));
       return;
     }
     setSaving(true);
@@ -438,7 +442,7 @@ export function CallCenterOrderModal() {
       triggerRefresh();
       closeOrder();
     } catch (e) {
-      setError(apiErrorMessage(e, 'Failed to save'));
+      setError(apiErrorMessage(e, t('callCenter.modal.failedToSave')));
     } finally {
       setSaving(false);
     }
@@ -466,7 +470,7 @@ export function CallCenterOrderModal() {
       triggerRefresh();
       closeOrder();
     } catch (e) {
-      setError(apiErrorMessage(e, 'Failed to update status'));
+      setError(apiErrorMessage(e, t('callCenter.modal.failedToUpdateStatus')));
     } finally {
       setStatusBusy(false);
     }
@@ -483,7 +487,7 @@ export function CallCenterOrderModal() {
     if (action === 'cancel') {
       // Cancellation reason now reuses the confirmation note — bail if empty.
       if (!form.confirmationNote.trim()) {
-        setError('Write the cancellation reason in the note field below.');
+        setError(t('callCenter.modal.reasons.writeCancelReason'));
         return;
       }
     }
@@ -495,7 +499,7 @@ export function CallCenterOrderModal() {
     if (!pendingAction) return;
     if (pendingAction === 'callback') {
       if (!callbackAt) {
-        setError('Pick a callback date & time.');
+        setError(t('callCenter.modal.reasons.pickCallback'));
         return;
       }
       runStatusUpdate({
@@ -529,18 +533,18 @@ export function CallCenterOrderModal() {
 
   const phoneDigits = (form?.customerPhone ?? order.customer.phoneDisplay).replace(/\D/g, '');
   const tagBadge = {
-    normal: { label: 'Normal', className: 'bg-gray-100 text-gray-600' },
-    vip: { label: 'VIP', className: 'bg-amber-100 text-amber-700' },
-    blacklisted: { label: 'Blacklisted', className: 'bg-red-100 text-red-700' },
+    normal: { label: t('callCenter.modal.tagNormal'), className: 'bg-gray-100 text-gray-600' },
+    vip: { label: t('callCenter.modal.tagVip'), className: 'bg-amber-100 text-amber-700' },
+    blacklisted: { label: t('callCenter.modal.tagBlacklisted'), className: 'bg-red-100 text-red-700' },
   }[order.customer.tag];
 
   const pendingCopy: Record<NonNullable<typeof pendingAction>, { title: string; variant: 'primary' | 'danger' }> = {
-    confirm: { title: 'Confirm this order?', variant: 'primary' },
-    cancel: { title: 'Cancel this order?', variant: 'danger' },
-    callback: { title: 'Schedule callback?', variant: 'primary' },
-    unreachable: { title: 'Mark as unreachable?', variant: 'primary' },
-    fake: { title: 'Mark as fake order?', variant: 'danger' },
-    'no-stock': { title: 'Mark as out of stock?', variant: 'primary' },
+    confirm: { title: t('callCenter.modal.pending.confirm'), variant: 'primary' },
+    cancel: { title: t('callCenter.modal.pending.cancel'), variant: 'danger' },
+    callback: { title: t('callCenter.modal.pending.callback'), variant: 'primary' },
+    unreachable: { title: t('callCenter.modal.pending.unreachable'), variant: 'primary' },
+    fake: { title: t('callCenter.modal.pending.fake'), variant: 'danger' },
+    'no-stock': { title: t('callCenter.modal.pending.noStock'), variant: 'primary' },
   };
 
   return (
@@ -552,11 +556,11 @@ export function CallCenterOrderModal() {
       footer={
         <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
           <p className="order-2 text-[11px] text-gray-400 sm:order-1">
-            {dirty ? 'You have unsaved changes' : 'No pending changes'}
+            {dirty ? t('callCenter.modal.unsavedChanges') : t('callCenter.modal.noPendingChanges')}
           </p>
           <div className="order-1 ml-auto flex items-center gap-2 sm:order-2 sm:ml-0">
             <CRMButton variant="ghost" size="sm" onClick={closeOrder} disabled={saving}>
-              Close
+              {t('common.close')}
             </CRMButton>
             {dirty && (
               <CRMButton
@@ -566,7 +570,7 @@ export function CallCenterOrderModal() {
                 onClick={handleSave}
                 loading={saving}
               >
-                Save changes
+                {t('callCenter.modal.saveChanges')}
               </CRMButton>
             )}
           </div>
@@ -583,12 +587,12 @@ export function CallCenterOrderModal() {
           </span>
           {order.unreachableCount > 0 && (
             <span className="inline-flex items-center gap-1 rounded-badge bg-red-500/90 px-2 py-0.5 text-[10px] font-semibold text-white">
-              <PhoneOff size={10} /> Unreachable ×{order.unreachableCount}
+              <PhoneOff size={10} /> {t('callCenter.modal.unreachableBadge', { count: order.unreachableCount })}
             </span>
           )}
           {isLocked && (
             <span className="inline-flex items-center gap-1 rounded-badge bg-gray-200 px-2 py-0.5 text-[10px] font-semibold text-gray-600">
-              <Lock size={10} /> Locked — shipped
+              <Lock size={10} /> {t('callCenter.modal.lockedShipped')}
             </span>
           )}
         </div>
@@ -602,9 +606,11 @@ export function CallCenterOrderModal() {
           <div className="flex items-start gap-2 rounded-card border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
             <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-600" />
             <p className="leading-snug">
-              <span className="font-semibold">Stock short on this order.</span>{' '}
-              One of the variants is below the requested quantity — confirming
-              will fail. Restock first, or pick <span className="font-semibold">No stock</span> from the status menu.
+              <span className="font-semibold">{t('callCenter.modal.stockShortTitle')}</span>{' '}
+              <Trans
+                i18nKey="callCenter.modal.stockShortBody"
+                components={{ b: <span className="font-semibold" /> }}
+              />
             </p>
           </div>
         )}
@@ -616,26 +622,26 @@ export function CallCenterOrderModal() {
             {/* Customer */}
             <div className="rounded-card border border-gray-100 bg-white/60 p-3">
               <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-primary">
-                Customer
+                {t('callCenter.modal.customer')}
               </h3>
               <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start">
                 {/* Fields — stack vertically so values stay readable even when the
                     modal splits into two columns and the QR sits alongside. */}
                 <div className="flex min-w-0 flex-1 flex-col gap-2">
                   <CRMInput
-                    label="Name *"
+                    label={t('callCenter.modal.name')}
                     value={form.customerName}
                     onChange={(e) => patch({ customerName: e.target.value })}
                   />
                   <div className="flex flex-col gap-1">
-                    <label className="text-[11px] font-medium text-gray-600">Phone *</label>
+                    <label className="text-[11px] font-medium text-gray-600">{t('callCenter.modal.phone')}</label>
                     <div className="flex items-center gap-1">
                       <input
                         type="tel"
                         inputMode="tel"
                         value={form.customerPhone}
                         onChange={(e) => patch({ customerPhone: e.target.value })}
-                        placeholder="06xxxxxxxx"
+                        placeholder={t('callCenter.modal.phonePlaceholder')}
                         className={cn(
                           'h-8 flex-1 min-w-0 rounded-input border px-2 font-mono text-[12px] focus:outline-none focus:ring-2',
                           phoneValid === false
@@ -646,7 +652,7 @@ export function CallCenterOrderModal() {
                       <a
                         href={`tel:${phoneDigits}`}
                         className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-btn bg-primary text-white hover:bg-primary-dark"
-                        title="Call"
+                        title={t('callCenter.modal.call')}
                       >
                         <Phone size={12} />
                       </a>
@@ -669,22 +675,22 @@ export function CallCenterOrderModal() {
                             ? 'bg-emerald-500 text-white'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800',
                         )}
-                        title={phoneCopied ? 'Copied!' : 'Copy phone number'}
+                        title={phoneCopied ? t('callCenter.modal.copied') : t('callCenter.modal.copyPhone')}
                       >
                         {phoneCopied ? <Check size={12} /> : <Copy size={12} />}
                       </button>
                     </div>
                   </div>
                   <CRMSelect
-                    label="City *"
+                    label={t('callCenter.modal.city')}
                     options={cities.map((c) => ({ value: c.name, label: c.name }))}
                     value={form.customerCity}
                     onChange={(v) => patch({ customerCity: v as string })}
                     searchable
-                    placeholder="Select a city"
+                    placeholder={t('callCenter.modal.selectCity')}
                   />
                   <CRMInput
-                    label="Address *"
+                    label={t('callCenter.modal.address')}
                     value={form.customerAddress}
                     onChange={(e) => patch({ customerAddress: e.target.value })}
                   />
@@ -700,11 +706,11 @@ export function CallCenterOrderModal() {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="group flex flex-1 flex-col items-center justify-center gap-1 rounded-btn bg-gradient-to-br from-emerald-500 to-emerald-600 px-3 py-2 text-white shadow-sm transition hover:from-emerald-600 hover:to-emerald-700 hover:shadow-md sm:flex-initial sm:py-3"
-                      title="Open WhatsApp chat"
+                      title={t('callCenter.modal.openWhatsapp')}
                     >
                       <MessageCircle size={32} strokeWidth={2.2} className="transition group-hover:scale-110" />
                       <span className="text-[9px] font-bold uppercase tracking-wider">
-                        WhatsApp
+                        {t('callCenter.modal.whatsapp')}
                       </span>
                     </a>
                     <div className="flex flex-1 flex-col items-center justify-center gap-1 rounded-btn border border-primary/10 bg-gradient-to-br from-white to-accent/30 p-2 sm:flex-initial">
@@ -718,7 +724,7 @@ export function CallCenterOrderModal() {
                         />
                       </div>
                       <span className="text-center text-[9px] font-bold uppercase tracking-wider text-gray-500">
-                        Scan to call
+                        {t('callCenter.modal.scanToCall')}
                       </span>
                     </div>
                   </div>
@@ -728,9 +734,9 @@ export function CallCenterOrderModal() {
                 <div className="mt-2 flex items-start gap-1.5 rounded-btn bg-amber-50 px-2 py-1 text-[11px] text-amber-700">
                   <AlertTriangle size={11} className="mt-0.5 shrink-0" />
                   <div>
-                    {cityValid === false && <div>City not in Coliix list — fix before confirming.</div>}
+                    {cityValid === false && <div>{t('callCenter.modal.cityNotInColiix')}</div>}
                     {phoneValid === false && (
-                      <div>Invalid Moroccan mobile — expected 10 digits starting with 05 / 06 / 07.</div>
+                      <div>{t('callCenter.modal.invalidMoroccanMobile')}</div>
                     )}
                   </div>
                 </div>
@@ -741,23 +747,23 @@ export function CallCenterOrderModal() {
             <div className="rounded-card border border-gray-100 bg-white/60 p-3">
               <div className="mb-2 flex items-center justify-between">
                 <h3 className="text-[10px] font-bold uppercase tracking-wider text-primary">
-                  Products
+                  {t('callCenter.modal.products')}
                 </h3>
                 {isLocked ? (
                   <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-500">
-                    <Lock size={10} /> Locked
+                    <Lock size={10} /> {t('callCenter.modal.locked')}
                   </span>
                 ) : (
                   <span className="rounded-badge bg-accent/50 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                    {items.length} {items.length === 1 ? 'item' : 'items'}
+                    {t('callCenter.modal.itemCount', { count: items.length })}
                   </span>
                 )}
               </div>
 
               {products.length === 0 ? (
-                <p className="text-[11px] text-gray-400">Loading catalogue…</p>
+                <p className="text-[11px] text-gray-400">{t('callCenter.modal.loadingCatalogue')}</p>
               ) : items.length === 0 ? (
-                <p className="text-[11px] text-gray-400">No products on this order.</p>
+                <p className="text-[11px] text-gray-400">{t('callCenter.modal.noProductsOnOrder')}</p>
               ) : (
                 <div className="flex flex-col gap-1.5">
                   {items.map((it) => {
@@ -774,7 +780,7 @@ export function CallCenterOrderModal() {
                             value={it.productId}
                             onChange={(v) => handleProductChange(it.key, v as string)}
                             searchable
-                            placeholder="Select product"
+                            placeholder={t('callCenter.modal.selectProduct')}
                             disabled={isLocked}
                           />
                         </div>
@@ -784,14 +790,14 @@ export function CallCenterOrderModal() {
                             options={colorOpts}
                             value={it.color ?? ''}
                             onChange={(v) => handleColorChange(it.key, v as string)}
-                            placeholder={colorOpts.length === 0 ? '—' : 'Color'}
+                            placeholder={colorOpts.length === 0 ? '—' : t('callCenter.modal.color')}
                             disabled={isLocked || colorOpts.length === 0}
                           />
                           <CRMSelect
                             options={sizeOpts}
                             value={it.size ?? ''}
                             onChange={(v) => handleSizeChange(it.key, v as string)}
-                            placeholder={sizeOpts.length === 0 ? '—' : 'Size'}
+                            placeholder={sizeOpts.length === 0 ? '—' : t('callCenter.modal.size')}
                             disabled={isLocked || sizeOpts.length === 0}
                           />
                         </div>
@@ -805,7 +811,7 @@ export function CallCenterOrderModal() {
                                 updateItem(it.key, { quantity: Math.max(1, it.quantity - 1) })
                               }
                               className="inline-flex h-8 w-8 items-center justify-center rounded-btn border border-gray-200 bg-white text-[14px] font-bold text-gray-500 hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
-                              title="Decrease"
+                              title={t('callCenter.modal.decrease')}
                             >
                               −
                             </button>
@@ -831,7 +837,7 @@ export function CallCenterOrderModal() {
                                 })
                               }
                               className="inline-flex h-8 w-8 items-center justify-center rounded-btn border border-gray-200 bg-white text-[14px] font-bold text-gray-500 hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
-                              title="Increase"
+                              title={t('callCenter.modal.increase')}
                             >
                               +
                             </button>
@@ -841,7 +847,7 @@ export function CallCenterOrderModal() {
                               type="button"
                               onClick={() => removeItem(it.key)}
                               className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-btn text-red-400 hover:bg-red-50 hover:text-red-600"
-                              title="Remove"
+                              title={t('callCenter.modal.remove')}
                             >
                               <Trash2 size={13} />
                             </button>
@@ -850,7 +856,7 @@ export function CallCenterOrderModal() {
                         {/* Footer — stock + subtotal */}
                         <div className="mt-1.5 flex items-center justify-between text-[10px]">
                           <span className={cn('font-semibold', stockTone(it.stock))}>
-                            {it.stock === 0 ? 'Out of stock' : `${it.stock} in stock`}
+                            {it.stock === 0 ? t('callCenter.modal.outOfStock') : t('callCenter.modal.inStock', { count: it.stock })}
                           </span>
                           <span className="text-gray-500">
                             {it.unitPrice.toLocaleString('fr-MA')} MAD ·{' '}
@@ -871,7 +877,7 @@ export function CallCenterOrderModal() {
                   onClick={addItem}
                   className="mt-1.5 flex w-full items-center justify-center gap-1 rounded-btn border border-dashed border-gray-200 py-1.5 text-[11px] text-gray-400 hover:border-primary hover:text-primary"
                 >
-                  <Plus size={12} /> Add product
+                  <Plus size={12} /> {t('callCenter.modal.addProduct')}
                 </button>
               )}
             </div>
@@ -882,31 +888,31 @@ export function CallCenterOrderModal() {
             {/* Pricing summary */}
             <div className="rounded-card border border-gray-100 bg-accent/30 p-3">
               <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-primary">
-                Pricing
+                {t('callCenter.modal.pricing')}
               </h3>
               <div className="grid grid-cols-2 gap-1.5 text-[11px]">
                 <div>
-                  <label className="block text-[10px] font-medium text-gray-600">Discount type</label>
+                  <label className="block text-[10px] font-medium text-gray-600">{t('callCenter.modal.discountType')}</label>
                   <div className="mt-0.5 flex rounded-input border border-gray-200 bg-white p-0.5">
-                    {(['', 'fixed', 'percentage'] as const).map((t) => (
+                    {(['', 'fixed', 'percentage'] as const).map((dt) => (
                       <button
-                        key={t}
+                        key={dt}
                         type="button"
-                        onClick={() => patch({ discountType: t })}
+                        onClick={() => patch({ discountType: dt })}
                         className={cn(
                           'flex-1 rounded-btn py-1 text-[10px] font-medium transition',
-                          form.discountType === t
+                          form.discountType === dt
                             ? 'bg-primary text-white shadow-sm'
                             : 'text-gray-500 hover:text-gray-700',
                         )}
                       >
-                        {t === '' ? 'None' : t === 'fixed' ? 'MAD' : '%'}
+                        {dt === '' ? t('callCenter.modal.none') : dt === 'fixed' ? 'MAD' : '%'}
                       </button>
                     ))}
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-medium text-gray-600">Amount</label>
+                  <label className="block text-[10px] font-medium text-gray-600">{t('callCenter.modal.discountAmount')}</label>
                   <input
                     type="number"
                     min={0}
@@ -919,12 +925,12 @@ export function CallCenterOrderModal() {
               </div>
               <div className="mt-2 flex items-end justify-between border-t border-primary/10 pt-2 text-[11px]">
                 <div className="flex flex-col text-gray-500">
-                  <span>Subtotal: <b className="text-gray-800">{totals.subtotal.toLocaleString('fr-MA')} MAD</b></span>
-                  <span>Discount: <b className="text-gray-800">{totals.discount.toLocaleString('fr-MA')} MAD</b></span>
-                  <span>Shipping: <b className="text-gray-800">{order.shippingPrice.toLocaleString('fr-MA')} MAD</b></span>
+                  <span>{t('callCenter.modal.subtotal')} <b className="text-gray-800">{totals.subtotal.toLocaleString('fr-MA')} MAD</b></span>
+                  <span>{t('callCenter.modal.discount')} <b className="text-gray-800">{totals.discount.toLocaleString('fr-MA')} MAD</b></span>
+                  <span>{t('callCenter.modal.shipping')} <b className="text-gray-800">{order.shippingPrice.toLocaleString('fr-MA')} MAD</b></span>
                 </div>
                 <div className="text-right">
-                  <p className="text-[9px] uppercase tracking-wider text-gray-400">Total</p>
+                  <p className="text-[9px] uppercase tracking-wider text-gray-400">{t('callCenter.modal.total')}</p>
                   <p className="text-lg font-bold text-primary leading-none">
                     {totals.total.toLocaleString('fr-MA')}
                     <span className="ml-1 text-[10px] font-medium text-gray-400">MAD</span>
@@ -938,29 +944,29 @@ export function CallCenterOrderModal() {
               <div className="flex flex-col gap-3">
                 <div>
                   <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-primary">
-                    Confirmation Note
+                    {t('callCenter.modal.confirmationNote')}
                     <span className="ml-2 text-[9px] font-normal normal-case text-gray-400">
-                      · also used as cancellation reason
+                      {t('callCenter.modal.alsoCancellationReason')}
                     </span>
                   </label>
                   <textarea
                     rows={2}
                     value={form.confirmationNote}
                     onChange={(e) => patch({ confirmationNote: e.target.value })}
-                    placeholder="Call context, cancellation reason, anything relevant…"
+                    placeholder={t('callCenter.modal.confirmationNotePlaceholder')}
                     className="w-full resize-none rounded-input border border-gray-200 bg-white px-2 py-1.5 text-[12px] focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
                 <div>
                   <label className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-primary">
                     <Truck size={10} />
-                    Delivery Note
+                    {t('callCenter.modal.deliveryNote')}
                   </label>
                   <textarea
                     rows={2}
                     value={form.shippingInstruction}
                     onChange={(e) => patch({ shippingInstruction: e.target.value })}
-                    placeholder="Delivery instructions, address details, preferred time…"
+                    placeholder={t('callCenter.modal.deliveryNotePlaceholder')}
                     className="w-full resize-none rounded-input border border-gray-200 bg-white px-2 py-1.5 text-[12px] focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
@@ -971,18 +977,18 @@ export function CallCenterOrderModal() {
             <div className="rounded-card border border-gray-100 bg-white/60 p-3">
               <div className="mb-2 flex items-center justify-between">
                 <h3 className="text-[10px] font-bold uppercase tracking-wider text-primary">
-                  Actions
+                  {t('callCenter.modal.actions')}
                 </h3>
                 {!baseReadiness.ok && !isLocked && (
                   <span className="inline-flex items-center gap-1 rounded-badge bg-amber-100 px-2 py-0.5 text-[9px] font-semibold text-amber-700">
-                    <AlertTriangle size={9} /> Blocked
+                    <AlertTriangle size={9} /> {t('callCenter.modal.blocked')}
                   </span>
                 )}
               </div>
               {isLocked ? (
                 <div className="flex items-center gap-2 rounded-btn bg-gray-50 px-3 py-2 text-[11px] text-gray-500">
                   <Lock size={12} />
-                  Order is shipped — confirmation actions are locked.
+                  {t('callCenter.modal.orderShippedLocked')}
                 </div>
               ) : (
                 <>
@@ -995,22 +1001,22 @@ export function CallCenterOrderModal() {
                       disabled={statusBusy || !confirmReadiness.ok}
                       title={!confirmReadiness.ok ? confirmReadiness.reasons[0] : undefined}
                     >
-                      Confirm
+                      {t('callCenter.modal.actionConfirm')}
                     </CRMButton>
                     <CRMButton variant="danger" size="sm" leftIcon={<X size={12} />} onClick={() => triggerStatus('cancel')} disabled={statusBusy || !baseReadiness.ok}>
-                      Cancel
+                      {t('callCenter.modal.actionCancel')}
                     </CRMButton>
                     <CRMButton variant="secondary" size="sm" leftIcon={<Calendar size={12} />} onClick={() => { if (!baseReadiness.ok) { setError(baseReadiness.reasons[0]); return; } setPendingAction('callback'); setError(null); }} disabled={statusBusy || !baseReadiness.ok}>
-                      Callback
+                      {t('callCenter.modal.actionCallback')}
                     </CRMButton>
                     <CRMButton variant="secondary" size="sm" leftIcon={<PhoneOff size={12} />} onClick={() => triggerStatus('unreachable')} disabled={statusBusy || !baseReadiness.ok}>
-                      Unreachable
+                      {t('callCenter.modal.actionUnreachable')}
                     </CRMButton>
                     <CRMButton variant="secondary" size="sm" leftIcon={<Ban size={12} />} onClick={() => triggerStatus('fake')} disabled={statusBusy || !baseReadiness.ok}>
-                      Fake
+                      {t('callCenter.modal.actionFake')}
                     </CRMButton>
                     <CRMButton variant="secondary" size="sm" leftIcon={<PackageX size={12} />} onClick={() => triggerStatus('no-stock')} disabled={statusBusy || !baseReadiness.ok}>
-                      No Stock
+                      {t('callCenter.modal.actionNoStock')}
                     </CRMButton>
                   </div>
 
@@ -1018,7 +1024,7 @@ export function CallCenterOrderModal() {
                     <p className="mt-1.5 text-[10px] text-amber-700">{baseReadiness.reasons[0]}</p>
                   ) : !confirmReadiness.ok && confirmReadiness.reasons[0] ? (
                     <p className="mt-1.5 text-[10px] text-amber-700">
-                      Confirm requires: {confirmReadiness.reasons[0]}
+                      {t('callCenter.modal.confirmRequires', { reason: confirmReadiness.reasons[0] })}
                     </p>
                   ) : null}
                 </>
@@ -1050,7 +1056,7 @@ export function CallCenterOrderModal() {
                       {pendingAction === 'callback' && (
                         <div>
                           <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-amber-700">
-                            Callback date &amp; time *
+                            {t('callCenter.modal.pending.callbackLabel')}
                           </label>
                           <div className="relative flex items-center">
                             <Clock size={12} className="absolute left-2.5 text-gray-400" />
@@ -1070,7 +1076,7 @@ export function CallCenterOrderModal() {
                           <MessageCircle size={14} className="mt-0.5 shrink-0 text-gray-400" />
                           <div className="min-w-0">
                             <span className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                              Note saved with this action
+                              {t('callCenter.modal.pending.noteSaved')}
                             </span>
                             <p className="mt-1 text-sm text-gray-700">{form.confirmationNote}</p>
                           </div>
@@ -1083,7 +1089,7 @@ export function CallCenterOrderModal() {
                           <Truck size={14} className="mt-0.5 shrink-0 text-blue-400" />
                           <div className="min-w-0">
                             <span className="block text-[10px] font-bold uppercase tracking-wider text-blue-400">
-                              Delivery note
+                              {t('callCenter.modal.pending.deliveryNote')}
                             </span>
                             <p className="mt-1 text-sm text-blue-700">{form.shippingInstruction}</p>
                           </div>
@@ -1098,7 +1104,7 @@ export function CallCenterOrderModal() {
                         onClick={() => setPendingAction(null)}
                         disabled={statusBusy}
                       >
-                        Cancel
+                        {t('common.cancel')}
                       </CRMButton>
                       <CRMButton
                         variant={pendingCopy[pendingAction].variant}
@@ -1107,7 +1113,7 @@ export function CallCenterOrderModal() {
                         loading={statusBusy}
                         disabled={pendingAction === 'callback' && !callbackAt}
                       >
-                        {pendingAction === 'callback' ? 'Schedule' : 'Confirm'}
+                        {pendingAction === 'callback' ? t('callCenter.modal.pending.schedule') : t('callCenter.modal.pending.confirm_cta')}
                       </CRMButton>
                     </div>
                   </div>
@@ -1120,7 +1126,7 @@ export function CallCenterOrderModal() {
             {history.length > 0 && (
               <div className="rounded-card border border-gray-100 bg-white/60 p-3">
                 <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-primary">
-                  Client history ({history.length})
+                  {t('callCenter.modal.clientHistory', { count: history.length })}
                 </h3>
                 <div className="flex flex-col gap-1">
                   {history.slice(0, 3).map((h) => (

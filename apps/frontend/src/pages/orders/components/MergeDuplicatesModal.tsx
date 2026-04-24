@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AlertTriangle, GitMerge, Loader2, Phone, User } from 'lucide-react';
 import { GlassModal } from '@/components/ui/GlassModal';
 import { CRMButton } from '@/components/ui/CRMButton';
@@ -31,6 +32,7 @@ function GroupPanel({
   group: DuplicateGroup;
   onMerged: () => void;
 }) {
+  const { t } = useTranslation();
   // Keeper defaults to the oldest order (already sorted asc by backend)
   const [keepId, setKeepId] = useState<string>(group.orders[0].id);
   const [mergeIds, setMergeIds] = useState<Set<string>>(
@@ -84,7 +86,7 @@ function GroupPanel({
               {group.customer.fullName}
             </span>
             <span className="rounded-badge bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
-              {group.orders.length} orders
+              {t('orders.merge.orderCount', { count: group.orders.length })}
             </span>
           </div>
           <div className="mt-1 flex items-center gap-3 text-xs text-gray-500">
@@ -99,7 +101,7 @@ function GroupPanel({
         {group.needsReassignment && (
           <div className="flex items-center gap-1.5 rounded-badge bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
             <AlertTriangle size={11} />
-            Reassign to one agent first
+            {t('orders.merge.needsReassignment')}
           </div>
         )}
       </div>
@@ -120,7 +122,7 @@ function GroupPanel({
               )}
             >
               {/* Keeper radio */}
-              <label className="flex items-center pt-1" title="Keep this order">
+              <label className="flex items-center pt-1" title={t('orders.merge.keepThisOrder')}>
                 <input
                   type="radio"
                   name={`keep-${group.customerId}`}
@@ -131,7 +133,7 @@ function GroupPanel({
               </label>
 
               {/* Merge checkbox */}
-              <label className="flex items-center pt-1" title="Merge this order into keeper">
+              <label className="flex items-center pt-1" title={t('orders.merge.mergeIntoKeeper')}>
                 <input
                   type="checkbox"
                   checked={isMerge}
@@ -149,12 +151,12 @@ function GroupPanel({
                   </span>
                   {isKeeper && (
                     <span className="rounded-badge bg-primary px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">
-                      Keeper
+                      {t('orders.merge.keeper')}
                     </span>
                   )}
                   {isMerge && (
                     <span className="rounded-badge bg-red-500 px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">
-                      Will merge
+                      {t('orders.merge.willMerge')}
                     </span>
                   )}
                 </div>
@@ -173,7 +175,7 @@ function GroupPanel({
                   {order.agent ? (
                     <span className="font-medium text-gray-600">{order.agent.name}</span>
                   ) : (
-                    <span className="font-medium text-orange-500">Unassigned</span>
+                    <span className="font-medium text-orange-500">{t('orders.merge.unassigned')}</span>
                   )}
                 </p>
               </div>
@@ -194,8 +196,8 @@ function GroupPanel({
       <div className="mt-3 flex items-center justify-between">
         <p className="text-[11px] text-gray-400">
           {group.needsReassignment
-            ? 'Ask admin to reassign all orders to the same agent before merging.'
-            : `Combining ${mergeIds.size} order${mergeIds.size !== 1 ? 's' : ''} into keeper · items will be summed · merged orders archived.`}
+            ? t('orders.merge.askReassignFirst')
+            : t('orders.merge.combiningHint', { count: mergeIds.size })}
         </p>
         <CRMButton
           variant="primary"
@@ -205,7 +207,9 @@ function GroupPanel({
           loading={merging}
           onClick={handleMerge}
         >
-          Merge {mergeIds.size > 0 ? `(${mergeIds.size})` : ''}
+          {mergeIds.size > 0
+            ? t('orders.merge.mergeButtonCount', { count: mergeIds.size })
+            : t('orders.merge.mergeButton')}
         </CRMButton>
       </div>
     </div>
@@ -215,6 +219,7 @@ function GroupPanel({
 // ─── Main modal ──────────────────────────────────────────────────────────────
 
 export function MergeDuplicatesModal({ open, onClose, onMerged }: MergeDuplicatesModalProps) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [groups, setGroups] = useState<DuplicateGroup[]>([]);
 
@@ -241,7 +246,7 @@ export function MergeDuplicatesModal({ open, onClose, onMerged }: MergeDuplicate
   };
 
   return (
-    <GlassModal open={open} onClose={onClose} title="Duplicate Orders" size="xl">
+    <GlassModal open={open} onClose={onClose} title={t('orders.merge.title')} size="xl">
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 size={24} className="animate-spin text-primary" />
@@ -249,16 +254,15 @@ export function MergeDuplicatesModal({ open, onClose, onMerged }: MergeDuplicate
       ) : groups.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 py-10 text-gray-400">
           <GitMerge size={32} className="text-gray-300" />
-          <p className="text-sm">No duplicate pending orders detected</p>
+          <p className="text-sm">{t('orders.merge.noDuplicatesDetected')}</p>
           <p className="text-xs text-gray-400">
-            Orders sharing a phone number will appear here when at least two are pending.
+            {t('orders.merge.noDuplicatesHint')}
           </p>
         </div>
       ) : (
         <div className="flex flex-col gap-3 overflow-y-auto" style={{ maxHeight: 'calc(80vh - 160px)' }}>
           <p className="text-xs text-gray-500">
-            Select the keeper (radio) and check which orders to merge into it. KPIs will count the
-            keeper as a single order after merging.
+            {t('orders.merge.intro')}
           </p>
           {groups.map((g) => (
             <GroupPanel key={g.customerId} group={g} onMerged={handleAfterMerge} />
@@ -268,7 +272,7 @@ export function MergeDuplicatesModal({ open, onClose, onMerged }: MergeDuplicate
 
       <div className="mt-5 flex justify-end border-t border-gray-100 pt-4">
         <CRMButton variant="secondary" onClick={onClose}>
-          Close
+          {t('common.close')}
         </CRMButton>
       </div>
     </GlassModal>

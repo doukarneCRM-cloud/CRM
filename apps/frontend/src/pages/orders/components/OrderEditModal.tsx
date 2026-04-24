@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Plus, Trash2, Package, Loader2, Lock, PackageSearch } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { GlassModal } from '@/components/ui/GlassModal';
 import { CRMInput } from '@/components/ui/CRMInput';
 import { CRMButton } from '@/components/ui/CRMButton';
@@ -109,6 +110,7 @@ function ItemRow({
   onRemove: () => void;
   canRemove: boolean;
 }) {
+  const { t } = useTranslation();
   const product = products.find((p) => p.id === item.productId);
   const colorOptions = getColorOptions(product);
   const sizeOptions = getSizeOptions(product, item.color);
@@ -157,23 +159,23 @@ function ItemRow({
         {/* Product */}
         <div className="col-span-4">
           <CRMSelect
-            label="Product"
+            label={t('orders.create.productLabel')}
             options={productOpts}
             value={item.productId}
             onChange={(v) => handleProductChange(v as string)}
             searchable
-            placeholder="Select product..."
+            placeholder={t('orders.edit.selectProduct')}
           />
         </div>
 
         {/* Color */}
         <div className="col-span-3">
           <CRMSelect
-            label="Color"
+            label={t('orders.edit.color')}
             options={colorOpts}
             value={item.color ?? ''}
             onChange={(v) => handleColorChange(v as string)}
-            placeholder={colorOpts.length === 0 ? '—' : 'Color'}
+            placeholder={colorOpts.length === 0 ? '—' : t('orders.edit.color')}
             disabled={colorOpts.length === 0}
           />
         </div>
@@ -181,11 +183,11 @@ function ItemRow({
         {/* Size */}
         <div className="col-span-2">
           <CRMSelect
-            label="Size"
+            label={t('orders.edit.size')}
             options={sizeOpts}
             value={item.size ?? ''}
             onChange={(v) => handleSizeChange(v as string)}
-            placeholder={sizeOpts.length === 0 ? '—' : 'Size'}
+            placeholder={sizeOpts.length === 0 ? '—' : t('orders.edit.size')}
             disabled={sizeOpts.length === 0}
           />
         </div>
@@ -193,7 +195,7 @@ function ItemRow({
         {/* Qty */}
         <div className="col-span-2">
           <CRMInput
-            label="Qty"
+            label={t('orders.edit.qty')}
             type="number"
             min={1}
             max={item.stock || 999}
@@ -220,15 +222,15 @@ function ItemRow({
       {/* Stock + price meta */}
       <div className="mt-2 flex items-center justify-between text-xs text-gray-400">
         <span className={cn('font-medium', stockColor)}>
-          {item.stock === 0 ? 'Out of stock' : `${item.stock} in stock`}
+          {item.stock === 0 ? t('orders.edit.outOfStock') : t('orders.edit.inStock', { count: item.stock })}
         </span>
         <span>
-          Unit:{' '}
+          {t('orders.edit.unit')}{' '}
           <span className="font-semibold text-gray-700">
             {item.unitPrice.toLocaleString('fr-MA')} MAD
           </span>
           <span className="mx-2 text-gray-300">·</span>
-          Subtotal:{' '}
+          {t('orders.edit.subtotal')}{' '}
           <span className="font-semibold text-gray-900">
             {(item.quantity * item.unitPrice).toLocaleString('fr-MA')} MAD
           </span>
@@ -247,6 +249,7 @@ interface OrderEditModalProps {
 }
 
 export function OrderEditModal({ order, onClose, onSaved }: OrderEditModalProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const canVerifyReturns = useAuthStore((s) => s.hasPermission(PERMISSIONS.RETURNS_VERIFY));
   const [products, setProducts] = useState<Product[]>([]);
@@ -360,7 +363,10 @@ export function OrderEditModal({ order, onClose, onSaved }: OrderEditModalProps)
   // backend rejects edits, so reflect that in the UI as a read-only view.
   const isLocked = !!order?.labelSent;
 
-  const cityOptions = cities.map((c) => ({ value: c.name, label: `${c.name} (${c.price} MAD)` }));
+  const cityOptions = cities.map((c) => ({
+    value: c.name,
+    label: t('orders.edit.cityWithPrice', { name: c.name, price: c.price }),
+  }));
   const isCityValid =
     cities.length === 0 || cities.some((c) => c.name.toLowerCase() === form.customerCity.toLowerCase());
 
@@ -415,7 +421,7 @@ export function OrderEditModal({ order, onClose, onSaved }: OrderEditModalProps)
       onSaved(updated);
       onClose();
     } catch (err) {
-      setSaveError(apiErrorMessage(err, 'Failed to save changes'));
+      setSaveError(apiErrorMessage(err, t('orders.edit.failedToSave')));
     } finally {
       setSaving(false);
     }
@@ -425,7 +431,7 @@ export function OrderEditModal({ order, onClose, onSaved }: OrderEditModalProps)
     <GlassModal
       open={!!order}
       onClose={onClose}
-      title={`Edit Order${order ? ` — ${order.reference}` : ''}`}
+      title={order ? t('orders.edit.titleWithRef', { reference: order.reference }) : t('orders.edit.title')}
       size="xl"
     >
       {loadingData ? (
@@ -442,43 +448,42 @@ export function OrderEditModal({ order, onClose, onSaved }: OrderEditModalProps)
             <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
               <Lock size={14} className="mt-0.5 flex-shrink-0 text-amber-600" />
               <div className="text-xs text-amber-800">
-                <p className="font-semibold">Locked — sent to Coliix</p>
+                <p className="font-semibold">{t('orders.edit.lockedTitle')}</p>
                 <p className="text-amber-700">
-                  The parcel is packed and labeled. Order details and status can no longer be
-                  edited.
+                  {t('orders.edit.lockedBody')}
                 </p>
               </div>
             </div>
           )}
           {/* ── Section 1: Customer (fully editable) ──────────────────────── */}
           <div>
-            <SectionHeader label="Customer" />
+            <SectionHeader label={t('orders.edit.customer')} />
             <div className="grid grid-cols-2 gap-3">
               <CRMInput
-                label="Full Name"
+                label={t('orders.edit.fullName')}
                 value={form.customerName}
                 onChange={(e) => setField('customerName', e.target.value)}
               />
               <CRMInput
-                label="Phone"
+                label={t('common.phone')}
                 value={form.customerPhone}
                 onChange={(e) => setField('customerPhone', e.target.value)}
               />
               <div>
                 <CRMSelect
-                  label="City"
+                  label={t('common.city')}
                   options={cityOptions}
                   value={form.customerCity}
                   onChange={(v) => setField('customerCity', v as string)}
                   searchable
-                  placeholder="Select city..."
+                  placeholder={t('orders.edit.selectCity')}
                 />
                 {form.customerCity && !isCityValid && (
-                  <p className="mt-1 text-xs text-amber-600">⚠ City not in shipping list</p>
+                  <p className="mt-1 text-xs text-amber-600">{t('orders.edit.cityNotInShipping')}</p>
                 )}
               </div>
               <CRMInput
-                label="Address"
+                label={t('common.address')}
                 value={form.customerAddress}
                 onChange={(e) => setField('customerAddress', e.target.value)}
               />
@@ -487,7 +492,7 @@ export function OrderEditModal({ order, onClose, onSaved }: OrderEditModalProps)
 
           {/* ── Section 2: Items ──────────────────────────────────────────── */}
           <div>
-            <SectionHeader label="Items" />
+            <SectionHeader label={t('orders.edit.items')} />
             <div className="flex flex-col gap-2">
               {form.items.map((item, i) => (
                 <ItemRow
@@ -507,17 +512,17 @@ export function OrderEditModal({ order, onClose, onSaved }: OrderEditModalProps)
                 className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-gray-200 py-2.5 text-sm text-gray-400 transition-colors hover:border-primary hover:text-primary"
               >
                 <Plus size={14} />
-                Add item
+                {t('orders.edit.addItem')}
               </button>
             )}
           </div>
 
           {/* ── Section 3: Pricing (free delivery — no shipping field) ────── */}
           <div>
-            <SectionHeader label="Pricing" />
+            <SectionHeader label={t('orders.edit.pricing')} />
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">Discount</label>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">{t('orders.edit.discountLabel')}</label>
                 <div className="flex rounded-input border border-gray-200 bg-gray-50 p-0.5">
                   {(['', 'fixed', 'percentage'] as const).map((type) => (
                     <button
@@ -531,37 +536,37 @@ export function OrderEditModal({ order, onClose, onSaved }: OrderEditModalProps)
                           : 'text-gray-400 hover:text-gray-600',
                       )}
                     >
-                      {type === '' ? 'None' : type === 'fixed' ? 'MAD' : '%'}
+                      {type === '' ? t('orders.edit.none') : type === 'fixed' ? 'MAD' : '%'}
                     </button>
                   ))}
                 </div>
               </div>
 
               <CRMInput
-                label="Discount Amount"
+                label={t('orders.edit.discountAmount')}
                 type="number"
                 min={0}
                 value={form.discountAmount}
                 onChange={(e) => setField('discountAmount', e.target.value)}
                 disabled={!form.discountType}
-                placeholder="0"
+                placeholder={t('orders.edit.discountAmountPlaceholder')}
               />
             </div>
 
             <div className="mt-3 flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm">
               <div className="flex gap-6 text-gray-400">
                 <span>
-                  Subtotal: <b className="text-gray-700">{subtotal.toLocaleString('fr-MA')} MAD</b>
+                  {t('orders.edit.subtotal')} <b className="text-gray-700">{subtotal.toLocaleString('fr-MA')} MAD</b>
                 </span>
                 {discount > 0 && (
                   <span>
-                    Discount: <b className="text-red-500">-{discount.toLocaleString('fr-MA')} MAD</b>
+                    {t('orders.edit.discount')} <b className="text-red-500">-{discount.toLocaleString('fr-MA')} MAD</b>
                   </span>
                 )}
-                <span className="text-emerald-600">Free delivery</span>
+                <span className="text-emerald-600">{t('orders.edit.freeDelivery')}</span>
               </div>
               <div className="text-right">
-                <span className="text-xs text-gray-400">Total</span>
+                <span className="text-xs text-gray-400">{t('orders.edit.total')}</span>
                 <p className="text-lg font-bold text-gray-900">
                   {total.toLocaleString('fr-MA')} MAD
                 </p>
@@ -571,25 +576,25 @@ export function OrderEditModal({ order, onClose, onSaved }: OrderEditModalProps)
 
           {/* ── Section 4: Notes ─────────────────────────────────────────── */}
           <div>
-            <SectionHeader label="Notes" />
+            <SectionHeader label={t('orders.edit.notes')} />
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-gray-700">Confirmation Note</label>
+                <label className="text-sm font-medium text-gray-700">{t('orders.edit.confirmationNote')}</label>
                 <textarea
                   rows={3}
                   value={form.confirmationNote}
                   onChange={(e) => setField('confirmationNote', e.target.value)}
-                  placeholder="Agent notes..."
+                  placeholder={t('orders.edit.confirmationNotePlaceholder')}
                   className="w-full resize-none rounded-input border border-gray-200 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-gray-700">Shipping Instruction</label>
+                <label className="text-sm font-medium text-gray-700">{t('orders.edit.shippingInstruction')}</label>
                 <textarea
                   rows={3}
                   value={form.shippingInstruction}
                   onChange={(e) => setField('shippingInstruction', e.target.value)}
-                  placeholder="Delivery instructions..."
+                  placeholder={t('orders.edit.shippingInstructionPlaceholder')}
                   className="w-full resize-none rounded-input border border-gray-200 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </div>
@@ -599,15 +604,15 @@ export function OrderEditModal({ order, onClose, onSaved }: OrderEditModalProps)
           {/* ── Section 5: Status (read-only) ────────────────────────────── */}
           {order && (
             <div>
-              <SectionHeader label="Status" />
+              <SectionHeader label={t('orders.edit.status')} />
               <div className="flex flex-wrap items-center gap-4 rounded-xl border border-gray-100 bg-gray-50/50 px-4 py-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400">Confirmation</span>
+                  <span className="text-xs text-gray-400">{t('orders.edit.statusConfirmation')}</span>
                   <StatusBadge status={order.confirmationStatus} />
                 </div>
                 <div className="h-3 w-px bg-gray-200" />
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400">Shipping</span>
+                  <span className="text-xs text-gray-400">{t('orders.edit.statusShipping')}</span>
                   <StatusBadge status={order.shippingStatus} />
                 </div>
                 <div className="ml-auto flex items-center gap-2">
@@ -621,12 +626,12 @@ export function OrderEditModal({ order, onClose, onSaved }: OrderEditModalProps)
                         className="inline-flex items-center gap-1 rounded-btn bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200 transition-colors hover:bg-amber-100"
                       >
                         <PackageSearch size={11} />
-                        Verify return
+                        {t('orders.edit.verifyReturn')}
                       </button>
                     )}
                   <span className="flex items-center gap-1 text-xs text-gray-400">
                     <Package size={11} />
-                    Change via status button
+                    {t('orders.edit.changeViaStatusButton')}
                   </span>
                 </div>
               </div>
@@ -644,11 +649,11 @@ export function OrderEditModal({ order, onClose, onSaved }: OrderEditModalProps)
           )}
           <div className="flex gap-3">
             <CRMButton variant="secondary" className="flex-1" onClick={onClose}>
-              {isLocked ? 'Close' : 'Cancel'}
+              {isLocked ? t('common.close') : t('common.cancel')}
             </CRMButton>
             {!isLocked && (
               <CRMButton variant="primary" className="flex-1" loading={saving} onClick={handleSave}>
-                Save Changes
+                {t('orders.edit.saveChanges')}
               </CRMButton>
             )}
           </div>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CheckCircle2, Truck, Settings, Clock } from 'lucide-react';
 import { GlassModal } from '@/components/ui/GlassModal';
 import { ordersApi } from '@/services/ordersApi';
@@ -95,6 +96,7 @@ export function OrderLogsModal({
   defaultFilter = 'all',
   onClose,
 }: OrderLogsModalProps) {
+  const { t } = useTranslation();
   const hasPermission = useAuthStore((s) => s.hasPermission);
   // Agents working from the call center (without orders:view) only see
   // confirmation + shipping tabs — the backend also filters system entries
@@ -123,21 +125,21 @@ export function OrderLogsModal({
 
   const filters: { key: LogFilter; label: string; count: number }[] = canSeeAll
     ? [
-        { key: 'all', label: 'All', count: logs.length },
-        { key: 'confirmation', label: 'Confirmation', count: logs.filter((l) => l.type === 'confirmation').length },
-        { key: 'shipping', label: 'Shipping', count: logs.filter((l) => l.type === 'shipping').length },
-        { key: 'system', label: 'System', count: logs.filter((l) => l.type === 'system').length },
+        { key: 'all', label: t('orders.logs.filterAll'), count: logs.length },
+        { key: 'confirmation', label: t('orders.logs.filterConfirmation'), count: logs.filter((l) => l.type === 'confirmation').length },
+        { key: 'shipping', label: t('orders.logs.filterShipping'), count: logs.filter((l) => l.type === 'shipping').length },
+        { key: 'system', label: t('orders.logs.filterSystem'), count: logs.filter((l) => l.type === 'system').length },
       ]
     : [
-        { key: 'confirmation', label: 'Confirmation', count: logs.filter((l) => l.type === 'confirmation').length },
-        { key: 'shipping', label: 'Shipping', count: logs.filter((l) => l.type === 'shipping').length },
+        { key: 'confirmation', label: t('orders.logs.filterConfirmation'), count: logs.filter((l) => l.type === 'confirmation').length },
+        { key: 'shipping', label: t('orders.logs.filterShipping'), count: logs.filter((l) => l.type === 'shipping').length },
       ];
 
   return (
     <GlassModal
       open={!!orderId}
       onClose={onClose}
-      title={`Order History${orderReference ? ` — ${orderReference}` : ''}`}
+      title={orderReference ? t('orders.logs.titleWithRef', { reference: orderReference }) : t('orders.logs.title')}
       size="md"
     >
       {/* Filter tabs */}
@@ -185,7 +187,7 @@ export function OrderLogsModal({
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-10 text-gray-400">
             <Clock size={32} className="text-gray-200" />
-            <p className="text-sm">No history yet</p>
+            <p className="text-sm">{t('orders.logs.noHistory')}</p>
           </div>
         ) : (
           <div className="pt-1">

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { isAxiosError } from 'axios';
 import { Loader2, Plus, Trash2, Check } from 'lucide-react';
 import { GlassModal } from '@/components/ui/GlassModal';
@@ -85,6 +86,7 @@ function makeDraft(product: Product | undefined): DraftItem {
 }
 
 export function OrderCreateModal({ open, onClose, onCreated }: Props) {
+  const { t } = useTranslation();
   const [loadingData, setLoadingData] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -158,14 +160,14 @@ export function OrderCreateModal({ open, onClose, onCreated }: Props) {
         if (prods.length > 0) setItems([makeDraft(prods[0])]);
       })
       .catch(() => {
-        setError('Failed to load products or cities');
+        setError(t('orders.create.failedToLoad'));
       })
       .finally(() => setLoadingData(false));
-  }, [open]);
+  }, [open, t]);
 
   const cityOptions = useMemo(
-    () => cities.map((c) => ({ value: c.name, label: `${c.name} (${c.price} MAD)` })),
-    [cities],
+    () => cities.map((c) => ({ value: c.name, label: t('orders.create.cityWithPrice', { name: c.name, price: c.price }) })),
+    [cities, t],
   );
   const isCityValid =
     !customerCity ||
@@ -264,9 +266,9 @@ export function OrderCreateModal({ open, onClose, onCreated }: Props) {
     } catch (err) {
       if (isAxiosError(err)) {
         const data = err.response?.data as { error?: { message?: string } } | undefined;
-        setError(data?.error?.message ?? 'Failed to create order');
+        setError(data?.error?.message ?? t('orders.create.failedToCreate'));
       } else {
-        setError('Failed to create order');
+        setError(t('orders.create.failedToCreate'));
       }
     } finally {
       setSaving(false);
@@ -277,7 +279,7 @@ export function OrderCreateModal({ open, onClose, onCreated }: Props) {
     <GlassModal
       open={open}
       onClose={onClose}
-      title="New manual order"
+      title={t('orders.newManualOrder')}
       size="2xl"
       footer={
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -286,25 +288,25 @@ export function OrderCreateModal({ open, onClose, onCreated }: Props) {
               <span className="font-medium text-red-500">{error}</span>
             ) : (
               <span className="text-gray-400">
-                Subtotal{' '}
+                {t('orders.create.subtotal')}{' '}
                 <b className="text-gray-700">{subtotal.toLocaleString('fr-MA')} MAD</b>
                 {discount > 0 && (
                   <>
-                    {' · '}Discount{' '}
+                    {' · '}{t('orders.create.discount')}{' '}
                     <b className="text-red-500">-{discount.toLocaleString('fr-MA')} MAD</b>
                   </>
                 )}
-                {' · '}Total{' '}
+                {' · '}{t('orders.create.total')}{' '}
                 <b className="text-gray-900">{total.toLocaleString('fr-MA')} MAD</b>
               </span>
             )}
           </div>
           <div className="flex items-center gap-2">
             <CRMButton variant="ghost" onClick={onClose} disabled={saving}>
-              Cancel
+              {t('common.cancel')}
             </CRMButton>
             <CRMButton onClick={handleSave} loading={saving} disabled={!canSave}>
-              Create order
+              {t('orders.createOrder')}
             </CRMButton>
           </div>
         </div>
@@ -320,7 +322,7 @@ export function OrderCreateModal({ open, onClose, onCreated }: Props) {
           <section>
             <div className="mb-2 flex items-center justify-between">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Customer
+                {t('orders.create.customer')}
               </h3>
               {selectedCustomerId && (
                 <button
@@ -333,17 +335,17 @@ export function OrderCreateModal({ open, onClose, onCreated }: Props) {
                     setCustomerAddress('');
                   }}
                   className="inline-flex items-center gap-1 rounded-badge bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 hover:bg-emerald-100"
-                  title="Clear and start fresh"
+                  title={t('orders.create.clearAndStartFresh')}
                 >
                   <Check size={10} />
-                  Existing client · clear
+                  {t('orders.create.existingClientClear')}
                 </button>
               )}
             </div>
             <div ref={customerRef} className="relative grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="relative">
                 <CRMInput
-                  label="Full name"
+                  label={t('orders.create.fullName')}
                   required
                   value={customerName}
                   onChange={(e) => {
@@ -351,12 +353,12 @@ export function OrderCreateModal({ open, onClose, onCreated }: Props) {
                     if (selectedCustomerId) setSelectedCustomerId(null);
                   }}
                   onFocus={() => setActiveLookup('name')}
-                  placeholder="Type to search existing clients…"
+                  placeholder={t('orders.create.typeToSearchClients')}
                 />
               </div>
               <div className="relative">
                 <CRMInput
-                  label="Phone"
+                  label={t('common.phone')}
                   required
                   value={customerPhone}
                   onChange={(e) => {
@@ -364,7 +366,7 @@ export function OrderCreateModal({ open, onClose, onCreated }: Props) {
                     if (selectedCustomerId) setSelectedCustomerId(null);
                   }}
                   onFocus={() => setActiveLookup('phone')}
-                  placeholder="06XXXXXXXX"
+                  placeholder={t('orders.create.phonePlaceholder')}
                 />
               </div>
 
@@ -380,11 +382,11 @@ export function OrderCreateModal({ open, onClose, onCreated }: Props) {
                   {suggestLoading ? (
                     <div className="flex items-center gap-2 px-3 py-3 text-xs text-gray-400">
                       <Loader2 size={12} className="animate-spin" />
-                      Searching clients…
+                      {t('orders.create.searchingClients')}
                     </div>
                   ) : suggestions.length === 0 ? (
                     <div className="px-3 py-3 text-xs text-gray-400">
-                      No matching client — a new one will be created.
+                      {t('orders.create.noMatchingClient')}
                     </div>
                   ) : (
                     <ul className="max-h-[260px] overflow-y-auto py-1">
@@ -411,7 +413,7 @@ export function OrderCreateModal({ open, onClose, onCreated }: Props) {
                               </p>
                             </div>
                             <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-600">
-                              {c.totalOrders} {c.totalOrders === 1 ? 'order' : 'orders'}
+                              {t('orders.create.orderCount', { count: c.totalOrders })}
                             </span>
                           </button>
                         </li>
@@ -423,7 +425,7 @@ export function OrderCreateModal({ open, onClose, onCreated }: Props) {
 
               <div>
                 <CRMSelect
-                  label="City"
+                  label={t('common.city')}
                   options={cityOptions}
                   value={customerCity}
                   onChange={(v) => {
@@ -431,20 +433,20 @@ export function OrderCreateModal({ open, onClose, onCreated }: Props) {
                     if (selectedCustomerId) setSelectedCustomerId(null);
                   }}
                   searchable
-                  placeholder="Select city..."
+                  placeholder={t('orders.create.selectCity')}
                 />
                 {customerCity && !isCityValid && (
-                  <p className="mt-1 text-xs text-amber-600">⚠ City not in shipping list</p>
+                  <p className="mt-1 text-xs text-amber-600">{t('orders.create.cityNotInShipping')}</p>
                 )}
               </div>
               <CRMInput
-                label="Address"
+                label={t('common.address')}
                 value={customerAddress}
                 onChange={(e) => {
                   setCustomerAddress(e.target.value);
                   if (selectedCustomerId) setSelectedCustomerId(null);
                 }}
-                placeholder="Street, building, etc. (optional)"
+                placeholder={t('orders.create.addressPlaceholder')}
               />
             </div>
           </section>
@@ -453,16 +455,16 @@ export function OrderCreateModal({ open, onClose, onCreated }: Props) {
           <section>
             <div className="mb-2 flex items-center justify-between">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Items
+                {t('orders.create.items')}
               </h3>
               <span className="rounded-badge bg-accent/50 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                {items.length} {items.length === 1 ? 'item' : 'items'}
+                {t('orders.create.itemCount', { count: items.length })}
               </span>
             </div>
 
             {products.length === 0 ? (
               <div className="rounded-card border border-dashed border-gray-200 bg-gray-50 py-6 text-center text-xs text-gray-500">
-                No active products. Create a product first before adding manual orders.
+                {t('orders.create.noActiveProducts')}
               </div>
             ) : (
               <div className="flex flex-col gap-2">
@@ -483,37 +485,37 @@ export function OrderCreateModal({ open, onClose, onCreated }: Props) {
                       <div className="grid grid-cols-12 gap-2">
                         <div className="col-span-12 md:col-span-4">
                           <CRMSelect
-                            label="Product"
+                            label={t('orders.create.productLabel')}
                             options={productOpts}
                             value={it.productId}
                             onChange={(v) => handleProductChange(it.key, v as string)}
                             searchable
-                            placeholder="Select product..."
+                            placeholder={t('orders.create.selectProduct')}
                           />
                         </div>
                         <div className="col-span-6 md:col-span-3">
                           <CRMSelect
-                            label="Color"
+                            label={t('orders.create.color')}
                             options={colorOpts}
                             value={it.color ?? ''}
                             onChange={(v) => handleColorChange(it.key, v as string)}
-                            placeholder={colorOpts.length === 0 ? '—' : 'Color'}
+                            placeholder={colorOpts.length === 0 ? '—' : t('orders.create.color')}
                             disabled={colorOpts.length === 0}
                           />
                         </div>
                         <div className="col-span-6 md:col-span-2">
                           <CRMSelect
-                            label="Size"
+                            label={t('orders.create.size')}
                             options={sizeOpts}
                             value={it.size ?? ''}
                             onChange={(v) => handleSizeChange(it.key, v as string)}
-                            placeholder={sizeOpts.length === 0 ? '—' : 'Size'}
+                            placeholder={sizeOpts.length === 0 ? '—' : t('orders.create.size')}
                             disabled={sizeOpts.length === 0}
                           />
                         </div>
                         <div className="col-span-10 md:col-span-2">
                           <CRMInput
-                            label="Qty"
+                            label={t('orders.create.qty')}
                             type="number"
                             min={1}
                             max={Math.max(1, it.stock || 999)}
@@ -531,7 +533,7 @@ export function OrderCreateModal({ open, onClose, onCreated }: Props) {
                             disabled={items.length === 1}
                             onClick={() => removeItem(it.key)}
                             className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-300 transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-30"
-                            aria-label="Remove item"
+                            aria-label={t('orders.removeItem')}
                           >
                             <Trash2 size={14} />
                           </button>
@@ -540,13 +542,13 @@ export function OrderCreateModal({ open, onClose, onCreated }: Props) {
 
                       <div className="mt-2 flex items-center justify-between text-xs text-gray-400">
                         <span className={cn('font-medium', stockTone)}>
-                          {it.stock === 0 ? 'Out of stock' : `${it.stock} in stock`}
+                          {it.stock === 0 ? t('orders.create.outOfStock') : t('orders.create.inStock', { count: it.stock })}
                         </span>
                         <span>
-                          Unit{' '}
+                          {t('orders.create.unit')}{' '}
                           <b className="text-gray-700">{it.unitPrice.toLocaleString('fr-MA')} MAD</b>
                           <span className="mx-2 text-gray-300">·</span>
-                          Subtotal{' '}
+                          {t('orders.create.subtotal')}{' '}
                           <b className="text-gray-900">
                             {(it.quantity * it.unitPrice).toLocaleString('fr-MA')} MAD
                           </b>
@@ -562,7 +564,7 @@ export function OrderCreateModal({ open, onClose, onCreated }: Props) {
                   className="mt-1 flex w-full items-center justify-center gap-2 rounded-card border border-dashed border-gray-200 py-2.5 text-sm text-gray-400 transition-colors hover:border-primary hover:text-primary"
                 >
                   <Plus size={14} />
-                  Add item
+                  {t('orders.create.addItem')}
                 </button>
               </div>
             )}
@@ -571,48 +573,48 @@ export function OrderCreateModal({ open, onClose, onCreated }: Props) {
           {/* ── Pricing & notes ──────────────────────────────────────── */}
           <section>
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
-              Pricing & notes
+              {t('orders.create.pricingNotes')}
             </h3>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">Discount</label>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">{t('orders.create.discountLabel')}</label>
                 <div className="flex rounded-input border border-gray-200 bg-gray-50 p-0.5">
-                  {(['', 'fixed', 'percentage'] as const).map((t) => (
+                  {(['', 'fixed', 'percentage'] as const).map((dt) => (
                     <button
-                      key={t}
+                      key={dt}
                       type="button"
-                      onClick={() => setDiscountType(t)}
+                      onClick={() => setDiscountType(dt)}
                       className={cn(
                         'flex-1 rounded-lg py-1.5 text-xs font-medium transition-all',
-                        discountType === t
+                        discountType === dt
                           ? 'bg-white text-gray-900 shadow-sm'
                           : 'text-gray-400 hover:text-gray-600',
                       )}
                     >
-                      {t === '' ? 'None' : t === 'fixed' ? 'MAD' : '%'}
+                      {dt === '' ? t('orders.create.none') : dt === 'fixed' ? 'MAD' : '%'}
                     </button>
                   ))}
                 </div>
               </div>
               <CRMInput
-                label="Discount amount"
+                label={t('orders.create.discountAmount')}
                 type="number"
                 min={0}
                 value={discountAmount}
                 onChange={(e) => setDiscountAmount(e.target.value)}
                 disabled={!discountType}
-                placeholder="0"
+                placeholder={t('orders.create.discountAmountPlaceholder')}
               />
             </div>
             <div className="mt-3">
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                Confirmation note
+                {t('orders.create.confirmationNote')}
               </label>
               <textarea
                 rows={2}
                 value={confirmationNote}
                 onChange={(e) => setConfirmationNote(e.target.value)}
-                placeholder="Call context, customer preference, etc. (optional)"
+                placeholder={t('orders.create.confirmationNotePlaceholder')}
                 className="w-full resize-none rounded-input border border-gray-200 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
