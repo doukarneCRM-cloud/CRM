@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { LogOut, Plus, QrCode, Star, Trash2 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { CRMButton } from '@/components/ui/CRMButton';
@@ -22,14 +23,8 @@ const STATUS_COLOR: Record<WhatsAppSessionStatus, string> = {
   error: 'bg-red-500',
 };
 
-const STATUS_LABEL: Record<WhatsAppSessionStatus, string> = {
-  connected: 'Connected',
-  connecting: 'Connecting',
-  disconnected: 'Disconnected',
-  error: 'Error',
-};
-
 export function SessionsTab() {
+  const { t } = useTranslation();
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canConnect = hasPermission(PERMISSIONS.WHATSAPP_CONNECT);
   const canManage = hasPermission(PERMISSIONS.AUTOMATION_MANAGE);
@@ -87,28 +82,28 @@ export function SessionsTab() {
       setNewUserId('');
     } catch (e: unknown) {
       const err = e as { response?: { data?: { error?: { message?: string } } }; message?: string };
-      const msg = err?.response?.data?.error?.message ?? err?.message ?? 'Unknown error';
-      pushToast({ kind: 'error', title: 'Failed to create session', body: msg });
+      const msg = err?.response?.data?.error?.message ?? err?.message ?? t('automation.sessions.unknownError');
+      pushToast({ kind: 'error', title: t('automation.sessions.createFailed'), body: msg });
     }
   };
 
   const disconnect = async (s: WhatsAppSession) => {
-    if (!window.confirm('Disconnect this session?')) return;
+    if (!window.confirm(t('automation.sessions.disconnectConfirm'))) return;
     try {
       await whatsappApi.disconnect(s.id);
       await load();
     } catch {
-      pushToast({ kind: 'error', title: 'Failed to disconnect' });
+      pushToast({ kind: 'error', title: t('automation.sessions.disconnectFailed') });
     }
   };
 
   const remove = async (s: WhatsAppSession) => {
-    if (!window.confirm('Delete this session permanently?')) return;
+    if (!window.confirm(t('automation.sessions.deleteConfirm'))) return;
     try {
       await whatsappApi.remove(s.id);
       await load();
     } catch {
-      pushToast({ kind: 'error', title: 'Failed to delete' });
+      pushToast({ kind: 'error', title: t('automation.sessions.deleteFailed') });
     }
   };
 
@@ -116,9 +111,9 @@ export function SessionsTab() {
     try {
       await automationApi.setSystemSession(s.id);
       setSystemSessionId(s.id);
-      pushToast({ kind: 'success', title: 'System sender updated' });
+      pushToast({ kind: 'success', title: t('automation.sessions.systemUpdated') });
     } catch {
-      pushToast({ kind: 'error', title: 'Failed to set system sender' });
+      pushToast({ kind: 'error', title: t('automation.sessions.systemUpdateFailed') });
     }
   };
 
@@ -139,10 +134,10 @@ export function SessionsTab() {
           <div>
             <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
               <Star size={14} className="text-amber-500" />
-              System session
+              {t('automation.sessions.systemSession')}
             </h3>
             <p className="mt-0.5 text-xs text-gray-500">
-              Used for commission DMs and as a fallback when an agent is offline.
+              {t('automation.sessions.systemSubtitle')}
             </p>
           </div>
           {systemSession ? (
@@ -162,7 +157,7 @@ export function SessionsTab() {
               leftIcon={<Plus size={14} />}
               onClick={() => createSession(null)}
             >
-              Create system session
+              {t('automation.sessions.createSystemSession')}
             </CRMButton>
           ) : null}
         </div>
@@ -171,7 +166,7 @@ export function SessionsTab() {
           <div className="mt-3 flex items-center gap-3 border-t border-gray-100 pt-3 text-sm">
             <span className={`h-2.5 w-2.5 rounded-full ${STATUS_COLOR[systemSession.status]}`} />
             <span className="font-medium text-gray-700">
-              {STATUS_LABEL[systemSession.status]}
+              {t(`automation.sessions.statusLabels.${systemSession.status}`)}
             </span>
             <span className="text-gray-500">{systemSession.phoneNumber ?? '—'}</span>
           </div>
@@ -179,15 +174,14 @@ export function SessionsTab() {
 
         {!systemSession && systemSessionId && (
           <p className="mt-3 text-xs text-amber-600">
-            A system session was configured but no matching session exists. Commission messages
-            will fail until you create one.
+            {t('automation.sessions.systemMissing')}
           </p>
         )}
       </GlassCard>
 
       <GlassCard padding="md">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-900">Agent sessions</h3>
+          <h3 className="text-sm font-semibold text-gray-900">{t('automation.sessions.agentSessions')}</h3>
           {canConnect && availableUsers.length > 0 && (
             <div className="flex items-center gap-2">
               <CRMSelect
@@ -195,7 +189,7 @@ export function SessionsTab() {
                 onChange={(v) => setNewUserId(Array.isArray(v) ? (v[0] ?? '') : v)}
                 className="min-w-[200px]"
                 options={[
-                  { value: '', label: 'Pick agent…' },
+                  { value: '', label: t('automation.sessions.pickAgent') },
                   ...availableUsers.map((u) => ({ value: u.id, label: u.name })),
                 ]}
               />
@@ -205,7 +199,7 @@ export function SessionsTab() {
                 disabled={!newUserId}
                 onClick={() => newUserId && createSession(newUserId)}
               >
-                Add
+                {t('automation.sessions.add')}
               </CRMButton>
             </div>
           )}
@@ -215,18 +209,18 @@ export function SessionsTab() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-[11px] uppercase tracking-wide text-gray-500">
               <tr>
-                <th className="px-3 py-2 text-left">Agent</th>
-                <th className="px-3 py-2 text-left">Phone</th>
-                <th className="px-3 py-2 text-left">Status</th>
-                <th className="px-3 py-2 text-left">Last heartbeat</th>
-                <th className="px-3 py-2 text-right">Actions</th>
+                <th className="px-3 py-2 text-left">{t('automation.sessions.columns.agent')}</th>
+                <th className="px-3 py-2 text-left">{t('automation.sessions.columns.phone')}</th>
+                <th className="px-3 py-2 text-left">{t('automation.sessions.columns.status')}</th>
+                <th className="px-3 py-2 text-left">{t('automation.sessions.columns.lastHeartbeat')}</th>
+                <th className="px-3 py-2 text-right">{t('automation.sessions.columns.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {agentSessions.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-3 py-8 text-center text-xs text-gray-400">
-                    No agent sessions yet.
+                    {t('automation.sessions.noAgentSessions')}
                   </td>
                 </tr>
               ) : (
@@ -236,7 +230,7 @@ export function SessionsTab() {
                       {s.user?.name ?? '—'}
                       {systemSessionId === s.id && (
                         <span className="ml-2 rounded-badge bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
-                          System
+                          {t('automation.sessions.systemBadge')}
                         </span>
                       )}
                     </td>
@@ -244,7 +238,7 @@ export function SessionsTab() {
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
                         <span className={`h-2 w-2 rounded-full ${STATUS_COLOR[s.status]}`} />
-                        <span>{STATUS_LABEL[s.status]}</span>
+                        <span>{t(`automation.sessions.statusLabels.${s.status}`)}</span>
                       </div>
                     </td>
                     <td className="px-3 py-2 text-xs text-gray-500">
@@ -299,28 +293,29 @@ function SessionRowActions({
   onRemove: () => void;
   onSetSystem: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="flex justify-end gap-1.5">
       {session.status !== 'connected' && canConnect && (
         <CRMButton size="sm" variant="ghost" leftIcon={<QrCode size={13} />} onClick={onConnect}>
-          Connect
+          {t('automation.sessions.actions.connect')}
         </CRMButton>
       )}
       {session.status === 'connected' && canConnect && (
         <CRMButton size="sm" variant="ghost" leftIcon={<LogOut size={13} />} onClick={onDisconnect}>
-          Disconnect
+          {t('automation.sessions.actions.disconnect')}
         </CRMButton>
       )}
       {!isSystem && session.status === 'connected' && canManage && (
         <CRMButton size="sm" variant="ghost" leftIcon={<Star size={13} />} onClick={onSetSystem}>
-          Set as system
+          {t('automation.sessions.actions.setAsSystem')}
         </CRMButton>
       )}
       {canConnect && (
         <button
           onClick={onRemove}
           className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-red-50 hover:text-red-600"
-          aria-label="Delete session"
+          aria-label={t('automation.sessions.actions.deleteSession')}
         >
           <Trash2 size={13} />
         </button>

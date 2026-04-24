@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import {
   Activity,
   AlertTriangle,
@@ -23,19 +25,9 @@ import {
   type OverviewSessionRow,
 } from '@/services/automationApi';
 
-const TRIGGER_LABELS: Record<AutomationTrigger, string> = {
-  confirmation_confirmed: 'Confirmed',
-  confirmation_cancelled: 'Cancelled',
-  confirmation_unreachable: 'Unreachable',
-  shipping_label_created: 'Label',
-  shipping_picked_up: 'Picked up',
-  shipping_in_transit: 'In transit',
-  shipping_out_for_delivery: 'Out for delivery',
-  shipping_delivered: 'Delivered',
-  shipping_returned: 'Returned',
-  shipping_return_validated: 'Return OK',
-  commission_paid: 'Commission',
-};
+function triggerLabel(t: TFunction, trigger: AutomationTrigger): string {
+  return t(`automation.triggers.${trigger}`);
+}
 
 const STATUS_DOTS: Record<MessageLogStatus, string> = {
   queued: 'bg-gray-400',
@@ -47,6 +39,7 @@ const STATUS_DOTS: Record<MessageLogStatus, string> = {
 };
 
 export function OverviewTab() {
+  const { t } = useTranslation();
   const pushToast = useToastStore((s) => s.push);
   const [snapshot, setSnapshot] = useState<OverviewSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,16 +52,16 @@ export function OverviewTab() {
       setSnapshot(snap);
     } catch (err) {
       console.error(err);
-      pushToast({ kind: 'error', title: 'Failed to load overview' });
+      pushToast({ kind: 'error', title: t('automation.overview.loadFailed') });
     } finally {
       setLoading(false);
     }
-  }, [pushToast]);
+  }, [pushToast, t]);
 
   useEffect(() => {
     void load();
-    const t = setInterval(load, 20_000);
-    return () => clearInterval(t);
+    const id = setInterval(load, 20_000);
+    return () => clearInterval(id);
   }, [load]);
 
   useEffect(() => {
@@ -90,8 +83,12 @@ export function OverviewTab() {
     }) => {
       pushToast({
         kind: 'info',
-        title: `Rate limit: ${payload.reason}`,
-        body: `session ${payload.sessionId.slice(0, 6)}… ${payload.hourlyUsed ?? ''}/${payload.hourlyLimit ?? ''}`,
+        title: t('automation.overview.rateLimitTitle', { reason: payload.reason }),
+        body: t('automation.overview.rateLimitBody', {
+          session: payload.sessionId.slice(0, 6),
+          used: payload.hourlyUsed ?? '',
+          limit: payload.hourlyLimit ?? '',
+        }),
       });
       void load();
     };
@@ -101,28 +98,29 @@ export function OverviewTab() {
       socket.off('message_log:updated', onUpdate);
       socket.off('whatsapp:rate_limited', onRateLimited);
     };
-  }, [load, pushToast]);
+  }, [load, pushToast, t]);
 
   const handleRequeue = async (id: string) => {
     setBusyId(id);
     try {
       await automationApi.requeueLog(id);
-      pushToast({ kind: 'success', title: 'Requeued' });
+      pushToast({ kind: 'success', title: t('automation.overview.requeued') });
       await load();
     } catch (err) {
       console.error(err);
-      pushToast({ kind: 'error', title: 'Requeue failed' });
+      pushToast({ kind: 'error', title: t('automation.overview.requeueFailed') });
     } finally {
       setBusyId(null);
     }
   };
 
   const maxTrigger = useMemo(
-    () => Math.max(1, ...(snapshot?.topTriggers.map((t) => t.count) ?? [0])),
+    () => Math.max(1, ...(snapshot?.topTriggers.map((tr) => tr.count) ?? [0])),
     [snapshot],
   );
 
-  if (loading && !snapshot) return <div className="p-4 text-sm text-gray-500">Loading overview…</div>;
+  if (loading && !snapshot)
+    return <div className="p-4 text-sm text-gray-500">{t('automation.overview.loading')}</div>;
   if (!snapshot) return null;
 
   const { sessions, queue, feed, topTriggers, optOuts7d } = snapshot;
@@ -131,12 +129,12 @@ export function OverviewTab() {
     <div className="flex flex-col gap-4">
       {/* ── Top KPIs ──────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
-        <KpiCard icon={Activity} label="Queued" value={queue.queued} tone="gray" />
-        <KpiCard icon={Clock} label="Sending" value={queue.sending} tone="blue" />
-        <KpiCard icon={CheckCircle2} label="Sent" value={queue.sent + queue.delivered} tone="green" />
-        <KpiCard icon={XCircle} label="Failed" value={queue.failed} tone="orange" />
-        <KpiCard icon={AlertTriangle} label="Dead" value={queue.dead} tone="red" />
-        <KpiCard icon={UserX} label="Opt-outs (7d)" value={optOuts7d} tone="gray" />
+        <KpiCard icon={Activity} label={t('automation.overview.kpi.queued')} value={queue.queued} tone="gray" />
+        <KpiCard icon={Clock} label={t('automation.overview.kpi.sending')} value={queue.sending} tone="blue" />
+        <KpiCard icon={CheckCircle2} label={t('automation.overview.kpi.sent')} value={queue.sent + queue.delivered} tone="green" />
+        <KpiCard icon={XCircle} label={t('automation.overview.kpi.failed')} value={queue.failed} tone="orange" />
+        <KpiCard icon={AlertTriangle} label={t('automation.overview.kpi.dead')} value={queue.dead} tone="red" />
+        <KpiCard icon={UserX} label={t('automation.overview.kpi.optOuts7d')} value={optOuts7d} tone="gray" />
       </div>
 
       {/* ── Session health + top triggers ────────────────────────────── */}
@@ -144,14 +142,14 @@ export function OverviewTab() {
         <GlassCard className="xl:col-span-2">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="flex items-center gap-2 text-sm font-semibold text-primary">
-              <Smartphone size={14} /> Sessions health
+              <Smartphone size={14} /> {t('automation.overview.sessionsHealth')}
             </h2>
             <button onClick={load} className="rounded-btn p-1 text-gray-500 hover:bg-gray-100">
               <RefreshCw size={12} />
             </button>
           </div>
           {sessions.length === 0 ? (
-            <div className="text-sm text-gray-500">No WhatsApp sessions yet.</div>
+            <div className="text-sm text-gray-500">{t('automation.overview.noSessions')}</div>
           ) : (
             <div className="space-y-2">
               {sessions.map((s) => (
@@ -163,22 +161,22 @@ export function OverviewTab() {
 
         <GlassCard>
           <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-primary">
-            <Gauge size={14} /> Top triggers today
+            <Gauge size={14} /> {t('automation.overview.topTriggers')}
           </h2>
           {topTriggers.length === 0 ? (
-            <div className="text-sm text-gray-500">No activity today.</div>
+            <div className="text-sm text-gray-500">{t('automation.overview.noActivity')}</div>
           ) : (
             <div className="space-y-2">
-              {topTriggers.map((t) => (
-                <div key={t.trigger} className="flex items-center gap-2 text-xs">
-                  <span className="w-28 shrink-0 truncate text-gray-600">{TRIGGER_LABELS[t.trigger]}</span>
+              {topTriggers.map((tr) => (
+                <div key={tr.trigger} className="flex items-center gap-2 text-xs">
+                  <span className="w-28 shrink-0 truncate text-gray-600">{triggerLabel(t, tr.trigger)}</span>
                   <div className="flex-1 overflow-hidden rounded-full bg-gray-100">
                     <div
                       className="h-2 bg-primary"
-                      style={{ width: `${(t.count / maxTrigger) * 100}%` }}
+                      style={{ width: `${(tr.count / maxTrigger) * 100}%` }}
                     />
                   </div>
-                  <span className="w-10 shrink-0 text-right font-semibold text-gray-700">{t.count}</span>
+                  <span className="w-10 shrink-0 text-right font-semibold text-gray-700">{tr.count}</span>
                 </div>
               ))}
             </div>
@@ -189,22 +187,22 @@ export function OverviewTab() {
       {/* ── Live feed ───────────────────────────────────────────────── */}
       <GlassCard>
         <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-primary">
-          <Activity size={14} /> Live feed (last 20)
+          <Activity size={14} /> {t('automation.overview.liveFeed')}
         </h2>
         {feed.length === 0 ? (
-          <div className="text-sm text-gray-500">No recent messages.</div>
+          <div className="text-sm text-gray-500">{t('automation.overview.noRecent')}</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 text-left text-xs uppercase text-gray-500">
-                  <th className="py-2 pr-2">When</th>
-                  <th className="px-2">Trigger</th>
-                  <th className="px-2">Agent</th>
-                  <th className="px-2">Order</th>
-                  <th className="px-2">To</th>
-                  <th className="px-2">Status</th>
-                  <th className="px-2">Error</th>
+                  <th className="py-2 pr-2">{t('automation.overview.columns.when')}</th>
+                  <th className="px-2">{t('automation.overview.columns.trigger')}</th>
+                  <th className="px-2">{t('automation.overview.columns.agent')}</th>
+                  <th className="px-2">{t('automation.overview.columns.order')}</th>
+                  <th className="px-2">{t('automation.overview.columns.to')}</th>
+                  <th className="px-2">{t('automation.overview.columns.status')}</th>
+                  <th className="px-2">{t('automation.overview.columns.error')}</th>
                   <th className="px-2"></th>
                 </tr>
               </thead>
@@ -212,14 +210,14 @@ export function OverviewTab() {
                 {feed.map((row) => (
                   <tr key={row.id} className="border-b border-gray-50 text-xs">
                     <td className="py-2 pr-2 text-gray-500">{formatTime(row.createdAt)}</td>
-                    <td className="px-2">{TRIGGER_LABELS[row.trigger]}</td>
+                    <td className="px-2">{triggerLabel(t, row.trigger)}</td>
                     <td className="px-2">{row.agent?.name ?? '—'}</td>
                     <td className="px-2 font-mono">{row.order?.reference ?? '—'}</td>
                     <td className="px-2 font-mono">{row.recipientPhone}</td>
                     <td className="px-2">
                       <span className="inline-flex items-center gap-1.5">
                         <span className={`h-2 w-2 rounded-full ${STATUS_DOTS[row.status]}`} />
-                        {row.status}
+                        {t(`automation.status.${row.status}`)}
                       </span>
                     </td>
                     <td className="max-w-[180px] truncate px-2 text-red-600">{row.error ?? ''}</td>
@@ -232,7 +230,7 @@ export function OverviewTab() {
                           onClick={() => handleRequeue(row.id)}
                         >
                           <RefreshCw size={10} />
-                          Requeue
+                          {t('automation.overview.requeue')}
                         </CRMButton>
                       )}
                     </td>
@@ -248,6 +246,7 @@ export function OverviewTab() {
 }
 
 function SessionHealthRow({ session }: { session: OverviewSessionRow }) {
+  const { t } = useTranslation();
   const hourlyPct = Math.min(100, (session.hourlyUsed / Math.max(1, session.hourlyLimit)) * 100);
   const dailyPct = Math.min(100, (session.dailyUsed / Math.max(1, session.dailyLimit)) * 100);
   const heartbeatAgeMin = session.lastHeartbeat
@@ -272,18 +271,33 @@ function SessionHealthRow({ session }: { session: OverviewSessionRow }) {
           <span className="text-xs text-gray-500">{session.phoneNumber ?? '—'}</span>
         </div>
         <div className="flex items-center gap-3 text-xs">
-          <span className="text-green-600">{session.sentToday} sent</span>
-          <span className="text-red-600">{session.failedToday} failed</span>
+          <span className="text-green-600">
+            {t('automation.overview.session.sent', { count: session.sentToday })}
+          </span>
+          <span className="text-red-600">
+            {t('automation.overview.session.failed', { count: session.failedToday })}
+          </span>
           {isStale && (
             <span className="flex items-center gap-1 text-orange-600">
-              <AlertTriangle size={10} /> stale {heartbeatAgeMin}m
+              <AlertTriangle size={10} />{' '}
+              {t('automation.overview.session.stale', { minutes: heartbeatAgeMin })}
             </span>
           )}
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <UsageBar label="Hourly" used={session.hourlyUsed} limit={session.hourlyLimit} pct={hourlyPct} />
-        <UsageBar label="Daily" used={session.dailyUsed} limit={session.dailyLimit} pct={dailyPct} />
+        <UsageBar
+          label={t('automation.overview.session.hourly')}
+          used={session.hourlyUsed}
+          limit={session.hourlyLimit}
+          pct={hourlyPct}
+        />
+        <UsageBar
+          label={t('automation.overview.session.daily')}
+          used={session.dailyUsed}
+          limit={session.dailyLimit}
+          pct={dailyPct}
+        />
       </div>
     </div>
   );

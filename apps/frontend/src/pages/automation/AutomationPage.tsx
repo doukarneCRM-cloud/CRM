@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Activity,
   Inbox,
@@ -25,38 +26,41 @@ interface TabDef {
   permission?: string;
 }
 
-const TABS: TabDef[] = [
-  { id: 'overview', label: 'Overview', icon: Activity, permission: PERMISSIONS.AUTOMATION_MONITOR },
-  { id: 'inbox', label: 'Inbox', icon: Inbox, permission: PERMISSIONS.WHATSAPP_VIEW },
-  { id: 'rules', label: 'Rules', icon: SlidersHorizontal },
-  { id: 'templates', label: 'Templates', icon: MessageSquare },
-  { id: 'sessions', label: 'Sessions', icon: Smartphone },
-  { id: 'logs', label: 'Logs', icon: ScrollText },
-];
-
 export default function AutomationPage() {
+  const { t } = useTranslation();
   const hasPermission = useAuthStore((s) => s.hasPermission);
-  const visibleTabs = TABS.filter((t) => !t.permission || hasPermission(t.permission));
+
+  const TABS = useMemo<TabDef[]>(
+    () => [
+      { id: 'overview', label: t('automation.tabs.overview'), icon: Activity, permission: PERMISSIONS.AUTOMATION_MONITOR },
+      { id: 'inbox', label: t('automation.tabs.inbox'), icon: Inbox, permission: PERMISSIONS.WHATSAPP_VIEW },
+      { id: 'rules', label: t('automation.tabs.rules'), icon: SlidersHorizontal },
+      { id: 'templates', label: t('automation.tabs.templates'), icon: MessageSquare },
+      { id: 'sessions', label: t('automation.tabs.sessions'), icon: Smartphone },
+      { id: 'logs', label: t('automation.tabs.logs'), icon: ScrollText },
+    ],
+    [t],
+  );
+
+  const visibleTabs = TABS.filter((tab) => !tab.permission || hasPermission(tab.permission));
   const [tab, setTab] = useState<TabKey>(visibleTabs[0]?.id ?? 'rules');
 
   return (
     <div className="flex h-full flex-col gap-4 p-6">
       <header>
-        <h1 className="text-2xl font-bold text-primary">Automation</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          WhatsApp overview, inbox, rules, templates, agent sessions, and delivery logs.
-        </p>
+        <h1 className="text-2xl font-bold text-primary">{t('automation.page.title')}</h1>
+        <p className="mt-1 text-sm text-gray-500">{t('automation.page.subtitle')}</p>
       </header>
 
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex items-center gap-1 overflow-x-auto">
-          {visibleTabs.map((t) => {
-            const Icon = t.icon;
-            const active = tab === t.id;
+          {visibleTabs.map((tabDef) => {
+            const Icon = tabDef.icon;
+            const active = tab === tabDef.id;
             return (
               <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
+                key={tabDef.id}
+                onClick={() => setTab(tabDef.id)}
                 className={`group relative flex shrink-0 items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors ${
                   active
                     ? 'border-primary text-primary'
@@ -64,7 +68,7 @@ export default function AutomationPage() {
                 }`}
               >
                 <Icon size={15} strokeWidth={active ? 2.4 : 2} />
-                {t.label}
+                {tabDef.label}
               </button>
             );
           })}

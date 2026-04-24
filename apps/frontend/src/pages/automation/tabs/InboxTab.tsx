@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import {
   Send,
   CheckCircle2,
@@ -28,16 +30,20 @@ import {
 } from '@/services/whatsappApi';
 import { teamApi, type TeamUser } from '@/services/teamApi';
 
-const STATUS_OPTIONS: Array<{ value: WhatsAppThreadStatus | 'all'; label: string }> = [
-  { value: 'all', label: 'All' },
-  { value: 'open', label: 'Open' },
-  { value: 'snoozed', label: 'Snoozed' },
-  { value: 'closed', label: 'Closed' },
-];
-
 export function InboxTab() {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const pushToast = useToastStore((s) => s.push);
+
+  const STATUS_OPTIONS = useMemo<Array<{ value: WhatsAppThreadStatus | 'all'; label: string }>>(
+    () => [
+      { value: 'all', label: t('automation.inbox.status.all') },
+      { value: 'open', label: t('automation.inbox.status.open') },
+      { value: 'snoozed', label: t('automation.inbox.status.snoozed') },
+      { value: 'closed', label: t('automation.inbox.status.closed') },
+    ],
+    [t],
+  );
   const roleName = (user?.role?.name ?? '').toLowerCase();
   const isAdmin = roleName === 'admin' || roleName === 'supervisor';
 
@@ -91,11 +97,11 @@ export function InboxTab() {
       if (!activeIdRef.current && rows.length > 0) setActiveId(rows[0].id);
     } catch (err) {
       console.error(err);
-      pushToast({ kind: 'error', title: 'Failed to load threads' });
+      pushToast({ kind: 'error', title: t('automation.inbox.loadThreadsFailed') });
     } finally {
       setLoadingThreads(false);
     }
-  }, [scope, statusFilter, agentFilter, pushToast]);
+  }, [scope, statusFilter, agentFilter, pushToast, t]);
 
   useEffect(() => {
     void refreshThreads();
@@ -108,15 +114,15 @@ export function InboxTab() {
         const rows = await whatsappApi.inbox.listMessages(id);
         setMessages(rows);
         await whatsappApi.inbox.markRead(id);
-        setThreads((prev) => prev.map((t) => (t.id === id ? { ...t, unreadCount: 0 } : t)));
+        setThreads((prev) => prev.map((thr) => (thr.id === id ? { ...thr, unreadCount: 0 } : thr)));
       } catch (err) {
         console.error(err);
-        pushToast({ kind: 'error', title: 'Failed to load messages' });
+        pushToast({ kind: 'error', title: t('automation.inbox.loadMessagesFailed') });
       } finally {
         setLoadingMessages(false);
       }
     },
-    [pushToast],
+    [pushToast, t],
   );
 
   useEffect(() => {
@@ -134,7 +140,7 @@ export function InboxTab() {
     const socket = getSocket();
     const onMessage = (payload: { thread: InboxThread; message: InboxMessage }) => {
       setThreads((prev) => {
-        const idx = prev.findIndex((t) => t.id === payload.thread.id);
+        const idx = prev.findIndex((thr) => thr.id === payload.thread.id);
         const next = [...prev];
         const merged = idx === -1 ? payload.thread : { ...prev[idx], ...payload.thread };
         // Don't bump unread if this thread is already open on screen.
@@ -164,16 +170,16 @@ export function InboxTab() {
   }, []);
 
   const activeThread = useMemo(
-    () => threads.find((t) => t.id === activeId) ?? null,
+    () => threads.find((thr) => thr.id === activeId) ?? null,
     [threads, activeId],
   );
 
   const filteredThreads = useMemo(() => {
     if (!search.trim()) return threads;
     const q = search.trim().toLowerCase();
-    return threads.filter((t) => {
-      const name = t.customer?.fullName?.toLowerCase() ?? '';
-      const phone = (t.customer?.phoneDisplay ?? t.customerPhone).toLowerCase();
+    return threads.filter((thr) => {
+      const name = thr.customer?.fullName?.toLowerCase() ?? '';
+      const phone = (thr.customer?.phoneDisplay ?? thr.customerPhone).toLowerCase();
       return name.includes(q) || phone.includes(q);
     });
   }, [threads, search]);
@@ -200,7 +206,7 @@ export function InboxTab() {
         await refreshMessages(activeThread.id);
       } catch (err) {
         console.error(err);
-        pushToast({ kind: 'error', title: 'Send failed' });
+        pushToast({ kind: 'error', title: t('automation.inbox.sendFailed') });
       } finally {
         setSending(false);
       }
@@ -214,7 +220,7 @@ export function InboxTab() {
       await refreshMessages(activeThread.id);
     } catch (err) {
       console.error(err);
-      pushToast({ kind: 'error', title: 'Send failed' });
+      pushToast({ kind: 'error', title: t('automation.inbox.sendFailed') });
     } finally {
       setSending(false);
     }
@@ -234,7 +240,7 @@ export function InboxTab() {
     e.target.value = '';
     if (!f) return;
     if (f.size > 50 * 1024 * 1024) {
-      pushToast({ kind: 'error', title: 'File too large (max 50 MB)' });
+      pushToast({ kind: 'error', title: t('automation.inbox.fileTooLarge') });
       return;
     }
     if (pendingPreview) URL.revokeObjectURL(pendingPreview);
@@ -263,7 +269,7 @@ export function InboxTab() {
         if (ev.data.size > 0) recordChunksRef.current.push(ev.data);
       };
       rec.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
+        stream.getTracks().forEach((track) => track.stop());
         if (recordTimerRef.current != null) {
           window.clearInterval(recordTimerRef.current);
           recordTimerRef.current = null;
@@ -284,7 +290,7 @@ export function InboxTab() {
           await refreshMessages(activeIdRef.current);
         } catch (err) {
           console.error(err);
-          pushToast({ kind: 'error', title: 'Voice note failed' });
+          pushToast({ kind: 'error', title: t('automation.inbox.voiceNoteFailed') });
         } finally {
           setSending(false);
         }
@@ -299,7 +305,7 @@ export function InboxTab() {
       }, 250);
     } catch (err) {
       console.error(err);
-      pushToast({ kind: 'error', title: 'Microphone permission denied' });
+      pushToast({ kind: 'error', title: t('automation.inbox.micDenied') });
     }
   };
 
@@ -312,7 +318,7 @@ export function InboxTab() {
     } else {
       // Cancel: swap the onstop to a no-op so the chunks are discarded.
       rec.onstop = () => {
-        rec.stream.getTracks().forEach((t) => t.stop());
+        rec.stream.getTracks().forEach((track) => track.stop());
         recordChunksRef.current = [];
         if (recordTimerRef.current != null) {
           window.clearInterval(recordTimerRef.current);
@@ -327,7 +333,7 @@ export function InboxTab() {
   useEffect(() => {
     return () => {
       if (recordTimerRef.current != null) window.clearInterval(recordTimerRef.current);
-      recorderRef.current?.stream.getTracks().forEach((t) => t.stop());
+      recorderRef.current?.stream.getTracks().forEach((track) => track.stop());
       if (pendingPreview) URL.revokeObjectURL(pendingPreview);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -338,10 +344,10 @@ export function InboxTab() {
     try {
       await whatsappApi.inbox.updateThread(activeThread.id, { status });
       await refreshThreads();
-      pushToast({ kind: 'success', title: `Marked ${status}` });
+      pushToast({ kind: 'success', title: t(`automation.inbox.markedStatus_${status}`) });
     } catch (err) {
       console.error(err);
-      pushToast({ kind: 'error', title: 'Update failed' });
+      pushToast({ kind: 'error', title: t('automation.inbox.updateFailed') });
     }
   };
 
@@ -357,19 +363,19 @@ export function InboxTab() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search or start a new chat"
+              placeholder={t('automation.inbox.searchPlaceholder')}
               className="w-full rounded-full border border-transparent bg-white py-2 pl-9 pr-3 text-xs outline-none focus:border-gray-300"
             />
           </div>
           {isAdmin && (
             <div className="flex gap-1">
               <FilterChip
-                label="Mine"
+                label={t('automation.inbox.scope.mine')}
                 active={scope === 'mine'}
                 onClick={() => setScope('mine')}
               />
               <FilterChip
-                label="All"
+                label={t('automation.inbox.scope.all')}
                 active={scope === 'all'}
                 onClick={() => setScope('all')}
               />
@@ -390,9 +396,9 @@ export function InboxTab() {
               value={agentFilter}
               onChange={(e) => setAgentFilter(e.target.value)}
               className="w-full rounded-full border border-transparent bg-white px-3 py-1.5 text-xs outline-none focus:border-gray-300"
-              title="Filter by agent"
+              title={t('automation.inbox.filterByAgent')}
             >
-              <option value="">All agents</option>
+              <option value="">{t('automation.inbox.allAgents')}</option>
               {agents.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name}
@@ -403,17 +409,17 @@ export function InboxTab() {
         </div>
         <div className="flex-1 overflow-y-auto bg-white">
           {loadingThreads ? (
-            <div className="p-4 text-sm text-gray-500">Loading…</div>
+            <div className="p-4 text-sm text-gray-500">{t('automation.inbox.loading')}</div>
           ) : filteredThreads.length === 0 ? (
-            <div className="p-4 text-sm text-gray-500">No conversations yet.</div>
+            <div className="p-4 text-sm text-gray-500">{t('automation.inbox.noConversations')}</div>
           ) : (
-            filteredThreads.map((t) => (
+            filteredThreads.map((thr) => (
               <ThreadRow
-                key={t.id}
-                thread={t}
-                active={t.id === activeId}
+                key={thr.id}
+                thread={thr}
+                active={thr.id === activeId}
                 showAgent={isAdmin && (scope === 'all' || !!agentFilter)}
-                onClick={() => setActiveId(t.id)}
+                onClick={() => setActiveId(thr.id)}
               />
             ))
           )}
@@ -428,11 +434,8 @@ export function InboxTab() {
               <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full bg-white text-[#00A884] shadow-sm">
                 <Send size={36} />
               </div>
-              <h3 className="mb-1 text-xl font-light text-gray-700">CRM WhatsApp Inbox</h3>
-              <p className="text-sm text-gray-500">
-                Select a conversation on the left to read the thread, send media, or record a
-                voice note.
-              </p>
+              <h3 className="mb-1 text-xl font-light text-gray-700">{t('automation.inbox.welcome.title')}</h3>
+              <p className="text-sm text-gray-500">{t('automation.inbox.welcome.body')}</p>
             </div>
           </div>
         ) : (
@@ -455,14 +458,14 @@ export function InboxTab() {
                 <button
                   onClick={() => handleStatus('snoozed')}
                   className="rounded-full p-2 text-gray-600 hover:bg-black/5"
-                  title="Snooze"
+                  title={t('automation.inbox.snooze')}
                 >
                   <Clock3 size={16} />
                 </button>
                 <button
                   onClick={() => handleStatus('closed')}
                   className="rounded-full p-2 text-gray-600 hover:bg-black/5"
-                  title="Close"
+                  title={t('automation.inbox.close')}
                 >
                   <CheckCircle2 size={16} />
                 </button>
@@ -479,9 +482,9 @@ export function InboxTab() {
               }}
             >
               {loadingMessages ? (
-                <div className="text-sm text-gray-500">Loading…</div>
+                <div className="text-sm text-gray-500">{t('automation.inbox.loading')}</div>
               ) : messages.length === 0 ? (
-                <div className="text-sm text-gray-500">No messages in this conversation yet.</div>
+                <div className="text-sm text-gray-500">{t('automation.inbox.noMessages')}</div>
               ) : (
                 <div className="flex flex-col gap-1">
                   {groupedMessages.map((group, gi) => (
@@ -503,7 +506,7 @@ export function InboxTab() {
             <div className="relative bg-[#F0F2F5] px-3 py-2">
               {activeThread.customer?.whatsappOptOut && (
                 <div className="mb-2 rounded-lg bg-red-50 p-2 text-xs text-red-700">
-                  This customer opted out of WhatsApp. Replies are blocked.
+                  {t('automation.inbox.optedOutBanner')}
                 </div>
               )}
 
@@ -536,7 +539,7 @@ export function InboxTab() {
                   {pendingPreview && pendingFile.type.startsWith('image/') ? (
                     <img
                       src={pendingPreview}
-                      alt="preview"
+                      alt={t('automation.inbox.mediaAlt.preview')}
                       className="h-14 w-14 rounded-lg object-cover"
                     />
                   ) : pendingPreview && pendingFile.type.startsWith('video/') ? (
@@ -558,7 +561,7 @@ export function InboxTab() {
                   <button
                     onClick={clearPending}
                     className="rounded-full p-1.5 text-gray-500 hover:bg-gray-100"
-                    title="Remove"
+                    title={t('automation.inbox.remove')}
                   >
                     <X size={14} />
                   </button>
@@ -573,20 +576,20 @@ export function InboxTab() {
                     <span className="relative inline-flex h-3 w-3 rounded-full bg-red-500" />
                   </span>
                   <span className="text-sm font-medium text-gray-700">
-                    Recording · {formatDuration(recordElapsed)}
+                    {t('automation.inbox.recordingLabel', { duration: formatDuration(recordElapsed) })}
                   </span>
                   <div className="ml-auto flex items-center gap-2">
                     <button
                       onClick={() => stopRecording(false)}
                       className="rounded-full p-2 text-gray-500 hover:bg-gray-100"
-                      title="Cancel"
+                      title={t('common.cancel')}
                     >
                       <X size={18} />
                     </button>
                     <button
                       onClick={() => stopRecording(true)}
                       className="flex h-10 w-10 items-center justify-center rounded-full bg-[#00A884] text-white shadow hover:bg-[#008f72]"
-                      title="Send voice note"
+                      title={t('automation.inbox.sendVoiceNote')}
                     >
                       <Send size={18} />
                     </button>
@@ -600,7 +603,7 @@ export function InboxTab() {
                       onClick={() => setAttachMenuOpen((v) => !v)}
                       disabled={!!activeThread.customer?.whatsappOptOut || sending}
                       className="flex h-10 w-10 items-center justify-center rounded-full text-gray-500 hover:bg-black/5 disabled:opacity-40"
-                      title="Attach"
+                      title={t('automation.inbox.attach')}
                     >
                       <Paperclip size={22} />
                     </button>
@@ -608,17 +611,17 @@ export function InboxTab() {
                       <div className="absolute bottom-12 left-0 z-10 w-44 overflow-hidden rounded-lg border border-gray-100 bg-white shadow-xl">
                         <AttachOption
                           icon={<ImageIcon size={16} className="text-pink-500" />}
-                          label="Photo"
+                          label={t('automation.inbox.attachPhoto')}
                           onClick={() => pickFile('image')}
                         />
                         <AttachOption
                           icon={<Film size={16} className="text-purple-500" />}
-                          label="Video"
+                          label={t('automation.inbox.attachVideo')}
                           onClick={() => pickFile('video')}
                         />
                         <AttachOption
                           icon={<FileIcon size={16} className="text-blue-500" />}
-                          label="Document"
+                          label={t('automation.inbox.attachDocument')}
                           onClick={() => pickFile('document')}
                         />
                       </div>
@@ -639,9 +642,9 @@ export function InboxTab() {
                       placeholder={
                         pendingFile
                           ? fileKind(pendingFile) === 'image' || fileKind(pendingFile) === 'video'
-                            ? 'Add a caption…'
-                            : 'Press send to deliver this file'
-                          : 'Type a message'
+                            ? t('automation.inbox.composerCaption')
+                            : t('automation.inbox.composerPressSend')
+                          : t('automation.inbox.composerPlaceholder')
                       }
                       rows={1}
                       className="block max-h-28 w-full resize-none border-0 bg-transparent p-0 text-sm leading-6 outline-none placeholder:text-gray-400 disabled:opacity-50"
@@ -654,7 +657,7 @@ export function InboxTab() {
                       onClick={startRecording}
                       disabled={!!activeThread.customer?.whatsappOptOut || sending}
                       className="flex h-10 w-10 items-center justify-center rounded-full bg-[#00A884] text-white shadow hover:bg-[#008f72] disabled:opacity-40"
-                      title="Record voice note"
+                      title={t('automation.inbox.recordVoiceNote')}
                     >
                       <Mic size={18} />
                     </button>
@@ -667,7 +670,7 @@ export function InboxTab() {
                         (!composer.trim() && !pendingFile)
                       }
                       className="flex h-10 w-10 items-center justify-center rounded-full bg-[#00A884] text-white shadow hover:bg-[#008f72] disabled:opacity-40"
-                      title="Send"
+                      title={t('automation.inbox.send')}
                     >
                       <Send size={18} />
                     </button>
@@ -718,6 +721,7 @@ function ThreadRow({
   showAgent: boolean;
   onClick: () => void;
 }) {
+  const { t } = useTranslation();
   const last = thread.messages?.[0];
   const name = thread.customer?.fullName ?? thread.customerPhone;
   const hasUnread = thread.unreadCount > 0;
@@ -735,14 +739,14 @@ function ThreadRow({
           <span
             className={`shrink-0 text-[11px] ${hasUnread ? 'font-semibold text-[#00A884]' : 'text-gray-500'}`}
           >
-            {formatRelative(thread.lastMessageAt)}
+            {formatRelative(t, thread.lastMessageAt)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-2">
           <span className="flex min-w-0 items-center gap-1 truncate text-[13px] text-gray-500">
             {last?.direction === 'out' && <CheckCheck size={14} className="shrink-0 text-gray-400" />}
             <span className="truncate">
-              {last ? formatMessagePreview(last) : thread.customer?.phoneDisplay ?? thread.customerPhone}
+              {last ? formatMessagePreview(t, last) : thread.customer?.phoneDisplay ?? thread.customerPhone}
             </span>
           </span>
           {hasUnread && (
@@ -755,7 +759,7 @@ function ThreadRow({
           <div className="mt-1 flex items-center gap-1.5 text-[10px] text-gray-400">
             {thread.customer?.whatsappOptOut && (
               <span className="flex items-center gap-0.5 text-red-500">
-                <UserX size={10} /> opted out
+                <UserX size={10} /> {t('automation.inbox.optedOut')}
               </span>
             )}
             {thread.assignedAgent && showAgent && (
@@ -780,6 +784,7 @@ function MessageBubble({
   first: boolean;
   last: boolean;
 }) {
+  const { t } = useTranslation();
   const out = message.direction === 'out';
   // Stickers aren't bubbles on WhatsApp — render bare so the transparent
   // webp sits on the chat background like a real sticker would.
@@ -789,7 +794,7 @@ function MessageBubble({
         <div className="flex flex-col items-end">
           <img
             src={resolveImageUrl(message.mediaUrl)}
-            alt="sticker"
+            alt={t('automation.inbox.mediaAlt.sticker')}
             className="h-32 w-32 object-contain"
           />
           <span className="mt-0.5 text-[10px] text-gray-500">{formatTime(message.createdAt)}</span>
@@ -845,25 +850,30 @@ function MessageBubble({
 
 // ─── Media renderers ───────────────────────────────────────────────────────
 function MediaBlock({ message }: { message: InboxMessage }) {
+  const { t } = useTranslation();
   const url = resolveImageUrl(message.mediaUrl ?? '');
   if (!url) return null;
   switch (message.mediaType) {
     case 'image':
       return (
         <a href={url} target="_blank" rel="noreferrer" className="block">
-          <img src={url} alt={message.body || 'image'} className="max-h-72 w-full rounded-lg object-cover" />
+          <img
+            src={url}
+            alt={message.body || t('automation.inbox.mediaAlt.image')}
+            className="max-h-72 w-full rounded-lg object-cover"
+          />
         </a>
       );
     case 'video':
       return (
         <video controls src={url} className="max-h-72 w-full rounded-lg bg-black">
-          Your browser can't play this video.
+          {t('automation.inbox.browser.cantPlayVideo')}
         </video>
       );
     case 'audio':
       return (
         <audio controls src={url} className="w-64 max-w-full">
-          Your browser can't play this audio.
+          {t('automation.inbox.browser.cantPlayAudio')}
         </audio>
       );
     case 'document':
@@ -875,7 +885,7 @@ function MediaBlock({ message }: { message: InboxMessage }) {
           className="flex items-center gap-2 rounded-lg bg-black/5 p-2 text-xs hover:bg-black/10"
         >
           <FileText size={18} className="shrink-0 text-gray-600" />
-          <span className="flex-1 truncate">{message.body || 'document'}</span>
+          <span className="flex-1 truncate">{message.body || t('automation.inbox.mediaAlt.document')}</span>
           <Download size={14} className="shrink-0 text-gray-500" />
         </a>
       );
@@ -891,10 +901,11 @@ function MessageTicks({ read }: { read: boolean }) {
 
 // ─── Day separator ─────────────────────────────────────────────────────────
 function DaySeparator({ date }: { date: Date }) {
+  const { t } = useTranslation();
   return (
     <div className="my-2 flex justify-center">
       <span className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-medium text-gray-600 shadow-sm">
-        {formatDayLabel(date)}
+        {formatDayLabel(t, date)}
       </span>
     </div>
   );
@@ -943,34 +954,37 @@ function groupByDay(messages: InboxMessage[]): Array<{ date: Date; messages: Inb
   return groups;
 }
 
-function formatDayLabel(d: Date): string {
+function formatDayLabel(t: TFunction, d: Date): string {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
   const target = new Date(d);
   target.setHours(0, 0, 0, 0);
-  if (target.getTime() === today.getTime()) return 'Today';
-  if (target.getTime() === yesterday.getTime()) return 'Yesterday';
+  if (target.getTime() === today.getTime()) return t('automation.inbox.day.today');
+  if (target.getTime() === yesterday.getTime()) return t('automation.inbox.day.yesterday');
   return d.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function formatMessagePreview(last: {
-  body: string;
-  mediaType: InboxMessage['mediaType'];
-}): string {
+function formatMessagePreview(
+  t: TFunction,
+  last: {
+    body: string;
+    mediaType: InboxMessage['mediaType'];
+  },
+): string {
   if (last.body) return last.body;
   switch (last.mediaType) {
     case 'image':
-      return '📷 Photo';
+      return t('automation.inbox.preview.photo');
     case 'video':
-      return '🎥 Video';
+      return t('automation.inbox.preview.video');
     case 'audio':
-      return '🎤 Voice message';
+      return t('automation.inbox.preview.voice');
     case 'sticker':
-      return 'Sticker';
+      return t('automation.inbox.preview.sticker');
     case 'document':
-      return '📎 Document';
+      return t('automation.inbox.preview.document');
     default:
       return '';
   }
@@ -981,15 +995,15 @@ function formatTime(iso: string): string {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-function formatRelative(iso: string): string {
+function formatRelative(t: TFunction, iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return 'now';
-  if (mins < 60) return `${mins}m`;
+  if (mins < 1) return t('automation.inbox.relative.now');
+  if (mins < 60) return t('automation.inbox.relative.minutes', { count: mins });
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h`;
+  if (hrs < 24) return t('automation.inbox.relative.hours', { count: hrs });
   const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d`;
+  if (days < 7) return t('automation.inbox.relative.days', { count: days });
   return new Date(iso).toLocaleDateString();
 }
 

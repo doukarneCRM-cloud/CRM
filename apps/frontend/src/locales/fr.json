@@ -1218,5 +1218,312 @@
         "networkError": "Erreur réseau — réessayez"
       }
     }
+  },
+  "automation": {
+    "page": {
+      "title": "Automatisation",
+      "subtitle": "Vue d'ensemble, messagerie, règles, modèles, sessions des agents et journaux de livraison WhatsApp."
+    },
+    "tabs": {
+      "overview": "Vue d'ensemble",
+      "inbox": "Messagerie",
+      "rules": "Règles",
+      "templates": "Modèles",
+      "sessions": "Sessions",
+      "logs": "Journaux"
+    },
+    "triggers": {
+      "confirmation_confirmed": "Confirmé",
+      "confirmation_cancelled": "Annulé",
+      "confirmation_unreachable": "Injoignable",
+      "shipping_label_created": "Étiquette",
+      "shipping_picked_up": "Ramassé",
+      "shipping_in_transit": "En transit",
+      "shipping_out_for_delivery": "En livraison",
+      "shipping_delivered": "Livré",
+      "shipping_returned": "Retourné",
+      "shipping_return_validated": "Retour OK",
+      "commission_paid": "Commission"
+    },
+    "triggersLong": {
+      "confirmation_confirmed": "Commande confirmée",
+      "confirmation_cancelled": "Commande annulée",
+      "confirmation_unreachable": "Client injoignable",
+      "shipping_label_created": "Étiquette créée",
+      "shipping_picked_up": "Ramassé",
+      "shipping_in_transit": "En transit",
+      "shipping_out_for_delivery": "En livraison",
+      "shipping_delivered": "Livré",
+      "shipping_returned": "Retourné",
+      "shipping_return_validated": "Retour validé",
+      "commission_paid": "Commission payée"
+    },
+    "status": {
+      "queued": "En file",
+      "sending": "Envoi",
+      "sent": "Envoyés",
+      "delivered": "Livrés",
+      "failed": "Échecs",
+      "dead": "Abandonnés"
+    },
+    "overview": {
+      "loading": "Chargement de la vue d'ensemble…",
+      "loadFailed": "Échec du chargement de la vue d'ensemble",
+      "rateLimitTitle": "Limite de débit : {{reason}}",
+      "rateLimitBody": "session {{session}}… {{used}}/{{limit}}",
+      "requeued": "Remis en file",
+      "requeueFailed": "Échec de la relance",
+      "requeue": "Relancer",
+      "kpi": {
+        "queued": "En file",
+        "sending": "Envoi",
+        "sent": "Envoyés",
+        "failed": "Échecs",
+        "dead": "Abandonnés",
+        "optOuts7d": "Désabonnements (7j)"
+      },
+      "sessionsHealth": "État des sessions",
+      "noSessions": "Aucune session WhatsApp.",
+      "topTriggers": "Principaux déclencheurs aujourd'hui",
+      "noActivity": "Aucune activité aujourd'hui.",
+      "liveFeed": "Flux en direct (20 derniers)",
+      "noRecent": "Aucun message récent.",
+      "columns": {
+        "when": "Quand",
+        "trigger": "Déclencheur",
+        "agent": "Agent",
+        "order": "Commande",
+        "to": "À",
+        "status": "Statut",
+        "error": "Erreur"
+      },
+      "session": {
+        "stale": "périmé {{minutes}}m",
+        "hourly": "Horaire",
+        "daily": "Quotidien",
+        "sent_one": "{{count}} envoyé",
+        "sent_other": "{{count}} envoyés",
+        "failed_one": "{{count}} échec",
+        "failed_other": "{{count}} échecs"
+      }
+    },
+    "inbox": {
+      "loadThreadsFailed": "Échec du chargement des conversations",
+      "loadMessagesFailed": "Échec du chargement des messages",
+      "sendFailed": "Échec de l'envoi",
+      "fileTooLarge": "Fichier trop volumineux (max 50 Mo)",
+      "voiceNoteFailed": "Échec du message vocal",
+      "micDenied": "Accès au microphone refusé",
+      "updateFailed": "Échec de la mise à jour",
+      "markedStatus_open": "Marqué ouvert",
+      "markedStatus_snoozed": "Mis en sourdine",
+      "markedStatus_closed": "Marqué fermé",
+      "searchPlaceholder": "Rechercher ou démarrer une conversation",
+      "status": {
+        "all": "Tous",
+        "open": "Ouverts",
+        "snoozed": "Sourdine",
+        "closed": "Fermés"
+      },
+      "scope": {
+        "mine": "Les miens",
+        "all": "Tous"
+      },
+      "filterByAgent": "Filtrer par agent",
+      "allAgents": "Tous les agents",
+      "loading": "Chargement…",
+      "noConversations": "Aucune conversation pour le moment.",
+      "welcome": {
+        "title": "Messagerie WhatsApp CRM",
+        "body": "Sélectionnez une conversation à gauche pour lire le fil, envoyer un média ou enregistrer un message vocal."
+      },
+      "snooze": "Mettre en sourdine",
+      "close": "Fermer",
+      "optedOutBanner": "Ce client s'est désabonné de WhatsApp. Les réponses sont bloquées.",
+      "remove": "Retirer",
+      "recordingLabel": "Enregistrement · {{duration}}",
+      "cancel": "Annuler",
+      "sendVoiceNote": "Envoyer le message vocal",
+      "attach": "Joindre",
+      "attachPhoto": "Photo",
+      "attachVideo": "Vidéo",
+      "attachDocument": "Document",
+      "composerPlaceholder": "Écrire un message",
+      "composerCaption": "Ajouter une légende…",
+      "composerPressSend": "Appuyez sur envoyer pour transmettre ce fichier",
+      "recordVoiceNote": "Enregistrer un message vocal",
+      "send": "Envoyer",
+      "noMessages": "Aucun message dans cette conversation.",
+      "optedOut": "désabonné",
+      "preview": {
+        "photo": "📷 Photo",
+        "video": "🎥 Vidéo",
+        "voice": "🎤 Message vocal",
+        "sticker": "Sticker",
+        "document": "📎 Document"
+      },
+      "day": {
+        "today": "Aujourd'hui",
+        "yesterday": "Hier"
+      },
+      "relative": {
+        "now": "à l'instant",
+        "minutes": "{{count}} min",
+        "hours": "{{count}} h",
+        "days": "{{count}} j"
+      },
+      "browser": {
+        "cantPlayVideo": "Votre navigateur ne peut pas lire cette vidéo.",
+        "cantPlayAudio": "Votre navigateur ne peut pas lire cet audio."
+      },
+      "mediaAlt": {
+        "image": "image",
+        "sticker": "sticker",
+        "preview": "aperçu",
+        "document": "document"
+      }
+    },
+    "rules": {
+      "loadFailed": "Échec du chargement des règles",
+      "loading": "Chargement…",
+      "saved": "Règle enregistrée",
+      "saveFailed": "Échec de l'enregistrement",
+      "createFailed": "Échec de la création",
+      "deleteFailed": "Échec de la suppression",
+      "noTemplateForTrigger": "Aucun modèle pour ce déclencheur",
+      "confirmDelete": "Supprimer la règle « {{name}} » ?",
+      "newRuleName": "Nouvelle règle",
+      "intro": "Les règles décident si un déclencheur se déclenche réellement. Chaque règle pointe vers un modèle et porte des conditions optionnelles. Lorsque plusieurs règles correspondent au même déclencheur, la règle de plus haute priorité l'emporte (sauf si vous activez <1>Déclencher toutes les règles correspondantes</1>).",
+      "newRule": "Nouvelle règle",
+      "noRules": "Aucune règle — le déclencheur ne sera pas activé.",
+      "priority": "Priorité",
+      "enabled": "Activée",
+      "disabled": "Désactivée",
+      "deleteRule": "Supprimer la règle",
+      "template": "Modèle",
+      "templateDisabled": "(modèle désactivé)",
+      "whenMultipleMatch": "Quand plusieurs règles correspondent",
+      "overlap": {
+        "first": "Ne déclencher que la première correspondance (par priorité)",
+        "all": "Déclencher toutes les règles correspondantes"
+      },
+      "forceSystem": "Forcer l'envoi via la session système",
+      "allOf": "TOUTES (chaque condition doit correspondre)",
+      "anyOf": "UNE AU MOINS (au moins une doit correspondre)",
+      "add": "ajouter",
+      "noAnd": "Aucune condition ET — la règle correspond à tout ici.",
+      "noOr": "Aucune condition OU.",
+      "saveRule": "Enregistrer la règle",
+      "removeCondition": "Supprimer la condition",
+      "valuePlaceholder": "valeur",
+      "listPlaceholder": "valeurs,séparées,par,virgules",
+      "ops": {
+        "eq": "égal à",
+        "neq": "différent de",
+        "in": "dans la liste",
+        "not_in": "hors de la liste",
+        "gte": "≥",
+        "lte": "≤",
+        "contains": "contient"
+      }
+    },
+    "templates": {
+      "saved": "Modèle enregistré",
+      "saveFailed": "Échec de l'enregistrement du modèle",
+      "variablesHint": "Variables (cliquez pour insérer)",
+      "bodyPlaceholder": "Corps du message…",
+      "preview": "Aperçu",
+      "empty": "Vide",
+      "saving": "Enregistrement…",
+      "save": "Enregistrer"
+    },
+    "sessions": {
+      "createFailed": "Échec de la création de la session",
+      "disconnectConfirm": "Déconnecter cette session ?",
+      "disconnectFailed": "Échec de la déconnexion",
+      "deleteConfirm": "Supprimer définitivement cette session ?",
+      "deleteFailed": "Échec de la suppression",
+      "systemUpdated": "Expéditeur système mis à jour",
+      "systemUpdateFailed": "Échec de la définition de l'expéditeur système",
+      "unknownError": "Erreur inconnue",
+      "systemSession": "Session système",
+      "systemSubtitle": "Utilisée pour les DM de commission et comme solution de repli quand un agent est hors ligne.",
+      "createSystemSession": "Créer la session système",
+      "systemMissing": "Une session système a été configurée mais aucune session correspondante n'existe. Les messages de commission échoueront jusqu'à ce que vous en créiez une.",
+      "agentSessions": "Sessions des agents",
+      "pickAgent": "Choisir un agent…",
+      "add": "Ajouter",
+      "noAgentSessions": "Aucune session agent pour le moment.",
+      "columns": {
+        "agent": "Agent",
+        "phone": "Téléphone",
+        "status": "Statut",
+        "lastHeartbeat": "Dernier signal",
+        "actions": "Actions"
+      },
+      "systemBadge": "Système",
+      "statusLabels": {
+        "connected": "Connectée",
+        "connecting": "Connexion",
+        "disconnected": "Déconnectée",
+        "error": "Erreur"
+      },
+      "actions": {
+        "connect": "Connecter",
+        "disconnect": "Déconnecter",
+        "setAsSystem": "Définir comme système",
+        "deleteSession": "Supprimer la session"
+      }
+    },
+    "logs": {
+      "retried": "Remis en file",
+      "retryFailed": "Échec de la relance",
+      "trigger": "Déclencheur",
+      "status": "Statut",
+      "allTriggers": "Tous les déclencheurs",
+      "allStatuses": "Tous les statuts",
+      "messages_one": "{{count}} message",
+      "messages_other": "{{count}} messages",
+      "refresh": "Actualiser",
+      "columns": {
+        "time": "Heure",
+        "trigger": "Déclencheur",
+        "recipient": "Destinataire",
+        "order": "Commande",
+        "agent": "Agent",
+        "status": "Statut"
+      },
+      "loading": "Chargement…",
+      "noMessages": "Aucun message pour le moment.",
+      "retry": "Réessayer",
+      "pagination": "Affichage de {{from}}–{{to}} sur {{total}}",
+      "prev": "Précédent",
+      "next": "Suivant",
+      "detailTitle": "Détail du message",
+      "detail": {
+        "trigger": "Déclencheur",
+        "recipient": "Destinataire",
+        "order": "Commande",
+        "agent": "Agent",
+        "status": "Statut",
+        "created": "Créé",
+        "sent": "Envoyé",
+        "providerId": "ID fournisseur",
+        "error": "Erreur",
+        "body": "Corps"
+      },
+      "close": "Fermer"
+    },
+    "qr": {
+      "connectUser": "Connecter {{name}}",
+      "connectSystem": "Connecter la session système",
+      "loadFailed": "Échec du chargement du QR",
+      "qrAlt": "QR WhatsApp",
+      "instructions": "Ouvrez WhatsApp → Appareils associés → Associer un appareil, puis scannez ce code.",
+      "pairingCode": "Ou utilisez le code d’appairage : <1>{{code}}</1>",
+      "statusLabel": "Statut : {{state}}",
+      "waiting": "En attente du QR…",
+      "close": "Fermer"
+    }
   }
 }

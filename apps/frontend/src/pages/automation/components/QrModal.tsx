@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation, Trans } from 'react-i18next';
 import { GlassModal } from '@/components/ui/GlassModal';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { whatsappApi, type WhatsAppSession } from '@/services/whatsappApi';
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export function QrModal({ open, session, onClose, onConnected }: Props) {
+  const { t } = useTranslation();
   const [qr, setQr] = useState<string | null>(null);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [state, setState] = useState<string>('connecting');
@@ -42,7 +44,7 @@ export function QrModal({ open, session, onClose, onConnected }: Props) {
         }
       } catch (e: any) {
         if (stopRef.current) return;
-        setError(e?.response?.data?.error ?? 'Failed to load QR');
+        setError(e?.response?.data?.error ?? t('automation.qr.loadFailed'));
       }
       timer = setTimeout(poll, 2000);
     };
@@ -53,9 +55,11 @@ export function QrModal({ open, session, onClose, onConnected }: Props) {
       stopRef.current = true;
       if (timer) clearTimeout(timer);
     };
-  }, [open, session, onConnected, onClose]);
+  }, [open, session, onConnected, onClose, t]);
 
-  const title = session?.user ? `Connect ${session.user.name}` : 'Connect system session';
+  const title = session?.user
+    ? t('automation.qr.connectUser', { name: session.user.name })
+    : t('automation.qr.connectSystem');
 
   return (
     <GlassModal open={open} onClose={onClose} title={title} size="md">
@@ -66,26 +70,30 @@ export function QrModal({ open, session, onClose, onConnected }: Props) {
           <>
             <img
               src={qr.startsWith('data:') ? qr : `data:image/png;base64,${qr}`}
-              alt="WhatsApp QR"
+              alt={t('automation.qr.qrAlt')}
               className="h-64 w-64 rounded-btn border border-gray-200 bg-white p-2"
             />
-            <p className="text-sm text-gray-600">
-              Open WhatsApp → Linked Devices → Link a device, then scan this code.
-            </p>
+            <p className="text-sm text-gray-600">{t('automation.qr.instructions')}</p>
             {pairingCode && (
               <p className="text-xs text-gray-500">
-                Or use pairing code: <span className="font-mono font-semibold">{pairingCode}</span>
+                <Trans
+                  i18nKey="automation.qr.pairingCode"
+                  values={{ code: pairingCode }}
+                  components={{ 1: <span className="font-mono font-semibold" /> }}
+                />
               </p>
             )}
-            <p className="text-[11px] uppercase tracking-wide text-gray-400">Status: {state}</p>
+            <p className="text-[11px] uppercase tracking-wide text-gray-400">
+              {t('automation.qr.statusLabel', { state })}
+            </p>
           </>
         ) : (
           <div className="flex h-64 w-64 items-center justify-center rounded-btn border border-dashed border-gray-200 text-sm text-gray-400">
-            Waiting for QR…
+            {t('automation.qr.waiting')}
           </div>
         )}
         <CRMButton variant="ghost" size="sm" onClick={onClose}>
-          Close
+          {t('automation.qr.close')}
         </CRMButton>
       </div>
     </GlassModal>

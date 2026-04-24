@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Save } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { CRMButton } from '@/components/ui/CRMButton';
@@ -12,19 +14,9 @@ import {
 } from '@/services/automationApi';
 import { VariableChips } from '../components/VariableChips';
 
-const TRIGGER_LABELS: Record<AutomationTrigger, string> = {
-  confirmation_confirmed: 'Order confirmed',
-  confirmation_cancelled: 'Order cancelled',
-  confirmation_unreachable: 'Client unreachable',
-  shipping_label_created: 'Label created',
-  shipping_picked_up: 'Picked up',
-  shipping_in_transit: 'In transit',
-  shipping_out_for_delivery: 'Out for delivery',
-  shipping_delivered: 'Delivered',
-  shipping_returned: 'Returned',
-  shipping_return_validated: 'Return validated',
-  commission_paid: 'Commission paid',
-};
+function triggerLabel(t: TFunction, trigger: AutomationTrigger): string {
+  return t(`automation.triggersLong.${trigger}`);
+}
 
 const SAMPLE_CTX = {
   customer: { name: 'Ahmed', phone: '+212600000000', city: 'Casablanca' },
@@ -43,6 +35,7 @@ function renderPreview(body: string): string {
 }
 
 export function TemplatesTab() {
+  const { t } = useTranslation();
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canManage = hasPermission(PERMISSIONS.AUTOMATION_MANAGE);
   const pushToast = useToastStore((s) => s.push);
@@ -58,7 +51,7 @@ export function TemplatesTab() {
       const rows = await automationApi.listTemplates();
       setTemplates(rows);
       const initial: Record<string, { enabled: boolean; body: string }> = {};
-      for (const t of rows) initial[t.trigger] = { enabled: t.enabled, body: t.body };
+      for (const tpl of rows) initial[tpl.trigger] = { enabled: tpl.enabled, body: tpl.body };
       setDrafts(initial);
     } finally {
       setLoading(false);
@@ -81,23 +74,23 @@ export function TemplatesTab() {
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-      {templates.map((t) => {
-        const draft = drafts[t.trigger] ?? { enabled: t.enabled, body: t.body };
-        const dirty = draft.body !== t.body || draft.enabled !== t.enabled;
+      {templates.map((tpl) => {
+        const draft = drafts[tpl.trigger] ?? { enabled: tpl.enabled, body: tpl.body };
+        const dirty = draft.body !== tpl.body || draft.enabled !== tpl.enabled;
         const setDraft = (next: Partial<{ enabled: boolean; body: string }>) =>
-          setDrafts((d) => ({ ...d, [t.trigger]: { ...draft, ...next } }));
+          setDrafts((d) => ({ ...d, [tpl.trigger]: { ...draft, ...next } }));
 
         const save = async () => {
-          setSaving(t.trigger);
+          setSaving(tpl.trigger);
           try {
-            const updated = await automationApi.updateTemplate(t.trigger, {
+            const updated = await automationApi.updateTemplate(tpl.trigger, {
               enabled: draft.enabled,
               body: draft.body,
             });
-            setTemplates((list) => list.map((x) => (x.trigger === t.trigger ? updated : x)));
-            pushToast({ kind: 'success', title: 'Template saved' });
+            setTemplates((list) => list.map((x) => (x.trigger === tpl.trigger ? updated : x)));
+            pushToast({ kind: 'success', title: t('automation.templates.saved') });
           } catch {
-            pushToast({ kind: 'error', title: 'Failed to save template' });
+            pushToast({ kind: 'error', title: t('automation.templates.saveFailed') });
           } finally {
             setSaving(null);
           }
@@ -105,11 +98,11 @@ export function TemplatesTab() {
 
         return (
           <TemplateCard
-            key={t.trigger}
-            template={t}
+            key={tpl.trigger}
+            template={tpl}
             draft={draft}
             dirty={dirty}
-            saving={saving === t.trigger}
+            saving={saving === tpl.trigger}
             canManage={canManage}
             onChange={setDraft}
             onSave={save}
@@ -137,6 +130,7 @@ function TemplateCard({
   onChange: (next: Partial<{ enabled: boolean; body: string }>) => void;
   onSave: () => void;
 }) {
+  const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const insertAtCursor = (token: string) => {
@@ -163,7 +157,7 @@ function TemplateCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold text-gray-900">
-            {TRIGGER_LABELS[template.trigger]}
+            {triggerLabel(t, template.trigger)}
           </h3>
           <p className="mt-0.5 text-[11px] uppercase tracking-wide text-gray-400">
             {template.trigger}
@@ -177,7 +171,7 @@ function TemplateCard({
       </div>
 
       <div className="flex flex-col gap-2">
-        <p className="text-xs font-medium text-gray-500">Variables (click to insert)</p>
+        <p className="text-xs font-medium text-gray-500">{t('automation.templates.variablesHint')}</p>
         <VariableChips trigger={template.trigger} onInsert={insertAtCursor} />
       </div>
 
@@ -188,15 +182,15 @@ function TemplateCard({
         disabled={!canManage}
         rows={5}
         className="w-full resize-y rounded-btn border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:bg-gray-50"
-        placeholder="Message body..."
+        placeholder={t('automation.templates.bodyPlaceholder')}
       />
 
       <div className="rounded-btn border border-dashed border-gray-200 bg-gray-50 p-3">
         <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-          Preview
+          {t('automation.templates.preview')}
         </p>
         <p className="whitespace-pre-wrap text-sm text-gray-700">
-          {preview || <span className="text-gray-400">Empty</span>}
+          {preview || <span className="text-gray-400">{t('automation.templates.empty')}</span>}
         </p>
       </div>
 
@@ -208,7 +202,7 @@ function TemplateCard({
             disabled={!dirty || saving}
             onClick={onSave}
           >
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? t('automation.templates.saving') : t('automation.templates.save')}
           </CRMButton>
         </div>
       )}

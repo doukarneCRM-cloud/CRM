@@ -1218,5 +1218,312 @@
         "networkError": "Network error — try again"
       }
     }
+  },
+  "automation": {
+    "page": {
+      "title": "Automation",
+      "subtitle": "WhatsApp overview, inbox, rules, templates, agent sessions, and delivery logs."
+    },
+    "tabs": {
+      "overview": "Overview",
+      "inbox": "Inbox",
+      "rules": "Rules",
+      "templates": "Templates",
+      "sessions": "Sessions",
+      "logs": "Logs"
+    },
+    "triggers": {
+      "confirmation_confirmed": "Confirmed",
+      "confirmation_cancelled": "Cancelled",
+      "confirmation_unreachable": "Unreachable",
+      "shipping_label_created": "Label",
+      "shipping_picked_up": "Picked up",
+      "shipping_in_transit": "In transit",
+      "shipping_out_for_delivery": "Out for delivery",
+      "shipping_delivered": "Delivered",
+      "shipping_returned": "Returned",
+      "shipping_return_validated": "Return OK",
+      "commission_paid": "Commission"
+    },
+    "triggersLong": {
+      "confirmation_confirmed": "Order confirmed",
+      "confirmation_cancelled": "Order cancelled",
+      "confirmation_unreachable": "Client unreachable",
+      "shipping_label_created": "Label created",
+      "shipping_picked_up": "Picked up",
+      "shipping_in_transit": "In transit",
+      "shipping_out_for_delivery": "Out for delivery",
+      "shipping_delivered": "Delivered",
+      "shipping_returned": "Returned",
+      "shipping_return_validated": "Return validated",
+      "commission_paid": "Commission paid"
+    },
+    "status": {
+      "queued": "Queued",
+      "sending": "Sending",
+      "sent": "Sent",
+      "delivered": "Delivered",
+      "failed": "Failed",
+      "dead": "Dead"
+    },
+    "overview": {
+      "loading": "Loading overview…",
+      "loadFailed": "Failed to load overview",
+      "rateLimitTitle": "Rate limit: {{reason}}",
+      "rateLimitBody": "session {{session}}… {{used}}/{{limit}}",
+      "requeued": "Requeued",
+      "requeueFailed": "Requeue failed",
+      "requeue": "Requeue",
+      "kpi": {
+        "queued": "Queued",
+        "sending": "Sending",
+        "sent": "Sent",
+        "failed": "Failed",
+        "dead": "Dead",
+        "optOuts7d": "Opt-outs (7d)"
+      },
+      "sessionsHealth": "Sessions health",
+      "noSessions": "No WhatsApp sessions yet.",
+      "topTriggers": "Top triggers today",
+      "noActivity": "No activity today.",
+      "liveFeed": "Live feed (last 20)",
+      "noRecent": "No recent messages.",
+      "columns": {
+        "when": "When",
+        "trigger": "Trigger",
+        "agent": "Agent",
+        "order": "Order",
+        "to": "To",
+        "status": "Status",
+        "error": "Error"
+      },
+      "session": {
+        "stale": "stale {{minutes}}m",
+        "hourly": "Hourly",
+        "daily": "Daily",
+        "sent_one": "{{count}} sent",
+        "sent_other": "{{count}} sent",
+        "failed_one": "{{count}} failed",
+        "failed_other": "{{count}} failed"
+      }
+    },
+    "inbox": {
+      "loadThreadsFailed": "Failed to load threads",
+      "loadMessagesFailed": "Failed to load messages",
+      "sendFailed": "Send failed",
+      "fileTooLarge": "File too large (max 50 MB)",
+      "voiceNoteFailed": "Voice note failed",
+      "micDenied": "Microphone permission denied",
+      "updateFailed": "Update failed",
+      "markedStatus_open": "Marked open",
+      "markedStatus_snoozed": "Marked snoozed",
+      "markedStatus_closed": "Marked closed",
+      "searchPlaceholder": "Search or start a new chat",
+      "status": {
+        "all": "All",
+        "open": "Open",
+        "snoozed": "Snoozed",
+        "closed": "Closed"
+      },
+      "scope": {
+        "mine": "Mine",
+        "all": "All"
+      },
+      "filterByAgent": "Filter by agent",
+      "allAgents": "All agents",
+      "loading": "Loading…",
+      "noConversations": "No conversations yet.",
+      "welcome": {
+        "title": "CRM WhatsApp Inbox",
+        "body": "Select a conversation on the left to read the thread, send media, or record a voice note."
+      },
+      "snooze": "Snooze",
+      "close": "Close",
+      "optedOutBanner": "This customer opted out of WhatsApp. Replies are blocked.",
+      "remove": "Remove",
+      "recordingLabel": "Recording · {{duration}}",
+      "cancel": "Cancel",
+      "sendVoiceNote": "Send voice note",
+      "attach": "Attach",
+      "attachPhoto": "Photo",
+      "attachVideo": "Video",
+      "attachDocument": "Document",
+      "composerPlaceholder": "Type a message",
+      "composerCaption": "Add a caption…",
+      "composerPressSend": "Press send to deliver this file",
+      "recordVoiceNote": "Record voice note",
+      "send": "Send",
+      "noMessages": "No messages in this conversation yet.",
+      "optedOut": "opted out",
+      "preview": {
+        "photo": "📷 Photo",
+        "video": "🎥 Video",
+        "voice": "🎤 Voice message",
+        "sticker": "Sticker",
+        "document": "📎 Document"
+      },
+      "day": {
+        "today": "Today",
+        "yesterday": "Yesterday"
+      },
+      "relative": {
+        "now": "now",
+        "minutes": "{{count}}m",
+        "hours": "{{count}}h",
+        "days": "{{count}}d"
+      },
+      "browser": {
+        "cantPlayVideo": "Your browser can't play this video.",
+        "cantPlayAudio": "Your browser can't play this audio."
+      },
+      "mediaAlt": {
+        "image": "image",
+        "sticker": "sticker",
+        "preview": "preview",
+        "document": "document"
+      }
+    },
+    "rules": {
+      "loadFailed": "Failed to load rules",
+      "loading": "Loading…",
+      "saved": "Rule saved",
+      "saveFailed": "Save failed",
+      "createFailed": "Create failed",
+      "deleteFailed": "Delete failed",
+      "noTemplateForTrigger": "No template for trigger",
+      "confirmDelete": "Delete rule \"{{name}}\"?",
+      "newRuleName": "New rule",
+      "intro": "Rules decide whether a trigger actually fires. Each rule points at a template and carries optional conditions. When multiple rules match the same trigger, the highest-priority rule wins (unless you set <1>Fire every matching rule</1>).",
+      "newRule": "New rule",
+      "noRules": "No rules — trigger will not fire.",
+      "priority": "Priority",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "deleteRule": "Delete rule",
+      "template": "Template",
+      "templateDisabled": "(template disabled)",
+      "whenMultipleMatch": "When multiple rules match",
+      "overlap": {
+        "first": "Fire only the first match (by priority)",
+        "all": "Fire every matching rule"
+      },
+      "forceSystem": "Force sending through the system session",
+      "allOf": "ALL of (must match every condition)",
+      "anyOf": "ANY of (match at least one)",
+      "add": "add",
+      "noAnd": "No AND conditions — rule matches everything here.",
+      "noOr": "No OR conditions.",
+      "saveRule": "Save rule",
+      "removeCondition": "Remove condition",
+      "valuePlaceholder": "value",
+      "listPlaceholder": "comma,separated,values",
+      "ops": {
+        "eq": "equals",
+        "neq": "not equals",
+        "in": "in list",
+        "not_in": "not in list",
+        "gte": "≥",
+        "lte": "≤",
+        "contains": "contains"
+      }
+    },
+    "templates": {
+      "saved": "Template saved",
+      "saveFailed": "Failed to save template",
+      "variablesHint": "Variables (click to insert)",
+      "bodyPlaceholder": "Message body...",
+      "preview": "Preview",
+      "empty": "Empty",
+      "saving": "Saving…",
+      "save": "Save"
+    },
+    "sessions": {
+      "createFailed": "Failed to create session",
+      "disconnectConfirm": "Disconnect this session?",
+      "disconnectFailed": "Failed to disconnect",
+      "deleteConfirm": "Delete this session permanently?",
+      "deleteFailed": "Failed to delete",
+      "systemUpdated": "System sender updated",
+      "systemUpdateFailed": "Failed to set system sender",
+      "unknownError": "Unknown error",
+      "systemSession": "System session",
+      "systemSubtitle": "Used for commission DMs and as a fallback when an agent is offline.",
+      "createSystemSession": "Create system session",
+      "systemMissing": "A system session was configured but no matching session exists. Commission messages will fail until you create one.",
+      "agentSessions": "Agent sessions",
+      "pickAgent": "Pick agent…",
+      "add": "Add",
+      "noAgentSessions": "No agent sessions yet.",
+      "columns": {
+        "agent": "Agent",
+        "phone": "Phone",
+        "status": "Status",
+        "lastHeartbeat": "Last heartbeat",
+        "actions": "Actions"
+      },
+      "systemBadge": "System",
+      "statusLabels": {
+        "connected": "Connected",
+        "connecting": "Connecting",
+        "disconnected": "Disconnected",
+        "error": "Error"
+      },
+      "actions": {
+        "connect": "Connect",
+        "disconnect": "Disconnect",
+        "setAsSystem": "Set as system",
+        "deleteSession": "Delete session"
+      }
+    },
+    "logs": {
+      "retried": "Re-enqueued",
+      "retryFailed": "Retry failed",
+      "trigger": "Trigger",
+      "status": "Status",
+      "allTriggers": "All triggers",
+      "allStatuses": "All statuses",
+      "messages_one": "{{count}} message",
+      "messages_other": "{{count}} messages",
+      "refresh": "Refresh",
+      "columns": {
+        "time": "Time",
+        "trigger": "Trigger",
+        "recipient": "Recipient",
+        "order": "Order",
+        "agent": "Agent",
+        "status": "Status"
+      },
+      "loading": "Loading…",
+      "noMessages": "No messages yet.",
+      "retry": "Retry",
+      "pagination": "Showing {{from}}–{{to}} of {{total}}",
+      "prev": "Prev",
+      "next": "Next",
+      "detailTitle": "Message detail",
+      "detail": {
+        "trigger": "Trigger",
+        "recipient": "Recipient",
+        "order": "Order",
+        "agent": "Agent",
+        "status": "Status",
+        "created": "Created",
+        "sent": "Sent",
+        "providerId": "Provider id",
+        "error": "Error",
+        "body": "Body"
+      },
+      "close": "Close"
+    },
+    "qr": {
+      "connectUser": "Connect {{name}}",
+      "connectSystem": "Connect system session",
+      "loadFailed": "Failed to load QR",
+      "qrAlt": "WhatsApp QR",
+      "instructions": "Open WhatsApp → Linked Devices → Link a device, then scan this code.",
+      "pairingCode": "Or use pairing code: <1>{{code}}</1>",
+      "statusLabel": "Status: {{state}}",
+      "waiting": "Waiting for QR…",
+      "close": "Close"
+    }
   }
 }
