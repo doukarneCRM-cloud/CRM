@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Save } from 'lucide-react';
 import { AvatarChip } from '@/components/ui/AvatarChip';
 import { teamApi, type CommissionRule, type TeamUser } from '@/services/teamApi';
@@ -24,6 +25,7 @@ function makeDraft(rule?: CommissionRule): Draft {
 }
 
 export function CommissionTable({ users, rules, canEdit, onSaved }: Props) {
+  const { t } = useTranslation();
   const byAgent = useMemo(() => {
     const m = new Map<string, CommissionRule>();
     rules.forEach((r) => m.set(r.agentId, r));
@@ -64,7 +66,7 @@ export function CommissionTable({ users, rules, canEdit, onSaved }: Props) {
       });
       onSaved();
     } catch {
-      window.alert('Failed to save commission');
+      window.alert(t('team.commissionTable.saveFailed'));
     } finally {
       setSavingId(null);
     }
@@ -73,7 +75,7 @@ export function CommissionTable({ users, rules, canEdit, onSaved }: Props) {
   if (agents.length === 0) {
     return (
       <p className="rounded-card border border-dashed border-gray-200 p-6 text-center text-xs text-gray-400">
-        No eligible agents yet. Create an agent first, then set their commission rates here.
+        {t('team.commissionTable.empty')}
       </p>
     );
   }
@@ -83,9 +85,9 @@ export function CommissionTable({ users, rules, canEdit, onSaved }: Props) {
       <table className="w-full text-sm">
         <thead className="bg-gray-50/60">
           <tr className="border-b border-gray-100 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400">
-            <th className="px-4 py-3">Agent</th>
-            <th className="px-4 py-3 w-40">On confirm (MAD)</th>
-            <th className="px-4 py-3 w-40">On deliver (MAD)</th>
+            <th className="px-4 py-3">{t('team.commissionTable.columns.agent')}</th>
+            <th className="px-4 py-3 w-40">{t('team.commissionTable.columns.onConfirm')}</th>
+            <th className="px-4 py-3 w-40">{t('team.commissionTable.columns.onDeliver')}</th>
             <th className="px-4 py-3 w-32 text-right"></th>
           </tr>
         </thead>
@@ -134,7 +136,7 @@ export function CommissionTable({ users, rules, canEdit, onSaved }: Props) {
                       )}
                     >
                       <Save size={11} />
-                      {savingId === a.id ? 'Saving…' : 'Save'}
+                      {savingId === a.id ? t('team.commissionTable.saving') : t('team.commissionTable.save')}
                     </button>
                   )}
                 </td>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Search } from 'lucide-react';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { CRMInput } from '@/components/ui/CRMInput';
@@ -14,6 +15,7 @@ import { AgentFormModal } from './components/AgentFormModal';
 type TabKey = 'active' | 'inactive';
 
 export default function AgentsPage() {
+  const { t } = useTranslation();
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canCreate = hasPermission(PERMISSIONS.TEAM_CREATE);
   const canEdit = hasPermission(PERMISSIONS.TEAM_EDIT);
@@ -72,16 +74,19 @@ export default function AgentsPage() {
   };
 
   const toggleActive = async (user: TeamUser) => {
-    const action = user.isActive ? 'deactivate' : 'reactivate';
     const note = user.isActive
-      ? 'Deactivating will unassign their pending orders and block login. Continue?'
-      : 'Reactivate this user?';
+      ? t('team.agents.confirm.deactivate')
+      : t('team.agents.confirm.reactivate');
     if (!window.confirm(note)) return;
     try {
       await teamApi.updateUser(user.id, { isActive: !user.isActive });
       await load();
     } catch {
-      window.alert(`Failed to ${action} user`);
+      window.alert(
+        user.isActive
+          ? t('team.agents.toggleFailed.deactivate')
+          : t('team.agents.toggleFailed.reactivate'),
+      );
     }
   };
 
@@ -93,14 +98,14 @@ export default function AgentsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-primary">Team members</h1>
+            <h1 className="text-2xl font-bold text-primary">{t('team.agents.title')}</h1>
             <p className="mt-1 text-sm text-gray-500">
-              Active: {counts.active} · Inactive: {counts.inactive}
+              {t('team.agents.counts', { active: counts.active, inactive: counts.inactive })}
             </p>
           </div>
           {canCreate && (
             <CRMButton leftIcon={<Plus size={14} />} onClick={openCreate}>
-              New team member
+              {t('team.agents.new')}
             </CRMButton>
           )}
         </div>
@@ -109,7 +114,7 @@ export default function AgentsPage() {
         <div className="flex flex-wrap items-end gap-3 rounded-card border border-gray-100 bg-white p-3">
           <div className="min-w-[240px] flex-1">
             <CRMInput
-              placeholder="Search by name, email, or role..."
+              placeholder={t('team.agents.searchPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               leftIcon={<Search size={14} />}
@@ -117,8 +122,8 @@ export default function AgentsPage() {
           </div>
           <PillTabGroup
             tabs={[
-              { id: 'active',   label: 'Active',   count: counts.active   },
-              { id: 'inactive', label: 'Inactive', count: counts.inactive },
+              { id: 'active',   label: t('team.agents.filter.active'),   count: counts.active   },
+              { id: 'inactive', label: t('team.agents.filter.inactive'), count: counts.inactive },
             ]}
             activeTab={tab}
             onChange={(id) => setTab(id as TabKey)}
@@ -134,7 +139,7 @@ export default function AgentsPage() {
           </div>
         ) : visible.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 rounded-card border border-dashed border-gray-200 py-16 text-gray-400">
-            <p className="text-sm">No team members match the current filters.</p>
+            <p className="text-sm">{t('team.agents.empty')}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

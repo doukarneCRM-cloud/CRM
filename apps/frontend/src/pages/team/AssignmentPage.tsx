@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Play, Power, Shuffle, Package } from 'lucide-react';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { useAuthStore } from '@/store/authStore';
@@ -14,24 +15,28 @@ import { cn } from '@/lib/cn';
 import { TeamTabs } from './components/TeamTabs';
 import { CommissionTable } from './components/CommissionTable';
 
-const STRATEGIES: { value: AssignmentRuleState['strategy']; label: string; help: string; icon: React.ElementType }[] = [
-  {
-    value: 'round_robin',
-    label: 'Round-robin',
-    help: 'Each agent gets the configured number of orders in turn.',
-    icon: Shuffle,
-  },
-  {
-    value: 'by_product',
-    label: 'By product',
-    help: 'Falls back to round-robin until product → agent mapping is configured.',
-    icon: Package,
-  },
-];
-
 export default function AssignmentPage() {
+  const { t } = useTranslation();
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canManage = hasPermission(PERMISSIONS.TEAM_MANAGE_ROLES);
+
+  const strategies: { value: AssignmentRuleState['strategy']; label: string; help: string; icon: React.ElementType }[] = useMemo(
+    () => [
+      {
+        value: 'round_robin',
+        label: t('team.assignment.strategy.roundRobin'),
+        help: t('team.assignment.strategy.roundRobinHelp'),
+        icon: Shuffle,
+      },
+      {
+        value: 'by_product',
+        label: t('team.assignment.strategy.byProduct'),
+        help: t('team.assignment.strategy.byProductHelp'),
+        icon: Package,
+      },
+    ],
+    [t],
+  );
 
   const [rule, setRule] = useState<AssignmentRuleState | null>(null);
   const [users, setUsers] = useState<TeamUser[]>([]);
@@ -73,7 +78,7 @@ export default function AssignmentPage() {
     } catch {
       // Rollback on failure
       setRule(rule);
-      window.alert('Failed to save change');
+      window.alert(t('team.assignment.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -111,18 +116,18 @@ export default function AssignmentPage() {
       <div className="flex flex-col gap-4 p-6">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-primary">Assignment rules</h1>
+          <h1 className="text-2xl font-bold text-primary">{t('team.assignment.title')}</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Configure how incoming orders are distributed among your confirmation agents.
+            {t('team.assignment.subtitle')}
           </p>
         </div>
 
         {/* Master toggle */}
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-gray-100 bg-white p-4">
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">Auto-assignment</h3>
+            <h3 className="text-sm font-semibold text-gray-900">{t('team.assignment.master.title')}</h3>
             <p className="text-xs text-gray-500">
-              When disabled, new orders stay unassigned until a supervisor picks an agent.
+              {t('team.assignment.master.subtitle')}
             </p>
           </div>
           <button
@@ -137,18 +142,18 @@ export default function AssignmentPage() {
             )}
           >
             <Power size={14} />
-            {rule.isActive ? 'Enabled' : 'Disabled'}
+            {rule.isActive ? t('team.assignment.master.enabled') : t('team.assignment.master.disabled')}
           </button>
         </section>
 
         {/* Strategy */}
         <section className="rounded-card border border-gray-100 bg-white p-4">
-          <h3 className="text-sm font-semibold text-gray-900">Strategy</h3>
+          <h3 className="text-sm font-semibold text-gray-900">{t('team.assignment.strategy.title')}</h3>
           <p className="mt-1 text-xs text-gray-500">
-            How to decide who gets the next order.
+            {t('team.assignment.strategy.subtitle')}
           </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            {STRATEGIES.map(({ value, label, help, icon: Icon }) => {
+            {strategies.map(({ value, label, help, icon: Icon }) => {
               const active = rule.strategy === value;
               return (
                 <button
@@ -183,9 +188,9 @@ export default function AssignmentPage() {
         <section className="rounded-card border border-gray-100 bg-white p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h3 className="text-sm font-semibold text-gray-900">Bounce count</h3>
+              <h3 className="text-sm font-semibold text-gray-900">{t('team.assignment.bounce.title')}</h3>
               <p className="mt-1 text-xs text-gray-500">
-                How many orders each agent receives before the rotation moves on.
+                {t('team.assignment.bounce.subtitle')}
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -207,13 +212,13 @@ export default function AssignmentPage() {
 
         {/* Simulator */}
         <section className="rounded-card border border-gray-100 bg-white p-4">
-          <h3 className="text-sm font-semibold text-gray-900">Preview rotation</h3>
+          <h3 className="text-sm font-semibold text-gray-900">{t('team.assignment.simulator.title')}</h3>
           <p className="mt-1 text-xs text-gray-500">
-            Dry-run the current rule against the list of eligible agents. Nothing is saved.
+            {t('team.assignment.simulator.subtitle')}
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-xs text-gray-600">
-              Orders:
+              {t('team.assignment.simulator.orders')}
               <input
                 type="number"
                 min={1}
@@ -229,14 +234,14 @@ export default function AssignmentPage() {
               onClick={runSimulation}
               loading={simulating}
             >
-              Simulate
+              {t('team.assignment.simulator.simulate')}
             </CRMButton>
           </div>
 
           {simulationResult && (
             <div className="mt-4 flex flex-wrap gap-2">
               {simulationResult.length === 0 ? (
-                <p className="text-xs text-gray-500">No eligible agents to rotate through.</p>
+                <p className="text-xs text-gray-500">{t('team.assignment.simulator.empty')}</p>
               ) : (
                 simulationResult.map((name, i) => (
                   <div
@@ -257,10 +262,9 @@ export default function AssignmentPage() {
         {/* Commission table */}
         <section className="flex flex-col gap-3">
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">Commission rates</h3>
+            <h3 className="text-sm font-semibold text-gray-900">{t('team.assignment.commission.title')}</h3>
             <p className="mt-1 text-xs text-gray-500">
-              Per-agent MAD earned on each confirmed and each delivered order. Commission is paid out
-              once per order when it delivers.
+              {t('team.assignment.commission.subtitle')}
             </p>
           </div>
           <CommissionTable

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown, Lock, Save, Undo2 } from 'lucide-react';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { teamApi, type RoleDetail, type PermissionOption } from '@/services/teamApi';
@@ -19,22 +20,6 @@ const SECTION_ORDER = [
   'analytics', 'integrations', 'atelie', 'settings',
 ] as const;
 
-const SECTION_LABELS: Record<string, string> = {
-  orders:       'Orders',
-  confirmation: 'Confirmation',
-  shipping:     'Shipping',
-  call_center:  'Call Center',
-  products:     'Products',
-  stock:        'Stock',
-  clients:      'Clients',
-  team:         'Team',
-  dashboard:    'Dashboard',
-  analytics:    'Analytics',
-  integrations: 'Integrations',
-  atelie:       'Atelie',
-  settings:     'Settings',
-};
-
 function sectionKey(permKey: string) {
   return permKey.split(':')[0];
 }
@@ -47,6 +32,7 @@ interface Props {
 }
 
 export function RolePermissionCard({ role, permissions, canEdit, onSaved }: Props) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(() => new Set(role.permissionKeys));
   const [saving, setSaving] = useState(false);
@@ -101,7 +87,7 @@ export function RolePermissionCard({ role, permissions, canEdit, onSaved }: Prop
 
   const save = async () => {
     if (role.isSystem && selected.size === 0) {
-      window.alert('The admin role must retain at least one permission.');
+      window.alert(t('team.rolePermissionCard.adminMustKeep'));
       return;
     }
     setSaving(true);
@@ -109,7 +95,7 @@ export function RolePermissionCard({ role, permissions, canEdit, onSaved }: Prop
       await teamApi.updateRole(role.id, { permissionKeys: Array.from(selected) });
       onSaved();
     } catch {
-      window.alert('Failed to save permissions');
+      window.alert(t('team.rolePermissionCard.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -137,12 +123,12 @@ export function RolePermissionCard({ role, permissions, canEdit, onSaved }: Prop
             <p className="truncate text-sm font-bold text-gray-900">{role.label}</p>
             {role.isSystem && (
               <span className="flex items-center gap-1 rounded-badge bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-500">
-                <Lock size={9} /> system
+                <Lock size={9} /> {t('team.rolePermissionCard.system')}
               </span>
             )}
           </div>
           <p className="truncate text-[11px] text-gray-400">
-            {role.userCount} user{role.userCount !== 1 ? 's' : ''} · {role.permissionKeys.length} permission{role.permissionKeys.length !== 1 ? 's' : ''}
+            {t('team.rolePermissionCard.userCount', { count: role.userCount })} · {t('team.rolePermissionCard.permissionCount', { count: role.permissionKeys.length })}
           </p>
         </div>
         <ChevronDown
@@ -157,7 +143,7 @@ export function RolePermissionCard({ role, permissions, canEdit, onSaved }: Prop
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {grouped.map(({ section, perms }) => {
               const allOn = perms.every((p) => selected.has(p.key));
-              const label = SECTION_LABELS[section] ?? section;
+              const label = t(`team.rolePermissionCard.sections.${section}`, { defaultValue: section });
               return (
                 <div key={section} className="rounded-input border border-gray-100 bg-white p-3">
                   <div className="mb-2 flex items-center justify-between">
@@ -169,7 +155,7 @@ export function RolePermissionCard({ role, permissions, canEdit, onSaved }: Prop
                         onClick={() => toggleSection(perms)}
                         className="text-[10px] font-medium text-primary hover:underline"
                       >
-                        {allOn ? 'Clear all' : 'Select all'}
+                        {allOn ? t('team.rolePermissionCard.clearAll') : t('team.rolePermissionCard.selectAll')}
                       </button>
                     )}
                   </div>
@@ -207,7 +193,7 @@ export function RolePermissionCard({ role, permissions, canEdit, onSaved }: Prop
                 disabled={!dirty || saving}
                 leftIcon={<Undo2 size={12} />}
               >
-                Revert
+                {t('team.rolePermissionCard.revert')}
               </CRMButton>
               <CRMButton
                 size="sm"
@@ -216,7 +202,7 @@ export function RolePermissionCard({ role, permissions, canEdit, onSaved }: Prop
                 loading={saving}
                 leftIcon={<Save size={12} />}
               >
-                Save permissions
+                {t('team.rolePermissionCard.savePermissions')}
               </CRMButton>
             </div>
           )}

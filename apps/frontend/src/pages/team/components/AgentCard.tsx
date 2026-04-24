@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Edit2, Power, Mail, Phone as PhoneIcon, Wallet, CheckCircle2, Clock, Truck } from 'lucide-react';
 import { AvatarChip } from '@/components/ui/AvatarChip';
 import { teamApi, type TeamUser } from '@/services/teamApi';
@@ -32,13 +33,17 @@ function formatMAD(n: number): string {
 }
 
 export function AgentCard({ user, canEdit, onEdit, onToggleActive, onChanged }: Props) {
+  const { t } = useTranslation();
   const roleClass = ROLE_COLORS[user.role.name] ?? 'bg-gray-100 text-gray-700';
   const [payingOut, setPayingOut] = useState(false);
 
   const handlePayout = async () => {
     if (user.commission.unpaid <= 0) return;
     const ok = window.confirm(
-      `Pay out ${formatMAD(user.commission.unpaid)} MAD to ${user.name}? This marks all unpaid commissions as paid.`,
+      t('team.agentCard.payoutConfirm', {
+        amount: formatMAD(user.commission.unpaid),
+        name: user.name,
+      }),
     );
     if (!ok) return;
     setPayingOut(true);
@@ -46,7 +51,7 @@ export function AgentCard({ user, canEdit, onEdit, onToggleActive, onChanged }: 
       await teamApi.payoutCommission(user.id);
       onChanged?.();
     } catch {
-      window.alert('Failed to record payout');
+      window.alert(t('team.agentCard.payoutFailed'));
     } finally {
       setPayingOut(false);
     }
@@ -95,11 +100,11 @@ export function AgentCard({ user, canEdit, onEdit, onToggleActive, onChanged }: 
 
       {/* Stats — same formulas as Dashboard / Reports (lifetime, non-archived). */}
       <div className="grid grid-cols-4 gap-2 border-t border-gray-100 pt-3">
-        <Stat label="Today" value={user.stats.todayAssigned} />
-        <Stat label="Confirmed" value={user.stats.confirmed} color="text-emerald-600" />
-        <Stat label="Delivered" value={user.stats.delivered} color="text-indigo-600" icon={Truck} />
+        <Stat label={t('team.agentCard.stats.today')} value={user.stats.todayAssigned} />
+        <Stat label={t('team.agentCard.stats.confirmed')} value={user.stats.confirmed} color="text-emerald-600" />
+        <Stat label={t('team.agentCard.stats.delivered')} value={user.stats.delivered} color="text-indigo-600" icon={Truck} />
         <Stat
-          label="Deliv. rate"
+          label={t('team.agentCard.stats.deliveryRate')}
           value={`${Math.round(user.stats.deliveryRate)}%`}
           color={
             user.stats.deliveryRate >= 70 ? 'text-emerald-600'
@@ -113,10 +118,10 @@ export function AgentCard({ user, canEdit, onEdit, onToggleActive, onChanged }: 
       <div className="border-t border-gray-100 pt-3">
         <div className="mb-1.5 flex items-center justify-between">
           <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-            Last 7 days
+            {t('team.agentCard.last7days')}
           </span>
           <span className="text-[10px] font-medium text-gray-500">
-            {user.performance7d.reduce((s, p) => s + p.orders, 0)} orders
+            {t('team.agentCard.ordersCount', { count: user.performance7d.reduce((s, p) => s + p.orders, 0) })}
           </span>
         </div>
         <PerformanceChart points={user.performance7d} />
@@ -126,7 +131,7 @@ export function AgentCard({ user, canEdit, onEdit, onToggleActive, onChanged }: 
       <div className="rounded-card border border-primary/10 bg-gradient-to-br from-accent/40 to-accent/10 p-3">
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
-            <Wallet size={11} /> Commission
+            <Wallet size={11} /> {t('team.agentCard.commission.title')}
           </span>
           <span className="text-sm font-bold text-primary">
             {formatMAD(user.commission.earned)} <span className="text-[10px] font-medium text-gray-500">MAD</span>
@@ -135,14 +140,14 @@ export function AgentCard({ user, canEdit, onEdit, onToggleActive, onChanged }: 
         <div className="mt-2 grid grid-cols-2 gap-2">
           <CommissionCell
             icon={<CheckCircle2 size={10} />}
-            label="Paid"
+            label={t('team.agentCard.commission.paid')}
             value={user.commission.paid}
             color="text-emerald-600"
             bg="bg-emerald-50"
           />
           <CommissionCell
             icon={<Clock size={10} />}
-            label="Unpaid"
+            label={t('team.agentCard.commission.unpaid')}
             value={user.commission.unpaid}
             color="text-amber-600"
             bg="bg-amber-50"
@@ -154,7 +159,9 @@ export function AgentCard({ user, canEdit, onEdit, onToggleActive, onChanged }: 
             disabled={payingOut}
             className="mt-2 flex w-full items-center justify-center gap-1 rounded-btn bg-primary px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {payingOut ? 'Processing…' : `Pay out ${formatMAD(user.commission.unpaid)} MAD`}
+            {payingOut
+              ? t('team.agentCard.commission.processing')
+              : t('team.agentCard.commission.payoutButton', { amount: formatMAD(user.commission.unpaid) })}
           </button>
         )}
       </div>
@@ -164,15 +171,15 @@ export function AgentCard({ user, canEdit, onEdit, onToggleActive, onChanged }: 
         <div className="flex items-center justify-end gap-1 border-t border-gray-100 pt-2">
           <button
             onClick={onEdit}
-            title="Edit agent"
+            title={t('team.agentCard.editTooltip')}
             className="flex h-8 items-center gap-1 rounded-lg px-3 text-xs font-medium text-gray-500 transition-colors hover:bg-accent hover:text-primary"
           >
             <Edit2 size={12} />
-            Edit
+            {t('team.agentCard.edit')}
           </button>
           <button
             onClick={onToggleActive}
-            title={user.isActive ? 'Deactivate' : 'Reactivate'}
+            title={user.isActive ? t('team.agentCard.deactivate') : t('team.agentCard.reactivate')}
             className={cn(
               'flex h-8 items-center gap-1 rounded-lg px-3 text-xs font-medium transition-colors',
               user.isActive
@@ -181,7 +188,7 @@ export function AgentCard({ user, canEdit, onEdit, onToggleActive, onChanged }: 
             )}
           >
             <Power size={12} />
-            {user.isActive ? 'Deactivate' : 'Reactivate'}
+            {user.isActive ? t('team.agentCard.deactivate') : t('team.agentCard.reactivate')}
           </button>
         </div>
       )}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { isAxiosError } from 'axios';
 import { GlassModal } from '@/components/ui/GlassModal';
 import { CRMInput } from '@/components/ui/CRMInput';
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export function AgentFormModal({ open, onClose, onSaved, editing, roles }: Props) {
+  const { t } = useTranslation();
   const isEdit = Boolean(editing);
 
   const [name, setName] = useState('');
@@ -81,9 +83,9 @@ export function AgentFormModal({ open, onClose, onSaved, editing, roles }: Props
     } catch (err) {
       if (isAxiosError(err)) {
         const data = err.response?.data as { error?: { message?: string } } | undefined;
-        setError(data?.error?.message ?? 'Failed to save');
+        setError(data?.error?.message ?? t('team.agentForm.saveFailed'));
       } else {
-        setError('Failed to save');
+        setError(t('team.agentForm.saveFailed'));
       }
     } finally {
       setSaving(false);
@@ -94,7 +96,7 @@ export function AgentFormModal({ open, onClose, onSaved, editing, roles }: Props
     <GlassModal
       open={open}
       onClose={onClose}
-      title={isEdit ? `Edit ${editing?.name}` : 'New team member'}
+      title={isEdit ? t('team.agentForm.titleEdit', { name: editing?.name ?? '' }) : t('team.agentForm.titleNew')}
       size="md"
       footer={
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -105,10 +107,10 @@ export function AgentFormModal({ open, onClose, onSaved, editing, roles }: Props
           )}
           <div className="flex items-center gap-2">
             <CRMButton variant="ghost" onClick={onClose} disabled={saving}>
-              Cancel
+              {t('common.cancel')}
             </CRMButton>
             <CRMButton onClick={handleSave} loading={saving} disabled={!canSave}>
-              {isEdit ? 'Save changes' : 'Create agent'}
+              {isEdit ? t('team.agentForm.save') : t('team.agentForm.create')}
             </CRMButton>
           </div>
         </div>
@@ -116,47 +118,47 @@ export function AgentFormModal({ open, onClose, onSaved, editing, roles }: Props
     >
       <div className="flex flex-col gap-3">
         <CRMInput
-          label="Full name"
+          label={t('team.agentForm.fullName')}
           required
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Sara El Amrani"
+          placeholder={t('team.agentForm.fullNamePlaceholder')}
         />
         <CRMInput
-          label="Email"
+          label={t('team.agentForm.email')}
           type="email"
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="name@anaqatoki.ma"
+          placeholder={t('team.agentForm.emailPlaceholder')}
         />
         <CRMInput
-          label="Phone"
+          label={t('team.agentForm.phone')}
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
-          placeholder="06XXXXXXXX (optional)"
+          placeholder={t('team.agentForm.phonePlaceholder')}
         />
         <CRMSelect
-          label="Role"
+          label={t('team.agentForm.role')}
           options={roleOptions}
           value={roleId}
           onChange={(v) => setRoleId(v as string)}
-          placeholder="Select role..."
+          placeholder={t('team.agentForm.rolePlaceholder')}
         />
         <CRMInput
-          label={isEdit ? 'Reset password (optional)' : 'Password'}
+          label={isEdit ? t('team.agentForm.passwordReset') : t('team.agentForm.password')}
           type="password"
           required={!isEdit}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder={isEdit ? 'Leave blank to keep current' : 'At least 8 characters'}
-          hint={!isEdit ? 'Agent uses this to log in.' : undefined}
+          placeholder={isEdit ? t('team.agentForm.passwordPlaceholderEdit') : t('team.agentForm.passwordPlaceholderCreate')}
+          hint={!isEdit ? t('team.agentForm.passwordHint') : undefined}
         />
         <CRMInput
-          label="Avatar URL"
+          label={t('team.agentForm.avatarUrl')}
           value={avatarUrl}
           onChange={(e) => setAvatarUrl(e.target.value)}
-          placeholder="https://... (optional)"
+          placeholder={t('team.agentForm.avatarUrlPlaceholder')}
         />
       </div>
     </GlassModal>

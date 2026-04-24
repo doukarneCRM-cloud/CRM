@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus } from 'lucide-react';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { useAuthStore } from '@/store/authStore';
@@ -10,6 +11,7 @@ import { RolePermissionCard } from './components/RolePermissionCard';
 import { RoleFormModal } from './components/RoleFormModal';
 
 export default function RolesPage() {
+  const { t } = useTranslation();
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canManage = hasPermission(PERMISSIONS.TEAM_MANAGE_ROLES);
 
@@ -40,14 +42,14 @@ export default function RolesPage() {
       <div className="flex flex-col gap-4 p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-primary">Roles &amp; permissions</h1>
+            <h1 className="text-2xl font-bold text-primary">{t('team.roles.title')}</h1>
             <p className="mt-1 text-sm text-gray-500">
-              Control what each role can see and do across the platform.
+              {t('team.roles.subtitle')}
             </p>
           </div>
           {canManage && (
             <CRMButton leftIcon={<Plus size={14} />} onClick={() => setCreateOpen(true)}>
-              New role
+              {t('team.roles.new')}
             </CRMButton>
           )}
         </div>

@@ -1,18 +1,20 @@
 import { NavLink } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Users as UsersIcon, Shield, GitBranch } from 'lucide-react';
 import { ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/cn';
 
-const TABS = [
-  { to: ROUTES.TEAM_AGENTS,     label: 'Agents',           icon: UsersIcon },
-  { to: ROUTES.TEAM_ROLES,      label: 'Roles',            icon: Shield    },
-  { to: ROUTES.TEAM_ASSIGNMENT, label: 'Assignment rules', icon: GitBranch },
-];
-
 export function TeamTabs() {
+  const { t } = useTranslation();
+  const tabs = [
+    { to: ROUTES.TEAM_AGENTS,     label: t('team.tabs.agents'),     icon: UsersIcon },
+    { to: ROUTES.TEAM_ROLES,      label: t('team.tabs.roles'),      icon: Shield    },
+    { to: ROUTES.TEAM_ASSIGNMENT, label: t('team.tabs.assignment'), icon: GitBranch },
+  ];
+
   return (
     <div className="flex items-center gap-1 border-b border-gray-100 bg-white/80 px-1 backdrop-blur-sm">
-      {TABS.map(({ to, label, icon: Icon }) => (
+      {tabs.map(({ to, label, icon: Icon }) => (
         <NavLink
           key={to}
           to={to}

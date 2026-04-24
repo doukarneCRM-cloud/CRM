@@ -744,5 +744,166 @@
       "notes": "Notes",
       "notesPlaceholder": "Notes internes (facultatif)"
     }
+  },
+  "team": {
+    "tabs": {
+      "agents": "Agents",
+      "roles": "Rôles",
+      "assignment": "Règles d'attribution"
+    },
+    "agents": {
+      "title": "Membres de l'équipe",
+      "counts": "Actifs : {{active}} · Inactifs : {{inactive}}",
+      "new": "Nouveau membre",
+      "searchPlaceholder": "Rechercher par nom, e-mail ou rôle…",
+      "filter": {
+        "active": "Actifs",
+        "inactive": "Inactifs"
+      },
+      "empty": "Aucun membre ne correspond aux filtres actuels.",
+      "confirm": {
+        "deactivate": "La désactivation retirera l'utilisateur de ses commandes en cours et bloquera sa connexion. Continuer ?",
+        "reactivate": "Réactiver cet utilisateur ?"
+      },
+      "toggleFailed": {
+        "deactivate": "Échec de la désactivation",
+        "reactivate": "Échec de la réactivation"
+      }
+    },
+    "agentCard": {
+      "payoutConfirm": "Verser {{amount}} MAD à {{name}} ? Toutes les commissions non payées seront marquées comme payées.",
+      "payoutFailed": "Échec de l'enregistrement du paiement",
+      "stats": {
+        "today": "Aujourd'hui",
+        "confirmed": "Confirmées",
+        "delivered": "Livrées",
+        "deliveryRate": "Taux livr."
+      },
+      "last7days": "7 derniers jours",
+      "ordersCount_one": "{{count}} commande",
+      "ordersCount_other": "{{count}} commandes",
+      "commission": {
+        "title": "Commission",
+        "paid": "Payée",
+        "unpaid": "Non payée",
+        "processing": "Traitement…",
+        "payoutButton": "Verser {{amount}} MAD"
+      },
+      "edit": "Modifier",
+      "editTooltip": "Modifier l'agent",
+      "deactivate": "Désactiver",
+      "reactivate": "Réactiver"
+    },
+    "agentForm": {
+      "titleNew": "Nouveau membre",
+      "titleEdit": "Modifier {{name}}",
+      "save": "Enregistrer",
+      "create": "Créer l'agent",
+      "saveFailed": "Échec de l'enregistrement",
+      "fullName": "Nom complet",
+      "fullNamePlaceholder": "ex. Sara El Amrani",
+      "email": "E-mail",
+      "emailPlaceholder": "nom@anaqatoki.ma",
+      "phone": "Téléphone",
+      "phonePlaceholder": "06XXXXXXXX (facultatif)",
+      "role": "Rôle",
+      "rolePlaceholder": "Sélectionner un rôle…",
+      "password": "Mot de passe",
+      "passwordReset": "Réinitialiser le mot de passe (facultatif)",
+      "passwordPlaceholderCreate": "Au moins 8 caractères",
+      "passwordPlaceholderEdit": "Laisser vide pour conserver",
+      "passwordHint": "L'agent l'utilise pour se connecter.",
+      "avatarUrl": "URL de l'avatar",
+      "avatarUrlPlaceholder": "https://… (facultatif)"
+    },
+    "roles": {
+      "title": "Rôles et permissions",
+      "subtitle": "Définissez ce que chaque rôle peut voir et faire dans la plateforme.",
+      "new": "Nouveau rôle"
+    },
+    "rolePermissionCard": {
+      "system": "système",
+      "userCount_one": "{{count}} utilisateur",
+      "userCount_other": "{{count}} utilisateurs",
+      "permissionCount_one": "{{count}} permission",
+      "permissionCount_other": "{{count}} permissions",
+      "clearAll": "Tout désélectionner",
+      "selectAll": "Tout sélectionner",
+      "revert": "Annuler",
+      "savePermissions": "Enregistrer les permissions",
+      "saveFailed": "Échec de l'enregistrement des permissions",
+      "adminMustKeep": "Le rôle admin doit conserver au moins une permission.",
+      "sections": {
+        "orders": "Commandes",
+        "confirmation": "Confirmation",
+        "shipping": "Expédition",
+        "call_center": "Centre d'appels",
+        "products": "Produits",
+        "stock": "Stock",
+        "clients": "Clients",
+        "team": "Équipe",
+        "dashboard": "Tableau de bord",
+        "analytics": "Analytique",
+        "integrations": "Intégrations",
+        "atelie": "Atelier",
+        "settings": "Paramètres"
+      }
+    },
+    "roleForm": {
+      "title": "Nouveau rôle",
+      "create": "Créer le rôle",
+      "createFailed": "Échec de la création du rôle",
+      "label": "Nom d'affichage",
+      "labelPlaceholder": "ex. Superviseur senior",
+      "slug": "Identifiant (usage interne)",
+      "slugPlaceholder": "superviseur_senior",
+      "slugHint": "Lettres minuscules, chiffres et tirets bas uniquement.",
+      "permissionsHint": "Vous choisirez les permissions à l'écran suivant, après la création du rôle."
+    },
+    "assignment": {
+      "title": "Règles d'attribution",
+      "subtitle": "Configurez la répartition des commandes entrantes entre vos agents de confirmation.",
+      "master": {
+        "title": "Attribution automatique",
+        "subtitle": "Lorsqu'elle est désactivée, les nouvelles commandes restent non attribuées jusqu'à ce qu'un superviseur choisisse un agent.",
+        "enabled": "Activée",
+        "disabled": "Désactivée"
+      },
+      "saveFailed": "Échec de l'enregistrement",
+      "strategy": {
+        "title": "Stratégie",
+        "subtitle": "Comment décider qui reçoit la prochaine commande.",
+        "roundRobin": "Tour de rôle",
+        "roundRobinHelp": "Chaque agent reçoit le nombre de commandes configuré avant de passer au suivant.",
+        "byProduct": "Par produit",
+        "byProductHelp": "Revient au tour de rôle tant qu'aucun mappage produit → agent n'est configuré."
+      },
+      "bounce": {
+        "title": "Nombre par agent",
+        "subtitle": "Nombre de commandes reçues par un agent avant que la rotation n'avance."
+      },
+      "simulator": {
+        "title": "Aperçu de la rotation",
+        "subtitle": "Simulez la règle actuelle sur la liste des agents éligibles. Rien n'est enregistré.",
+        "orders": "Commandes :",
+        "simulate": "Simuler",
+        "empty": "Aucun agent éligible pour la rotation."
+      },
+      "commission": {
+        "title": "Barème de commission",
+        "subtitle": "MAD gagnés par agent pour chaque commande confirmée et chaque commande livrée. La commission est versée une fois par commande à la livraison."
+      }
+    },
+    "commissionTable": {
+      "empty": "Aucun agent éligible. Créez un agent puis définissez son barème ici.",
+      "columns": {
+        "agent": "Agent",
+        "onConfirm": "À la confirmation (MAD)",
+        "onDeliver": "À la livraison (MAD)"
+      },
+      "saving": "Enregistrement…",
+      "save": "Enregistrer",
+      "saveFailed": "Échec de l'enregistrement de la commission"
+    }
   }
 }

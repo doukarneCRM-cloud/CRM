@@ -744,5 +744,166 @@
       "notes": "Notes",
       "notesPlaceholder": "Internal notes (optional)"
     }
+  },
+  "team": {
+    "tabs": {
+      "agents": "Agents",
+      "roles": "Roles",
+      "assignment": "Assignment rules"
+    },
+    "agents": {
+      "title": "Team members",
+      "counts": "Active: {{active}} · Inactive: {{inactive}}",
+      "new": "New team member",
+      "searchPlaceholder": "Search by name, email, or role...",
+      "filter": {
+        "active": "Active",
+        "inactive": "Inactive"
+      },
+      "empty": "No team members match the current filters.",
+      "confirm": {
+        "deactivate": "Deactivating will unassign their pending orders and block login. Continue?",
+        "reactivate": "Reactivate this user?"
+      },
+      "toggleFailed": {
+        "deactivate": "Failed to deactivate user",
+        "reactivate": "Failed to reactivate user"
+      }
+    },
+    "agentCard": {
+      "payoutConfirm": "Pay out {{amount}} MAD to {{name}}? This marks all unpaid commissions as paid.",
+      "payoutFailed": "Failed to record payout",
+      "stats": {
+        "today": "Today",
+        "confirmed": "Confirmed",
+        "delivered": "Delivered",
+        "deliveryRate": "Deliv. rate"
+      },
+      "last7days": "Last 7 days",
+      "ordersCount_one": "{{count}} order",
+      "ordersCount_other": "{{count}} orders",
+      "commission": {
+        "title": "Commission",
+        "paid": "Paid",
+        "unpaid": "Unpaid",
+        "processing": "Processing…",
+        "payoutButton": "Pay out {{amount}} MAD"
+      },
+      "edit": "Edit",
+      "editTooltip": "Edit agent",
+      "deactivate": "Deactivate",
+      "reactivate": "Reactivate"
+    },
+    "agentForm": {
+      "titleNew": "New team member",
+      "titleEdit": "Edit {{name}}",
+      "save": "Save changes",
+      "create": "Create agent",
+      "saveFailed": "Failed to save",
+      "fullName": "Full name",
+      "fullNamePlaceholder": "e.g. Sara El Amrani",
+      "email": "Email",
+      "emailPlaceholder": "name@anaqatoki.ma",
+      "phone": "Phone",
+      "phonePlaceholder": "06XXXXXXXX (optional)",
+      "role": "Role",
+      "rolePlaceholder": "Select role...",
+      "password": "Password",
+      "passwordReset": "Reset password (optional)",
+      "passwordPlaceholderCreate": "At least 8 characters",
+      "passwordPlaceholderEdit": "Leave blank to keep current",
+      "passwordHint": "Agent uses this to log in.",
+      "avatarUrl": "Avatar URL",
+      "avatarUrlPlaceholder": "https://... (optional)"
+    },
+    "roles": {
+      "title": "Roles & permissions",
+      "subtitle": "Control what each role can see and do across the platform.",
+      "new": "New role"
+    },
+    "rolePermissionCard": {
+      "system": "system",
+      "userCount_one": "{{count}} user",
+      "userCount_other": "{{count}} users",
+      "permissionCount_one": "{{count}} permission",
+      "permissionCount_other": "{{count}} permissions",
+      "clearAll": "Clear all",
+      "selectAll": "Select all",
+      "revert": "Revert",
+      "savePermissions": "Save permissions",
+      "saveFailed": "Failed to save permissions",
+      "adminMustKeep": "The admin role must retain at least one permission.",
+      "sections": {
+        "orders": "Orders",
+        "confirmation": "Confirmation",
+        "shipping": "Shipping",
+        "call_center": "Call Center",
+        "products": "Products",
+        "stock": "Stock",
+        "clients": "Clients",
+        "team": "Team",
+        "dashboard": "Dashboard",
+        "analytics": "Analytics",
+        "integrations": "Integrations",
+        "atelie": "Atelie",
+        "settings": "Settings"
+      }
+    },
+    "roleForm": {
+      "title": "New role",
+      "create": "Create role",
+      "createFailed": "Failed to create role",
+      "label": "Display name",
+      "labelPlaceholder": "e.g. Senior Supervisor",
+      "slug": "Slug (used internally)",
+      "slugPlaceholder": "senior_supervisor",
+      "slugHint": "Lowercase letters, digits, and underscores only.",
+      "permissionsHint": "You'll pick permissions on the next screen after the role is created."
+    },
+    "assignment": {
+      "title": "Assignment rules",
+      "subtitle": "Configure how incoming orders are distributed among your confirmation agents.",
+      "master": {
+        "title": "Auto-assignment",
+        "subtitle": "When disabled, new orders stay unassigned until a supervisor picks an agent.",
+        "enabled": "Enabled",
+        "disabled": "Disabled"
+      },
+      "saveFailed": "Failed to save change",
+      "strategy": {
+        "title": "Strategy",
+        "subtitle": "How to decide who gets the next order.",
+        "roundRobin": "Round-robin",
+        "roundRobinHelp": "Each agent gets the configured number of orders in turn.",
+        "byProduct": "By product",
+        "byProductHelp": "Falls back to round-robin until product → agent mapping is configured."
+      },
+      "bounce": {
+        "title": "Bounce count",
+        "subtitle": "How many orders each agent receives before the rotation moves on."
+      },
+      "simulator": {
+        "title": "Preview rotation",
+        "subtitle": "Dry-run the current rule against the list of eligible agents. Nothing is saved.",
+        "orders": "Orders:",
+        "simulate": "Simulate",
+        "empty": "No eligible agents to rotate through."
+      },
+      "commission": {
+        "title": "Commission rates",
+        "subtitle": "Per-agent MAD earned on each confirmed and each delivered order. Commission is paid out once per order when it delivers."
+      }
+    },
+    "commissionTable": {
+      "empty": "No eligible agents yet. Create an agent first, then set their commission rates here.",
+      "columns": {
+        "agent": "Agent",
+        "onConfirm": "On confirm (MAD)",
+        "onDeliver": "On deliver (MAD)"
+      },
+      "saving": "Saving…",
+      "save": "Save",
+      "saveFailed": "Failed to save commission"
+    }
   }
 }

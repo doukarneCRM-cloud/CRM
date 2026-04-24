@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { isAxiosError } from 'axios';
 import { GlassModal } from '@/components/ui/GlassModal';
 import { CRMInput } from '@/components/ui/CRMInput';
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export function RoleFormModal({ open, onClose, onCreated }: Props) {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [label, setLabel] = useState('');
   const [saving, setSaving] = useState(false);
@@ -49,9 +51,9 @@ export function RoleFormModal({ open, onClose, onCreated }: Props) {
     } catch (err) {
       if (isAxiosError(err)) {
         const data = err.response?.data as { error?: { message?: string } } | undefined;
-        setError(data?.error?.message ?? 'Failed to create role');
+        setError(data?.error?.message ?? t('team.roleForm.createFailed'));
       } else {
-        setError('Failed to create role');
+        setError(t('team.roleForm.createFailed'));
       }
     } finally {
       setSaving(false);
@@ -62,7 +64,7 @@ export function RoleFormModal({ open, onClose, onCreated }: Props) {
     <GlassModal
       open={open}
       onClose={onClose}
-      title="New role"
+      title={t('team.roleForm.title')}
       size="sm"
       footer={
         <div className="flex items-center justify-between gap-2">
@@ -73,10 +75,10 @@ export function RoleFormModal({ open, onClose, onCreated }: Props) {
           )}
           <div className="flex items-center gap-2">
             <CRMButton variant="ghost" onClick={onClose} disabled={saving}>
-              Cancel
+              {t('common.cancel')}
             </CRMButton>
             <CRMButton onClick={handleSave} loading={saving} disabled={!canSave}>
-              Create role
+              {t('team.roleForm.create')}
             </CRMButton>
           </div>
         </div>
@@ -84,25 +86,25 @@ export function RoleFormModal({ open, onClose, onCreated }: Props) {
     >
       <div className="flex flex-col gap-3">
         <CRMInput
-          label="Display name"
+          label={t('team.roleForm.label')}
           required
           value={label}
           onChange={(e) => setLabel(e.target.value)}
-          placeholder="e.g. Senior Supervisor"
+          placeholder={t('team.roleForm.labelPlaceholder')}
         />
         <CRMInput
-          label="Slug (used internally)"
+          label={t('team.roleForm.slug')}
           required
           value={name}
           onChange={(e) => {
             setNameTouched(true);
             setName(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''));
           }}
-          placeholder="senior_supervisor"
-          hint="Lowercase letters, digits, and underscores only."
+          placeholder={t('team.roleForm.slugPlaceholder')}
+          hint={t('team.roleForm.slugHint')}
         />
         <p className="text-xs text-gray-500">
-          You'll pick permissions on the next screen after the role is created.
+          {t('team.roleForm.permissionsHint')}
         </p>
       </div>
     </GlassModal>
