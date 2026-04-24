@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Check, Search, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
@@ -34,7 +35,16 @@ const CRMSelect = ({
 }: CRMSelectProps) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+  // Menu position (fixed-coord in viewport) is recomputed on open + on
+  // scroll/resize. We portal the menu to <body> so parents with
+  // overflow:hidden / overflow:auto can't clip it, which used to cause the
+  // options list to get covered by the table below on LogsTab.
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(
+    null,
+  );
   const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const selectedValues = multi
     ? (Array.isArray(value) ? value : [])
@@ -46,9 +56,30 @@ const CRMSelect = ({
     ? options.filter((o) => o.label.toLowerCase().includes(search.toLowerCase()))
     : options;
 
+  useLayoutEffect(() => {
+    if (!open) return;
+    const update = () => {
+      if (!buttonRef.current) return;
+      const r = buttonRef.current.getBoundingClientRect();
+      setMenuPos({ top: r.bottom + 4, left: r.left, width: r.width });
+    };
+    update();
+    // `capture: true` so scrolls on ancestor scroll containers reach us too —
+    // otherwise the menu floats in place while the trigger scrolls away.
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', update);
+    };
+  }, [open]);
+
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const inTrigger = containerRef.current?.contains(target) ?? false;
+      const inMenu = menuRef.current?.contains(target) ?? false;
+      if (!inTrigger && !inMenu) {
         setOpen(false);
         setSearch('');
       }
@@ -85,6 +116,7 @@ const CRMSelect = ({
       {label && <label className="text-sm font-medium text-gray-700">{label}</label>}
 
       <button
+        ref={buttonRef}
         type="button"
         disabled={disabled}
         onClick={() => !disabled && setOpen((v) => !v)}
@@ -118,47 +150,54 @@ const CRMSelect = ({
         </div>
       </button>
 
-      {open && (
-        <div className="absolute top-full z-50 mt-1 w-full rounded-input border border-gray-200 bg-white shadow-hover">
-          {searchable && (
-            <div className="border-b border-gray-100 p-2">
-              <div className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-1.5">
-                <Search size={14} className="text-gray-400" />
-                <input
-                  autoFocus
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search..."
-                  className="w-full bg-transparent text-sm text-gray-700 outline-none placeholder-gray-400"
-                />
+      {open &&
+        menuPos &&
+        createPortal(
+          <div
+            ref={menuRef}
+            className="fixed z-[60] rounded-input border border-gray-200 bg-white shadow-hover"
+            style={{ top: menuPos.top, left: menuPos.left, width: menuPos.width }}
+          >
+            {searchable && (
+              <div className="border-b border-gray-100 p-2">
+                <div className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-1.5">
+                  <Search size={14} className="text-gray-400" />
+                  <input
+                    autoFocus
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search..."
+                    className="w-full bg-transparent text-sm text-gray-700 outline-none placeholder-gray-400"
+                  />
+                </div>
               </div>
-            </div>
-          )}
-          <ul className="max-h-60 overflow-y-auto py-1">
-            {filtered.length === 0 && (
-              <li className="px-4 py-3 text-sm text-gray-400">No options found</li>
             )}
-            {filtered.map((option) => {
-              const isSelected = selectedValues.includes(option.value);
-              return (
-                <li
-                  key={option.value}
-                  onClick={() => toggle(option.value)}
-                  className={cn(
-                    'flex cursor-pointer items-center justify-between px-4 py-2.5 text-sm transition-colors',
-                    isSelected
-                      ? 'bg-accent text-primary font-medium'
-                      : 'text-gray-700 hover:bg-gray-50',
-                  )}
-                >
-                  {option.label}
-                  {isSelected && <Check size={14} />}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
+            <ul className="max-h-60 overflow-y-auto py-1">
+              {filtered.length === 0 && (
+                <li className="px-4 py-3 text-sm text-gray-400">No options found</li>
+              )}
+              {filtered.map((option) => {
+                const isSelected = selectedValues.includes(option.value);
+                return (
+                  <li
+                    key={option.value}
+                    onClick={() => toggle(option.value)}
+                    className={cn(
+                      'flex cursor-pointer items-center justify-between px-4 py-2.5 text-sm transition-colors',
+                      isSelected
+                        ? 'bg-accent text-primary font-medium'
+                        : 'text-gray-700 hover:bg-gray-50',
+                    )}
+                  >
+                    {option.label}
+                    {isSelected && <Check size={14} />}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>,
+          document.body,
+        )}
 
       {error && <p className="text-xs font-medium text-red-500">{error}</p>}
     </div>
