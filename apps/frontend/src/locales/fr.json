@@ -905,5 +905,211 @@
       "save": "Enregistrer",
       "saveFailed": "Échec de l'enregistrement de la commission"
     }
+  },
+  "money": {
+    "title": "Finances",
+    "tabs": {
+      "expenses": { "label": "Dépenses", "hint": "Frais opérationnels — factures, abonnements, publicités" },
+      "commission": { "label": "Commissions", "hint": "Versements par agent avec justificatifs et historique" },
+      "delivery": { "label": "Facture livreur", "hint": "Frais du transporteur sur les commandes livrées" }
+    },
+    "expenses": {
+      "kpi": {
+        "total": "Total des dépenses",
+        "entries": "Entrées",
+        "avg": "Moy. / entrée"
+      },
+      "searchPlaceholder": "Rechercher une description…",
+      "anyDate": "Toute date",
+      "exportCsv": "Exporter CSV",
+      "add": "Ajouter une dépense",
+      "recordFirst": "Enregistrer votre première dépense",
+      "emptySearch": "Aucune dépense ne correspond à cette recherche.",
+      "emptyNone": "Aucune dépense enregistrée pour l'instant.",
+      "columns": {
+        "date": "Date",
+        "description": "Description",
+        "amount": "Montant",
+        "file": "Fichier",
+        "recordedBy": "Enregistré par"
+      },
+      "view": "Voir",
+      "editAria": "Modifier",
+      "deleteAria": "Supprimer",
+      "pageOf": "Page {{page}} sur {{totalPages}} · {{total}} entrées",
+      "prev": "Préc.",
+      "next": "Suiv.",
+      "deleteConfirm": "Supprimer la dépense « {{description}} » ?",
+      "loadFailed": "Échec du chargement des dépenses",
+      "exportFailed": "Échec de l'export des dépenses",
+      "deleteFailed": "Échec de la suppression de la dépense",
+      "previewTitle": "Justificatif de dépense",
+      "export": {
+        "headers": {
+          "date": "Date",
+          "description": "Description",
+          "amount": "Montant (MAD)",
+          "file": "Fichier",
+          "recordedBy": "Enregistré par"
+        }
+      },
+      "form": {
+        "titleNew": "Enregistrer une dépense",
+        "titleEdit": "Modifier la dépense",
+        "create": "Enregistrer la dépense",
+        "save": "Enregistrer",
+        "saveFailed": "Échec de l'enregistrement de la dépense",
+        "description": "Description",
+        "descriptionPlaceholder": "ex. Google Ads — campagne d'octobre",
+        "amount": "Montant (MAD)",
+        "amountPlaceholder": "0,00",
+        "date": "Date",
+        "attachment": "Pièce jointe",
+        "uploading": "Téléchargement…",
+        "attachHint": "Joindre une facture ou une capture (PNG/JPG/PDF, ≤ 8 Mo)",
+        "removeFile": "Retirer le fichier",
+        "uploadFailed": "Échec du téléchargement du fichier"
+      }
+    },
+    "commission": {
+      "kpi": {
+        "owed": "Total dû",
+        "paid": "Total payé",
+        "delivered": "Commandes livrées",
+        "agents": "Agents"
+      },
+      "emptyAgents": "Aucun agent avec accès aux commissions pour l'instant.",
+      "card": {
+        "owed": "Dû",
+        "paid": "Payé",
+        "rate": "Taux",
+        "pending": "en attente",
+        "paidLabel": "payé"
+      },
+      "loadFailed": "Échec du chargement des commissions",
+      "drawer": {
+        "titleSuffix": "Commission",
+        "pending": "Commandes en attente",
+        "history": "Historique des versements",
+        "owed": "Dû",
+        "paidTotal": "Payé",
+        "totalEarned": "Total gagné",
+        "orders_one": "{{count}} commande",
+        "orders_other": "{{count}} commandes",
+        "delivered": "{{count}} livrées",
+        "recordPayment": "Enregistrer un versement"
+      },
+      "pendingOrders": {
+        "loadFailed": "Échec du chargement des commandes",
+        "cleared": "Tout est soldé — rien en attente.",
+        "columns": {
+          "order": "Commande",
+          "delivered": "Livrée",
+          "customer": "Client",
+          "commission": "Commission"
+        }
+      },
+      "history": {
+        "loadFailed": "Échec du chargement de l'historique",
+        "empty": "Aucun versement enregistré pour l'instant.",
+        "reverseConfirm": "Annuler ce versement ? Les commandes concernées repasseront en attente.",
+        "reverseFailed": "Échec de l'annulation du versement",
+        "orders_one": "{{count}} commande",
+        "orders_other": "{{count}} commandes",
+        "by": "par {{name}}",
+        "proof": "Justificatif",
+        "reverseAria": "Annuler",
+        "proofPreviewTitle": "Justificatif de commission"
+      },
+      "recordModal": {
+        "title": "Enregistrer un versement · {{name}}",
+        "ordersToSettle": "Commandes à régler",
+        "deselectAll": "Tout désélectionner",
+        "selectAll": "Tout sélectionner",
+        "nothingPending": "Rien en attente.",
+        "columns": {
+          "order": "Commande",
+          "customer": "Client",
+          "amount": "Montant"
+        },
+        "amountToPay": "Montant à verser",
+        "confirmPayment": "Confirmer le versement",
+        "noteLabel": "Note (facultatif)",
+        "notePlaceholder": "ex. Payé par virement le 2026-04-18",
+        "proofLabel": "Justificatif de paiement (facultatif)",
+        "uploading": "Téléchargement…",
+        "attachProof": "Joindre un reçu ou un avis bancaire",
+        "removeProof": "Retirer",
+        "uploadProofFailed": "Échec du téléchargement du justificatif",
+        "loadOrdersFailed": "Échec du chargement des commandes",
+        "recordFailed": "Échec de l'enregistrement du versement"
+      }
+    },
+    "delivery": {
+      "kpi": {
+        "delivered": "Commandes livrées",
+        "deliveredSubtitle": "{{amount}} de frais transporteur",
+        "totalPayout": "Versement total",
+        "totalPayoutSubtitle": "Total client − frais transporteur",
+        "unpaidPayout": "Versement en attente",
+        "unpaidPayoutSubtitle": "Coliix n'a pas encore reversé",
+        "received": "Reçu",
+        "receivedSubtitle": "Réconcilié sur votre compte"
+      },
+      "searchPlaceholder": "Rechercher référence, suivi, client, ville…",
+      "anyDate": "Toute date",
+      "filter": {
+        "all": "Tout",
+        "paid": "Payé",
+        "unpaid": "En attente"
+      },
+      "bulk": {
+        "selected": "{{count}} sélectionnés",
+        "markPending": "Marquer en attente",
+        "markReceived": "Marquer reçu"
+      },
+      "emptySearch": "Aucune commande ne correspond à cette recherche.",
+      "emptyNone": "Aucune commande livrée pour l'instant.",
+      "loadFailed": "Échec du chargement de la facture livreur",
+      "updateFailed": "Échec de la mise à jour du statut",
+      "month": {
+        "summary": "{{orders}} commandes · {{paid}} payées · {{unpaid}} en attente",
+        "unpaidPayout": "Versement en attente",
+        "totalPayout": "Versement total",
+        "fees": "Frais",
+        "csv": "CSV",
+        "markMonth": "Marquer le mois reçu"
+      },
+      "columns": {
+        "order": "Commande",
+        "delivered": "Livrée",
+        "customer": "Client",
+        "tracking": "Suivi",
+        "total": "Total",
+        "fee": "Frais",
+        "payout": "Versement",
+        "status": "Statut"
+      },
+      "status": {
+        "received": "Reçu",
+        "pending": "En attente"
+      },
+      "export": {
+        "headers": {
+          "reference": "Référence",
+          "delivered": "Livrée",
+          "customer": "Client",
+          "phone": "Téléphone",
+          "city": "Ville",
+          "tracking": "Suivi",
+          "orderTotal": "Total commande (MAD)",
+          "carrierFee": "Frais transporteur (MAD)",
+          "netPayout": "Versement net (MAD)",
+          "status": "Statut"
+        },
+        "statusReceived": "Reçu",
+        "statusPending": "En attente"
+      }
+    }
   }
 }

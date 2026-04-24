@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Plus,
   Search,
@@ -38,6 +39,7 @@ function fmtDate(iso: string): string {
 }
 
 export function ExpensesTab() {
+  const { t } = useTranslation();
   const canManage = useAuthStore((s) => s.hasPermission(PERMISSIONS.MONEY_MANAGE));
 
   const [page, setPage] = useState(1);
@@ -72,7 +74,13 @@ export function ExpensesTab() {
         dateTo: dateRange.to ?? undefined,
       });
       const csv = rowsToCsv(
-        ['Date', 'Description', 'Amount (MAD)', 'File', 'Recorded by'],
+        [
+          t('money.expenses.export.headers.date'),
+          t('money.expenses.export.headers.description'),
+          t('money.expenses.export.headers.amount'),
+          t('money.expenses.export.headers.file'),
+          t('money.expenses.export.headers.recordedBy'),
+        ],
         r.data.map((e) => [
           e.date.slice(0, 10),
           e.description,
@@ -86,7 +94,7 @@ export function ExpensesTab() {
         : '';
       downloadCsv(`expenses${suffix}.csv`, csv);
     } catch (err) {
-      setError(apiErrorMessage(err, 'Failed to export expenses'));
+      setError(apiErrorMessage(err, t('money.expenses.exportFailed')));
     } finally {
       setExporting(false);
     }
@@ -123,7 +131,7 @@ export function ExpensesTab() {
         });
       })
       .catch((e) => {
-        if (!cancelled) setError(apiErrorMessage(e, 'Failed to load expenses'));
+        if (!cancelled) setError(apiErrorMessage(e, t('money.expenses.loadFailed')));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -134,12 +142,12 @@ export function ExpensesTab() {
   }, [page, debounced, reloadKey, dateRange.from, dateRange.to]);
 
   const handleDelete = async (e: Expense) => {
-    if (!confirm(`Delete expense "${e.description}"?`)) return;
+    if (!confirm(t('money.expenses.deleteConfirm', { description: e.description }))) return;
     try {
       await moneyApi.deleteExpense(e.id);
       setReloadKey((k) => k + 1);
     } catch (err) {
-      setError(apiErrorMessage(err, 'Failed to delete expense'));
+      setError(apiErrorMessage(err, t('money.expenses.deleteFailed')));
     }
   };
 
@@ -153,19 +161,19 @@ export function ExpensesTab() {
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         <KPICard
-          title="Total Expenses"
+          title={t('money.expenses.kpi.total')}
           value={fmtMAD(data.totalAmount)}
           icon={DollarSign}
           iconColor="#EF4444"
         />
         <KPICard
-          title="Entries"
+          title={t('money.expenses.kpi.entries')}
           value={data.total.toLocaleString('fr-MA')}
           icon={Receipt}
           iconColor="#6366F1"
         />
         <KPICard
-          title="Avg / Entry"
+          title={t('money.expenses.kpi.avg')}
           value={fmtMAD(data.total > 0 ? data.totalAmount / data.total : 0)}
           icon={Calendar}
           iconColor="#10B981"
@@ -177,7 +185,7 @@ export function ExpensesTab() {
           <div className="flex flex-1 flex-wrap items-center gap-2">
             <CRMInput
               leftIcon={<Search size={14} />}
-              placeholder="Search description…"
+              placeholder={t('money.expenses.searchPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               wrapperClassName="flex-1 max-w-md"
@@ -185,7 +193,7 @@ export function ExpensesTab() {
             <FbDateRangePicker
               value={dateRange}
               onChange={(r) => setDateRange(r)}
-              placeholder="Any date"
+              placeholder={t('money.expenses.anyDate')}
             />
           </div>
           <div className="flex items-center gap-2">
@@ -197,7 +205,7 @@ export function ExpensesTab() {
               disabled={data.total === 0}
               onClick={handleExport}
             >
-              Export CSV
+              {t('money.expenses.exportCsv')}
             </CRMButton>
             {canManage && (
               <CRMButton
@@ -207,7 +215,7 @@ export function ExpensesTab() {
                   setShowForm(true);
                 }}
               >
-                Add Expense
+                {t('money.expenses.add')}
               </CRMButton>
             )}
           </div>
@@ -219,7 +227,7 @@ export function ExpensesTab() {
           <div className="flex h-[220px] flex-col items-center justify-center gap-2 text-center text-gray-400">
             <Receipt size={28} className="text-gray-300" />
             <p className="text-sm">
-              {debounced ? 'No expenses match this search.' : 'No expenses recorded yet.'}
+              {debounced ? t('money.expenses.emptySearch') : t('money.expenses.emptyNone')}
             </p>
             {canManage && !debounced && (
               <CRMButton
@@ -231,7 +239,7 @@ export function ExpensesTab() {
                   setShowForm(true);
                 }}
               >
-                Record your first expense
+                {t('money.expenses.recordFirst')}
               </CRMButton>
             )}
           </div>
@@ -240,11 +248,11 @@ export function ExpensesTab() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-[10px] uppercase tracking-wide text-gray-400">
-                  <th className="py-2 pr-2">Date</th>
-                  <th className="py-2 pr-2">Description</th>
-                  <th className="py-2 pr-2 text-right">Amount</th>
-                  <th className="py-2 pr-2">File</th>
-                  <th className="py-2 pr-2">Recorded by</th>
+                  <th className="py-2 pr-2">{t('money.expenses.columns.date')}</th>
+                  <th className="py-2 pr-2">{t('money.expenses.columns.description')}</th>
+                  <th className="py-2 pr-2 text-right">{t('money.expenses.columns.amount')}</th>
+                  <th className="py-2 pr-2">{t('money.expenses.columns.file')}</th>
+                  <th className="py-2 pr-2">{t('money.expenses.columns.recordedBy')}</th>
                   {canManage && <th className="py-2 pr-2 w-[1%]" />}
                 </tr>
               </thead>
@@ -263,7 +271,7 @@ export function ExpensesTab() {
                           onClick={() => setPreviewUrl(`${BASE_URL}${e.fileUrl}`)}
                           className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
                         >
-                          <Paperclip size={12} /> View
+                          <Paperclip size={12} /> {t('money.expenses.view')}
                         </button>
                       ) : (
                         <span className="text-xs text-gray-300">—</span>
@@ -281,14 +289,14 @@ export function ExpensesTab() {
                               setShowForm(true);
                             }}
                             className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-accent hover:text-primary"
-                            aria-label="Edit"
+                            aria-label={t('money.expenses.editAria')}
                           >
                             <Pencil size={13} />
                           </button>
                           <button
                             onClick={() => handleDelete(e)}
                             className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                            aria-label="Delete"
+                            aria-label={t('money.expenses.deleteAria')}
                           >
                             <Trash2 size={13} />
                           </button>
@@ -305,7 +313,7 @@ export function ExpensesTab() {
         {data.totalPages > 1 && (
           <div className="flex items-center justify-between border-t border-gray-100 pt-2 text-xs text-gray-500">
             <span>
-              Page {page} of {data.totalPages} · {data.total} entries
+              {t('money.expenses.pageOf', { page, totalPages: data.totalPages, total: data.total })}
             </span>
             <div className="flex items-center gap-2">
               <CRMButton
@@ -314,7 +322,7 @@ export function ExpensesTab() {
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
-                Prev
+                {t('money.expenses.prev')}
               </CRMButton>
               <CRMButton
                 size="sm"
@@ -322,7 +330,7 @@ export function ExpensesTab() {
                 disabled={page >= data.totalPages}
                 onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
               >
-                Next
+                {t('money.expenses.next')}
               </CRMButton>
             </div>
           </div>
@@ -344,7 +352,7 @@ export function ExpensesTab() {
         open={previewUrl !== null}
         onClose={() => setPreviewUrl(null)}
         url={previewUrl ?? ''}
-        title="Expense receipt"
+        title={t('money.expenses.previewTitle')}
       />
     </div>
   );
@@ -361,6 +369,7 @@ function ExpenseFormModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { t } = useTranslation();
   const [description, setDescription] = useState(editing?.description ?? '');
   const [amount, setAmount] = useState(editing?.amount?.toString() ?? '');
   const [date, setDate] = useState(
@@ -384,7 +393,7 @@ function ExpenseFormModal({
       const res = await moneyApi.uploadExpenseFile(file);
       setFileUrl(res.url);
     } catch (e) {
-      setErr(apiErrorMessage(e, 'Failed to upload file'));
+      setErr(apiErrorMessage(e, t('money.expenses.form.uploadFailed')));
     } finally {
       setUploading(false);
     }
@@ -408,7 +417,7 @@ function ExpenseFormModal({
       }
       onSaved();
     } catch (e) {
-      setErr(apiErrorMessage(e, 'Failed to save expense'));
+      setErr(apiErrorMessage(e, t('money.expenses.form.saveFailed')));
     } finally {
       setSaving(false);
     }
@@ -418,15 +427,15 @@ function ExpenseFormModal({
     <GlassModal
       open
       onClose={onClose}
-      title={editing ? 'Edit Expense' : 'Record Expense'}
+      title={editing ? t('money.expenses.form.titleEdit') : t('money.expenses.form.titleNew')}
       size="md"
       footer={
         <div className="flex items-center justify-end gap-2">
           <CRMButton variant="ghost" onClick={onClose} disabled={saving}>
-            Cancel
+            {t('common.cancel')}
           </CRMButton>
           <CRMButton onClick={handleSubmit} loading={saving} disabled={!isValid}>
-            {editing ? 'Save changes' : 'Record expense'}
+            {editing ? t('money.expenses.form.save') : t('money.expenses.form.create')}
           </CRMButton>
         </div>
       }
@@ -439,8 +448,8 @@ function ExpenseFormModal({
         )}
 
         <CRMInput
-          label="Description"
-          placeholder="e.g. Google Ads — October campaign"
+          label={t('money.expenses.form.description')}
+          placeholder={t('money.expenses.form.descriptionPlaceholder')}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           required
@@ -448,17 +457,17 @@ function ExpenseFormModal({
 
         <div className="grid grid-cols-2 gap-3">
           <CRMInput
-            label="Amount (MAD)"
+            label={t('money.expenses.form.amount')}
             type="number"
             step="0.01"
             min="0.01"
-            placeholder="0.00"
+            placeholder={t('money.expenses.form.amountPlaceholder')}
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             required
           />
           <CRMInput
-            label="Date"
+            label={t('money.expenses.form.date')}
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
@@ -468,7 +477,7 @@ function ExpenseFormModal({
 
         {/* File attachment */}
         <div className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-gray-700">Attachment</span>
+          <span className="text-sm font-medium text-gray-700">{t('money.expenses.form.attachment')}</span>
           {fileUrl ? (
             <div className="flex items-center justify-between rounded-card border border-gray-200 bg-gray-50 px-3 py-2">
               <a
@@ -483,7 +492,7 @@ function ExpenseFormModal({
               <button
                 onClick={() => setFileUrl(null)}
                 className="flex h-6 w-6 items-center justify-center rounded-full text-gray-400 hover:bg-red-50 hover:text-red-600"
-                aria-label="Remove file"
+                aria-label={t('money.expenses.form.removeFile')}
               >
                 <X size={12} />
               </button>
@@ -498,7 +507,7 @@ function ExpenseFormModal({
               )}
             >
               <Upload size={14} />
-              {uploading ? 'Uploading…' : 'Attach invoice or screenshot (PNG/JPG/PDF, ≤ 8 MB)'}
+              {uploading ? t('money.expenses.form.uploading') : t('money.expenses.form.attachHint')}
             </button>
           )}
           <input

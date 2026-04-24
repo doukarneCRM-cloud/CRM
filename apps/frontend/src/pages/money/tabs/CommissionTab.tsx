@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Users,
   Check,
@@ -41,6 +42,7 @@ function fmtDate(iso: string | null): string {
 }
 
 export function CommissionTab() {
+  const { t } = useTranslation();
   const canManage = useAuthStore((s) => s.hasPermission(PERMISSIONS.MONEY_MANAGE));
 
   const [rows, setRows] = useState<AgentCommissionRow[]>([]);
@@ -59,7 +61,7 @@ export function CommissionTab() {
         if (!cancelled) setRows(r);
       })
       .catch((e) => {
-        if (!cancelled) setError(apiErrorMessage(e, 'Failed to load commissions'));
+        if (!cancelled) setError(apiErrorMessage(e, t('money.commission.loadFailed')));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -91,25 +93,25 @@ export function CommissionTab() {
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <KPICard
-          title="Total Owed"
+          title={t('money.commission.kpi.owed')}
           value={fmtMAD(totals.pending)}
           icon={Clock}
           iconColor="#F59E0B"
         />
         <KPICard
-          title="Total Paid"
+          title={t('money.commission.kpi.paid')}
           value={fmtMAD(totals.paid)}
           icon={Check}
           iconColor="#10B981"
         />
         <KPICard
-          title="Delivered Orders"
+          title={t('money.commission.kpi.delivered')}
           value={totals.delivered.toLocaleString('fr-MA')}
           icon={Package}
           iconColor="#6366F1"
         />
         <KPICard
-          title="Agents"
+          title={t('money.commission.kpi.agents')}
           value={rows.length.toString()}
           icon={Users}
           iconColor="#8B5CF6"
@@ -125,7 +127,7 @@ export function CommissionTab() {
       ) : rows.length === 0 ? (
         <GlassCard className="flex h-[220px] flex-col items-center justify-center gap-2 text-center text-gray-400">
           <Users size={28} className="text-gray-300" />
-          <p className="text-sm">No agents with commission access yet.</p>
+          <p className="text-sm">{t('money.commission.emptyAgents')}</p>
         </GlassCard>
       ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -149,24 +151,24 @@ export function CommissionTab() {
 
                 <div className="flex items-end justify-between">
                   <div>
-                    <p className="text-[10px] uppercase tracking-wide text-gray-400">Owed</p>
+                    <p className="text-[10px] uppercase tracking-wide text-gray-400">{t('money.commission.card.owed')}</p>
                     <p className="text-lg font-bold text-amber-600">{fmtMAD(r.pendingTotal)}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[10px] uppercase tracking-wide text-gray-400">Paid</p>
+                    <p className="text-[10px] uppercase tracking-wide text-gray-400">{t('money.commission.card.paid')}</p>
                     <p className="text-sm font-semibold text-emerald-600">{fmtMAD(r.paidTotal)}</p>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between border-t border-gray-100 pt-2 text-[11px] text-gray-500">
                   <span>
-                    <b className="text-gray-800">{r.pendingCount}</b> pending
+                    <b className="text-gray-800">{r.pendingCount}</b> {t('money.commission.card.pending')}
                   </span>
                   <span>
-                    <b className="text-gray-800">{r.paidCount}</b> paid
+                    <b className="text-gray-800">{r.paidCount}</b> {t('money.commission.card.paidLabel')}
                   </span>
                   <span>
-                    Rate <b className="text-gray-800">{fmtMAD(r.perOrderRate)}</b>
+                    {t('money.commission.card.rate')} <b className="text-gray-800">{fmtMAD(r.perOrderRate)}</b>
                   </span>
                 </div>
               </GlassCard>
@@ -203,37 +205,38 @@ function AgentDrawer({
   onClose: () => void;
   onPaymentRecorded: () => void;
 }) {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<'pending' | 'history'>('pending');
   const [showPayForm, setShowPayForm] = useState(false);
 
   return (
-    <GlassModal open onClose={onClose} title={`${agent.name} · Commission`} size="2xl">
+    <GlassModal open onClose={onClose} title={`${agent.name} · ${t('money.commission.drawer.titleSuffix')}`} size="2xl">
       <div className="flex flex-col gap-4">
         <div className="grid grid-cols-3 gap-3">
           <div className="rounded-card border border-amber-100 bg-amber-50/60 px-3 py-3">
-            <p className="text-[10px] uppercase tracking-wide text-amber-700">Owed</p>
+            <p className="text-[10px] uppercase tracking-wide text-amber-700">{t('money.commission.drawer.owed')}</p>
             <p className="text-xl font-bold text-amber-700">{fmtMAD(agent.pendingTotal)}</p>
-            <p className="text-[11px] text-amber-700/80">{agent.pendingCount} orders</p>
+            <p className="text-[11px] text-amber-700/80">{t('money.commission.drawer.orders', { count: agent.pendingCount })}</p>
           </div>
           <div className="rounded-card border border-emerald-100 bg-emerald-50/60 px-3 py-3">
-            <p className="text-[10px] uppercase tracking-wide text-emerald-700">Paid</p>
+            <p className="text-[10px] uppercase tracking-wide text-emerald-700">{t('money.commission.drawer.paidTotal')}</p>
             <p className="text-xl font-bold text-emerald-700">{fmtMAD(agent.paidTotal)}</p>
-            <p className="text-[11px] text-emerald-700/80">{agent.paidCount} orders</p>
+            <p className="text-[11px] text-emerald-700/80">{t('money.commission.drawer.orders', { count: agent.paidCount })}</p>
           </div>
           <div className="rounded-card border border-gray-100 bg-white px-3 py-3">
-            <p className="text-[10px] uppercase tracking-wide text-gray-500">Total earned</p>
+            <p className="text-[10px] uppercase tracking-wide text-gray-500">{t('money.commission.drawer.totalEarned')}</p>
             <p className="text-xl font-bold text-gray-900">{fmtMAD(agent.total)}</p>
-            <p className="text-[11px] text-gray-500">{agent.deliveredCount} delivered</p>
+            <p className="text-[11px] text-gray-500">{t('money.commission.drawer.delivered', { count: agent.deliveredCount })}</p>
           </div>
         </div>
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1 rounded-card border border-gray-100 bg-white p-1">
             <TabBtn active={tab === 'pending'} onClick={() => setTab('pending')}>
-              <Clock size={13} /> Pending orders
+              <Clock size={13} /> {t('money.commission.drawer.pending')}
             </TabBtn>
             <TabBtn active={tab === 'history'} onClick={() => setTab('history')}>
-              <History size={13} /> Payment history
+              <History size={13} /> {t('money.commission.drawer.history')}
             </TabBtn>
           </div>
 
@@ -242,7 +245,7 @@ function AgentDrawer({
               leftIcon={<Wallet size={14} />}
               onClick={() => setShowPayForm(true)}
             >
-              Record payment
+              {t('money.commission.drawer.recordPayment')}
             </CRMButton>
           )}
         </div>
@@ -303,6 +306,7 @@ function TabBtn({
 // ─── Pending orders list ────────────────────────────────────────────────────
 
 function PendingOrders({ agentId }: { agentId: string }) {
+  const { t } = useTranslation();
   const [rows, setRows] = useState<AgentPendingOrder[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -311,11 +315,11 @@ function PendingOrders({ agentId }: { agentId: string }) {
     moneyApi
       .listAgentPendingOrders(agentId)
       .then((r) => !cancelled && setRows(r))
-      .catch((e) => !cancelled && setErr(apiErrorMessage(e, 'Failed to load orders')));
+      .catch((e) => !cancelled && setErr(apiErrorMessage(e, t('money.commission.pendingOrders.loadFailed'))));
     return () => {
       cancelled = true;
     };
-  }, [agentId]);
+  }, [agentId, t]);
 
   if (err)
     return (
@@ -328,7 +332,7 @@ function PendingOrders({ agentId }: { agentId: string }) {
     return (
       <div className="flex h-[160px] flex-col items-center justify-center gap-1 text-gray-400">
         <Check size={22} className="text-emerald-400" />
-        <p className="text-xs">All cleared — nothing pending.</p>
+        <p className="text-xs">{t('money.commission.pendingOrders.cleared')}</p>
       </div>
     );
 
@@ -337,10 +341,10 @@ function PendingOrders({ agentId }: { agentId: string }) {
       <table className="w-full text-xs">
         <thead className="sticky top-0 bg-gray-50 text-[10px] uppercase tracking-wide text-gray-400">
           <tr>
-            <th className="px-3 py-2 text-left">Order</th>
-            <th className="px-3 py-2 text-left">Delivered</th>
-            <th className="px-3 py-2 text-left">Customer</th>
-            <th className="px-3 py-2 text-right">Commission</th>
+            <th className="px-3 py-2 text-left">{t('money.commission.pendingOrders.columns.order')}</th>
+            <th className="px-3 py-2 text-left">{t('money.commission.pendingOrders.columns.delivered')}</th>
+            <th className="px-3 py-2 text-left">{t('money.commission.pendingOrders.columns.customer')}</th>
+            <th className="px-3 py-2 text-right">{t('money.commission.pendingOrders.columns.commission')}</th>
           </tr>
         </thead>
         <tbody>
@@ -376,6 +380,7 @@ function PaymentHistory({
   canManage: boolean;
   onChange: () => void;
 }) {
+  const { t } = useTranslation();
   const [rows, setRows] = useState<CommissionPayment[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
@@ -386,20 +391,20 @@ function PaymentHistory({
     moneyApi
       .listPaymentHistory(agentId)
       .then((r) => !cancelled && setRows(r))
-      .catch((e) => !cancelled && setErr(apiErrorMessage(e, 'Failed to load history')));
+      .catch((e) => !cancelled && setErr(apiErrorMessage(e, t('money.commission.history.loadFailed'))));
     return () => {
       cancelled = true;
     };
-  }, [agentId, reload]);
+  }, [agentId, reload, t]);
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Reverse this payment? Affected orders will go back to pending.')) return;
+    if (!confirm(t('money.commission.history.reverseConfirm'))) return;
     try {
       await moneyApi.deletePayment(id);
       setReload((k) => k + 1);
       onChange();
     } catch (e) {
-      setErr(apiErrorMessage(e, 'Failed to reverse payment'));
+      setErr(apiErrorMessage(e, t('money.commission.history.reverseFailed')));
     }
   };
 
@@ -414,7 +419,7 @@ function PaymentHistory({
     return (
       <div className="flex h-[160px] flex-col items-center justify-center gap-1 text-gray-400">
         <History size={22} className="text-gray-300" />
-        <p className="text-xs">No payments recorded yet.</p>
+        <p className="text-xs">{t('money.commission.history.empty')}</p>
       </div>
     );
 
@@ -430,8 +435,8 @@ function PaymentHistory({
                 <span className="text-[11px] text-gray-400">{fmtDate(p.paidAt)}</span>
               </div>
               <p className="mt-0.5 text-[11px] text-gray-500">
-                {p.orderIds.length} order{p.orderIds.length !== 1 && 's'}
-                {p.recordedBy && ` · by ${p.recordedBy.name}`}
+                {t('money.commission.history.orders', { count: p.orderIds.length })}
+                {p.recordedBy && ` · ${t('money.commission.history.by', { name: p.recordedBy.name })}`}
               </p>
               {p.notes && (
                 <p className="mt-1 rounded-btn bg-gray-50 px-2 py-1 text-[11px] italic text-gray-600">
@@ -444,7 +449,7 @@ function PaymentHistory({
                   onClick={() => setPreviewUrl(`${BASE_URL}${p.fileUrl}`)}
                   className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
                 >
-                  <FileText size={11} /> Proof
+                  <FileText size={11} /> {t('money.commission.history.proof')}
                 </button>
               )}
             </div>
@@ -452,7 +457,7 @@ function PaymentHistory({
               <button
                 onClick={() => handleDelete(p.id)}
                 className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                aria-label="Reverse"
+                aria-label={t('money.commission.history.reverseAria')}
               >
                 <Trash2 size={12} />
               </button>
@@ -465,7 +470,7 @@ function PaymentHistory({
         open={previewUrl !== null}
         onClose={() => setPreviewUrl(null)}
         url={previewUrl ?? ''}
-        title="Commission proof"
+        title={t('money.commission.history.proofPreviewTitle')}
       />
     </>
   );
@@ -482,6 +487,7 @@ function RecordPaymentModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { t } = useTranslation();
   const [orders, setOrders] = useState<AgentPendingOrder[] | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [notes, setNotes] = useState('');
@@ -498,8 +504,8 @@ function RecordPaymentModal({
         setOrders(r);
         setSelectedIds(new Set(r.map((o) => o.id)));
       })
-      .catch((e) => setErr(apiErrorMessage(e, 'Failed to load orders')));
-  }, [agent.agentId]);
+      .catch((e) => setErr(apiErrorMessage(e, t('money.commission.recordModal.loadOrdersFailed'))));
+  }, [agent.agentId, t]);
 
   const total = useMemo(() => {
     if (!orders) return 0;
@@ -523,7 +529,7 @@ function RecordPaymentModal({
       const res = await moneyApi.uploadCommissionFile(file);
       setFileUrl(res.url);
     } catch (e) {
-      setErr(apiErrorMessage(e, 'Failed to upload proof'));
+      setErr(apiErrorMessage(e, t('money.commission.recordModal.uploadProofFailed')));
     } finally {
       setUploading(false);
     }
@@ -543,7 +549,7 @@ function RecordPaymentModal({
       });
       onSaved();
     } catch (e) {
-      setErr(apiErrorMessage(e, 'Failed to record payment'));
+      setErr(apiErrorMessage(e, t('money.commission.recordModal.recordFailed')));
     } finally {
       setSaving(false);
     }
@@ -553,20 +559,20 @@ function RecordPaymentModal({
     <GlassModal
       open
       onClose={onClose}
-      title={`Record payment · ${agent.name}`}
+      title={t('money.commission.recordModal.title', { name: agent.name })}
       size="2xl"
       footer={
         <div className="flex items-center justify-between gap-2">
           <div>
-            <p className="text-[10px] uppercase tracking-wide text-gray-400">Amount to pay</p>
+            <p className="text-[10px] uppercase tracking-wide text-gray-400">{t('money.commission.recordModal.amountToPay')}</p>
             <p className="text-lg font-bold text-emerald-700">{fmtMAD(total)}</p>
           </div>
           <div className="flex items-center gap-2">
             <CRMButton variant="ghost" onClick={onClose} disabled={saving}>
-              Cancel
+              {t('common.cancel')}
             </CRMButton>
             <CRMButton onClick={handleSubmit} loading={saving} disabled={total <= 0}>
-              Confirm payment
+              {t('money.commission.recordModal.confirmPayment')}
             </CRMButton>
           </div>
         </div>
@@ -581,7 +587,7 @@ function RecordPaymentModal({
 
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm font-semibold text-gray-800">Orders to settle</p>
+            <p className="text-sm font-semibold text-gray-800">{t('money.commission.recordModal.ordersToSettle')}</p>
             {orders && orders.length > 0 && (
               <button
                 type="button"
@@ -592,7 +598,7 @@ function RecordPaymentModal({
                   )
                 }
               >
-                {selectedIds.size === orders.length ? 'Deselect all' : 'Select all'}
+                {selectedIds.size === orders.length ? t('money.commission.recordModal.deselectAll') : t('money.commission.recordModal.selectAll')}
               </button>
             )}
           </div>
@@ -600,7 +606,7 @@ function RecordPaymentModal({
             <div className="skeleton h-[180px] rounded-card" />
           ) : orders.length === 0 ? (
             <div className="rounded-card border border-gray-100 bg-gray-50 px-3 py-6 text-center text-xs text-gray-400">
-              Nothing pending.
+              {t('money.commission.recordModal.nothingPending')}
             </div>
           ) : (
             <div className="max-h-[35vh] overflow-y-auto rounded-card border border-gray-100">
@@ -608,9 +614,9 @@ function RecordPaymentModal({
                 <thead className="sticky top-0 bg-gray-50 text-[10px] uppercase tracking-wide text-gray-400">
                   <tr>
                     <th className="w-8 px-3 py-2" />
-                    <th className="px-3 py-2 text-left">Order</th>
-                    <th className="px-3 py-2 text-left">Customer</th>
-                    <th className="px-3 py-2 text-right">Amount</th>
+                    <th className="px-3 py-2 text-left">{t('money.commission.recordModal.columns.order')}</th>
+                    <th className="px-3 py-2 text-left">{t('money.commission.recordModal.columns.customer')}</th>
+                    <th className="px-3 py-2 text-right">{t('money.commission.recordModal.columns.amount')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -651,18 +657,18 @@ function RecordPaymentModal({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-gray-700">Note (optional)</label>
+          <label className="text-sm font-medium text-gray-700">{t('money.commission.recordModal.noteLabel')}</label>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={2}
-            placeholder="e.g. Paid by bank transfer on 2026-04-18"
+            placeholder={t('money.commission.recordModal.notePlaceholder')}
             className="w-full resize-none rounded-input border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-gray-700">Proof of payment (optional)</span>
+          <span className="text-sm font-medium text-gray-700">{t('money.commission.recordModal.proofLabel')}</span>
           {fileUrl ? (
             <div className="flex items-center justify-between rounded-card border border-gray-200 bg-gray-50 px-3 py-2">
               <a
@@ -677,7 +683,7 @@ function RecordPaymentModal({
               <button
                 onClick={() => setFileUrl(null)}
                 className="flex h-6 w-6 items-center justify-center rounded-full text-gray-400 hover:bg-red-50 hover:text-red-600"
-                aria-label="Remove"
+                aria-label={t('money.commission.recordModal.removeProof')}
               >
                 <X size={12} />
               </button>
@@ -692,7 +698,7 @@ function RecordPaymentModal({
               )}
             >
               <Upload size={14} />
-              {uploading ? 'Uploading…' : 'Attach receipt or bank slip'}
+              {uploading ? t('money.commission.recordModal.uploading') : t('money.commission.recordModal.attachProof')}
             </button>
           )}
           <input

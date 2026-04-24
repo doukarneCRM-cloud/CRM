@@ -905,5 +905,211 @@
       "save": "Save",
       "saveFailed": "Failed to save commission"
     }
+  },
+  "money": {
+    "title": "Money",
+    "tabs": {
+      "expenses": { "label": "Expenses", "hint": "Operational costs — invoices, utilities, ad spend" },
+      "commission": { "label": "Commission", "hint": "Per-agent payouts with proof & history" },
+      "delivery": { "label": "Delivery Invoice", "hint": "Carrier fees on delivered orders" }
+    },
+    "expenses": {
+      "kpi": {
+        "total": "Total Expenses",
+        "entries": "Entries",
+        "avg": "Avg / Entry"
+      },
+      "searchPlaceholder": "Search description…",
+      "anyDate": "Any date",
+      "exportCsv": "Export CSV",
+      "add": "Add Expense",
+      "recordFirst": "Record your first expense",
+      "emptySearch": "No expenses match this search.",
+      "emptyNone": "No expenses recorded yet.",
+      "columns": {
+        "date": "Date",
+        "description": "Description",
+        "amount": "Amount",
+        "file": "File",
+        "recordedBy": "Recorded by"
+      },
+      "view": "View",
+      "editAria": "Edit",
+      "deleteAria": "Delete",
+      "pageOf": "Page {{page}} of {{totalPages}} · {{total}} entries",
+      "prev": "Prev",
+      "next": "Next",
+      "deleteConfirm": "Delete expense \"{{description}}\"?",
+      "loadFailed": "Failed to load expenses",
+      "exportFailed": "Failed to export expenses",
+      "deleteFailed": "Failed to delete expense",
+      "previewTitle": "Expense receipt",
+      "export": {
+        "headers": {
+          "date": "Date",
+          "description": "Description",
+          "amount": "Amount (MAD)",
+          "file": "File",
+          "recordedBy": "Recorded by"
+        }
+      },
+      "form": {
+        "titleNew": "Record Expense",
+        "titleEdit": "Edit Expense",
+        "create": "Record expense",
+        "save": "Save changes",
+        "saveFailed": "Failed to save expense",
+        "description": "Description",
+        "descriptionPlaceholder": "e.g. Google Ads — October campaign",
+        "amount": "Amount (MAD)",
+        "amountPlaceholder": "0.00",
+        "date": "Date",
+        "attachment": "Attachment",
+        "uploading": "Uploading…",
+        "attachHint": "Attach invoice or screenshot (PNG/JPG/PDF, ≤ 8 MB)",
+        "removeFile": "Remove file",
+        "uploadFailed": "Failed to upload file"
+      }
+    },
+    "commission": {
+      "kpi": {
+        "owed": "Total Owed",
+        "paid": "Total Paid",
+        "delivered": "Delivered Orders",
+        "agents": "Agents"
+      },
+      "emptyAgents": "No agents with commission access yet.",
+      "card": {
+        "owed": "Owed",
+        "paid": "Paid",
+        "rate": "Rate",
+        "pending": "pending",
+        "paidLabel": "paid"
+      },
+      "loadFailed": "Failed to load commissions",
+      "drawer": {
+        "titleSuffix": "Commission",
+        "pending": "Pending orders",
+        "history": "Payment history",
+        "owed": "Owed",
+        "paidTotal": "Paid",
+        "totalEarned": "Total earned",
+        "orders_one": "{{count}} order",
+        "orders_other": "{{count}} orders",
+        "delivered": "{{count}} delivered",
+        "recordPayment": "Record payment"
+      },
+      "pendingOrders": {
+        "loadFailed": "Failed to load orders",
+        "cleared": "All cleared — nothing pending.",
+        "columns": {
+          "order": "Order",
+          "delivered": "Delivered",
+          "customer": "Customer",
+          "commission": "Commission"
+        }
+      },
+      "history": {
+        "loadFailed": "Failed to load history",
+        "empty": "No payments recorded yet.",
+        "reverseConfirm": "Reverse this payment? Affected orders will go back to pending.",
+        "reverseFailed": "Failed to reverse payment",
+        "orders_one": "{{count}} order",
+        "orders_other": "{{count}} orders",
+        "by": "by {{name}}",
+        "proof": "Proof",
+        "reverseAria": "Reverse",
+        "proofPreviewTitle": "Commission proof"
+      },
+      "recordModal": {
+        "title": "Record payment · {{name}}",
+        "ordersToSettle": "Orders to settle",
+        "deselectAll": "Deselect all",
+        "selectAll": "Select all",
+        "nothingPending": "Nothing pending.",
+        "columns": {
+          "order": "Order",
+          "customer": "Customer",
+          "amount": "Amount"
+        },
+        "amountToPay": "Amount to pay",
+        "confirmPayment": "Confirm payment",
+        "noteLabel": "Note (optional)",
+        "notePlaceholder": "e.g. Paid by bank transfer on 2026-04-18",
+        "proofLabel": "Proof of payment (optional)",
+        "uploading": "Uploading…",
+        "attachProof": "Attach receipt or bank slip",
+        "removeProof": "Remove",
+        "uploadProofFailed": "Failed to upload proof",
+        "loadOrdersFailed": "Failed to load orders",
+        "recordFailed": "Failed to record payment"
+      }
+    },
+    "delivery": {
+      "kpi": {
+        "delivered": "Delivered Orders",
+        "deliveredSubtitle": "{{amount}} in carrier fees",
+        "totalPayout": "Total Payout",
+        "totalPayoutSubtitle": "Customer total − carrier fees",
+        "unpaidPayout": "Unpaid Payout",
+        "unpaidPayoutSubtitle": "Coliix hasn't remitted yet",
+        "received": "Received",
+        "receivedSubtitle": "Reconciled to your account"
+      },
+      "searchPlaceholder": "Search reference, tracking, customer, city…",
+      "anyDate": "Any date",
+      "filter": {
+        "all": "All",
+        "paid": "Paid",
+        "unpaid": "Unpaid"
+      },
+      "bulk": {
+        "selected": "{{count}} selected",
+        "markPending": "Mark pending",
+        "markReceived": "Mark received"
+      },
+      "emptySearch": "No orders match this search.",
+      "emptyNone": "No delivered orders yet.",
+      "loadFailed": "Failed to load delivery invoice",
+      "updateFailed": "Failed to update paid status",
+      "month": {
+        "summary": "{{orders}} orders · {{paid}} paid · {{unpaid}} unpaid",
+        "unpaidPayout": "Unpaid payout",
+        "totalPayout": "Total payout",
+        "fees": "Fees",
+        "csv": "CSV",
+        "markMonth": "Mark month received"
+      },
+      "columns": {
+        "order": "Order",
+        "delivered": "Delivered",
+        "customer": "Customer",
+        "tracking": "Tracking",
+        "total": "Total",
+        "fee": "Fee",
+        "payout": "Payout",
+        "status": "Status"
+      },
+      "status": {
+        "received": "Received",
+        "pending": "Pending"
+      },
+      "export": {
+        "headers": {
+          "reference": "Reference",
+          "delivered": "Delivered",
+          "customer": "Customer",
+          "phone": "Phone",
+          "city": "City",
+          "tracking": "Tracking",
+          "orderTotal": "Order Total (MAD)",
+          "carrierFee": "Carrier Fee (MAD)",
+          "netPayout": "Net Payout (MAD)",
+          "status": "Status"
+        },
+        "statusReceived": "Received",
+        "statusPending": "Pending"
+      }
+    }
   }
 }

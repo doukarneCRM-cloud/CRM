@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Truck,
   Check,
@@ -32,19 +33,22 @@ function fmtDate(iso: string | null): string {
   return new Date(iso).toLocaleDateString('fr-MA', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function exportMonthCsv(m: DeliveryInvoiceMonth) {
+function exportMonthCsv(
+  m: DeliveryInvoiceMonth,
+  t: (key: string) => string,
+) {
   const csv = rowsToCsv(
     [
-      'Reference',
-      'Delivered',
-      'Customer',
-      'Phone',
-      'City',
-      'Tracking',
-      'Order Total (MAD)',
-      'Carrier Fee (MAD)',
-      'Net Payout (MAD)',
-      'Status',
+      t('money.delivery.export.headers.reference'),
+      t('money.delivery.export.headers.delivered'),
+      t('money.delivery.export.headers.customer'),
+      t('money.delivery.export.headers.phone'),
+      t('money.delivery.export.headers.city'),
+      t('money.delivery.export.headers.tracking'),
+      t('money.delivery.export.headers.orderTotal'),
+      t('money.delivery.export.headers.carrierFee'),
+      t('money.delivery.export.headers.netPayout'),
+      t('money.delivery.export.headers.status'),
     ],
     m.orders.map((o) => [
       o.reference,
@@ -56,7 +60,7 @@ function exportMonthCsv(m: DeliveryInvoiceMonth) {
       o.orderTotal.toFixed(2),
       o.shippingFee.toFixed(2),
       o.netPayout.toFixed(2),
-      o.paidToCarrier ? 'Received' : 'Pending',
+      o.paidToCarrier ? t('money.delivery.export.statusReceived') : t('money.delivery.export.statusPending'),
     ]),
   );
   downloadCsv(`delivery-invoice_${m.period}.csv`, csv);
@@ -65,6 +69,7 @@ function exportMonthCsv(m: DeliveryInvoiceMonth) {
 type Filter = 'all' | 'paid' | 'unpaid';
 
 export function DeliveryInvoiceTab() {
+  const { t } = useTranslation();
   const canManage = useAuthStore((s) => s.hasPermission(PERMISSIONS.MONEY_MANAGE));
 
   const [search, setSearch] = useState('');
@@ -107,7 +112,7 @@ export function DeliveryInvoiceTab() {
         }
       })
       .catch((e) => {
-        if (!cancelled) setError(apiErrorMessage(e, 'Failed to load delivery invoice'));
+        if (!cancelled) setError(apiErrorMessage(e, t('money.delivery.loadFailed')));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -127,7 +132,7 @@ export function DeliveryInvoiceTab() {
       await moneyApi.setCarrierPaid(orderIds, paid);
       setReloadKey((k) => k + 1);
     } catch (e) {
-      setError(apiErrorMessage(e, 'Failed to update paid status'));
+      setError(apiErrorMessage(e, t('money.delivery.updateFailed')));
     } finally {
       setBulkLoading(false);
     }
@@ -153,30 +158,30 @@ export function DeliveryInvoiceTab() {
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <KPICard
-          title="Delivered Orders"
+          title={t('money.delivery.kpi.delivered')}
           value={totals?.orders.toLocaleString('fr-MA') ?? '0'}
-          subtitle={`${fmtMAD(totals?.totalFees ?? 0)} in carrier fees`}
+          subtitle={t('money.delivery.kpi.deliveredSubtitle', { amount: fmtMAD(totals?.totalFees ?? 0) })}
           icon={Truck}
           iconColor="#6366F1"
         />
         <KPICard
-          title="Total Payout"
+          title={t('money.delivery.kpi.totalPayout')}
           value={fmtMAD(totals?.totalPayout ?? 0)}
-          subtitle="Customer total − carrier fees"
+          subtitle={t('money.delivery.kpi.totalPayoutSubtitle')}
           icon={Wallet}
           iconColor="#0EA5E9"
         />
         <KPICard
-          title="Unpaid Payout"
+          title={t('money.delivery.kpi.unpaidPayout')}
           value={fmtMAD(totals?.unpaidPayout ?? 0)}
-          subtitle="Coliix hasn't remitted yet"
+          subtitle={t('money.delivery.kpi.unpaidPayoutSubtitle')}
           icon={Clock}
           iconColor="#F59E0B"
         />
         <KPICard
-          title="Received"
+          title={t('money.delivery.kpi.received')}
           value={fmtMAD(totals?.paidPayout ?? 0)}
-          subtitle="Reconciled to your account"
+          subtitle={t('money.delivery.kpi.receivedSubtitle')}
           icon={Check}
           iconColor="#10B981"
         />
@@ -187,7 +192,7 @@ export function DeliveryInvoiceTab() {
           <div className="flex flex-1 flex-wrap items-center gap-2">
             <CRMInput
               leftIcon={<Search size={14} />}
-              placeholder="Search reference, tracking, customer, city…"
+              placeholder={t('money.delivery.searchPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               wrapperClassName="flex-1 max-w-md"
@@ -195,7 +200,7 @@ export function DeliveryInvoiceTab() {
             <FbDateRangePicker
               value={dateRange}
               onChange={(r) => setDateRange(r)}
-              placeholder="Any date"
+              placeholder={t('money.delivery.anyDate')}
             />
             <div className="flex items-center gap-1 rounded-card border border-gray-100 bg-white p-1">
               {(['unpaid', 'paid', 'all'] as Filter[]).map((f) => (
@@ -209,7 +214,7 @@ export function DeliveryInvoiceTab() {
                       : 'text-gray-500 hover:bg-accent hover:text-primary',
                   )}
                 >
-                  {f === 'all' ? 'All' : f === 'paid' ? 'Paid' : 'Unpaid'}
+                  {t(`money.delivery.filter.${f}`)}
                 </button>
               ))}
             </div>
@@ -217,14 +222,14 @@ export function DeliveryInvoiceTab() {
 
           {canManage && selected.size > 0 && (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">{selected.size} selected</span>
+              <span className="text-xs text-gray-500">{t('money.delivery.bulk.selected', { count: selected.size })}</span>
               <CRMButton
                 size="sm"
                 variant="secondary"
                 onClick={() => setOrderPaid(Array.from(selected), false)}
                 loading={bulkLoading}
               >
-                Mark pending
+                {t('money.delivery.bulk.markPending')}
               </CRMButton>
               <CRMButton
                 size="sm"
@@ -232,7 +237,7 @@ export function DeliveryInvoiceTab() {
                 onClick={() => setOrderPaid(Array.from(selected), true)}
                 loading={bulkLoading}
               >
-                Mark received
+                {t('money.delivery.bulk.markReceived')}
               </CRMButton>
             </div>
           )}
@@ -244,7 +249,7 @@ export function DeliveryInvoiceTab() {
           <div className="flex h-[220px] flex-col items-center justify-center gap-2 text-center text-gray-400">
             <Truck size={28} className="text-gray-300" />
             <p className="text-sm">
-              {debounced ? 'No orders match this search.' : 'No delivered orders yet.'}
+              {debounced ? t('money.delivery.emptySearch') : t('money.delivery.emptyNone')}
             </p>
           </div>
         ) : (
@@ -263,20 +268,20 @@ export function DeliveryInvoiceTab() {
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-bold text-gray-900">{m.label}</p>
                       <p className="text-[11px] text-gray-400">
-                        {m.orderCount} orders · {m.paidCount} paid · {m.unpaidCount} unpaid
+                        {t('money.delivery.month.summary', { orders: m.orderCount, paid: m.paidCount, unpaid: m.unpaidCount })}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-4">
                       <div className="text-right">
-                        <p className="text-[10px] uppercase tracking-wide text-gray-400">Unpaid payout</p>
+                        <p className="text-[10px] uppercase tracking-wide text-gray-400">{t('money.delivery.month.unpaidPayout')}</p>
                         <p className="text-sm font-bold text-amber-600">{fmtMAD(m.unpaidPayout)}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-[10px] uppercase tracking-wide text-gray-400">Total payout</p>
+                        <p className="text-[10px] uppercase tracking-wide text-gray-400">{t('money.delivery.month.totalPayout')}</p>
                         <p className="text-sm font-bold text-gray-900">{fmtMAD(m.totalPayout)}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-[10px] uppercase tracking-wide text-gray-400">Fees</p>
+                        <p className="text-[10px] uppercase tracking-wide text-gray-400">{t('money.delivery.month.fees')}</p>
                         <p className="text-xs font-semibold text-gray-500">{fmtMAD(m.totalFees)}</p>
                       </div>
                       <CRMButton
@@ -285,10 +290,10 @@ export function DeliveryInvoiceTab() {
                         leftIcon={<Download size={13} />}
                         onClick={(e) => {
                           e.stopPropagation();
-                          exportMonthCsv(m);
+                          exportMonthCsv(m, t);
                         }}
                       >
-                        CSV
+                        {t('money.delivery.month.csv')}
                       </CRMButton>
                       {canManage && m.unpaidCount > 0 && (
                         <CRMButton
@@ -303,7 +308,7 @@ export function DeliveryInvoiceTab() {
                           }}
                           disabled={bulkLoading}
                         >
-                          Mark month received
+                          {t('money.delivery.month.markMonth')}
                         </CRMButton>
                       )}
                       {isOpen ? (
@@ -342,14 +347,14 @@ export function DeliveryInvoiceTab() {
                                 />
                               </th>
                             )}
-                            <th className="px-3 py-2 text-left">Order</th>
-                            <th className="px-3 py-2 text-left">Delivered</th>
-                            <th className="px-3 py-2 text-left">Customer</th>
-                            <th className="px-3 py-2 text-left">Tracking</th>
-                            <th className="px-3 py-2 text-right">Total</th>
-                            <th className="px-3 py-2 text-right">Fee</th>
-                            <th className="px-3 py-2 text-right">Payout</th>
-                            <th className="px-3 py-2 text-right">Status</th>
+                            <th className="px-3 py-2 text-left">{t('money.delivery.columns.order')}</th>
+                            <th className="px-3 py-2 text-left">{t('money.delivery.columns.delivered')}</th>
+                            <th className="px-3 py-2 text-left">{t('money.delivery.columns.customer')}</th>
+                            <th className="px-3 py-2 text-left">{t('money.delivery.columns.tracking')}</th>
+                            <th className="px-3 py-2 text-right">{t('money.delivery.columns.total')}</th>
+                            <th className="px-3 py-2 text-right">{t('money.delivery.columns.fee')}</th>
+                            <th className="px-3 py-2 text-right">{t('money.delivery.columns.payout')}</th>
+                            <th className="px-3 py-2 text-right">{t('money.delivery.columns.status')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -398,11 +403,11 @@ export function DeliveryInvoiceTab() {
                               <td className="px-3 py-2.5 text-right">
                                 {o.paidToCarrier ? (
                                   <span className="inline-flex items-center gap-1 rounded-badge bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                                    <Check size={10} /> Received
+                                    <Check size={10} /> {t('money.delivery.status.received')}
                                   </span>
                                 ) : (
                                   <span className="inline-flex items-center gap-1 rounded-badge bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">
-                                    <Clock size={10} /> Pending
+                                    <Clock size={10} /> {t('money.delivery.status.pending')}
                                   </span>
                                 )}
                               </td>
