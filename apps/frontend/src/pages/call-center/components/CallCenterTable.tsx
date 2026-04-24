@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef, type MouseEvent } from 'react';
 import {
   History, MessageCircle, Send, Package, Phone, StickyNote, PhoneOff, Truck, Search, X,
-  AlertTriangle,
+  AlertTriangle, Copy, Check,
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { OrderSourceIcon } from '@/components/ui/OrderSourceIcon';
@@ -252,7 +252,21 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
   const todayHighlight = callbackToday && !overdue;
 
   const phoneDigits = order.customer.phoneDisplay.replace(/\D/g, '');
-  const wa = `https://wa.me/${phoneDigits}`;
+  // MA country code: strip leading 0 and prefix 212 so wa.me resolves to the
+  // right number whether the stored value keeps the local 0 or not.
+  const wa = `https://wa.me/212${phoneDigits.replace(/^0/, '')}`;
+  const [phoneCopied, setPhoneCopied] = useState(false);
+  const copyPhone = useCallback(async (e: MouseEvent) => {
+    e.stopPropagation();
+    if (!order.customer.phoneDisplay) return;
+    try {
+      await navigator.clipboard.writeText(order.customer.phoneDisplay);
+      setPhoneCopied(true);
+      setTimeout(() => setPhoneCopied(false), 1200);
+    } catch {
+      // Clipboard API may be blocked on insecure contexts — fail silent.
+    }
+  }, [order.customer.phoneDisplay]);
 
   return (
     <div
@@ -319,15 +333,28 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
             >
               <Phone size={13} />
             </a>
+            <button
+              type="button"
+              onClick={copyPhone}
+              className={cn(
+                'inline-flex h-8 w-8 items-center justify-center rounded-full transition',
+                phoneCopied
+                  ? 'bg-emerald-500 text-white'
+                  : 'bg-gray-100 text-gray-600 active:bg-gray-200',
+              )}
+              title={phoneCopied ? 'Copied!' : 'Copy phone'}
+            >
+              {phoneCopied ? <Check size={13} /> : <Copy size={13} />}
+            </button>
             <a
               href={wa}
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 active:bg-emerald-100"
-              title="WhatsApp"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-sm active:from-emerald-600 active:to-emerald-700"
+              title="Open WhatsApp"
             >
-              <MessageCircle size={13} />
+              <MessageCircle size={18} strokeWidth={2.2} />
             </a>
           </div>
         </div>
@@ -478,40 +505,55 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
         </div>
 
         {/* Customer */}
-        <div className="min-w-0">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenCustomer(order.customer.id);
-            }}
-            className="truncate text-left text-sm font-semibold text-gray-900 hover:text-primary hover:underline"
-            title="View client history"
-          >
-            {order.customer.fullName}
-          </button>
-          <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-gray-500">
-            <span className="font-mono">{order.customer.phoneDisplay}</span>
-            <a
-              href={`tel:${phoneDigits}`}
-              onClick={(e) => e.stopPropagation()}
-              className="inline-flex h-4 w-4 items-center justify-center rounded-full text-primary hover:bg-primary/10"
-              title="Call"
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenCustomer(order.customer.id);
+              }}
+              className="truncate text-left text-sm font-semibold text-gray-900 hover:text-primary hover:underline"
+              title="View client history"
             >
-              <Phone size={10} />
-            </a>
-            <a
-              href={wa}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="inline-flex h-4 w-4 items-center justify-center rounded-full text-emerald-600 hover:bg-emerald-50"
-              title="Open WhatsApp"
-            >
-              <MessageCircle size={11} />
-            </a>
-            <span className="truncate text-gray-400">· {order.customer.city}</span>
+              {order.customer.fullName}
+            </button>
+            <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-gray-500">
+              <span className="font-mono">{order.customer.phoneDisplay}</span>
+              <a
+                href={`tel:${phoneDigits}`}
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex h-4 w-4 items-center justify-center rounded-full text-primary hover:bg-primary/10"
+                title="Call"
+              >
+                <Phone size={10} />
+              </a>
+              <button
+                type="button"
+                onClick={copyPhone}
+                className={cn(
+                  'inline-flex h-4 w-4 items-center justify-center rounded-full transition',
+                  phoneCopied
+                    ? 'bg-emerald-500 text-white'
+                    : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700',
+                )}
+                title={phoneCopied ? 'Copied!' : 'Copy phone'}
+              >
+                {phoneCopied ? <Check size={10} /> : <Copy size={10} />}
+              </button>
+              <span className="truncate text-gray-400">· {order.customer.city}</span>
+            </div>
           </div>
+          <a
+            href={wa}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-btn bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-sm transition hover:from-emerald-600 hover:to-emerald-700 hover:shadow-md"
+            title="Open WhatsApp"
+          >
+            <MessageCircle size={16} strokeWidth={2.2} />
+          </a>
         </div>
 
         {/* Product — grouped by product name, one line of variant chips each */}
