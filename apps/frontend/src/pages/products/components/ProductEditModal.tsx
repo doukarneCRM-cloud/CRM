@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Sparkles, Trash2, Zap } from 'lucide-react';
 import { GlassModal } from '@/components/ui/GlassModal';
 import { CRMButton } from '@/components/ui/CRMButton';
@@ -62,6 +63,7 @@ function toDrafts(product: ProductDetail | null): VariantDraft[] {
 }
 
 export function ProductEditModal({ open, onClose, onSaved, product }: Props) {
+  const { t } = useTranslation();
   const isEdit = product != null;
 
   // ── Core product fields ─────────────────────────────────────────────────
@@ -218,7 +220,7 @@ export function ProductEditModal({ open, onClose, onSaved, product }: Props) {
       onSaved();
       onClose();
     } catch (err) {
-      setError(apiErrorMessage(err, 'Failed to save product'));
+      setError(apiErrorMessage(err, t('products.edit.saveFailed')));
     } finally {
       setSaving(false);
     }
@@ -230,7 +232,7 @@ export function ProductEditModal({ open, onClose, onSaved, product }: Props) {
     <GlassModal
       open={open}
       onClose={onClose}
-      title={isEdit ? 'Edit product' : 'New product'}
+      title={isEdit ? t('products.edit.titleEdit') : t('products.edit.titleNew')}
       size="2xl"
       footer={
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -241,10 +243,10 @@ export function ProductEditModal({ open, onClose, onSaved, product }: Props) {
           )}
           <div className="flex items-center gap-2">
             <CRMButton variant="ghost" onClick={onClose} disabled={saving}>
-              Cancel
+              {t('common.cancel')}
             </CRMButton>
             <CRMButton onClick={handleSave} loading={saving} disabled={!canSave}>
-              {isEdit ? 'Save changes' : 'Create product'}
+              {isEdit ? t('products.edit.save') : t('products.edit.create')}
             </CRMButton>
           </div>
         </div>
@@ -257,22 +259,22 @@ export function ProductEditModal({ open, onClose, onSaved, product }: Props) {
 
           <div className="flex flex-col gap-3">
             <CRMInput
-              label="Product name"
+              label={t('products.edit.fields.name')}
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Anaqa Tee"
+              placeholder={t('products.edit.fields.namePlaceholder')}
             />
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <CRMInput
-                label="SKU"
+                label={t('products.edit.fields.sku')}
                 required
                 value={sku}
                 onChange={(e) => setSku(e.target.value)}
-                placeholder="TEE-001"
+                placeholder={t('products.edit.fields.skuPlaceholder')}
               />
               <CRMInput
-                label="Base price (MAD)"
+                label={t('products.edit.fields.basePrice')}
                 required
                 type="number"
                 min={0}
@@ -289,15 +291,15 @@ export function ProductEditModal({ open, onClose, onSaved, product }: Props) {
                   onChange={(e) => setIsActive(e.target.checked)}
                   className="h-3.5 w-3.5 accent-primary"
                 />
-                Active (uncheck to hide this product)
+                {t('products.edit.fields.active')}
               </label>
             )}
 
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-gray-700">
-                Default agent
+                {t('products.edit.fields.defaultAgent')}
                 <span className="ml-1 text-[10px] font-normal text-gray-400">
-                  · used when auto-assign is set to "By Product"
+                  {t('products.edit.fields.defaultAgentHint')}
                 </span>
               </label>
               <select
@@ -305,7 +307,7 @@ export function ProductEditModal({ open, onClose, onSaved, product }: Props) {
                 onChange={(e) => setAssignedAgentId(e.target.value)}
                 className="rounded-input border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
               >
-                <option value="">None (fall back to round-robin)</option>
+                <option value="">{t('products.edit.fields.defaultAgentNone')}</option>
                 {agents.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.name}
@@ -317,13 +319,13 @@ export function ProductEditModal({ open, onClose, onSaved, product }: Props) {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-gray-700">Description</label>
+          <label className="text-sm font-medium text-gray-700">{t('products.edit.fields.description')}</label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
             className="w-full rounded-input border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-            placeholder="Short description (optional)"
+            placeholder={t('products.edit.fields.descriptionPlaceholder')}
           />
         </div>
 
@@ -331,27 +333,25 @@ export function ProductEditModal({ open, onClose, onSaved, product }: Props) {
         <div className="flex flex-col gap-3 rounded-card border border-gray-100 bg-accent/30 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <h4 className="text-sm font-semibold text-gray-900">Variants</h4>
-              <p className="text-[11px] text-gray-500">
-                Add options and generate combinations automatically.
-              </p>
+              <h4 className="text-sm font-semibold text-gray-900">{t('products.edit.variants.title')}</h4>
+              <p className="text-[11px] text-gray-500">{t('products.edit.variants.subtitle')}</p>
             </div>
             <span className="rounded-badge bg-white px-2 py-0.5 text-[10px] font-semibold text-primary">
-              {variants.length} total
+              {t('products.edit.variants.totalBadge', { count: variants.length })}
             </span>
           </div>
 
           {/* Options row */}
           <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto]">
             <TagInput
-              label="Option 1 (e.g. Size)"
-              placeholder="S, M, L…"
+              label={t('products.edit.variants.option1')}
+              placeholder={t('products.edit.variants.option1Placeholder')}
               values={sizes}
               onChange={setSizes}
             />
             <TagInput
-              label="Option 2 (e.g. Color)"
-              placeholder="Red, Blue…"
+              label={t('products.edit.variants.option2')}
+              placeholder={t('products.edit.variants.option2Placeholder')}
               values={colors}
               onChange={setColors}
             />
@@ -363,7 +363,7 @@ export function ProductEditModal({ open, onClose, onSaved, product }: Props) {
                 disabled={generateDisabled}
                 className="w-full md:w-auto"
               >
-                Generate
+                {t('products.edit.variants.generate')}
               </CRMButton>
             </div>
           </div>
@@ -374,7 +374,7 @@ export function ProductEditModal({ open, onClose, onSaved, product }: Props) {
               <div className="flex items-end gap-2">
                 <CRMInput
                   wrapperClassName="flex-1"
-                  label="Bulk price (MAD)"
+                  label={t('products.edit.variants.bulkPrice')}
                   type="number"
                   min={0}
                   value={bulkPrice}
@@ -382,7 +382,7 @@ export function ProductEditModal({ open, onClose, onSaved, product }: Props) {
                     const v = e.target.value;
                     setBulkPrice(v === '' ? '' : Number(v));
                   }}
-                  placeholder="Apply to all variants"
+                  placeholder={t('products.edit.variants.bulkPricePlaceholder')}
                 />
                 <CRMButton
                   variant="ghost"
@@ -391,13 +391,13 @@ export function ProductEditModal({ open, onClose, onSaved, product }: Props) {
                   onClick={applyBulkPrice}
                   disabled={typeof bulkPrice !== 'number' || bulkPrice < 0}
                 >
-                  Apply
+                  {t('products.edit.variants.apply')}
                 </CRMButton>
               </div>
               <div className="flex items-end gap-2">
                 <CRMInput
                   wrapperClassName="flex-1"
-                  label="Bulk stock"
+                  label={t('products.edit.variants.bulkStock')}
                   type="number"
                   min={0}
                   value={bulkStock}
@@ -405,7 +405,7 @@ export function ProductEditModal({ open, onClose, onSaved, product }: Props) {
                     const v = e.target.value;
                     setBulkStock(v === '' ? '' : Number(v));
                   }}
-                  placeholder="Apply to all variants"
+                  placeholder={t('products.edit.variants.bulkPricePlaceholder')}
                 />
                 <CRMButton
                   variant="ghost"
@@ -414,7 +414,7 @@ export function ProductEditModal({ open, onClose, onSaved, product }: Props) {
                   onClick={applyBulkStock}
                   disabled={typeof bulkStock !== 'number' || bulkStock < 0}
                 >
-                  Apply
+                  {t('products.edit.variants.apply')}
                 </CRMButton>
               </div>
             </div>
@@ -423,19 +423,21 @@ export function ProductEditModal({ open, onClose, onSaved, product }: Props) {
           {/* Variant rows */}
           {variants.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-1 rounded-card border border-dashed border-gray-200 bg-white/50 py-6 text-center">
-              <p className="text-xs font-semibold text-gray-600">No variants yet</p>
+              <p className="text-xs font-semibold text-gray-600">{t('products.edit.variants.emptyTitle')}</p>
               <p className="text-[11px] text-gray-400">
-                Add one or both option lists above, then click <span className="font-medium text-primary">Generate</span>.
+                {t('products.edit.variants.emptyHintBefore')}
+                <span className="font-medium text-primary">{t('products.edit.variants.emptyHintGenerate')}</span>
+                {t('products.edit.variants.emptyHintAfter')}
               </p>
             </div>
           ) : (
             <div className="overflow-hidden rounded-card border border-gray-100 bg-white">
               <div className="grid grid-cols-12 gap-2 border-b border-gray-100 bg-gray-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                <div className="col-span-3">Size</div>
-                <div className="col-span-3">Color</div>
-                <div className="col-span-3">SKU</div>
-                <div className="col-span-1 text-right">Price</div>
-                <div className="col-span-1 text-right">Stock</div>
+                <div className="col-span-3">{t('products.edit.variants.colSize')}</div>
+                <div className="col-span-3">{t('products.edit.variants.colColor')}</div>
+                <div className="col-span-3">{t('products.edit.variants.colSku')}</div>
+                <div className="col-span-1 text-right">{t('products.edit.variants.colPrice')}</div>
+                <div className="col-span-1 text-right">{t('products.edit.variants.colStock')}</div>
                 <div className="col-span-1" />
               </div>
               <ul className="max-h-[280px] overflow-y-auto">
@@ -448,19 +450,19 @@ export function ProductEditModal({ open, onClose, onSaved, product }: Props) {
                       className="col-span-3 rounded-input border border-gray-200 px-2 py-1.5 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
                       value={v.size ?? ''}
                       onChange={(e) => updateVariant(v.key, { size: e.target.value })}
-                      placeholder="L"
+                      placeholder={t('products.edit.variants.rowSizePlaceholder')}
                     />
                     <input
                       className="col-span-3 rounded-input border border-gray-200 px-2 py-1.5 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
                       value={v.color ?? ''}
                       onChange={(e) => updateVariant(v.key, { color: e.target.value })}
-                      placeholder="Black"
+                      placeholder={t('products.edit.variants.rowColorPlaceholder')}
                     />
                     <input
                       className="col-span-3 rounded-input border border-gray-200 px-2 py-1.5 font-mono text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
                       value={v.sku}
                       onChange={(e) => updateVariant(v.key, { sku: e.target.value })}
-                      placeholder="TEE-001-BLK-L"
+                      placeholder={t('products.edit.variants.rowSkuPlaceholder')}
                     />
                     <input
                       type="number"
@@ -480,7 +482,7 @@ export function ProductEditModal({ open, onClose, onSaved, product }: Props) {
                       type="button"
                       onClick={() => removeVariant(v.key)}
                       className="col-span-1 flex h-7 w-7 items-center justify-center justify-self-end rounded-full text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
-                      aria-label="Remove variant"
+                      aria-label={t('products.edit.variants.removeVariant')}
                     >
                       <Trash2 size={13} />
                     </button>

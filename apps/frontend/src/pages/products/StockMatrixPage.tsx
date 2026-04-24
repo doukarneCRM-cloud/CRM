@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Grid2x2, List, Search } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { ROUTES } from '@/constants/routes';
@@ -9,6 +10,7 @@ import { useProducts } from './hooks/useProducts';
 import { ProductStockMatrix } from './components/ProductStockMatrix';
 
 export default function StockMatrixPage() {
+  const { t } = useTranslation();
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canEdit = hasPermission(PERMISSIONS.PRODUCTS_EDIT);
 
@@ -19,10 +21,8 @@ export default function StockMatrixPage() {
     <div className="flex flex-col gap-4 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Stock Matrix</h1>
-          <p className="text-xs text-gray-400">
-            Per-product variant grid. Click any cell to edit — updates broadcast live.
-          </p>
+          <h1 className="text-xl font-bold text-gray-900">{t('products.stockMatrix.title')}</h1>
+          <p className="text-xs text-gray-400">{t('products.stockMatrix.subtitle')}</p>
         </div>
 
         <NavLink
@@ -30,7 +30,7 @@ export default function StockMatrixPage() {
           className="flex items-center gap-1.5 rounded-btn border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-primary hover:text-primary"
         >
           <List size={14} />
-          Product list
+          {t('products.stockMatrix.productList')}
         </NavLink>
       </div>
 
@@ -40,12 +40,12 @@ export default function StockMatrixPage() {
           leftIcon={<Search size={14} />}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name or SKU"
+          placeholder={t('products.list.searchPlaceholder')}
         />
         <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
           <Grid2x2 size={13} />
           <span>
-            {loading ? 'Loading…' : `${products.length} product${products.length === 1 ? '' : 's'}`}
+            {loading ? t('products.list.loading') : t('products.list.count', { count: products.length })}
           </span>
         </div>
       </div>
@@ -58,7 +58,7 @@ export default function StockMatrixPage() {
         </div>
       ) : products.length === 0 ? (
         <div className="flex h-[240px] items-center justify-center rounded-card border border-dashed border-gray-200 bg-white/60 text-xs text-gray-400">
-          No products to show
+          {t('products.stockMatrix.empty')}
         </div>
       ) : (
         <div className="flex flex-col gap-3">

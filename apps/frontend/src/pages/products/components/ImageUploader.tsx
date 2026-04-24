@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ImagePlus, Loader2, Trash2, UploadCloud } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { productsApi } from '@/services/productsApi';
@@ -14,6 +15,7 @@ interface Props {
 const MAX_MB = 8;
 
 export function ImageUploader({ value, onChange, className }: Props) {
+  const { t } = useTranslation();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -22,11 +24,11 @@ export function ImageUploader({ value, onChange, className }: Props) {
   const handleFile = async (file: File) => {
     setError(null);
     if (!file.type.startsWith('image/')) {
-      setError('Please choose an image file');
+      setError(t('products.image.notAnImage'));
       return;
     }
     if (file.size > MAX_MB * 1024 * 1024) {
-      setError(`Image must be under ${MAX_MB} MB`);
+      setError(t('products.image.tooLarge', { mb: MAX_MB }));
       return;
     }
     setUploading(true);
@@ -34,7 +36,7 @@ export function ImageUploader({ value, onChange, className }: Props) {
       const { url } = await productsApi.uploadImage(file);
       onChange(url);
     } catch (err) {
-      setError(apiErrorMessage(err, 'Upload failed'));
+      setError(apiErrorMessage(err, t('products.image.uploadFailed')));
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = '';
@@ -69,7 +71,7 @@ export function ImageUploader({ value, onChange, className }: Props) {
         <div className="group relative aspect-square w-full overflow-hidden rounded-card border border-gray-200 bg-gradient-to-br from-gray-50 to-white">
           <img
             src={preview}
-            alt="Product"
+            alt={t('products.image.alt')}
             className="h-full w-full object-contain p-2"
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).style.display = 'none';
@@ -83,14 +85,14 @@ export function ImageUploader({ value, onChange, className }: Props) {
               className="flex items-center gap-1 rounded-btn bg-white/90 px-2 py-1 text-[11px] font-medium text-gray-800 shadow-sm transition-colors hover:bg-white"
             >
               <UploadCloud size={12} />
-              Replace
+              {t('products.image.replace')}
             </button>
             <button
               type="button"
               onClick={() => onChange(null)}
               disabled={uploading}
               className="flex items-center gap-1 rounded-btn bg-red-500/90 px-2 py-1 text-[11px] font-medium text-white shadow-sm transition-colors hover:bg-red-600"
-              aria-label="Remove image"
+              aria-label={t('products.image.remove')}
             >
               <Trash2 size={12} />
             </button>
@@ -125,9 +127,9 @@ export function ImageUploader({ value, onChange, className }: Props) {
             <ImagePlus size={22} />
           )}
           <span className="text-center text-[11px] font-medium leading-tight">
-            {uploading ? 'Uploading…' : 'Click or drop image'}
+            {uploading ? t('products.image.uploading') : t('products.image.clickOrDrop')}
           </span>
-          <span className="text-[10px] text-gray-400">PNG · JPG · WebP · &lt;{MAX_MB}MB</span>
+          <span className="text-[10px] text-gray-400">{t('products.image.sizeHint', { mb: MAX_MB })}</span>
         </button>
       )}
 

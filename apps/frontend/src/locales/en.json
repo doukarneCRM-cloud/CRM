@@ -572,5 +572,122 @@
       "skipContinue": "Skip & continue",
       "mergeContinue": "Merge {{count}} & continue"
     }
+  },
+  "products": {
+    "list": {
+      "title": "Products",
+      "subtitle": "Catalog & variant management",
+      "stockMatrix": "Stock matrix",
+      "addProduct": "Add product",
+      "searchPlaceholder": "Search by name or SKU",
+      "showInactive": "Show inactive",
+      "loading": "Loading…",
+      "count_one": "{{count}} product",
+      "count_other": "{{count}} products",
+      "emptyTitle": "No products yet",
+      "emptySearch": "Try a different search term.",
+      "emptyCta": "Create your first product to get started.",
+      "deleteFailed": "Failed to delete product. Try again."
+    },
+    "stockMatrix": {
+      "title": "Stock Matrix",
+      "subtitle": "Per-product variant grid. Click any cell to edit — updates broadcast live.",
+      "productList": "Product list",
+      "colorSize": "Color / Size",
+      "empty": "No products to show",
+      "baseLabel": "Base:",
+      "variantCount_one": "{{count}} variant",
+      "variantCount_other": "{{count}} variants",
+      "stockAria": "Stock: {{count}}"
+    },
+    "card": {
+      "inactive": "Inactive",
+      "deleteProduct": "Delete product",
+      "editProduct": "Edit product",
+      "base": "Base",
+      "variantCount_one": "{{count}} variant",
+      "variantCount_other": "{{count}} variants",
+      "inStock": "{{count}} in stock",
+      "measurements": "Measurements",
+      "show": "Show",
+      "hide": "Hide",
+      "deleteConfirm": "Delete \"{{name}}\"?\n\nThe product will disappear from the catalog. Orders that already reference it stay intact (their confirmation status is preserved), but they'll show a red \"untracked\" marker because stock for this product is no longer maintained.\n\nThis cannot be undone."
+    },
+    "edit": {
+      "titleNew": "New product",
+      "titleEdit": "Edit product",
+      "create": "Create product",
+      "save": "Save changes",
+      "saveFailed": "Failed to save product",
+      "fields": {
+        "name": "Product name",
+        "namePlaceholder": "e.g. Anaqa Tee",
+        "sku": "SKU",
+        "skuPlaceholder": "TEE-001",
+        "basePrice": "Base price (MAD)",
+        "active": "Active (uncheck to hide this product)",
+        "defaultAgent": "Default agent",
+        "defaultAgentHint": "· used when auto-assign is set to \"By Product\"",
+        "defaultAgentNone": "None (fall back to round-robin)",
+        "description": "Description",
+        "descriptionPlaceholder": "Short description (optional)"
+      },
+      "variants": {
+        "title": "Variants",
+        "subtitle": "Add options and generate combinations automatically.",
+        "totalBadge": "{{count}} total",
+        "option1": "Option 1 (e.g. Size)",
+        "option1Placeholder": "S, M, L…",
+        "option2": "Option 2 (e.g. Color)",
+        "option2Placeholder": "Red, Blue…",
+        "generate": "Generate",
+        "bulkPrice": "Bulk price (MAD)",
+        "bulkPricePlaceholder": "Apply to all variants",
+        "bulkStock": "Bulk stock",
+        "apply": "Apply",
+        "emptyTitle": "No variants yet",
+        "emptyHintBefore": "Add one or both option lists above, then click ",
+        "emptyHintGenerate": "Generate",
+        "emptyHintAfter": ".",
+        "colSize": "Size",
+        "colColor": "Color",
+        "colSku": "SKU",
+        "colPrice": "Price",
+        "colStock": "Stock",
+        "rowSizePlaceholder": "L",
+        "rowColorPlaceholder": "Black",
+        "rowSkuPlaceholder": "TEE-001-BLK-L",
+        "removeVariant": "Remove variant"
+      }
+    },
+    "image": {
+      "uploading": "Uploading…",
+      "clickOrDrop": "Click or drop image",
+      "sizeHint": "PNG · JPG · WebP · <{{mb}}MB",
+      "replace": "Replace",
+      "remove": "Remove image",
+      "uploadFailed": "Upload failed",
+      "notAnImage": "Please choose an image file",
+      "tooLarge": "Image must be under {{mb}} MB",
+      "alt": "Product"
+    },
+    "measurements": {
+      "title": "Measurements chart",
+      "optional": "· optional",
+      "description": "Add a small size chart agents can share with clients (chest, waist, length…).",
+      "usePreset": "Use preset (Size · Chest · Waist · Length)",
+      "startBlank": "Start blank",
+      "removeChart": "Remove chart",
+      "addRow": "Add row",
+      "addColumn": "Add column",
+      "columnSize": "Size",
+      "columnPlaceholder": "Column",
+      "removeColumn": "Remove column",
+      "removeRow": "Remove row",
+      "header": "Measurements (cm)"
+    },
+    "tag": {
+      "removeValue": "Remove {{value}}"
+    }
   }
 }

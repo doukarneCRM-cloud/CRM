@@ -572,5 +572,122 @@
       "skipContinue": "Passer et continuer",
       "mergeContinue": "Fusionner {{count}} et continuer"
     }
+  },
+  "products": {
+    "list": {
+      "title": "Produits",
+      "subtitle": "Catalogue et gestion des variantes",
+      "stockMatrix": "Matrice de stock",
+      "addProduct": "Ajouter un produit",
+      "searchPlaceholder": "Rechercher par nom ou SKU",
+      "showInactive": "Afficher les inactifs",
+      "loading": "Chargement…",
+      "count_one": "{{count}} produit",
+      "count_other": "{{count}} produits",
+      "emptyTitle": "Aucun produit pour le moment",
+      "emptySearch": "Essayez un autre terme de recherche.",
+      "emptyCta": "Créez votre premier produit pour commencer.",
+      "deleteFailed": "Échec de la suppression du produit. Réessayez."
+    },
+    "stockMatrix": {
+      "title": "Matrice de stock",
+      "subtitle": "Grille des variantes par produit. Cliquez sur une cellule pour modifier — les mises à jour sont diffusées en direct.",
+      "productList": "Liste des produits",
+      "colorSize": "Couleur / Taille",
+      "empty": "Aucun produit à afficher",
+      "baseLabel": "Base :",
+      "variantCount_one": "{{count}} variante",
+      "variantCount_other": "{{count}} variantes",
+      "stockAria": "Stock : {{count}}"
+    },
+    "card": {
+      "inactive": "Inactif",
+      "deleteProduct": "Supprimer le produit",
+      "editProduct": "Modifier le produit",
+      "base": "Base",
+      "variantCount_one": "{{count}} variante",
+      "variantCount_other": "{{count}} variantes",
+      "inStock": "{{count}} en stock",
+      "measurements": "Mensurations",
+      "show": "Afficher",
+      "hide": "Masquer",
+      "deleteConfirm": "Supprimer « {{name}} » ?\n\nLe produit disparaîtra du catalogue. Les commandes qui y font déjà référence restent intactes (leur statut de confirmation est conservé), mais afficheront un marqueur rouge « non suivi » car le stock de ce produit n'est plus maintenu.\n\nCette action est irréversible."
+    },
+    "edit": {
+      "titleNew": "Nouveau produit",
+      "titleEdit": "Modifier le produit",
+      "create": "Créer le produit",
+      "save": "Enregistrer",
+      "saveFailed": "Échec de l'enregistrement du produit",
+      "fields": {
+        "name": "Nom du produit",
+        "namePlaceholder": "ex. Anaqa Tee",
+        "sku": "SKU",
+        "skuPlaceholder": "TEE-001",
+        "basePrice": "Prix de base (MAD)",
+        "active": "Actif (décochez pour masquer ce produit)",
+        "defaultAgent": "Agent par défaut",
+        "defaultAgentHint": "· utilisé lorsque l'attribution automatique est définie sur « Par produit »",
+        "defaultAgentNone": "Aucun (retour au round-robin)",
+        "description": "Description",
+        "descriptionPlaceholder": "Brève description (facultatif)"
+      },
+      "variants": {
+        "title": "Variantes",
+        "subtitle": "Ajoutez des options et générez automatiquement les combinaisons.",
+        "totalBadge": "{{count}} au total",
+        "option1": "Option 1 (ex. Taille)",
+        "option1Placeholder": "S, M, L…",
+        "option2": "Option 2 (ex. Couleur)",
+        "option2Placeholder": "Rouge, Bleu…",
+        "generate": "Générer",
+        "bulkPrice": "Prix groupé (MAD)",
+        "bulkPricePlaceholder": "Appliquer à toutes les variantes",
+        "bulkStock": "Stock groupé",
+        "apply": "Appliquer",
+        "emptyTitle": "Aucune variante pour le moment",
+        "emptyHintBefore": "Ajoutez une ou les deux listes d'options ci-dessus, puis cliquez sur ",
+        "emptyHintGenerate": "Générer",
+        "emptyHintAfter": ".",
+        "colSize": "Taille",
+        "colColor": "Couleur",
+        "colSku": "SKU",
+        "colPrice": "Prix",
+        "colStock": "Stock",
+        "rowSizePlaceholder": "L",
+        "rowColorPlaceholder": "Noir",
+        "rowSkuPlaceholder": "TEE-001-BLK-L",
+        "removeVariant": "Supprimer la variante"
+      }
+    },
+    "image": {
+      "uploading": "Envoi en cours…",
+      "clickOrDrop": "Cliquez ou déposez une image",
+      "sizeHint": "PNG · JPG · WebP · <{{mb}} Mo",
+      "replace": "Remplacer",
+      "remove": "Supprimer l'image",
+      "uploadFailed": "Échec du téléversement",
+      "notAnImage": "Veuillez choisir un fichier image",
+      "tooLarge": "L'image doit faire moins de {{mb}} Mo",
+      "alt": "Produit"
+    },
+    "measurements": {
+      "title": "Tableau des mensurations",
+      "optional": "· facultatif",
+      "description": "Ajoutez un petit tableau des tailles que les agents peuvent partager avec les clientes (poitrine, taille, longueur…).",
+      "usePreset": "Utiliser le modèle (Taille · Poitrine · Tour de taille · Longueur)",
+      "startBlank": "Commencer vide",
+      "removeChart": "Supprimer le tableau",
+      "addRow": "Ajouter une ligne",
+      "addColumn": "Ajouter une colonne",
+      "columnSize": "Taille",
+      "columnPlaceholder": "Colonne",
+      "removeColumn": "Supprimer la colonne",
+      "removeRow": "Supprimer la ligne",
+      "header": "Mensurations (cm)"
+    },
+    "tag": {
+      "removeValue": "Supprimer {{value}}"
+    }
   }
 }

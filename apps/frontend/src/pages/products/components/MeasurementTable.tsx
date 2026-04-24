@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Ruler } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import type { ProductMeasurements } from '@/services/productsApi';
@@ -16,6 +17,7 @@ function isEmpty(data: ProductMeasurements | null | undefined): boolean {
 }
 
 export function MeasurementTable({ data, className, compact = false }: Props) {
+  const { t } = useTranslation();
   if (isEmpty(data)) return null;
   const { columns, rows } = data!;
 
@@ -29,7 +31,7 @@ export function MeasurementTable({ data, className, compact = false }: Props) {
       <div className="flex items-center gap-1.5 border-b border-gray-100 bg-accent/30 px-3 py-1.5">
         <Ruler size={12} className="text-primary" />
         <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-600">
-          Measurements (cm)
+          {t('products.measurements.header')}
         </span>
       </div>
       <div className="overflow-x-auto">

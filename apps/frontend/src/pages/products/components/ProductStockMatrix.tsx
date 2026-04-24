@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Package } from 'lucide-react';
 import { StockCell } from './StockCell';
 import { MeasurementTable } from './MeasurementTable';
@@ -14,6 +15,7 @@ interface Props {
 // cells = stock for that combination. Variants missing a combination render
 // as a dashed placeholder so the grid stays aligned.
 export function ProductStockMatrix({ product, canEdit }: Props) {
+  const { t } = useTranslation();
   const { colors, sizes, variantMap } = useMemo(() => {
     const colorSet = new Set<string>();
     const sizeSet = new Set<string>();
@@ -62,7 +64,7 @@ export function ProductStockMatrix({ product, canEdit }: Props) {
             {product.sku}
           </p>
           <p className="text-xs text-gray-500">
-            Base: <span className="font-semibold text-primary">{product.basePrice.toLocaleString('fr-MA')} MAD</span>
+            {t('products.stockMatrix.baseLabel')} <span className="font-semibold text-primary">{product.basePrice.toLocaleString('fr-MA')} MAD</span>
           </p>
         </div>
       </div>
@@ -72,7 +74,7 @@ export function ProductStockMatrix({ product, canEdit }: Props) {
         <div className="flex items-center justify-between gap-2 border-b border-gray-100 px-4 py-3">
           <h3 className="truncate text-sm font-semibold text-gray-900">{product.name}</h3>
           <span className="shrink-0 rounded-badge bg-accent px-2 py-0.5 text-[10px] font-semibold text-primary">
-            {product.variants.length} variant{product.variants.length === 1 ? '' : 's'}
+            {t('products.stockMatrix.variantCount', { count: product.variants.length })}
           </span>
         </div>
 
@@ -82,7 +84,7 @@ export function ProductStockMatrix({ product, canEdit }: Props) {
             <thead>
               <tr>
                 <th className="sticky left-0 z-10 bg-white px-4 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-                  Color / Size
+                  {t('products.stockMatrix.colorSize')}
                 </th>
                 {sizes.map((s) => (
                   <th

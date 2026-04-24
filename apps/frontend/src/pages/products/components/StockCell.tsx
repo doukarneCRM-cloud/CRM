@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { productsApi } from '@/services/productsApi';
@@ -19,6 +20,7 @@ function tone(stock: number) {
 }
 
 export function StockCell({ productId, variantId, stock, canEdit }: Props) {
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(String(stock));
   const [saving, setSaving] = useState(false);
@@ -107,7 +109,7 @@ export function StockCell({ productId, variantId, stock, canEdit }: Props) {
       disabled={!canEdit || saving}
       onClick={() => canEdit && setEditing(true)}
       className={baseCls}
-      aria-label={`Stock: ${stock}`}
+      aria-label={t('products.stockMatrix.stockAria', { count: stock })}
     >
       {saving ? <Loader2 size={14} className="animate-spin" /> : stock}
     </button>

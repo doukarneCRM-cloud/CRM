@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Search, Grid3x3 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { ROUTES } from '@/constants/routes';
@@ -13,6 +14,7 @@ import { productsApi, type ProductDetail } from '@/services/productsApi';
 import { apiErrorMessage } from '@/lib/apiError';
 
 export default function ProductsListPage() {
+  const { t } = useTranslation();
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canCreate = hasPermission(PERMISSIONS.PRODUCTS_CREATE);
   const canEdit = hasPermission(PERMISSIONS.PRODUCTS_EDIT);
@@ -42,7 +44,7 @@ export default function ProductsListPage() {
     try {
       await productsApi.remove(product.id);
     } catch (e) {
-      window.alert(apiErrorMessage(e, 'Failed to delete product. Try again.'));
+      window.alert(apiErrorMessage(e, t('products.list.deleteFailed')));
       return;
     }
     await refresh();
@@ -52,8 +54,8 @@ export default function ProductsListPage() {
     <div className="flex flex-col gap-4 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Products</h1>
-          <p className="text-xs text-gray-400">Catalog & variant management</p>
+          <h1 className="text-xl font-bold text-gray-900">{t('products.list.title')}</h1>
+          <p className="text-xs text-gray-400">{t('products.list.subtitle')}</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -62,11 +64,11 @@ export default function ProductsListPage() {
             className="flex items-center gap-1.5 rounded-btn border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-primary hover:text-primary"
           >
             <Grid3x3 size={14} />
-            Stock matrix
+            {t('products.list.stockMatrix')}
           </NavLink>
           {canCreate && (
             <CRMButton leftIcon={<Plus size={14} />} onClick={openCreate}>
-              Add product
+              {t('products.list.addProduct')}
             </CRMButton>
           )}
         </div>
@@ -78,7 +80,7 @@ export default function ProductsListPage() {
           leftIcon={<Search size={14} />}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name or SKU"
+          placeholder={t('products.list.searchPlaceholder')}
         />
         <label className="flex items-center gap-2 text-xs text-gray-600">
           <input
@@ -87,10 +89,10 @@ export default function ProductsListPage() {
             onChange={(e) => setShowInactive(e.target.checked)}
             className="h-3.5 w-3.5 accent-primary"
           />
-          Show inactive
+          {t('products.list.showInactive')}
         </label>
         <div className="ml-auto text-xs text-gray-400">
-          {loading ? 'Loading…' : `${products.length} product${products.length === 1 ? '' : 's'}`}
+          {loading ? t('products.list.loading') : t('products.list.count', { count: products.length })}
         </div>
       </div>
 
@@ -102,13 +104,13 @@ export default function ProductsListPage() {
         </div>
       ) : products.length === 0 ? (
         <div className="flex h-[280px] flex-col items-center justify-center gap-2 rounded-card border border-dashed border-gray-200 bg-white/60 text-center">
-          <p className="text-sm font-semibold text-gray-700">No products yet</p>
+          <p className="text-sm font-semibold text-gray-700">{t('products.list.emptyTitle')}</p>
           <p className="text-xs text-gray-400">
-            {search ? 'Try a different search term.' : 'Create your first product to get started.'}
+            {search ? t('products.list.emptySearch') : t('products.list.emptyCta')}
           </p>
           {canCreate && !search && (
             <CRMButton leftIcon={<Plus size={14} />} onClick={openCreate} className="mt-2">
-              Add product
+              {t('products.list.addProduct')}
             </CRMButton>
           )}
         </div>

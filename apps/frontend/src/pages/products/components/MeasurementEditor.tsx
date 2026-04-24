@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Plus, Ruler, Trash2, X } from 'lucide-react';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { cn } from '@/lib/cn';
@@ -23,6 +24,7 @@ function emptyRow(cols: number): string[] {
 }
 
 export function MeasurementEditor({ value, onChange }: Props) {
+  const { t } = useTranslation();
   const data = value;
 
   const handleStart = (preset: boolean) => {
@@ -36,12 +38,10 @@ export function MeasurementEditor({ value, onChange }: Props) {
       <div className="flex flex-col gap-3 rounded-card border border-dashed border-gray-200 bg-white/60 p-4">
         <div className="flex items-center gap-2">
           <Ruler size={14} className="text-primary" />
-          <h4 className="text-sm font-semibold text-gray-900">Measurements chart</h4>
-          <span className="text-[11px] text-gray-400">· optional</span>
+          <h4 className="text-sm font-semibold text-gray-900">{t('products.measurements.title')}</h4>
+          <span className="text-[11px] text-gray-400">{t('products.measurements.optional')}</span>
         </div>
-        <p className="text-[11px] text-gray-500">
-          Add a small size chart agents can share with clients (chest, waist, length…).
-        </p>
+        <p className="text-[11px] text-gray-500">{t('products.measurements.description')}</p>
         <div className="flex flex-wrap gap-2">
           <CRMButton
             type="button"
@@ -50,7 +50,7 @@ export function MeasurementEditor({ value, onChange }: Props) {
             leftIcon={<Plus size={12} />}
             onClick={() => handleStart(true)}
           >
-            Use preset (Size · Chest · Waist · Length)
+            {t('products.measurements.usePreset')}
           </CRMButton>
           <CRMButton
             type="button"
@@ -59,7 +59,7 @@ export function MeasurementEditor({ value, onChange }: Props) {
             leftIcon={<Plus size={12} />}
             onClick={() => handleStart(false)}
           >
-            Start blank
+            {t('products.measurements.startBlank')}
           </CRMButton>
         </div>
       </div>
@@ -112,14 +112,14 @@ export function MeasurementEditor({ value, onChange }: Props) {
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Ruler size={14} className="text-primary" />
-          <h4 className="text-sm font-semibold text-gray-900">Measurements chart</h4>
+          <h4 className="text-sm font-semibold text-gray-900">{t('products.measurements.title')}</h4>
         </div>
         <button
           type="button"
           onClick={handleClear}
           className="text-[11px] font-medium text-gray-400 hover:text-red-500"
         >
-          Remove chart
+          {t('products.measurements.removeChart')}
         </button>
       </div>
 
@@ -134,14 +134,14 @@ export function MeasurementEditor({ value, onChange }: Props) {
                       <input
                         value={c}
                         onChange={(e) => setColumn(idx, e.target.value)}
-                        placeholder={idx === 0 ? 'Size' : 'Column'}
+                        placeholder={idx === 0 ? t('products.measurements.columnSize') : t('products.measurements.columnPlaceholder')}
                         className="w-full min-w-[64px] rounded-input border border-gray-200 px-1.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-gray-700 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
                       />
                       <button
                         type="button"
                         onClick={() => removeColumn(idx)}
                         className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-gray-300 transition-colors hover:bg-red-50 hover:text-red-500"
-                        aria-label="Remove column"
+                        aria-label={t('products.measurements.removeColumn')}
                       >
                         <X size={11} />
                       </button>
@@ -172,7 +172,7 @@ export function MeasurementEditor({ value, onChange }: Props) {
                       type="button"
                       onClick={() => removeRow(rIdx)}
                       className="flex h-6 w-6 items-center justify-center rounded-full text-gray-300 transition-colors hover:bg-red-50 hover:text-red-500"
-                      aria-label="Remove row"
+                      aria-label={t('products.measurements.removeRow')}
                     >
                       <Trash2 size={11} />
                     </button>
@@ -193,7 +193,7 @@ export function MeasurementEditor({ value, onChange }: Props) {
           onClick={addRow}
           disabled={data.rows.length >= 50}
         >
-          Add row
+          {t('products.measurements.addRow')}
         </CRMButton>
         <CRMButton
           type="button"
@@ -203,7 +203,7 @@ export function MeasurementEditor({ value, onChange }: Props) {
           onClick={addColumn}
           disabled={data.columns.length >= 12}
         >
-          Add column
+          {t('products.measurements.addColumn')}
         </CRMButton>
       </div>
     </div>

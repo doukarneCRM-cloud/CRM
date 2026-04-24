@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Package, Pencil, Trash2, Loader2, Ruler } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { cn } from '@/lib/cn';
@@ -21,6 +22,7 @@ function stockTone(stock: number) {
 }
 
 export function ProductCard({ product, canEdit, canDelete, onEdit, onDelete }: Props) {
+  const { t } = useTranslation();
   const totalStock = product.variants.reduce((s, v) => s + v.stock, 0);
   const hasMeasurements =
     !!product.measurements &&
@@ -30,12 +32,7 @@ export function ProductCard({ product, canEdit, canDelete, onEdit, onDelete }: P
   const [showMeasurements, setShowMeasurements] = useState(false);
 
   const handleDelete = async () => {
-    const ok = window.confirm(
-      `Delete "${product.name}"?\n\n`
-      + `The product will disappear from the catalog. Orders that already reference it stay intact `
-      + `(their confirmation status is preserved), but they'll show a red "untracked" marker because `
-      + `stock for this product is no longer maintained.\n\nThis cannot be undone.`,
-    );
+    const ok = window.confirm(t('products.card.deleteConfirm', { name: product.name }));
     if (!ok) return;
     setDeleting(true);
     try {
@@ -65,7 +62,7 @@ export function ProductCard({ product, canEdit, canDelete, onEdit, onDelete }: P
 
         {product.isActive === false && (
           <span className="absolute left-2 top-2 rounded-badge bg-gray-900/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
-            Inactive
+            {t('products.card.inactive')}
           </span>
         )}
 
@@ -76,8 +73,8 @@ export function ProductCard({ product, canEdit, canDelete, onEdit, onDelete }: P
               onClick={handleDelete}
               disabled={deleting}
               className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-red-500 shadow-sm transition-colors hover:bg-white hover:text-red-600 disabled:opacity-60"
-              aria-label="Delete product"
-              title="Delete product"
+              aria-label={t('products.card.deleteProduct')}
+              title={t('products.card.deleteProduct')}
             >
               {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
             </button>
@@ -87,7 +84,7 @@ export function ProductCard({ product, canEdit, canDelete, onEdit, onDelete }: P
               type="button"
               onClick={onEdit}
               className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-primary shadow-sm transition-colors hover:bg-white"
-              aria-label="Edit product"
+              aria-label={t('products.card.editProduct')}
             >
               <Pencil size={13} />
             </button>
@@ -102,7 +99,7 @@ export function ProductCard({ product, canEdit, canDelete, onEdit, onDelete }: P
             <p className="truncate font-mono text-[10px] text-gray-400">{product.sku}</p>
           </div>
           <div className="shrink-0 text-right">
-            <p className="text-[10px] uppercase tracking-wide text-gray-400">Base</p>
+            <p className="text-[10px] uppercase tracking-wide text-gray-400">{t('products.card.base')}</p>
             <p className="text-sm font-bold text-primary">
               {product.basePrice.toLocaleString('fr-MA')}
             </p>
@@ -117,7 +114,7 @@ export function ProductCard({ product, canEdit, canDelete, onEdit, onDelete }: P
                 'rounded-badge border px-1.5 py-0.5 text-[10px] font-medium',
                 stockTone(v.stock),
               )}
-              title={`${v.color ?? '—'} · ${v.size ?? '—'} — ${v.stock} in stock`}
+              title={`${v.color ?? '—'} · ${v.size ?? '—'} — ${t('products.card.inStock', { count: v.stock })}`}
             >
               {[v.color, v.size].filter(Boolean).join(' · ') || v.sku}
               <span className="ml-1 font-bold">({v.stock})</span>
@@ -132,10 +129,10 @@ export function ProductCard({ product, canEdit, canDelete, onEdit, onDelete }: P
 
         <div className="flex items-center justify-between border-t border-gray-100 pt-2 text-[11px]">
           <span className="text-gray-400">
-            {product.variants.length} variant{product.variants.length === 1 ? '' : 's'}
+            {t('products.card.variantCount', { count: product.variants.length })}
           </span>
           <span className={cn('font-semibold', totalStock === 0 ? 'text-red-500' : 'text-gray-700')}>
-            {totalStock} in stock
+            {t('products.card.inStock', { count: totalStock })}
           </span>
         </div>
 
@@ -148,10 +145,10 @@ export function ProductCard({ product, canEdit, canDelete, onEdit, onDelete }: P
             >
               <span className="flex items-center gap-1.5">
                 <Ruler size={11} className="text-primary" />
-                Measurements
+                {t('products.card.measurements')}
               </span>
               <span className="text-[10px] font-medium text-gray-400">
-                {showMeasurements ? 'Hide' : 'Show'}
+                {showMeasurements ? t('products.card.hide') : t('products.card.show')}
               </span>
             </button>
             {showMeasurements && <MeasurementTable data={product.measurements} compact />}

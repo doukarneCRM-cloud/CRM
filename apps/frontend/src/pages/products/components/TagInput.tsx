@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
@@ -13,6 +14,7 @@ interface Props {
 // Chip-style multi-value input. Enter or comma commits a tag; Backspace on
 // empty input removes the last tag. Duplicates (case-insensitive) are ignored.
 export function TagInput({ label, placeholder, values, onChange, className }: Props) {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -67,7 +69,7 @@ export function TagInput({ label, placeholder, values, onChange, className }: Pr
                 remove(v);
               }}
               className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-primary/60 transition-colors hover:bg-primary/10 hover:text-primary"
-              aria-label={`Remove ${v}`}
+              aria-label={t('products.tag.removeValue', { value: v })}
             >
               <X size={10} />
             </button>
