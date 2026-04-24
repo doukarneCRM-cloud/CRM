@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Truck, PhoneCall, TrendingUp } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { GlobalFilterBar, type FilterChipConfig } from '@/components/ui/GlobalFilterBar';
 import {
   CONFIRMATION_STATUS_OPTIONS,
@@ -15,21 +16,35 @@ import { ProfitTab } from './tabs/ProfitTab';
 
 type TabId = 'delivery' | 'confirmation' | 'profit';
 
-const TABS: Array<{ id: TabId; label: string; icon: typeof Truck; hint: string }> = [
-  { id: 'delivery', label: 'Delivery', icon: Truck, hint: 'Shipping pipeline & on-time rates' },
-  { id: 'confirmation', label: 'Confirmation', icon: PhoneCall, hint: 'Call-center funnel' },
-  { id: 'profit', label: 'Profit', icon: TrendingUp, hint: 'Revenue minus all costs' },
-];
-
-const STATIC_FILTER_CONFIGS: FilterChipConfig[] = [
-  { key: 'confirmationStatuses', label: 'Confirmation', options: CONFIRMATION_STATUS_OPTIONS },
-  { key: 'shippingStatuses', label: 'Shipping', options: SHIPPING_STATUS_OPTIONS },
-  { key: 'sources', label: 'Source', options: SOURCE_OPTIONS },
-];
-
 export default function AnalyticsPage() {
+  const { t } = useTranslation();
   const [active, setActive] = useState<TabId>('delivery');
-  const activeMeta = TABS.find((t) => t.id === active)!;
+
+  const TABS = useMemo(
+    () => [
+      {
+        id: 'delivery' as TabId,
+        label: t('analytics.tabs.delivery.label'),
+        icon: Truck,
+        hint: t('analytics.tabs.delivery.hint'),
+      },
+      {
+        id: 'confirmation' as TabId,
+        label: t('analytics.tabs.confirmation.label'),
+        icon: PhoneCall,
+        hint: t('analytics.tabs.confirmation.hint'),
+      },
+      {
+        id: 'profit' as TabId,
+        label: t('analytics.tabs.profit.label'),
+        icon: TrendingUp,
+        hint: t('analytics.tabs.profit.hint'),
+      },
+    ],
+    [t],
+  );
+
+  const activeMeta = TABS.find((tab) => tab.id === active)!;
 
   const [agents, setAgents] = useState<AgentOption[]>([]);
   useEffect(() => {
@@ -39,22 +54,27 @@ export default function AnalyticsPage() {
   }, []);
 
   const filterConfigs = useMemo<FilterChipConfig[]>(() => {
-    if (agents.length === 0) return STATIC_FILTER_CONFIGS;
+    const staticConfigs: FilterChipConfig[] = [
+      { key: 'confirmationStatuses', label: t('analytics.filters.confirmation'), options: CONFIRMATION_STATUS_OPTIONS },
+      { key: 'shippingStatuses', label: t('analytics.filters.shipping'), options: SHIPPING_STATUS_OPTIONS },
+      { key: 'sources', label: t('analytics.filters.source'), options: SOURCE_OPTIONS },
+    ];
+    if (agents.length === 0) return staticConfigs;
     return [
-      ...STATIC_FILTER_CONFIGS,
+      ...staticConfigs,
       {
         key: 'agentIds',
-        label: 'Agent',
+        label: t('analytics.filters.agent'),
         options: agents.map((a) => ({ value: a.id, label: a.name })),
       },
     ];
-  }, [agents]);
+  }, [agents, t]);
 
   return (
     <div className="flex flex-col gap-4 p-4">
       <div className="flex items-baseline justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Analytics</h1>
+          <h1 className="text-xl font-bold text-gray-900">{t('analytics.page.title')}</h1>
           <p className="text-xs text-gray-400">{activeMeta.hint}</p>
         </div>
       </div>
@@ -62,13 +82,13 @@ export default function AnalyticsPage() {
       <GlobalFilterBar filterConfigs={filterConfigs} showDateRange sticky={false} />
 
       <div className="flex flex-wrap items-center gap-2 rounded-card border border-gray-100 bg-white p-1.5">
-        {TABS.map((t) => {
-          const Icon = t.icon;
-          const isActive = active === t.id;
+        {TABS.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = active === tab.id;
           return (
             <button
-              key={t.id}
-              onClick={() => setActive(t.id)}
+              key={tab.id}
+              onClick={() => setActive(tab.id)}
               className={cn(
                 'flex flex-1 min-w-[140px] items-center justify-center gap-2 rounded-btn px-4 py-2.5 text-sm font-semibold transition-all',
                 isActive
@@ -77,7 +97,7 @@ export default function AnalyticsPage() {
               )}
             >
               <Icon size={16} />
-              {t.label}
+              {tab.label}
             </button>
           );
         })}

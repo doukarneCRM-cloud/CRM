@@ -1525,5 +1525,179 @@
       "waiting": "Waiting for QR…",
       "close": "Close"
     }
+  },
+  "analytics": {
+    "page": {
+      "title": "Analytics"
+    },
+    "tabs": {
+      "delivery": {
+        "label": "Delivery",
+        "hint": "Shipping pipeline & on-time rates"
+      },
+      "confirmation": {
+        "label": "Confirmation",
+        "hint": "Call-center funnel"
+      },
+      "profit": {
+        "label": "Profit",
+        "hint": "Revenue minus all costs"
+      }
+    },
+    "filters": {
+      "confirmation": "Confirmation",
+      "shipping": "Shipping",
+      "source": "Source",
+      "agent": "Agent"
+    },
+    "common": {
+      "noData": "No data",
+      "noDataInRange": "No data in range",
+      "mad": "MAD",
+      "total": "Total"
+    },
+    "confirmation": {
+      "error": "Failed to load confirmation analytics",
+      "kpi": {
+        "totalOrders": "Total Orders",
+        "confirmed": "Confirmed",
+        "cancelled": "Cancelled",
+        "unreachable": "Unreachable",
+        "merged": "Merged",
+        "confirmationRate": "Confirmation Rate",
+        "avgConfirmTime": "Avg Confirm Time"
+      },
+      "trend": {
+        "title": "Confirmation Trend",
+        "subtitle": "Confirmed vs cancelled per day"
+      },
+      "funnel": {
+        "title": "Confirmation Funnel",
+        "subtitle": "Where every order sits"
+      },
+      "cities": {
+        "title": "Top Cities · Confirmation",
+        "subtitle": "Confirmation rate by city",
+        "columns": {
+          "city": "City",
+          "orders": "Orders",
+          "confirmed": "Confirmed",
+          "cancelled": "Cancelled",
+          "rate": "Rate"
+        }
+      },
+      "agents": {
+        "title": "Top Agents · Confirmation",
+        "subtitle": "Performance per call-center agent",
+        "calls_one": "{{count}} call",
+        "calls_other": "{{count}} calls",
+        "stat": {
+          "confirmed": "Confirmed",
+          "cancelled": "Cancelled",
+          "unreachable": "Unreachable"
+        }
+      },
+      "products": {
+        "title": "Top Products · Confirmation",
+        "subtitle": "Tap a row to see best-performing variants",
+        "breakdown": "{{orders}} orders · {{confirmed}} confirmed · {{cancelled}} cancelled",
+        "noVariants": "No variant breakdown"
+      }
+    },
+    "delivery": {
+      "error": "Failed to load delivery analytics",
+      "kpi": {
+        "shipped": "Shipped",
+        "delivered": "Delivered",
+        "returned": "Returned",
+        "deliveryRate": "Delivery Rate",
+        "avgDelivery": "Avg Delivery",
+        "avgDeliveryUnit": "days",
+        "revenueDelivered": "Revenue (Delivered)"
+      },
+      "trend": {
+        "title": "Delivery Trend",
+        "subtitle": "Delivered vs returned per day"
+      },
+      "pipeline": {
+        "title": "Shipping Pipeline",
+        "subtitle": "Orders at each stage"
+      },
+      "cities": {
+        "title": "Top Cities · Delivery",
+        "subtitle": "Avg time per city · success rate",
+        "columns": {
+          "city": "City",
+          "orders": "Orders",
+          "delivered": "Delivered",
+          "returned": "Returned",
+          "avgDays": "Avg days",
+          "rate": "Rate"
+        }
+      },
+      "agents": {
+        "title": "Top Agents · Delivery",
+        "subtitle": "Confirmed vs delivered + revenue",
+        "stat": {
+          "confirmed": "Confirmed",
+          "delivered": "Delivered",
+          "returned": "Returned"
+        }
+      },
+      "products": {
+        "title": "Top Products · Delivery",
+        "subtitle": "Tap a row to see best-performing variants",
+        "breakdown": "{{orders}} orders · {{delivered}} delivered · {{returned}} returned",
+        "noVariants": "No variant breakdown"
+      }
+    },
+    "profit": {
+      "error": "Failed to load profit analytics",
+      "kpi": {
+        "revenue": "Revenue",
+        "cogs": "COGS",
+        "shippingFees": "Shipping fees",
+        "expenses": "Expenses",
+        "profit": "Profit",
+        "margin": "Margin"
+      },
+      "trend": {
+        "title": "Revenue & Profit Trend",
+        "subtitle": "Daily — net of all costs"
+      },
+      "breakdown": {
+        "title": "Profit Composition",
+        "subtitle": "Where revenue actually goes",
+        "revenue": "Revenue",
+        "cogs": "COGS",
+        "shippingFees": "Shipping fees",
+        "expenses": "Expenses",
+        "equalsProfit": "= Profit"
+      },
+      "byProduct": {
+        "title": "Profit by Product",
+        "subtitleHtmlPrefix": "Set ",
+        "subtitleHtmlBold": "cost price",
+        "subtitleHtmlSuffix": " on each variant for accurate profit",
+        "columns": {
+          "product": "Product",
+          "units": "Units",
+          "revenue": "Revenue",
+          "cogs": "COGS",
+          "profit": "Profit",
+          "margin": "Margin"
+        }
+      },
+      "byAgent": {
+        "title": "Profit by Agent",
+        "subtitle": "Net contribution per agent (revenue − COGS − shipping)",
+        "row": {
+          "revenue": "Revenue",
+          "cogs": "− COGS",
+          "shipping": "− Shipping",
+          "profit": "Profit"
+        }
+      }
+    }
   }
 }

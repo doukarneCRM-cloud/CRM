@@ -10,6 +10,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -40,6 +41,7 @@ function fmt(n: number): string {
 }
 
 export function ConfirmationTab() {
+  const { t } = useTranslation();
   const filters = useAnalyticsFilters();
   const [data, setData] = useState<ConfirmationTabPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,7 +57,7 @@ export function ConfirmationTab() {
         if (!cancelled) setData(d);
       })
       .catch((e) => {
-        if (!cancelled) setError(apiErrorMessage(e, 'Failed to load confirmation analytics'));
+        if (!cancelled) setError(apiErrorMessage(e, t('analytics.confirmation.error')));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -63,7 +65,7 @@ export function ConfirmationTab() {
     return () => {
       cancelled = true;
     };
-  }, [filters]);
+  }, [filters, t]);
 
   const kpis = data?.kpis;
 
@@ -77,41 +79,41 @@ export function ConfirmationTab() {
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
         <KPICard
-          title="Total Orders"
+          title={t('analytics.confirmation.kpi.totalOrders')}
           value={fmt(kpis?.totalOrders ?? 0)}
           icon={PhoneCall}
           iconColor="#0EA5E9"
           percentageChange={kpis?.percentageChanges.totalOrders}
         />
         <KPICard
-          title="Confirmed"
+          title={t('analytics.confirmation.kpi.confirmed')}
           value={fmt(kpis?.confirmed ?? 0)}
           icon={CheckCircle2}
           iconColor="#16A34A"
           percentageChange={kpis?.percentageChanges.confirmed}
         />
         <KPICard
-          title="Cancelled"
+          title={t('analytics.confirmation.kpi.cancelled')}
           value={fmt(kpis?.cancelled ?? 0)}
           icon={XCircle}
           iconColor="#9CA3AF"
           percentageChange={kpis?.percentageChanges.cancelled}
         />
         <KPICard
-          title="Unreachable"
+          title={t('analytics.confirmation.kpi.unreachable')}
           value={fmt(kpis?.unreachable ?? 0)}
           icon={PhoneOff}
           iconColor="#EF4444"
         />
         <KPICard
-          title="Merged"
+          title={t('analytics.confirmation.kpi.merged')}
           value={`${fmt(kpis?.merged ?? 0)} · ${kpis ? kpis.mergedRate.toFixed(1) : '0.0'}%`}
           icon={GitMerge}
           iconColor="#F59E0B"
           percentageChange={kpis?.percentageChanges.merged}
         />
         <KPICard
-          title="Confirmation Rate"
+          title={t('analytics.confirmation.kpi.confirmationRate')}
           value={kpis ? kpis.confirmationRate.toFixed(1) : '0.0'}
           unit="%"
           icon={Hourglass}
@@ -119,7 +121,7 @@ export function ConfirmationTab() {
           percentageChange={kpis?.percentageChanges.confirmationRate}
         />
         <KPICard
-          title="Avg Confirm Time"
+          title={t('analytics.confirmation.kpi.avgConfirmTime')}
           value={kpis ? kpis.avgConfirmationHours.toFixed(1) : '0'}
           unit="h"
           icon={Timer}
@@ -150,17 +152,18 @@ function ConfirmationTrendCard({
   data: ConfirmationTabPayload['trend'];
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <GlassCard className="lg:col-span-2 flex flex-col gap-3">
       <div>
-        <h3 className="text-sm font-semibold text-gray-900">Confirmation Trend</h3>
-        <p className="text-[11px] text-gray-400">Confirmed vs cancelled per day</p>
+        <h3 className="text-sm font-semibold text-gray-900">{t('analytics.confirmation.trend.title')}</h3>
+        <p className="text-[11px] text-gray-400">{t('analytics.confirmation.trend.subtitle')}</p>
       </div>
       {loading ? (
         <div className="skeleton h-[220px] w-full rounded-xl" />
       ) : data.length === 0 ? (
         <div className="flex h-[220px] items-center justify-center text-xs text-gray-400">
-          No data in range
+          {t('analytics.common.noDataInRange')}
         </div>
       ) : (
         <div className="h-[220px]">
@@ -207,6 +210,7 @@ function FunnelCard({
   pipeline: ConfirmationTabPayload['pipeline'];
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   const slices = useMemo(
     () =>
       pipeline
@@ -224,14 +228,14 @@ function FunnelCard({
   return (
     <GlassCard className="flex flex-col gap-3">
       <div>
-        <h3 className="text-sm font-semibold text-gray-900">Confirmation Funnel</h3>
-        <p className="text-[11px] text-gray-400">Where every order sits</p>
+        <h3 className="text-sm font-semibold text-gray-900">{t('analytics.confirmation.funnel.title')}</h3>
+        <p className="text-[11px] text-gray-400">{t('analytics.confirmation.funnel.subtitle')}</p>
       </div>
       {loading ? (
         <div className="skeleton h-[220px] w-full rounded-xl" />
       ) : total === 0 ? (
         <div className="flex h-[220px] items-center justify-center text-xs text-gray-400">
-          No data
+          {t('analytics.common.noData')}
         </div>
       ) : (
         <>
@@ -261,7 +265,7 @@ function FunnelCard({
               </PieChart>
             </ResponsiveContainer>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-[10px] uppercase tracking-wide text-gray-400">Total</span>
+              <span className="text-[10px] uppercase tracking-wide text-gray-400">{t('analytics.common.total')}</span>
               <span className="text-xl font-bold text-gray-900">{total}</span>
             </div>
           </div>
@@ -292,28 +296,29 @@ function CitiesCard({
   cities: ConfirmationTabPayload['cities'];
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <GlassCard className="flex flex-col gap-3">
       <div>
-        <h3 className="text-sm font-semibold text-gray-900">Top Cities · Confirmation</h3>
-        <p className="text-[11px] text-gray-400">Confirmation rate by city</p>
+        <h3 className="text-sm font-semibold text-gray-900">{t('analytics.confirmation.cities.title')}</h3>
+        <p className="text-[11px] text-gray-400">{t('analytics.confirmation.cities.subtitle')}</p>
       </div>
       {loading ? (
         <div className="skeleton h-[260px] w-full rounded-xl" />
       ) : cities.length === 0 ? (
         <div className="flex h-[180px] items-center justify-center text-xs text-gray-400">
-          No data
+          {t('analytics.common.noData')}
         </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
               <tr className="text-left text-[10px] uppercase tracking-wide text-gray-400">
-                <th className="py-2">City</th>
-                <th className="py-2 text-right">Orders</th>
-                <th className="py-2 text-right">Confirmed</th>
-                <th className="py-2 text-right">Cancelled</th>
-                <th className="py-2 text-right">Rate</th>
+                <th className="py-2">{t('analytics.confirmation.cities.columns.city')}</th>
+                <th className="py-2 text-right">{t('analytics.confirmation.cities.columns.orders')}</th>
+                <th className="py-2 text-right">{t('analytics.confirmation.cities.columns.confirmed')}</th>
+                <th className="py-2 text-right">{t('analytics.confirmation.cities.columns.cancelled')}</th>
+                <th className="py-2 text-right">{t('analytics.confirmation.cities.columns.rate')}</th>
               </tr>
             </thead>
             <tbody>
@@ -354,17 +359,18 @@ function AgentsCard({
   agents: ConfirmationTabPayload['agents'];
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <GlassCard className="flex flex-col gap-3">
       <div>
-        <h3 className="text-sm font-semibold text-gray-900">Top Agents · Confirmation</h3>
-        <p className="text-[11px] text-gray-400">Performance per call-center agent</p>
+        <h3 className="text-sm font-semibold text-gray-900">{t('analytics.confirmation.agents.title')}</h3>
+        <p className="text-[11px] text-gray-400">{t('analytics.confirmation.agents.subtitle')}</p>
       </div>
       {loading ? (
         <div className="skeleton h-[260px] w-full rounded-xl" />
       ) : agents.length === 0 ? (
         <div className="flex h-[180px] items-center justify-center text-xs text-gray-400">
-          No data
+          {t('analytics.common.noData')}
         </div>
       ) : (
         <div className="flex flex-col gap-2.5">
@@ -375,12 +381,12 @@ function AgentsCard({
             >
               <div className="flex items-baseline justify-between gap-2">
                 <span className="truncate text-sm font-semibold text-gray-900">{a.agentName}</span>
-                <span className="text-xs font-bold text-primary">{a.total} calls</span>
+                <span className="text-xs font-bold text-primary">{t('analytics.confirmation.agents.calls', { count: a.total })}</span>
               </div>
               <div className="mt-1.5 grid grid-cols-3 gap-2 text-[11px]">
-                <Stat label="Confirmed" value={a.confirmed} color="text-green-700" />
-                <Stat label="Cancelled" value={a.cancelled} color="text-gray-700" />
-                <Stat label="Unreachable" value={a.unreachable} color="text-rose-600" />
+                <Stat label={t('analytics.confirmation.agents.stat.confirmed')} value={a.confirmed} color="text-green-700" />
+                <Stat label={t('analytics.confirmation.agents.stat.cancelled')} value={a.cancelled} color="text-gray-700" />
+                <Stat label={t('analytics.confirmation.agents.stat.unreachable')} value={a.unreachable} color="text-rose-600" />
               </div>
               <div className="mt-2 flex items-center gap-2">
                 <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100">
@@ -417,21 +423,22 @@ function ProductsCard({
   products: ConfirmationTabPayload['products'];
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState<string | null>(null);
 
   return (
     <GlassCard className="flex flex-col gap-3">
       <div>
-        <h3 className="text-sm font-semibold text-gray-900">Top Products · Confirmation</h3>
+        <h3 className="text-sm font-semibold text-gray-900">{t('analytics.confirmation.products.title')}</h3>
         <p className="text-[11px] text-gray-400">
-          Tap a row to see best-performing variants
+          {t('analytics.confirmation.products.subtitle')}
         </p>
       </div>
       {loading ? (
         <div className="skeleton h-[300px] w-full rounded-xl" />
       ) : products.length === 0 ? (
         <div className="flex h-[180px] items-center justify-center text-xs text-gray-400">
-          No data
+          {t('analytics.common.noData')}
         </div>
       ) : (
         <div className="flex flex-col gap-2">
@@ -462,7 +469,11 @@ function ProductsCard({
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-gray-900">{p.productName}</p>
                     <p className="text-[11px] text-gray-400">
-                      {p.orders} orders · {p.confirmed} confirmed · {p.cancelled} cancelled
+                      {t('analytics.confirmation.products.breakdown', {
+                        orders: p.orders,
+                        confirmed: p.confirmed,
+                        cancelled: p.cancelled,
+                      })}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
@@ -488,7 +499,7 @@ function ProductsCard({
                 {isOpen && (
                   <div className="border-t border-gray-100 bg-gray-50/40 px-3 py-2.5">
                     {p.variants.length === 0 ? (
-                      <p className="text-[11px] text-gray-400">No variant breakdown</p>
+                      <p className="text-[11px] text-gray-400">{t('analytics.confirmation.products.noVariants')}</p>
                     ) : (
                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3">
                         {p.variants.map((v) => (

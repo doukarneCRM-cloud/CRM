@@ -1525,5 +1525,179 @@
       "waiting": "En attente du QR…",
       "close": "Fermer"
     }
+  },
+  "analytics": {
+    "page": {
+      "title": "Analyses"
+    },
+    "tabs": {
+      "delivery": {
+        "label": "Livraison",
+        "hint": "Pipeline d’expédition et taux de ponctualité"
+      },
+      "confirmation": {
+        "label": "Confirmation",
+        "hint": "Entonnoir du centre d’appels"
+      },
+      "profit": {
+        "label": "Profit",
+        "hint": "Chiffre d’affaires moins tous les coûts"
+      }
+    },
+    "filters": {
+      "confirmation": "Confirmation",
+      "shipping": "Expédition",
+      "source": "Source",
+      "agent": "Agent"
+    },
+    "common": {
+      "noData": "Aucune donnée",
+      "noDataInRange": "Aucune donnée sur la période",
+      "mad": "MAD",
+      "total": "Total"
+    },
+    "confirmation": {
+      "error": "Échec du chargement des analyses de confirmation",
+      "kpi": {
+        "totalOrders": "Total des commandes",
+        "confirmed": "Confirmées",
+        "cancelled": "Annulées",
+        "unreachable": "Injoignables",
+        "merged": "Fusionnées",
+        "confirmationRate": "Taux de confirmation",
+        "avgConfirmTime": "Délai moy. de confirmation"
+      },
+      "trend": {
+        "title": "Tendance des confirmations",
+        "subtitle": "Confirmées vs annulées par jour"
+      },
+      "funnel": {
+        "title": "Entonnoir de confirmation",
+        "subtitle": "Où se trouve chaque commande"
+      },
+      "cities": {
+        "title": "Top villes · Confirmation",
+        "subtitle": "Taux de confirmation par ville",
+        "columns": {
+          "city": "Ville",
+          "orders": "Commandes",
+          "confirmed": "Confirmées",
+          "cancelled": "Annulées",
+          "rate": "Taux"
+        }
+      },
+      "agents": {
+        "title": "Top agents · Confirmation",
+        "subtitle": "Performance par agent du centre d’appels",
+        "calls_one": "{{count}} appel",
+        "calls_other": "{{count}} appels",
+        "stat": {
+          "confirmed": "Confirmées",
+          "cancelled": "Annulées",
+          "unreachable": "Injoignables"
+        }
+      },
+      "products": {
+        "title": "Top produits · Confirmation",
+        "subtitle": "Touchez une ligne pour voir les variantes les plus performantes",
+        "breakdown": "{{orders}} commandes · {{confirmed}} confirmées · {{cancelled}} annulées",
+        "noVariants": "Aucune répartition par variante"
+      }
+    },
+    "delivery": {
+      "error": "Échec du chargement des analyses de livraison",
+      "kpi": {
+        "shipped": "Expédiées",
+        "delivered": "Livrées",
+        "returned": "Retournées",
+        "deliveryRate": "Taux de livraison",
+        "avgDelivery": "Livraison moyenne",
+        "avgDeliveryUnit": "jours",
+        "revenueDelivered": "Chiffre d’affaires (livré)"
+      },
+      "trend": {
+        "title": "Tendance des livraisons",
+        "subtitle": "Livrées vs retournées par jour"
+      },
+      "pipeline": {
+        "title": "Pipeline d’expédition",
+        "subtitle": "Commandes à chaque étape"
+      },
+      "cities": {
+        "title": "Top villes · Livraison",
+        "subtitle": "Délai moyen par ville · taux de réussite",
+        "columns": {
+          "city": "Ville",
+          "orders": "Commandes",
+          "delivered": "Livrées",
+          "returned": "Retournées",
+          "avgDays": "Jours moy.",
+          "rate": "Taux"
+        }
+      },
+      "agents": {
+        "title": "Top agents · Livraison",
+        "subtitle": "Confirmées vs livrées + chiffre d’affaires",
+        "stat": {
+          "confirmed": "Confirmées",
+          "delivered": "Livrées",
+          "returned": "Retournées"
+        }
+      },
+      "products": {
+        "title": "Top produits · Livraison",
+        "subtitle": "Touchez une ligne pour voir les variantes les plus performantes",
+        "breakdown": "{{orders}} commandes · {{delivered}} livrées · {{returned}} retournées",
+        "noVariants": "Aucune répartition par variante"
+      }
+    },
+    "profit": {
+      "error": "Échec du chargement des analyses de profit",
+      "kpi": {
+        "revenue": "Chiffre d’affaires",
+        "cogs": "Coût des ventes",
+        "shippingFees": "Frais de livraison",
+        "expenses": "Dépenses",
+        "profit": "Profit",
+        "margin": "Marge"
+      },
+      "trend": {
+        "title": "Tendance du chiffre d’affaires & profit",
+        "subtitle": "Quotidien — net de tous les coûts"
+      },
+      "breakdown": {
+        "title": "Composition du profit",
+        "subtitle": "Où va réellement le chiffre d’affaires",
+        "revenue": "Chiffre d’affaires",
+        "cogs": "Coût des ventes",
+        "shippingFees": "Frais de livraison",
+        "expenses": "Dépenses",
+        "equalsProfit": "= Profit"
+      },
+      "byProduct": {
+        "title": "Profit par produit",
+        "subtitleHtmlPrefix": "Définissez le ",
+        "subtitleHtmlBold": "prix de revient",
+        "subtitleHtmlSuffix": " de chaque variante pour un profit précis",
+        "columns": {
+          "product": "Produit",
+          "units": "Unités",
+          "revenue": "Chiffre d’affaires",
+          "cogs": "Coût des ventes",
+          "profit": "Profit",
+          "margin": "Marge"
+        }
+      },
+      "byAgent": {
+        "title": "Profit par agent",
+        "subtitle": "Contribution nette par agent (CA − coûts − livraison)",
+        "row": {
+          "revenue": "Chiffre d’affaires",
+          "cogs": "− Coût des ventes",
+          "shipping": "− Livraison",
+          "profit": "Profit"
+        }
+      }
+    }
   }
 }

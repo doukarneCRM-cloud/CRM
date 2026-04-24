@@ -7,6 +7,7 @@ import {
   PiggyBank,
   Percent,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -29,6 +30,7 @@ function fmt(n: number): string {
 }
 
 export function ProfitTab() {
+  const { t } = useTranslation();
   const filters = useAnalyticsFilters();
   const [data, setData] = useState<ProfitTabPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,7 +46,7 @@ export function ProfitTab() {
         if (!cancelled) setData(d);
       })
       .catch((e) => {
-        if (!cancelled) setError(apiErrorMessage(e, 'Failed to load profit analytics'));
+        if (!cancelled) setError(apiErrorMessage(e, t('analytics.profit.error')));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -52,7 +54,7 @@ export function ProfitTab() {
     return () => {
       cancelled = true;
     };
-  }, [filters]);
+  }, [filters, t]);
 
   const kpis = data?.kpis;
 
@@ -67,47 +69,47 @@ export function ProfitTab() {
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
         <KPICard
-          title="Revenue"
+          title={t('analytics.profit.kpi.revenue')}
           value={fmt(Math.round(kpis?.revenue ?? 0))}
-          unit="MAD"
+          unit={t('analytics.common.mad')}
           icon={Banknote}
           iconColor="#16A34A"
           percentageChange={kpis?.percentageChanges.revenue}
         />
         <KPICard
-          title="COGS"
+          title={t('analytics.profit.kpi.cogs')}
           value={fmt(Math.round(kpis?.cogs ?? 0))}
-          unit="MAD"
+          unit={t('analytics.common.mad')}
           icon={PackageMinus}
           iconColor="#F59E0B"
           percentageChange={kpis?.percentageChanges.cogs}
         />
         <KPICard
-          title="Shipping fees"
+          title={t('analytics.profit.kpi.shippingFees')}
           value={fmt(Math.round(kpis?.shippingFees ?? 0))}
-          unit="MAD"
+          unit={t('analytics.common.mad')}
           icon={Truck}
           iconColor="#0EA5E9"
           percentageChange={kpis?.percentageChanges.shippingFees}
         />
         <KPICard
-          title="Expenses"
+          title={t('analytics.profit.kpi.expenses')}
           value={fmt(Math.round(kpis?.expenses ?? 0))}
-          unit="MAD"
+          unit={t('analytics.common.mad')}
           icon={Receipt}
           iconColor="#9CA3AF"
           percentageChange={kpis?.percentageChanges.expenses}
         />
         <KPICard
-          title="Profit"
+          title={t('analytics.profit.kpi.profit')}
           value={fmt(Math.round(kpis?.profit ?? 0))}
-          unit="MAD"
+          unit={t('analytics.common.mad')}
           icon={PiggyBank}
           iconColor="#18181B"
           percentageChange={kpis?.percentageChanges.profit}
         />
         <KPICard
-          title="Margin"
+          title={t('analytics.profit.kpi.margin')}
           value={kpis ? kpis.margin.toFixed(1) : '0'}
           unit="%"
           icon={Percent}
@@ -139,17 +141,18 @@ function ProfitTrendCard({
   data: ProfitTabPayload['trend'];
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <GlassCard className="lg:col-span-2 flex flex-col gap-3">
       <div>
-        <h3 className="text-sm font-semibold text-gray-900">Revenue & Profit Trend</h3>
-        <p className="text-[11px] text-gray-400">Daily — net of all costs</p>
+        <h3 className="text-sm font-semibold text-gray-900">{t('analytics.profit.trend.title')}</h3>
+        <p className="text-[11px] text-gray-400">{t('analytics.profit.trend.subtitle')}</p>
       </div>
       {loading ? (
         <div className="skeleton h-[240px] w-full rounded-xl" />
       ) : data.length === 0 ? (
         <div className="flex h-[240px] items-center justify-center text-xs text-gray-400">
-          No data in range
+          {t('analytics.common.noDataInRange')}
         </div>
       ) : (
         <div className="h-[240px]">
@@ -172,7 +175,7 @@ function ProfitTrendCard({
                   border: '1px solid #F3F4F6',
                   fontSize: 12,
                 }}
-                formatter={(v: number) => [`${fmt(Math.round(v))} MAD`]}
+                formatter={(v: number) => [`${fmt(Math.round(v))} ${t('analytics.common.mad')}`]}
               />
               <Bar dataKey="revenue" fill="#16A34A" radius={[4, 4, 0, 0]} opacity={0.4} />
               <Line type="monotone" dataKey="profit" stroke="#18181B" strokeWidth={2.5} dot={false} />
@@ -191,14 +194,15 @@ function BreakdownCard({
   breakdown: ProfitTabPayload['breakdown'];
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   const items = useMemo(
     () => [
-      { label: 'Revenue', value: breakdown.revenue, color: '#16A34A' },
-      { label: 'COGS', value: breakdown.cogs, color: '#F59E0B', deduction: true },
-      { label: 'Shipping fees', value: breakdown.shippingFees, color: '#0EA5E9', deduction: true },
-      { label: 'Expenses', value: breakdown.expenses, color: '#9CA3AF', deduction: true },
+      { label: t('analytics.profit.breakdown.revenue'), value: breakdown.revenue, color: '#16A34A' },
+      { label: t('analytics.profit.breakdown.cogs'), value: breakdown.cogs, color: '#F59E0B', deduction: true },
+      { label: t('analytics.profit.breakdown.shippingFees'), value: breakdown.shippingFees, color: '#0EA5E9', deduction: true },
+      { label: t('analytics.profit.breakdown.expenses'), value: breakdown.expenses, color: '#9CA3AF', deduction: true },
     ],
-    [breakdown],
+    [breakdown, t],
   );
 
   const max = Math.max(1, ...items.map((i) => i.value));
@@ -206,8 +210,8 @@ function BreakdownCard({
   return (
     <GlassCard className="flex flex-col gap-3">
       <div>
-        <h3 className="text-sm font-semibold text-gray-900">Profit Composition</h3>
-        <p className="text-[11px] text-gray-400">Where revenue actually goes</p>
+        <h3 className="text-sm font-semibold text-gray-900">{t('analytics.profit.breakdown.title')}</h3>
+        <p className="text-[11px] text-gray-400">{t('analytics.profit.breakdown.subtitle')}</p>
       </div>
       {loading ? (
         <div className="skeleton h-[200px] w-full rounded-xl" />
@@ -221,7 +225,7 @@ function BreakdownCard({
                     {it.deduction && <span className="text-rose-500">−</span>} {it.label}
                   </span>
                   <span className="font-bold text-gray-900">
-                    {fmt(Math.round(it.value))} MAD
+                    {fmt(Math.round(it.value))} {t('analytics.common.mad')}
                   </span>
                 </div>
                 <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-gray-100">
@@ -237,14 +241,14 @@ function BreakdownCard({
             ))}
           </div>
           <div className="mt-2 flex items-center justify-between rounded-card bg-primary/5 px-3 py-2">
-            <span className="text-xs font-semibold text-primary">= Profit</span>
+            <span className="text-xs font-semibold text-primary">{t('analytics.profit.breakdown.equalsProfit')}</span>
             <span
               className={cn(
                 'text-base font-bold',
                 breakdown.profit >= 0 ? 'text-primary' : 'text-rose-600',
               )}
             >
-              {fmt(Math.round(breakdown.profit))} MAD
+              {fmt(Math.round(breakdown.profit))} {t('analytics.common.mad')}
             </span>
           </div>
         </>
@@ -260,31 +264,34 @@ function ByProductCard({
   products: ProfitTabPayload['byProduct'];
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <GlassCard className="flex flex-col gap-3">
       <div>
-        <h3 className="text-sm font-semibold text-gray-900">Profit by Product</h3>
+        <h3 className="text-sm font-semibold text-gray-900">{t('analytics.profit.byProduct.title')}</h3>
         <p className="text-[11px] text-gray-400">
-          Set <span className="font-semibold">cost price</span> on each variant for accurate profit
+          {t('analytics.profit.byProduct.subtitleHtmlPrefix')}
+          <span className="font-semibold">{t('analytics.profit.byProduct.subtitleHtmlBold')}</span>
+          {t('analytics.profit.byProduct.subtitleHtmlSuffix')}
         </p>
       </div>
       {loading ? (
         <div className="skeleton h-[300px] w-full rounded-xl" />
       ) : products.length === 0 ? (
         <div className="flex h-[180px] items-center justify-center text-xs text-gray-400">
-          No data
+          {t('analytics.common.noData')}
         </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-gray-100 text-left text-[10px] uppercase tracking-wide text-gray-400">
-                <th className="py-2">Product</th>
-                <th className="py-2 text-right">Units</th>
-                <th className="py-2 text-right">Revenue</th>
-                <th className="py-2 text-right">COGS</th>
-                <th className="py-2 text-right">Profit</th>
-                <th className="py-2 text-right">Margin</th>
+                <th className="py-2">{t('analytics.profit.byProduct.columns.product')}</th>
+                <th className="py-2 text-right">{t('analytics.profit.byProduct.columns.units')}</th>
+                <th className="py-2 text-right">{t('analytics.profit.byProduct.columns.revenue')}</th>
+                <th className="py-2 text-right">{t('analytics.profit.byProduct.columns.cogs')}</th>
+                <th className="py-2 text-right">{t('analytics.profit.byProduct.columns.profit')}</th>
+                <th className="py-2 text-right">{t('analytics.profit.byProduct.columns.margin')}</th>
               </tr>
             </thead>
             <tbody>
@@ -348,17 +355,18 @@ function ByAgentCard({
   agents: ProfitTabPayload['byAgent'];
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <GlassCard className="flex flex-col gap-3">
       <div>
-        <h3 className="text-sm font-semibold text-gray-900">Profit by Agent</h3>
-        <p className="text-[11px] text-gray-400">Net contribution per agent (revenue − COGS − shipping)</p>
+        <h3 className="text-sm font-semibold text-gray-900">{t('analytics.profit.byAgent.title')}</h3>
+        <p className="text-[11px] text-gray-400">{t('analytics.profit.byAgent.subtitle')}</p>
       </div>
       {loading ? (
         <div className="skeleton h-[260px] w-full rounded-xl" />
       ) : agents.length === 0 ? (
         <div className="flex h-[180px] items-center justify-center text-xs text-gray-400">
-          No data
+          {t('analytics.common.noData')}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
@@ -383,12 +391,12 @@ function ByAgentCard({
                 </span>
               </div>
               <div className="mt-2 space-y-1 text-[11px]">
-                <Row label="Revenue" value={a.revenue} color="text-green-700" />
-                <Row label="− COGS" value={a.cogs} color="text-amber-700" />
-                <Row label="− Shipping" value={a.shippingFees} color="text-blue-700" />
+                <Row label={t('analytics.profit.byAgent.row.revenue')} value={a.revenue} color="text-green-700" />
+                <Row label={t('analytics.profit.byAgent.row.cogs')} value={a.cogs} color="text-amber-700" />
+                <Row label={t('analytics.profit.byAgent.row.shipping')} value={a.shippingFees} color="text-blue-700" />
                 <div className="mt-1 border-t border-gray-100 pt-1">
                   <Row
-                    label="Profit"
+                    label={t('analytics.profit.byAgent.row.profit')}
                     value={a.profit}
                     color={a.profit >= 0 ? 'text-primary font-bold' : 'text-rose-600 font-bold'}
                   />
@@ -403,11 +411,12 @@ function ByAgentCard({
 }
 
 function Row({ label, value, color }: { label: string; value: number; color: string }) {
+  const { t } = useTranslation();
   return (
     <div className="flex items-center justify-between">
       <span className="text-gray-500">{label}</span>
       <span className={color}>
-        {fmt(Math.round(value))} <span className="text-[10px] text-gray-400">MAD</span>
+        {fmt(Math.round(value))} <span className="text-[10px] text-gray-400">{t('analytics.common.mad')}</span>
       </span>
     </div>
   );

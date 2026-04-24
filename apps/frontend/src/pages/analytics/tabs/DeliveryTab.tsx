@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -31,6 +32,7 @@ function fmt(n: number): string {
 }
 
 export function DeliveryTab() {
+  const { t } = useTranslation();
   const filters = useAnalyticsFilters();
   const [data, setData] = useState<DeliveryTabPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -46,7 +48,7 @@ export function DeliveryTab() {
         if (!cancelled) setData(d);
       })
       .catch((e) => {
-        if (!cancelled) setError(apiErrorMessage(e, 'Failed to load delivery analytics'));
+        if (!cancelled) setError(apiErrorMessage(e, t('analytics.delivery.error')));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -54,7 +56,7 @@ export function DeliveryTab() {
     return () => {
       cancelled = true;
     };
-  }, [filters]);
+  }, [filters, t]);
 
   const kpis = data?.kpis;
 
@@ -69,45 +71,45 @@ export function DeliveryTab() {
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
         <KPICard
-          title="Shipped"
+          title={t('analytics.delivery.kpi.shipped')}
           value={fmt(kpis?.shipped ?? 0)}
           icon={Truck}
           iconColor="#0EA5E9"
           percentageChange={kpis?.percentageChanges.shipped}
         />
         <KPICard
-          title="Delivered"
+          title={t('analytics.delivery.kpi.delivered')}
           value={fmt(kpis?.delivered ?? 0)}
           icon={PackageCheck}
           iconColor="#16A34A"
           percentageChange={kpis?.percentageChanges.delivered}
         />
         <KPICard
-          title="Returned"
+          title={t('analytics.delivery.kpi.returned')}
           value={fmt(kpis?.returned ?? 0)}
           icon={PackageX}
           iconColor="#F43F5E"
           percentageChange={kpis?.percentageChanges.returned}
         />
         <KPICard
-          title="Delivery Rate"
+          title={t('analytics.delivery.kpi.deliveryRate')}
           value={kpis ? kpis.deliveryRate.toFixed(1) : '0.0'}
           unit="%"
           iconColor="#22C55E"
           percentageChange={kpis?.percentageChanges.deliveryRate}
         />
         <KPICard
-          title="Avg Delivery"
+          title={t('analytics.delivery.kpi.avgDelivery')}
           value={kpis ? kpis.avgDeliveryDays.toFixed(1) : '0'}
-          unit="days"
+          unit={t('analytics.delivery.kpi.avgDeliveryUnit')}
           icon={Timer}
           iconColor="#8B5CF6"
           percentageChange={kpis?.percentageChanges.avgDeliveryDays}
         />
         <KPICard
-          title="Revenue (Delivered)"
+          title={t('analytics.delivery.kpi.revenueDelivered')}
           value={fmt(kpis?.revenue ?? 0)}
-          unit="MAD"
+          unit={t('analytics.common.mad')}
           icon={Banknote}
           iconColor="#18181B"
           percentageChange={kpis?.percentageChanges.revenue}
@@ -137,17 +139,18 @@ function DeliveryTrendCard({
   data: DeliveryTabPayload['trend'];
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <GlassCard className="lg:col-span-2 flex flex-col gap-3">
       <div>
-        <h3 className="text-sm font-semibold text-gray-900">Delivery Trend</h3>
-        <p className="text-[11px] text-gray-400">Delivered vs returned per day</p>
+        <h3 className="text-sm font-semibold text-gray-900">{t('analytics.delivery.trend.title')}</h3>
+        <p className="text-[11px] text-gray-400">{t('analytics.delivery.trend.subtitle')}</p>
       </div>
       {loading ? (
         <div className="skeleton h-[220px] w-full rounded-xl" />
       ) : data.length === 0 ? (
         <div className="flex h-[220px] items-center justify-center text-xs text-gray-400">
-          No data in range
+          {t('analytics.common.noDataInRange')}
         </div>
       ) : (
         <div className="h-[220px]">
@@ -211,13 +214,14 @@ function ShippingPipelineCard({
   pipeline: DeliveryTabPayload['pipeline'];
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   const max = Math.max(1, ...pipeline.map((p) => p.count));
 
   return (
     <GlassCard className="flex flex-col gap-3">
       <div>
-        <h3 className="text-sm font-semibold text-gray-900">Shipping Pipeline</h3>
-        <p className="text-[11px] text-gray-400">Orders at each stage</p>
+        <h3 className="text-sm font-semibold text-gray-900">{t('analytics.delivery.pipeline.title')}</h3>
+        <p className="text-[11px] text-gray-400">{t('analytics.delivery.pipeline.subtitle')}</p>
       </div>
       {loading ? (
         <div className="skeleton h-[220px] w-full rounded-xl" />
@@ -266,29 +270,30 @@ function CitiesCard({
   cities: DeliveryTabPayload['cities'];
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <GlassCard className="flex flex-col gap-3">
       <div>
-        <h3 className="text-sm font-semibold text-gray-900">Top Cities · Delivery</h3>
-        <p className="text-[11px] text-gray-400">Avg time per city · success rate</p>
+        <h3 className="text-sm font-semibold text-gray-900">{t('analytics.delivery.cities.title')}</h3>
+        <p className="text-[11px] text-gray-400">{t('analytics.delivery.cities.subtitle')}</p>
       </div>
       {loading ? (
         <div className="skeleton h-[260px] w-full rounded-xl" />
       ) : cities.length === 0 ? (
         <div className="flex h-[180px] items-center justify-center text-xs text-gray-400">
-          No data
+          {t('analytics.common.noData')}
         </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
               <tr className="text-left text-[10px] uppercase tracking-wide text-gray-400">
-                <th className="py-2">City</th>
-                <th className="py-2 text-right">Orders</th>
-                <th className="py-2 text-right">Delivered</th>
-                <th className="py-2 text-right">Returned</th>
-                <th className="py-2 text-right">Avg days</th>
-                <th className="py-2 text-right">Rate</th>
+                <th className="py-2">{t('analytics.delivery.cities.columns.city')}</th>
+                <th className="py-2 text-right">{t('analytics.delivery.cities.columns.orders')}</th>
+                <th className="py-2 text-right">{t('analytics.delivery.cities.columns.delivered')}</th>
+                <th className="py-2 text-right">{t('analytics.delivery.cities.columns.returned')}</th>
+                <th className="py-2 text-right">{t('analytics.delivery.cities.columns.avgDays')}</th>
+                <th className="py-2 text-right">{t('analytics.delivery.cities.columns.rate')}</th>
               </tr>
             </thead>
             <tbody>
@@ -331,17 +336,18 @@ function AgentsCard({
   agents: DeliveryTabPayload['agents'];
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <GlassCard className="flex flex-col gap-3">
       <div>
-        <h3 className="text-sm font-semibold text-gray-900">Top Agents · Delivery</h3>
-        <p className="text-[11px] text-gray-400">Confirmed vs delivered + revenue</p>
+        <h3 className="text-sm font-semibold text-gray-900">{t('analytics.delivery.agents.title')}</h3>
+        <p className="text-[11px] text-gray-400">{t('analytics.delivery.agents.subtitle')}</p>
       </div>
       {loading ? (
         <div className="skeleton h-[260px] w-full rounded-xl" />
       ) : agents.length === 0 ? (
         <div className="flex h-[180px] items-center justify-center text-xs text-gray-400">
-          No data
+          {t('analytics.common.noData')}
         </div>
       ) : (
         <div className="flex flex-col gap-2.5">
@@ -353,13 +359,13 @@ function AgentsCard({
               <div className="flex items-baseline justify-between gap-2">
                 <span className="truncate text-sm font-semibold text-gray-900">{a.agentName}</span>
                 <span className="text-xs font-bold text-primary">
-                  {fmt(a.revenue)} <span className="font-normal text-gray-400">MAD</span>
+                  {fmt(a.revenue)} <span className="font-normal text-gray-400">{t('analytics.common.mad')}</span>
                 </span>
               </div>
               <div className="mt-1.5 grid grid-cols-3 gap-2 text-[11px]">
-                <Stat label="Confirmed" value={a.confirmed} color="text-blue-700" />
-                <Stat label="Delivered" value={a.delivered} color="text-green-700" />
-                <Stat label="Returned" value={a.returned} color="text-rose-600" />
+                <Stat label={t('analytics.delivery.agents.stat.confirmed')} value={a.confirmed} color="text-blue-700" />
+                <Stat label={t('analytics.delivery.agents.stat.delivered')} value={a.delivered} color="text-green-700" />
+                <Stat label={t('analytics.delivery.agents.stat.returned')} value={a.returned} color="text-rose-600" />
               </div>
               <div className="mt-2 flex items-center gap-2">
                 <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-gray-100">
@@ -397,21 +403,22 @@ function ProductsCard({
   products: DeliveryTabPayload['products'];
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState<string | null>(null);
 
   return (
     <GlassCard className="flex flex-col gap-3">
       <div>
-        <h3 className="text-sm font-semibold text-gray-900">Top Products · Delivery</h3>
+        <h3 className="text-sm font-semibold text-gray-900">{t('analytics.delivery.products.title')}</h3>
         <p className="text-[11px] text-gray-400">
-          Tap a row to see best-performing variants
+          {t('analytics.delivery.products.subtitle')}
         </p>
       </div>
       {loading ? (
         <div className="skeleton h-[300px] w-full rounded-xl" />
       ) : products.length === 0 ? (
         <div className="flex h-[180px] items-center justify-center text-xs text-gray-400">
-          No data
+          {t('analytics.common.noData')}
         </div>
       ) : (
         <div className="flex flex-col gap-2">
@@ -443,12 +450,16 @@ function ProductsCard({
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-gray-900">{p.productName}</p>
                     <p className="text-[11px] text-gray-400">
-                      {p.orders} orders · {p.delivered} delivered · {p.returned} returned
+                      {t('analytics.delivery.products.breakdown', {
+                        orders: p.orders,
+                        delivered: p.delivered,
+                        returned: p.returned,
+                      })}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
                     <span className="text-xs font-bold text-primary">
-                      {fmt(p.revenue)} <span className="text-[10px] text-gray-400">MAD</span>
+                      {fmt(p.revenue)} <span className="text-[10px] text-gray-400">{t('analytics.common.mad')}</span>
                     </span>
                     <span
                       className={cn(
@@ -472,7 +483,7 @@ function ProductsCard({
                 {isOpen && (
                   <div className="border-t border-gray-100 bg-gray-50/40 px-3 py-2.5">
                     {p.variants.length === 0 ? (
-                      <p className="text-[11px] text-gray-400">No variant breakdown</p>
+                      <p className="text-[11px] text-gray-400">{t('analytics.delivery.products.noVariants')}</p>
                     ) : (
                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3">
                         {p.variants.map((v) => (
