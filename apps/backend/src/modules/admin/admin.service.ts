@@ -1,14 +1,28 @@
+import crypto from 'node:crypto';
 import { prisma } from '../../shared/prisma';
 
 // ─── Reset-CRM confirmation code ─────────────────────────────────────────────
-// Sourced from CRM_RESET_CODE env var so the literal string isn't baked into
-// the git repo. Primary gate is the `settings:reset_crm` RBAC permission;
-// this code is the "are you sure?" typing exercise. Dev fallback preserves
-// the previous behaviour so local setups keep working without extra config.
-const RESET_CODE =
-  process.env.CRM_RESET_CODE && process.env.CRM_RESET_CODE.length >= 6
-    ? process.env.CRM_RESET_CODE
-    : 'Newlifebb123';
+// Primary gate is the `settings:reset_crm` RBAC permission; this code is
+// just the "are you sure?" typing exercise. Production requires
+// CRM_RESET_CODE (validated at boot in shared/env.ts). Dev auto-generates
+// a random per-process code printed to the console so no literal ever
+// ships in the git repo.
+function resolveResetCode(): string {
+  const fromEnv = process.env.CRM_RESET_CODE;
+  if (fromEnv && fromEnv.length >= 6) return fromEnv;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('CRM_RESET_CODE must be set to a string of at least 6 chars in production');
+  }
+  const generated = crypto.randomBytes(6).toString('hex');
+  // eslint-disable-next-line no-console
+  console.warn(
+    `[admin] CRM_RESET_CODE not set — generated dev code: ${generated} ` +
+      `(set CRM_RESET_CODE in .env to pin it across restarts).`,
+  );
+  return generated;
+}
+
+const RESET_CODE = resolveResetCode();
 
 export function getResetCode(): string {
   return RESET_CODE;

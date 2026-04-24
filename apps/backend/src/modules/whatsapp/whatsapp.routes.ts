@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { verifyJWT } from '../../shared/middleware/verifyJWT';
 import { requirePermission } from '../../shared/middleware/rbac.middleware';
@@ -51,19 +52,22 @@ export async function whatsappRoutes(app: FastifyInstance) {
   );
 
   // Evolution calls this back with connection/message events. Two-layer auth:
-  //   1. If EVOLUTION_WEBHOOK_SECRET is set, require it in the
-  //      `x-webhook-secret` header — configure Evolution to send this header
-  //      and forged webhooks get rejected.
-  //   2. We still only act on events whose `instance` matches a session we
+  //   1. Shared-secret header — Evolution must send EVOLUTION_WEBHOOK_SECRET
+  //      as the `x-webhook-secret` header. Required in production (validated
+  //      at boot in shared/env.ts); dev accepts any value if the env var is
+  //      unset.
+  //   2. We only act on events whose `instance` matches a session we
   //      created (inside ingestWebhook / provider.parseWebhook).
-  // Leaving the env var unset preserves the previous behaviour so existing
-  // deployments keep working, but a startup warning is logged in index.ts.
   app.post('/webhook', async (req, reply) => {
     const secret = process.env.EVOLUTION_WEBHOOK_SECRET;
     if (secret) {
       const provided = req.headers['x-webhook-secret'];
       const providedStr = Array.isArray(provided) ? provided[0] : provided;
-      if (providedStr !== secret) {
+      const ok =
+        typeof providedStr === 'string' &&
+        providedStr.length === secret.length &&
+        timingSafeEqualStr(providedStr, secret);
+      if (!ok) {
         return reply.status(401).send({
           error: {
             code: 'INVALID_WEBHOOK_SECRET',
@@ -76,4 +80,13 @@ export async function whatsappRoutes(app: FastifyInstance) {
     await svc.ingestWebhook(req.body as Record<string, unknown>);
     return reply.send({ ok: true });
   });
+}
+
+// Constant-time string compare. Returns false on length mismatch without
+// calling Buffer.equals to avoid leaking the secret length via timing.
+function timingSafeEqualStr(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  return crypto.timingSafeEqual(ab, bb);
 }

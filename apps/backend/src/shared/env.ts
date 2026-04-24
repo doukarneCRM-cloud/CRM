@@ -32,15 +32,16 @@ const PRODUCTION_REQUIRED: RequiredVar[] = [
       /^[0-9a-fA-F]{64}$/.test(v) ? null : 'must be a 64-char hex string',
   },
   { key: 'FRONTEND_URL', description: 'Public frontend origin for CORS' },
-];
-
-// Optional but strongly recommended in production. Boot still succeeds; we
-// print a warning so the operator knows the feature is off.
-const PRODUCTION_RECOMMENDED: RequiredVar[] = [
+  {
+    key: 'CRM_RESET_CODE',
+    description: 'Typed-confirmation code for /admin/reset-crm (>=6 chars)',
+    validate: (v) => (v.length < 6 ? 'must be at least 6 chars' : null),
+  },
   {
     key: 'EVOLUTION_WEBHOOK_SECRET',
     description:
-      'Shared secret for Evolution webhook auth. Without it the webhook endpoint is open to the internet.',
+      'Shared secret Evolution sends as x-webhook-secret. Without it the webhook endpoint is open to anyone who finds the URL.',
+    validate: (v) => (v.length < 16 ? 'must be at least 16 chars' : null),
   },
   { key: 'R2_ENDPOINT', description: 'Cloudflare R2 endpoint for uploads' },
   { key: 'R2_BUCKET', description: 'R2 bucket name' },
@@ -48,6 +49,8 @@ const PRODUCTION_RECOMMENDED: RequiredVar[] = [
   { key: 'R2_SECRET_ACCESS_KEY', description: 'R2 secret' },
   { key: 'R2_PUBLIC_URL', description: 'R2 public base URL' },
 ];
+
+const PRODUCTION_RECOMMENDED: RequiredVar[] = [];
 
 export function validateEnv(): void {
   if (process.env.NODE_ENV !== 'production') return;

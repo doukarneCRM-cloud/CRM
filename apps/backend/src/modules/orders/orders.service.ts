@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { prisma } from '../../shared/prisma';
+import { prisma, type OrderPayload } from '../../shared/prisma';
 import { emitToRoom } from '../../shared/socket';
 import {
   createNotification,
@@ -350,7 +350,7 @@ export async function createOrder(input: CreateOrderInput, actor: JwtPayload) {
   // Typed to match the full include shape so downstream `withStockWarning`
   // can read items/variant.stock without an any-cast.
   let order:
-    | Prisma.OrderGetPayload<{ include: typeof ORDER_FULL_INCLUDE }>
+    | OrderPayload<{ include: typeof ORDER_FULL_INCLUDE }>
     | undefined;
   let healedOnce = false;
 
