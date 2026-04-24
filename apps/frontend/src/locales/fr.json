@@ -689,5 +689,60 @@
     "tag": {
       "removeValue": "Supprimer {{value}}"
     }
+  },
+  "clients": {
+    "title": "Clients",
+    "subtitle": "Parcourez, segmentez et consultez l'historique de chaque cliente.",
+    "newClient": "Nouvelle cliente",
+    "searchPlaceholder": "Rechercher par nom, téléphone ou ville…",
+    "allCities": "Toutes les villes",
+    "tabs": {
+      "all": "Toutes",
+      "normal": "Normal",
+      "vip": "VIP",
+      "blacklisted": "Liste noire"
+    },
+    "sort": {
+      "recent": "Plus récents",
+      "topBuyers": "Meilleures acheteuses"
+    },
+    "table": {
+      "name": "NOM",
+      "phone": "TÉLÉPHONE",
+      "city": "VILLE",
+      "orders": "COMMANDES",
+      "lastOrder": "DERNIÈRE COMMANDE",
+      "tag": "ÉTIQUETTE",
+      "empty": "Aucune cliente trouvée",
+      "openWhatsapp": "Ouvrir WhatsApp",
+      "viewHistory": "Voir l'historique",
+      "rowsPerPage": "Lignes par page :",
+      "range": "{{start}} – {{end}} sur {{total}}",
+      "relative": {
+        "never": "Jamais",
+        "today": "Aujourd'hui",
+        "yesterday": "Hier",
+        "daysAgo": "il y a {{count}} j",
+        "monthsAgo": "il y a {{count}} mois",
+        "yearsAgo": "il y a {{count}} a"
+      }
+    },
+    "create": {
+      "title": "Nouvelle cliente",
+      "save": "Créer la cliente",
+      "saveFailed": "Échec de la création de la cliente",
+      "fullName": "Nom complet",
+      "fullNamePlaceholder": "ex. Sara El Amrani",
+      "phone": "Téléphone",
+      "phonePlaceholder": "06XXXXXXXX",
+      "city": "Ville",
+      "cityPlaceholder": "Sélectionner une ville…",
+      "cityOption": "{{name}} ({{price}} MAD)",
+      "address": "Adresse",
+      "addressPlaceholder": "Rue, immeuble, etc. (facultatif)",
+      "tag": "Étiquette",
+      "notes": "Notes",
+      "notesPlaceholder": "Notes internes (facultatif)"
+    }
   }
 }

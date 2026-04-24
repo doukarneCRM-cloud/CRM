@@ -689,5 +689,60 @@
     "tag": {
       "removeValue": "Remove {{value}}"
     }
+  },
+  "clients": {
+    "title": "Clients",
+    "subtitle": "Browse, segment, and review the history of every customer.",
+    "newClient": "New client",
+    "searchPlaceholder": "Search by name, phone, or city...",
+    "allCities": "All cities",
+    "tabs": {
+      "all": "All",
+      "normal": "Normal",
+      "vip": "VIP",
+      "blacklisted": "Blacklisted"
+    },
+    "sort": {
+      "recent": "Most recent",
+      "topBuyers": "Top buyers"
+    },
+    "table": {
+      "name": "NAME",
+      "phone": "PHONE",
+      "city": "CITY",
+      "orders": "ORDERS",
+      "lastOrder": "LAST ORDER",
+      "tag": "TAG",
+      "empty": "No clients found",
+      "openWhatsapp": "Open WhatsApp",
+      "viewHistory": "View history",
+      "rowsPerPage": "Rows per page:",
+      "range": "{{start}} – {{end}} of {{total}}",
+      "relative": {
+        "never": "Never",
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "daysAgo": "{{count}}d ago",
+        "monthsAgo": "{{count}}mo ago",
+        "yearsAgo": "{{count}}y ago"
+      }
+    },
+    "create": {
+      "title": "New client",
+      "save": "Create client",
+      "saveFailed": "Failed to create client",
+      "fullName": "Full name",
+      "fullNamePlaceholder": "e.g. Sara El Amrani",
+      "phone": "Phone",
+      "phonePlaceholder": "06XXXXXXXX",
+      "city": "City",
+      "cityPlaceholder": "Select city...",
+      "cityOption": "{{name}} ({{price}} MAD)",
+      "address": "Address",
+      "addressPlaceholder": "Street, building, etc. (optional)",
+      "tag": "Tag",
+      "notes": "Notes",
+      "notesPlaceholder": "Internal notes (optional)"
+    }
   }
 }

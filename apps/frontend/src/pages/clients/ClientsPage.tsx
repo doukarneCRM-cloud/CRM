@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Search } from 'lucide-react';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { CRMInput } from '@/components/ui/CRMInput';
@@ -14,22 +15,29 @@ import { ClientsTable } from './components/ClientsTable';
 import { CreateClientModal } from './components/CreateClientModal';
 import { CustomerHistoryModal } from '../orders/components/CustomerHistoryModal';
 
-const TAG_TABS = [
-  { id: 'all',         label: 'All'         },
-  { id: 'normal',      label: 'Normal'      },
-  { id: 'vip',         label: 'VIP'         },
-  { id: 'blacklisted', label: 'Blacklisted' },
-];
-
-const SORT_OPTIONS = [
-  { value: 'recent',       label: 'Most recent'  },
-  { value: 'totalOrders',  label: 'Top buyers'   },
-];
-
 export default function ClientsPage() {
+  const { t } = useTranslation();
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canCreate = hasPermission(PERMISSIONS.CLIENTS_EDIT);
   const canEditTag = hasPermission(PERMISSIONS.CLIENTS_EDIT);
+
+  const tagTabs = useMemo(
+    () => [
+      { id: 'all',         label: t('clients.tabs.all')         },
+      { id: 'normal',      label: t('clients.tabs.normal')      },
+      { id: 'vip',         label: t('clients.tabs.vip')         },
+      { id: 'blacklisted', label: t('clients.tabs.blacklisted') },
+    ],
+    [t],
+  );
+
+  const sortOptions = useMemo(
+    () => [
+      { value: 'recent',       label: t('clients.sort.recent')     },
+      { value: 'totalOrders',  label: t('clients.sort.topBuyers')  },
+    ],
+    [t],
+  );
 
   const {
     clients, total, totalPages, loading,
@@ -51,7 +59,7 @@ export default function ClientsPage() {
   }, []);
 
   const cityOptions = [
-    { value: '', label: 'All cities' },
+    { value: '', label: t('clients.allCities') },
     ...cities.map((c) => ({ value: c.name, label: c.name })),
   ];
 
@@ -70,10 +78,8 @@ export default function ClientsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-primary">Clients</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Browse, segment, and review the history of every customer.
-          </p>
+          <h1 className="text-2xl font-bold text-primary">{t('clients.title')}</h1>
+          <p className="mt-1 text-sm text-gray-500">{t('clients.subtitle')}</p>
         </div>
         {canCreate && (
           <CRMButton
@@ -81,7 +87,7 @@ export default function ClientsPage() {
             leftIcon={<Plus size={14} />}
             onClick={() => setCreateOpen(true)}
           >
-            New client
+            {t('clients.newClient')}
           </CRMButton>
         )}
       </div>
@@ -90,7 +96,7 @@ export default function ClientsPage() {
       <div className="flex flex-wrap items-end gap-3 rounded-card border border-gray-100 bg-white p-3">
         <div className="min-w-[240px] flex-1">
           <CRMInput
-            placeholder="Search by name, phone, or city..."
+            placeholder={t('clients.searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             leftIcon={<Search size={14} />}
@@ -102,21 +108,21 @@ export default function ClientsPage() {
             options={cityOptions}
             value={city}
             onChange={(v) => setCity(v as string)}
-            placeholder="All cities"
+            placeholder={t('clients.allCities')}
             searchable
           />
         </div>
 
         <div className="w-40">
           <CRMSelect
-            options={SORT_OPTIONS}
+            options={sortOptions}
             value={sortBy ?? 'recent'}
             onChange={(v) => setSortBy(v as typeof sortBy)}
           />
         </div>
 
         <PillTabGroup
-          tabs={TAG_TABS}
+          tabs={tagTabs}
           activeTab={tag || 'all'}
           onChange={(id) => setTag(id === 'all' ? '' : (id as typeof tag))}
         />

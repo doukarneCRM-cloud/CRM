@@ -1,4 +1,6 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import {
   useReactTable,
   getCoreRowModel,
@@ -18,24 +20,28 @@ const PAGE_SIZES = [25, 50, 100] as const;
 
 type Tag = ClientListItem['tag'];
 
-const TAG_CONFIG: Record<Tag, { label: string; bg: string; text: string; dot: string }> = {
-  normal:      { label: 'Normal',      bg: 'bg-gray-100',   text: 'text-gray-600',  dot: 'bg-gray-400'  },
-  vip:         { label: 'VIP',         bg: 'bg-amber-100',  text: 'text-amber-700', dot: 'bg-amber-500' },
-  blacklisted: { label: 'Blacklisted', bg: 'bg-red-100',    text: 'text-red-700',   dot: 'bg-red-500'   },
+const TAG_STYLES: Record<Tag, { bg: string; text: string; dot: string }> = {
+  normal:      { bg: 'bg-gray-100',   text: 'text-gray-600',  dot: 'bg-gray-400'  },
+  vip:         { bg: 'bg-amber-100',  text: 'text-amber-700', dot: 'bg-amber-500' },
+  blacklisted: { bg: 'bg-red-100',    text: 'text-red-700',   dot: 'bg-red-500'   },
 };
 
 const TAG_ORDER: Tag[] = ['normal', 'vip', 'blacklisted'];
 
+function tagLabel(t: TFunction, tag: Tag): string {
+  return t(`clients.tabs.${tag}`);
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function relativeDate(iso: string | null) {
-  if (!iso) return 'Never';
+function relativeDate(t: TFunction, iso: string | null) {
+  if (!iso) return t('clients.table.relative.never');
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-  if (days === 0) return 'Today';
-  if (days === 1) return 'Yesterday';
-  if (days < 30) return `${days}d ago`;
-  if (days < 365) return `${Math.floor(days / 30)}mo ago`;
-  return `${Math.floor(days / 365)}y ago`;
+  if (days === 0) return t('clients.table.relative.today');
+  if (days === 1) return t('clients.table.relative.yesterday');
+  if (days < 30) return t('clients.table.relative.daysAgo', { count: days });
+  if (days < 365) return t('clients.table.relative.monthsAgo', { count: Math.floor(days / 30) });
+  return t('clients.table.relative.yearsAgo', { count: Math.floor(days / 365) });
 }
 
 function SkeletonRow({ cols }: { cols: number }) {
@@ -60,9 +66,10 @@ interface TagPillProps {
 }
 
 function TagPill({ tag, editable, pending, onChange }: TagPillProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const cfg = TAG_CONFIG[tag];
+  const cfg = TAG_STYLES[tag];
 
   // Close on outside click
   useEffect(() => {
@@ -84,7 +91,7 @@ function TagPill({ tag, editable, pending, onChange }: TagPillProps) {
       )}
     >
       <span className={cn('h-1.5 w-1.5 rounded-full', cfg.dot)} />
-      {cfg.label}
+      {tagLabel(t, tag)}
       {editable && <ChevronDown size={10} className="opacity-60" />}
     </span>
   );
@@ -103,22 +110,22 @@ function TagPill({ tag, editable, pending, onChange }: TagPillProps) {
       </button>
       {open && (
         <div className="absolute left-0 top-full z-20 mt-1 flex min-w-[130px] flex-col overflow-hidden rounded-xl border border-gray-100 bg-white py-1 shadow-lg">
-          {TAG_ORDER.map((t) => {
-            const c = TAG_CONFIG[t];
+          {TAG_ORDER.map((option) => {
+            const c = TAG_STYLES[option];
             return (
               <button
-                key={t}
+                key={option}
                 onClick={() => {
                   setOpen(false);
-                  if (t !== tag) onChange(t);
+                  if (option !== tag) onChange(option);
                 }}
                 className={cn(
                   'flex items-center gap-2 px-3 py-1.5 text-left text-xs font-medium transition-colors hover:bg-accent',
-                  t === tag && 'bg-accent/50',
+                  option === tag && 'bg-accent/50',
                 )}
               >
                 <span className={cn('h-1.5 w-1.5 rounded-full', c.dot)} />
-                <span className={c.text}>{c.label}</span>
+                <span className={c.text}>{tagLabel(t, option)}</span>
               </button>
             );
           })}
@@ -160,6 +167,7 @@ export function ClientsTable({
   onPageChange,
   onPageSizeChange,
 }: ClientsTableProps) {
+  const { t } = useTranslation();
   const [pendingTagId, setPendingTagId] = useState<string | null>(null);
 
   const handleTag = async (client: ClientListItem, tag: Tag) => {
@@ -176,7 +184,7 @@ export function ClientsTable({
       // ── Name + avatar ─────────────────────────────────────────────────────
       {
         id: 'name',
-        header: 'NAME',
+        header: t('clients.table.name'),
         size: 240,
         cell: ({ row }) => (
           <button
@@ -195,7 +203,7 @@ export function ClientsTable({
       // ── Phone (WhatsApp shortcut) ─────────────────────────────────────────
       {
         id: 'phone',
-        header: 'PHONE',
+        header: t('clients.table.phone'),
         size: 150,
         cell: ({ row }) => {
           const wa = `https://wa.me/${row.original.phoneDisplay.replace(/^0/, '212')}`;
@@ -208,7 +216,7 @@ export function ClientsTable({
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
                 className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-green-600 transition-colors hover:bg-green-50"
-                title="Open WhatsApp"
+                title={t('clients.table.openWhatsapp')}
               >
                 <MessageCircle size={11} />
               </a>
@@ -220,7 +228,7 @@ export function ClientsTable({
       // ── City ──────────────────────────────────────────────────────────────
       {
         id: 'city',
-        header: 'CITY',
+        header: t('clients.table.city'),
         size: 140,
         cell: ({ row }) => (
           <div className="flex items-center gap-1 text-xs text-gray-700">
@@ -233,7 +241,7 @@ export function ClientsTable({
       // ── Total orders ──────────────────────────────────────────────────────
       {
         id: 'totalOrders',
-        header: 'ORDERS',
+        header: t('clients.table.orders'),
         size: 90,
         cell: ({ row }) => (
           <span className="inline-flex items-center gap-1 rounded-badge bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
@@ -245,12 +253,12 @@ export function ClientsTable({
       // ── Last order ────────────────────────────────────────────────────────
       {
         id: 'lastOrderAt',
-        header: 'LAST ORDER',
+        header: t('clients.table.lastOrder'),
         size: 130,
         cell: ({ row }) => (
           <div className="flex flex-col">
             <span className="text-xs font-medium text-gray-700">
-              {relativeDate(row.original.lastOrderAt)}
+              {relativeDate(t, row.original.lastOrderAt)}
             </span>
             {row.original.lastOrderAt && (
               <span className="text-[10px] text-gray-400">
@@ -264,14 +272,14 @@ export function ClientsTable({
       // ── Tag pill (inline edit for admin/supervisor) ──────────────────────
       {
         id: 'tag',
-        header: 'TAG',
+        header: t('clients.table.tag'),
         size: 130,
         cell: ({ row }) => (
           <TagPill
             tag={row.original.tag}
             editable={canEditTag}
             pending={pendingTagId === row.original.id}
-            onChange={(t) => handleTag(row.original, t)}
+            onChange={(next) => handleTag(row.original, next)}
           />
         ),
       },
@@ -284,7 +292,7 @@ export function ClientsTable({
         cell: ({ row }) => (
           <button
             onClick={() => onViewHistory(row.original)}
-            title="View history"
+            title={t('clients.table.viewHistory')}
             className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-300 transition-colors hover:bg-accent hover:text-primary"
           >
             <History size={14} />
@@ -293,7 +301,7 @@ export function ClientsTable({
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [clients, canEditTag, pendingTagId],
+    [clients, canEditTag, pendingTagId, t],
   );
 
   const table = useReactTable({
@@ -338,7 +346,7 @@ export function ClientsTable({
                 <td colSpan={colCount}>
                   <div className="flex flex-col items-center justify-center gap-3 py-16 text-gray-400">
                     <UsersIcon size={42} className="text-gray-200" />
-                    <p className="text-sm">No clients found</p>
+                    <p className="text-sm">{t('clients.table.empty')}</p>
                   </div>
                 </td>
               </tr>
@@ -369,7 +377,7 @@ export function ClientsTable({
       {/* Pagination footer */}
       <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3">
         <div className="flex items-center gap-2 text-sm text-gray-500">
-          <span className="text-xs">Rows per page:</span>
+          <span className="text-xs">{t('clients.table.rowsPerPage')}</span>
           <div className="relative">
             <select
               value={pageSize}
@@ -387,7 +395,7 @@ export function ClientsTable({
         <div className="flex items-center gap-3 text-xs text-gray-500">
           <span className="flex items-center gap-1">
             <TagIcon size={11} className="text-gray-300" />
-            {rangeStart} – {rangeEnd} of {total.toLocaleString()}
+            {t('clients.table.range', { start: rangeStart, end: rangeEnd, total: total.toLocaleString() })}
           </span>
           <div className="flex items-center gap-1">
             <button
