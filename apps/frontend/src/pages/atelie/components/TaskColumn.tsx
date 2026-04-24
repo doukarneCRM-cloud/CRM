@@ -1,6 +1,7 @@
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Plus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { Task, TaskStatus } from '@/services/atelieApi';
 import { TaskCard } from './TaskCard';
 import { cn } from '@/lib/cn';
@@ -17,6 +18,7 @@ interface Props {
 }
 
 export function TaskColumn({ status, title, accent, tasks, myUserId, onCreate, onOpen, onHide }: Props) {
+  const { t } = useTranslation();
   const { setNodeRef, isOver } = useDroppable({ id: `col:${status}`, data: { status } });
 
   return (
@@ -33,7 +35,7 @@ export function TaskColumn({ status, title, accent, tasks, myUserId, onCreate, o
           <button
             onClick={onCreate}
             className="flex h-6 w-6 items-center justify-center rounded-btn text-gray-400 hover:bg-accent hover:text-primary"
-            aria-label="Add task"
+            aria-label={t('atelie.tasks.addTask')}
           >
             <Plus size={14} />
           </button>
@@ -47,19 +49,19 @@ export function TaskColumn({ status, title, accent, tasks, myUserId, onCreate, o
           isOver ? 'bg-primary/5 ring-2 ring-primary/20' : 'bg-gray-50/60',
         )}
       >
-        <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-          {tasks.map((t) => (
+        <SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
+          {tasks.map((task) => (
             <TaskCard
-              key={t.id}
-              task={t}
-              isMine={t.ownerId === myUserId}
-              onClick={() => onOpen(t)}
-              onHide={t.ownerId === myUserId ? undefined : () => onHide(t)}
+              key={task.id}
+              task={task}
+              isMine={task.ownerId === myUserId}
+              onClick={() => onOpen(task)}
+              onHide={task.ownerId === myUserId ? undefined : () => onHide(task)}
             />
           ))}
         </SortableContext>
         {tasks.length === 0 && (
-          <p className="py-6 text-center text-xs text-gray-400">Drop tasks here</p>
+          <p className="py-6 text-center text-xs text-gray-400">{t('atelie.tasks.dropHere')}</p>
         )}
       </div>
     </div>

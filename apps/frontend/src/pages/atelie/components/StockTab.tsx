@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FabricRollsTab } from './FabricRollsTab';
 import { AccessoriesTab } from './AccessoriesTab';
 
 type StockSubTab = 'fabric' | 'accessories';
 
 export function StockTab() {
+  const { t } = useTranslation();
   const [sub, setSub] = useState<StockSubTab>('fabric');
 
   return (
@@ -18,7 +20,7 @@ export function StockTab() {
               : 'text-gray-500 hover:text-gray-800'
           }`}
         >
-          Fabric rolls
+          {t('atelie.stock.fabricRolls')}
         </button>
         <button
           onClick={() => setSub('accessories')}
@@ -28,7 +30,7 @@ export function StockTab() {
               : 'text-gray-500 hover:text-gray-800'
           }`}
         >
-          Accessories
+          {t('atelie.stock.accessories')}
         </button>
       </div>
 

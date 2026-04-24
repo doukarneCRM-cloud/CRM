@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { GlassModal, CRMInput, CRMButton } from '@/components/ui';
 
 interface Props {
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export function IncompleteReasonPrompt({ open, onClose, onSubmit }: Props) {
+  const { t } = useTranslation();
   const [reason, setReason] = useState('');
 
   function handleSubmit() {
@@ -21,26 +23,26 @@ export function IncompleteReasonPrompt({ open, onClose, onSubmit }: Props) {
     <GlassModal
       open={open}
       onClose={onClose}
-      title="Mark as incomplete"
+      title={t('atelie.incompleteReason.title')}
       size="sm"
       footer={
         <div className="flex justify-end gap-2">
           <CRMButton variant="ghost" onClick={onClose}>
-            Cancel
+            {t('common.cancel')}
           </CRMButton>
           <CRMButton onClick={handleSubmit} disabled={!reason.trim()}>
-            Mark incomplete
+            {t('atelie.incompleteReason.submit')}
           </CRMButton>
         </div>
       }
     >
       <div className="flex flex-col gap-2">
-        <p className="text-sm text-gray-500">Tell the team why this task couldn't be finished.</p>
+        <p className="text-sm text-gray-500">{t('atelie.incompleteReason.body')}</p>
         <CRMInput
           autoFocus
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder="e.g. Missing fabric supplier"
+          placeholder={t('atelie.incompleteReason.placeholder')}
         />
       </div>
     </GlassModal>

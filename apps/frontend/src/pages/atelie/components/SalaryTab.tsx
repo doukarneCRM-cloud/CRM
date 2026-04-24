@@ -1,10 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Check, RotateCcw } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { GlassCard, CRMButton, GlassModal, CRMInput } from '@/components/ui';
 import { atelieApi, type SalaryRow } from '@/services/atelieApi';
 import { mondayOfWeekUTC, addWeeks, formatWeekRange } from '../utils/weekMath';
 
 export function SalaryTab() {
+  const { t } = useTranslation();
   const [weekStart, setWeekStart] = useState<Date>(() => mondayOfWeekUTC());
   const [rows, setRows] = useState<SalaryRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -35,7 +37,7 @@ export function SalaryTab() {
   );
 
   async function unpay(id: string) {
-    if (!window.confirm('Revert this payment?')) return;
+    if (!window.confirm(t('atelie.salary.confirmRevert'))) return;
     await atelieApi.unpaySalary(id);
     load();
   }
@@ -47,7 +49,7 @@ export function SalaryTab() {
           <button
             onClick={() => setWeekStart((d) => addWeeks(d, -1))}
             className="flex h-8 w-8 items-center justify-center rounded-btn border border-gray-200 text-gray-500 hover:bg-gray-50"
-            aria-label="Previous"
+            aria-label={t('atelie.salary.previous')}
           >
             <ChevronLeft size={14} />
           </button>
@@ -57,19 +59,19 @@ export function SalaryTab() {
           <button
             onClick={() => setWeekStart((d) => addWeeks(d, 1))}
             className="flex h-8 w-8 items-center justify-center rounded-btn border border-gray-200 text-gray-500 hover:bg-gray-50"
-            aria-label="Next"
+            aria-label={t('atelie.salary.next')}
           >
             <ChevronRight size={14} />
           </button>
           <CRMButton variant="ghost" size="sm" onClick={() => setWeekStart(mondayOfWeekUTC())}>
-            This week
+            {t('atelie.salary.thisWeek')}
           </CRMButton>
         </div>
 
         <div className="flex gap-2">
-          <Pill label="Earned" value={totals.earned} tone="neutral" />
-          <Pill label="Paid" value={totals.paid} tone="green" />
-          <Pill label="Outstanding" value={totals.unpaid} tone="amber" />
+          <Pill label={t('atelie.salary.pillEarned')} value={totals.earned} tone="neutral" />
+          <Pill label={t('atelie.salary.pillPaid')} value={totals.paid} tone="green" />
+          <Pill label={t('atelie.salary.pillOutstanding')} value={totals.unpaid} tone="amber" />
         </div>
       </div>
 
@@ -77,12 +79,12 @@ export function SalaryTab() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50/70 text-xs text-gray-500">
             <tr>
-              <th className="px-4 py-3 text-left font-medium">Employee</th>
-              <th className="px-3 py-3 text-left font-medium">Role</th>
-              <th className="px-3 py-3 text-right font-medium">Amount</th>
-              <th className="px-3 py-3 text-right font-medium">Paid</th>
-              <th className="px-3 py-3 text-center font-medium">Status</th>
-              <th className="px-3 py-3 text-right font-medium">Paid by</th>
+              <th className="px-4 py-3 text-left font-medium">{t('atelie.salary.columns.employee')}</th>
+              <th className="px-3 py-3 text-left font-medium">{t('atelie.salary.columns.role')}</th>
+              <th className="px-3 py-3 text-right font-medium">{t('atelie.salary.columns.amount')}</th>
+              <th className="px-3 py-3 text-right font-medium">{t('atelie.salary.columns.paid')}</th>
+              <th className="px-3 py-3 text-center font-medium">{t('atelie.salary.columns.status')}</th>
+              <th className="px-3 py-3 text-right font-medium">{t('atelie.salary.columns.paidBy')}</th>
               <th className="px-3 py-3 text-right font-medium"></th>
             </tr>
           </thead>
@@ -90,14 +92,14 @@ export function SalaryTab() {
             {loading && rows.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-6 text-center text-sm text-gray-400">
-                  Loading…
+                  {t('atelie.salary.loading')}
                 </td>
               </tr>
             )}
             {!loading && rows.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-6 text-center text-sm text-gray-400">
-                  No payroll rows this week yet.
+                  {t('atelie.salary.empty')}
                 </td>
               </tr>
             )}
@@ -119,7 +121,7 @@ export function SalaryTab() {
                         : 'rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-600'
                     }
                   >
-                    {r.isPaid ? 'Paid' : 'Unpaid'}
+                    {r.isPaid ? t('atelie.salary.paid') : t('atelie.salary.unpaid')}
                   </span>
                 </td>
                 <td className="px-3 py-2.5 text-right text-xs text-gray-500">
@@ -131,14 +133,14 @@ export function SalaryTab() {
                       onClick={() => unpay(r.id)}
                       className="inline-flex items-center gap-1 rounded-btn border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-500 hover:bg-gray-50"
                     >
-                      <RotateCcw size={12} /> Revert
+                      <RotateCcw size={12} /> {t('atelie.salary.revert')}
                     </button>
                   ) : (
                     <button
                       onClick={() => setPaying(r)}
                       className="inline-flex items-center gap-1 rounded-btn bg-primary px-2.5 py-1 text-xs font-semibold text-white hover:bg-primary-dark"
                     >
-                      <Check size={12} /> Mark paid
+                      <Check size={12} /> {t('atelie.salary.markPaid')}
                     </button>
                   )}
                 </td>
@@ -168,6 +170,7 @@ function Pill({ label, value, tone }: { label: string; value: number; tone: 'gre
 }
 
 function PayModal({ row, onClose, onSaved }: { row: SalaryRow; onClose: () => void; onSaved: () => void }) {
+  const { t } = useTranslation();
   const [paidAmount, setPaidAmount] = useState<number>(row.amount);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
@@ -187,31 +190,31 @@ function PayModal({ row, onClose, onSaved }: { row: SalaryRow; onClose: () => vo
     <GlassModal
       open
       onClose={onClose}
-      title={`Pay ${row.employee.name}`}
+      title={t('atelie.salary.payTitle', { name: row.employee.name })}
       size="sm"
       footer={
         <div className="flex justify-end gap-2">
           <CRMButton variant="ghost" onClick={onClose} disabled={saving}>
-            Cancel
+            {t('common.cancel')}
           </CRMButton>
           <CRMButton onClick={confirm} loading={saving}>
-            Confirm payment
+            {t('atelie.salary.confirmPayment')}
           </CRMButton>
         </div>
       }
     >
       <div className="flex flex-col gap-3">
         <CRMInput
-          label="Amount paid (MAD)"
+          label={t('atelie.salary.payAmount')}
           type="number"
           min={0}
           step={10}
           value={paidAmount}
           onChange={(e) => setPaidAmount(Number(e.target.value))}
-          hint={`Salary due: ${row.amount.toFixed(0)} MAD`}
+          hint={t('atelie.salary.payHint', { amount: row.amount.toFixed(0) })}
         />
         <CRMInput
-          label="Notes (optional)"
+          label={t('atelie.salary.payNotes')}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
         />

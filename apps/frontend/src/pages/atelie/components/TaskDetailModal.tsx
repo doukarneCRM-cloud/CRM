@@ -11,8 +11,9 @@ import {
   FileText,
   ExternalLink,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { GlassModal, CRMButton } from '@/components/ui';
-import { atelieApi, type TaskDetail } from '@/services/atelieApi';
+import { atelieApi, type TaskDetail, type TaskStatus, type TaskVisibility } from '@/services/atelieApi';
 import { useAuthStore } from '@/store/authStore';
 import { TaskFormModal } from './TaskFormModal';
 
@@ -26,6 +27,7 @@ interface Props {
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 
 export function TaskDetailModal({ open, taskId, onClose, onChanged }: Props) {
+  const { t } = useTranslation();
   const me = useAuthStore((s) => s.user);
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [loading, setLoading] = useState(false);
@@ -38,8 +40,8 @@ export function TaskDetailModal({ open, taskId, onClose, onChanged }: Props) {
     if (!taskId) return;
     setLoading(true);
     try {
-      const t = await atelieApi.getTask(taskId);
-      setTask(t);
+      const detail = await atelieApi.getTask(taskId);
+      setTask(detail);
     } finally {
       setLoading(false);
     }
@@ -53,6 +55,18 @@ export function TaskDetailModal({ open, taskId, onClose, onChanged }: Props) {
 
   if (!open) return null;
   const isOwner = !!(task && me && task.ownerId === me.id);
+
+  function visibilityLabel(v: TaskVisibility): string {
+    return v === 'shared' ? t('atelie.taskDetail.visibilityShared') : t('atelie.taskDetail.visibilityPrivate');
+  }
+
+  function statusLabel(s: TaskStatus): string {
+    if (s === 'backlog') return t('atelie.taskDetail.statusBacklog');
+    if (s === 'processing') return t('atelie.taskDetail.statusProcessing');
+    if (s === 'done') return t('atelie.taskDetail.statusDone');
+    if (s === 'forgotten') return t('atelie.taskDetail.statusForgotten');
+    return t('atelie.taskDetail.statusIncomplete');
+  }
 
   async function postComment() {
     if (!task || !commentBody.trim()) return;
@@ -69,7 +83,7 @@ export function TaskDetailModal({ open, taskId, onClose, onChanged }: Props) {
 
   async function deleteComment(cid: string) {
     if (!task) return;
-    if (!window.confirm('Delete comment?')) return;
+    if (!window.confirm(t('atelie.taskDetail.confirmDeleteComment'))) return;
     await atelieApi.deleteComment(task.id, cid);
     await refresh();
     onChanged();
@@ -84,7 +98,7 @@ export function TaskDetailModal({ open, taskId, onClose, onChanged }: Props) {
 
   async function deleteAttachment(aid: string) {
     if (!task) return;
-    if (!window.confirm('Remove this attachment?')) return;
+    if (!window.confirm(t('atelie.taskDetail.confirmRemoveAttachment'))) return;
     await atelieApi.deleteAttachment(task.id, aid);
     await refresh();
     onChanged();
@@ -92,7 +106,7 @@ export function TaskDetailModal({ open, taskId, onClose, onChanged }: Props) {
 
   async function deleteTask() {
     if (!task) return;
-    if (!window.confirm(`Delete "${task.title}"?`)) return;
+    if (!window.confirm(t('atelie.taskDetail.confirmDeleteTask', { title: task.title }))) return;
     await atelieApi.deleteTask(task.id);
     onChanged();
     onClose();
@@ -100,9 +114,9 @@ export function TaskDetailModal({ open, taskId, onClose, onChanged }: Props) {
 
   return (
     <>
-      <GlassModal open={open} onClose={onClose} size="2xl" title={task?.title ?? 'Task'}>
+      <GlassModal open={open} onClose={onClose} size="2xl" title={task?.title ?? t('atelie.taskDetail.fallbackTitle')}>
         {loading && !task ? (
-          <p className="text-sm text-gray-400">Loading…</p>
+          <p className="text-sm text-gray-400">{t('atelie.taskDetail.loading')}</p>
         ) : task ? (
           <div className="flex flex-col gap-5">
             <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -114,15 +128,15 @@ export function TaskDetailModal({ open, taskId, onClose, onChanged }: Props) {
                 }
               >
                 {task.visibility === 'shared' ? <Users size={11} /> : <Lock size={11} />}
-                {task.visibility}
+                {visibilityLabel(task.visibility)}
               </span>
               <span className="rounded-full bg-gray-100 px-2 py-0.5 font-semibold capitalize text-gray-600">
-                {task.status}
+                {statusLabel(task.status)}
               </span>
-              <span className="text-gray-400">by {task.owner.name}</span>
+              <span className="text-gray-400">{t('atelie.taskDetail.by', { name: task.owner.name })}</span>
               {task.dueAt && (
                 <span className="text-amber-600">
-                  Due {new Date(task.dueAt).toLocaleDateString()}
+                  {t('atelie.taskDetail.due', { date: new Date(task.dueAt).toLocaleDateString() })}
                 </span>
               )}
               {isOwner && (
@@ -130,14 +144,14 @@ export function TaskDetailModal({ open, taskId, onClose, onChanged }: Props) {
                   <button
                     onClick={() => setEditing(true)}
                     className="flex h-7 w-7 items-center justify-center rounded-btn text-gray-400 hover:bg-accent hover:text-primary"
-                    aria-label="Edit"
+                    aria-label={t('atelie.taskDetail.edit')}
                   >
                     <Pencil size={14} />
                   </button>
                   <button
                     onClick={deleteTask}
                     className="flex h-7 w-7 items-center justify-center rounded-btn text-gray-400 hover:bg-red-50 hover:text-red-500"
-                    aria-label="Delete"
+                    aria-label={t('atelie.taskDetail.delete')}
                   >
                     <Trash2 size={14} />
                   </button>
@@ -153,7 +167,7 @@ export function TaskDetailModal({ open, taskId, onClose, onChanged }: Props) {
 
             {task.incompleteReason && (
               <div className="rounded-xl bg-red-50 p-3 text-sm text-red-600">
-                <strong>Incomplete:</strong> {task.incompleteReason}
+                <strong>{t('atelie.taskDetail.incompletePrefix')}</strong> {task.incompleteReason}
               </div>
             )}
 
@@ -161,7 +175,7 @@ export function TaskDetailModal({ open, taskId, onClose, onChanged }: Props) {
             <div>
               <div className="mb-2 flex items-center justify-between">
                 <h4 className="text-sm font-semibold text-gray-700">
-                  Attachments ({task.attachments.length})
+                  {t('atelie.taskDetail.attachmentsTitle', { count: task.attachments.length })}
                 </h4>
                 {isOwner && (
                   <>
@@ -181,7 +195,7 @@ export function TaskDetailModal({ open, taskId, onClose, onChanged }: Props) {
                       leftIcon={<Paperclip size={12} />}
                       onClick={() => fileRef.current?.click()}
                     >
-                      Attach file
+                      {t('atelie.taskDetail.attachFile')}
                     </CRMButton>
                   </>
                 )}
@@ -197,12 +211,12 @@ export function TaskDetailModal({ open, taskId, onClose, onChanged }: Props) {
             {/* Comments */}
             <div>
               <h4 className="mb-2 text-sm font-semibold text-gray-700">
-                Comments ({task.comments.length})
+                {t('atelie.taskDetail.commentsTitle', { count: task.comments.length })}
               </h4>
 
               <div className="mb-3 flex flex-col gap-2">
                 {task.comments.length === 0 && (
-                  <p className="text-xs text-gray-400">No comments yet.</p>
+                  <p className="text-xs text-gray-400">{t('atelie.taskDetail.noComments')}</p>
                 )}
                 {task.comments.map((c) => {
                   const canDel = me?.id === c.author.id || isOwner;
@@ -218,7 +232,7 @@ export function TaskDetailModal({ open, taskId, onClose, onChanged }: Props) {
                             <button
                               onClick={() => deleteComment(c.id)}
                               className="text-gray-300 hover:text-red-500"
-                              aria-label="Delete comment"
+                              aria-label={t('atelie.taskDetail.deleteComment')}
                             >
                               <Trash2 size={11} />
                             </button>
@@ -236,7 +250,7 @@ export function TaskDetailModal({ open, taskId, onClose, onChanged }: Props) {
                   value={commentBody}
                   onChange={(e) => setCommentBody(e.target.value)}
                   rows={2}
-                  placeholder="Add a comment…"
+                  placeholder={t('atelie.taskDetail.commentPlaceholder')}
                   className="flex-1 rounded-input border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
                 <CRMButton
@@ -245,7 +259,7 @@ export function TaskDetailModal({ open, taskId, onClose, onChanged }: Props) {
                   disabled={!commentBody.trim()}
                   leftIcon={<Send size={12} />}
                 >
-                  Post
+                  {t('atelie.taskDetail.post')}
                 </CRMButton>
               </div>
             </div>
@@ -276,8 +290,9 @@ interface AttachmentListProps {
 }
 
 function AttachmentList({ attachments, baseUrl, canDelete, onDelete }: AttachmentListProps) {
+  const { t } = useTranslation();
   if (attachments.length === 0) {
-    return <p className="text-xs text-gray-400">No attachments.</p>;
+    return <p className="text-xs text-gray-400">{t('atelie.taskDetail.noAttachments')}</p>;
   }
 
   const images = attachments.filter((a) => a.mimeType.startsWith('image/'));
@@ -294,7 +309,7 @@ function AttachmentList({ attachments, baseUrl, canDelete, onDelete }: Attachmen
                 target="_blank"
                 rel="noreferrer"
                 className="block h-20 w-20 overflow-hidden rounded-lg border border-gray-200 bg-gray-50"
-                title={`${a.fileName} — click to open`}
+                title={t('atelie.taskDetail.fileOpenTitle', { name: a.fileName })}
               >
                 <img
                   src={`${baseUrl}${a.fileUrl}`}
@@ -306,7 +321,7 @@ function AttachmentList({ attachments, baseUrl, canDelete, onDelete }: Attachmen
                 <button
                   onClick={() => onDelete(a.id)}
                   className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-white text-gray-400 shadow-sm opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100"
-                  aria-label="Remove"
+                  aria-label={t('atelie.taskDetail.remove')}
                 >
                   <XIcon size={11} />
                 </button>
@@ -325,6 +340,9 @@ function AttachmentList({ attachments, baseUrl, canDelete, onDelete }: Attachmen
               a.mimeType === 'application/pdf' ||
               a.mimeType.startsWith('text/') ||
               a.mimeType === 'application/json';
+            const openLabel = openable
+              ? t('atelie.taskDetail.openInNewTab')
+              : t('atelie.taskDetail.download');
             return (
               <div
                 key={a.id}
@@ -343,14 +361,16 @@ function AttachmentList({ attachments, baseUrl, canDelete, onDelete }: Attachmen
                 >
                   {a.fileName}
                 </a>
-                <span className="text-gray-400">{(a.sizeBytes / 1024).toFixed(0)} KB</span>
+                <span className="text-gray-400">
+                  {t('atelie.taskDetail.fileSizeKb', { size: (a.sizeBytes / 1024).toFixed(0) })}
+                </span>
                 <a
                   href={`${baseUrl}${a.fileUrl}`}
                   target="_blank"
                   rel="noreferrer"
                   className="text-gray-400 hover:text-primary"
-                  aria-label={openable ? 'Open in new tab' : 'Download'}
-                  title={openable ? 'Open in new tab' : 'Download'}
+                  aria-label={openLabel}
+                  title={openLabel}
                 >
                   {openable ? <ExternalLink size={12} /> : <Download size={12} />}
                 </a>
@@ -358,7 +378,7 @@ function AttachmentList({ attachments, baseUrl, canDelete, onDelete }: Attachmen
                   <button
                     onClick={() => onDelete(a.id)}
                     className="text-gray-400 hover:text-red-500"
-                    aria-label="Remove"
+                    aria-label={t('atelie.taskDetail.remove')}
                   >
                     <XIcon size={12} />
                   </button>

@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2, Settings2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { GlassCard, CRMButton } from '@/components/ui';
 import { atelieApi, type FabricTypeGroup } from '@/services/atelieApi';
+import { apiErrorMessage } from '@/lib/apiError';
 import { FabricRollFormModal } from './FabricRollFormModal';
 import { FabricTypeManagerModal } from './FabricTypeManagerModal';
 
 export function FabricRollsTab() {
+  const { t } = useTranslation();
   const [tree, setTree] = useState<FabricTypeGroup[]>([]);
   const [loading, setLoading] = useState(false);
   const [openTypes, setOpenTypes] = useState<Record<string, boolean>>({});
@@ -28,80 +31,79 @@ export function FabricRollsTab() {
   }, [load]);
 
   async function onAdjust(rollId: string, current: number) {
-    const next = window.prompt(`Set remaining meters for this roll:`, String(current));
+    const next = window.prompt(t('atelie.fabricRolls.promptAdjust'), String(current));
     if (next === null) return;
     const n = Number(next);
     if (Number.isNaN(n) || n < 0) return;
-    await atelieApi.adjustFabricRoll(rollId, { remainingLength: n, reason: 'Manual adjust' });
+    await atelieApi.adjustFabricRoll(rollId, {
+      remainingLength: n,
+      reason: t('atelie.fabricRolls.manualAdjustReason'),
+    });
     load();
   }
 
   async function onDelete(rollId: string) {
-    if (!window.confirm('Delete this roll?')) return;
+    if (!window.confirm(t('atelie.fabricRolls.confirmDelete'))) return;
     try {
       await atelieApi.deleteFabricRoll(rollId);
       load();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Delete failed';
-      window.alert(msg);
+      window.alert(apiErrorMessage(err, t('atelie.fabricRolls.deleteFailed')));
     }
   }
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-xs text-gray-500">
-          Each physical roll is stored separately — same type + same color can vary in width,
-          length, and price.
-        </div>
+        <div className="text-xs text-gray-500">{t('atelie.fabricRolls.intro')}</div>
         <div className="flex items-center gap-2">
           <CRMButton
             variant="secondary"
             leftIcon={<Settings2 size={14} />}
             onClick={() => setTypesManagerOpen(true)}
           >
-            Fabric types
+            {t('atelie.fabricRolls.fabricTypes')}
           </CRMButton>
           <CRMButton leftIcon={<Plus size={14} />} onClick={() => setRollFormOpen(true)}>
-            Purchase roll
+            {t('atelie.fabricRolls.purchaseRoll')}
           </CRMButton>
         </div>
       </div>
 
       <GlassCard padding="md">
         {loading && tree.length === 0 && (
-          <p className="py-6 text-center text-sm text-gray-400">Loading…</p>
+          <p className="py-6 text-center text-sm text-gray-400">{t('atelie.fabricRolls.loading')}</p>
         )}
         {!loading && tree.length === 0 && (
           <p className="py-6 text-center text-sm text-gray-400">
-            No fabric rolls yet. Click "Purchase roll" to add the first one.
+            {t('atelie.fabricRolls.empty')}
           </p>
         )}
 
         <div className="flex flex-col gap-1.5">
-          {tree.map((t) => {
-            const typeOpen = openTypes[t.typeId] ?? true;
+          {tree.map((row) => {
+            const typeOpen = openTypes[row.typeId] ?? true;
             return (
-              <div key={t.typeId} className="rounded-input border border-gray-100">
+              <div key={row.typeId} className="rounded-input border border-gray-100">
                 <button
                   onClick={() =>
-                    setOpenTypes((s) => ({ ...s, [t.typeId]: !typeOpen }))
+                    setOpenTypes((s) => ({ ...s, [row.typeId]: !typeOpen }))
                   }
                   className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-gray-50"
                 >
                   <div className="flex items-center gap-2">
                     {typeOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                    <span className="text-sm font-semibold text-gray-900">{t.typeName}</span>
+                    <span className="text-sm font-semibold text-gray-900">{row.typeName}</span>
                   </div>
                   <span className="text-xs text-gray-500">
-                    {t.totalRemaining.toFixed(1)} m total
+                    {t('atelie.fabricRolls.totalMeters', { value: row.totalRemaining.toFixed(1) })}
                   </span>
                 </button>
 
                 {typeOpen && (
                   <div className="space-y-1 border-t border-gray-100 px-3 py-2">
-                    {t.colors.map((c) => {
-                      const colorKey = `${t.typeId}::${c.color}`;
+                    {row.colors.map((c) => {
+                      const colorKey = `${row.typeId}::${c.color}`;
                       const colorOpen = openColors[colorKey] ?? false;
                       return (
                         <div key={colorKey} className="rounded-input bg-gray-50/40">
@@ -121,11 +123,11 @@ export function FabricRollsTab() {
                                 {c.color}
                               </span>
                               <span className="text-[10px] text-gray-500">
-                                ({c.rolls.length} roll{c.rolls.length === 1 ? '' : 's'})
+                                {t('atelie.fabricRolls.rolls', { count: c.rolls.length })}
                               </span>
                             </div>
                             <span className="text-[11px] text-gray-500">
-                              {c.totalRemaining.toFixed(1)} m
+                              {t('atelie.fabricRolls.meters', { value: c.totalRemaining.toFixed(1) })}
                             </span>
                           </button>
 
@@ -134,19 +136,23 @@ export function FabricRollsTab() {
                               <table className="w-full text-xs">
                                 <thead className="bg-white/60 text-[10px] uppercase text-gray-400">
                                   <tr>
-                                    <th className="px-3 py-1.5 text-left font-medium">Date</th>
-                                    <th className="px-3 py-1.5 text-right font-medium">Width</th>
-                                    <th className="px-3 py-1.5 text-right font-medium">
-                                      Length
+                                    <th className="px-3 py-1.5 text-left font-medium">
+                                      {t('atelie.fabricRolls.columns.date')}
                                     </th>
                                     <th className="px-3 py-1.5 text-right font-medium">
-                                      Remaining
+                                      {t('atelie.fabricRolls.columns.width')}
                                     </th>
                                     <th className="px-3 py-1.5 text-right font-medium">
-                                      MAD / m
+                                      {t('atelie.fabricRolls.columns.length')}
+                                    </th>
+                                    <th className="px-3 py-1.5 text-right font-medium">
+                                      {t('atelie.fabricRolls.columns.remaining')}
+                                    </th>
+                                    <th className="px-3 py-1.5 text-right font-medium">
+                                      {t('atelie.fabricRolls.columns.pricePerMeter')}
                                     </th>
                                     <th className="px-3 py-1.5 text-left font-medium">
-                                      Supplier
+                                      {t('atelie.fabricRolls.columns.supplier')}
                                     </th>
                                     <th className="px-3 py-1.5 text-right" />
                                   </tr>
@@ -158,13 +164,15 @@ export function FabricRollsTab() {
                                         {new Date(r.purchaseDate).toLocaleDateString()}
                                       </td>
                                       <td className="px-3 py-1.5 text-right text-gray-600">
-                                        {r.widthCm ? `${r.widthCm} cm` : '—'}
+                                        {r.widthCm
+                                          ? t('atelie.fabricRolls.widthCm', { value: r.widthCm })
+                                          : '—'}
                                       </td>
                                       <td className="px-3 py-1.5 text-right text-gray-600">
-                                        {r.initialLength} m
+                                        {t('atelie.fabricRolls.lengthM', { value: r.initialLength })}
                                       </td>
                                       <td className="px-3 py-1.5 text-right font-semibold text-gray-900">
-                                        {r.remainingLength.toFixed(1)} m
+                                        {t('atelie.fabricRolls.lengthM', { value: r.remainingLength.toFixed(1) })}
                                       </td>
                                       <td className="px-3 py-1.5 text-right text-gray-700">
                                         {r.unitCostPerMeter.toFixed(2)}
@@ -178,12 +186,12 @@ export function FabricRollsTab() {
                                             onClick={() => onAdjust(r.id, r.remainingLength)}
                                             className="rounded-btn px-2 py-0.5 text-[10px] text-gray-500 hover:bg-white hover:text-primary"
                                           >
-                                            Adjust
+                                            {t('atelie.fabricRolls.adjust')}
                                           </button>
                                           <button
                                             onClick={() => onDelete(r.id)}
                                             className="flex h-6 w-6 items-center justify-center rounded-btn text-gray-400 hover:bg-red-50 hover:text-red-500"
-                                            aria-label="Delete roll"
+                                            aria-label={t('atelie.fabricRolls.deleteRoll')}
                                           >
                                             <Trash2 size={12} />
                                           </button>

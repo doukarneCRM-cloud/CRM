@@ -1,6 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { MessageCircle, Paperclip, Eye, EyeOff, Lock, Users } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { Task, TaskStatus } from '@/services/atelieApi';
 import { cn } from '@/lib/cn';
 
@@ -21,6 +22,7 @@ const STATUS_BORDER: Record<TaskStatus, string> = {
 };
 
 export function TaskCard({ task, isMine, onClick, onHide }: Props) {
+  const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
     data: { task, isMine },
@@ -69,13 +71,13 @@ export function TaskCard({ task, isMine, onClick, onHide }: Props) {
         <div className="flex shrink-0 items-center gap-1">
           {isMine ? (
             task.visibility === 'shared' ? (
-              <Users size={12} className="text-blue-500" aria-label="Shared" />
+              <Users size={12} className="text-blue-500" aria-label={t('atelie.taskCard.shared')} />
             ) : (
-              <Lock size={12} className="text-gray-300" aria-label="Private" />
+              <Lock size={12} className="text-gray-300" aria-label={t('atelie.taskCard.private')} />
             )
           ) : (
             <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-blue-600">
-              Shared
+              {t('atelie.taskCard.shared')}
             </span>
           )}
         </div>
@@ -86,7 +88,9 @@ export function TaskCard({ task, isMine, onClick, onHide }: Props) {
       )}
 
       {!isMine && task.owner && (
-        <p className="mb-1.5 text-[11px] text-gray-400">by {task.owner.name}</p>
+        <p className="mb-1.5 text-[11px] text-gray-400">
+          {t('atelie.taskCard.by', { name: task.owner.name })}
+        </p>
       )}
 
       {task.incompleteReason && (
@@ -109,7 +113,7 @@ export function TaskCard({ task, isMine, onClick, onHide }: Props) {
           )}
           {task.dueAt && (
             <span className="text-amber-600">
-              Due {new Date(task.dueAt).toLocaleDateString()}
+              {t('atelie.taskCard.due', { date: new Date(task.dueAt).toLocaleDateString() })}
             </span>
           )}
         </div>
@@ -121,14 +125,14 @@ export function TaskCard({ task, isMine, onClick, onHide }: Props) {
               onHide();
             }}
             className="opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500"
-            aria-label="Hide from my board"
-            title="Hide from my board"
+            aria-label={t('atelie.taskCard.hideFromBoard')}
+            title={t('atelie.taskCard.hideFromBoard')}
           >
             <EyeOff size={12} />
           </button>
         )}
         {isMine && task.visibility === 'private' && (
-          <Eye size={11} className="text-gray-300" aria-label="Only you see this" />
+          <Eye size={11} className="text-gray-300" aria-label={t('atelie.taskCard.onlyYouSee')} />
         )}
       </div>
     </div>

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { GlassModal, CRMInput, CRMSelect, CRMButton } from '@/components/ui';
 import {
   atelieApi,
@@ -7,22 +8,7 @@ import {
   type MaterialCategory,
   type MaterialUnit,
 } from '@/services/atelieApi';
-
-const CATEGORY_OPTIONS = [
-  { value: 'fabric', label: 'Fabric' },
-  { value: 'accessory', label: 'Accessory' },
-  { value: 'needle', label: 'Needle' },
-  { value: 'thread', label: 'Thread' },
-  { value: 'other', label: 'Other' },
-];
-
-const UNIT_OPTIONS = [
-  { value: 'meter', label: 'Meter' },
-  { value: 'piece', label: 'Piece' },
-  { value: 'kilogram', label: 'Kilogram' },
-  { value: 'spool', label: 'Spool' },
-  { value: 'box', label: 'Box' },
-];
+import { apiErrorMessage } from '@/lib/apiError';
 
 interface Props {
   open: boolean;
@@ -32,6 +18,7 @@ interface Props {
 }
 
 export function MaterialFormModal({ open, onClose, onSaved, material }: Props) {
+  const { t } = useTranslation();
   const [form, setForm] = useState<CreateMaterialPayload>({
     name: '',
     category: 'fabric',
@@ -44,6 +31,28 @@ export function MaterialFormModal({ open, onClose, onSaved, material }: Props) {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const CATEGORY_OPTIONS = useMemo(
+    () => [
+      { value: 'fabric', label: t('atelie.accessories.categoryFabric') },
+      { value: 'accessory', label: t('atelie.accessories.categoryAccessory') },
+      { value: 'needle', label: t('atelie.accessories.categoryNeedle') },
+      { value: 'thread', label: t('atelie.accessories.categoryThread') },
+      { value: 'other', label: t('atelie.accessories.categoryOther') },
+    ],
+    [t],
+  );
+
+  const UNIT_OPTIONS = useMemo(
+    () => [
+      { value: 'meter', label: t('atelie.materialForm.units.meter') },
+      { value: 'piece', label: t('atelie.materialForm.units.piece') },
+      { value: 'kilogram', label: t('atelie.materialForm.units.kilogram') },
+      { value: 'spool', label: t('atelie.materialForm.units.spool') },
+      { value: 'box', label: t('atelie.materialForm.units.box') },
+    ],
+    [t],
+  );
 
   useEffect(() => {
     if (open) {
@@ -76,7 +85,7 @@ export function MaterialFormModal({ open, onClose, onSaved, material }: Props) {
 
   async function submit() {
     if (!form.name.trim()) {
-      setError('Name is required');
+      setError(t('atelie.materialForm.nameRequired'));
       return;
     }
     setSaving(true);
@@ -86,10 +95,7 @@ export function MaterialFormModal({ open, onClose, onSaved, material }: Props) {
       onSaved();
       onClose();
     } catch (err) {
-      const msg =
-        (err as { response?: { data?: { error?: { message?: string } } } }).response?.data?.error
-          ?.message ?? 'Failed to save';
-      setError(msg);
+      setError(apiErrorMessage(err, t('atelie.materialForm.saveFailed')));
     } finally {
       setSaving(false);
     }
@@ -99,35 +105,35 @@ export function MaterialFormModal({ open, onClose, onSaved, material }: Props) {
     <GlassModal
       open={open}
       onClose={onClose}
-      title={material ? 'Edit material' : 'New material'}
+      title={material ? t('atelie.materialForm.titleEdit') : t('atelie.materialForm.titleNew')}
       size="md"
       footer={
         <div className="flex justify-end gap-2">
           <CRMButton variant="ghost" onClick={onClose} disabled={saving}>
-            Cancel
+            {t('common.cancel')}
           </CRMButton>
           <CRMButton onClick={submit} loading={saving}>
-            {material ? 'Save' : 'Create'}
+            {material ? t('atelie.materialForm.save') : t('atelie.materialForm.create')}
           </CRMButton>
         </div>
       }
     >
       <div className="flex flex-col gap-3">
         <CRMInput
-          label="Name"
+          label={t('atelie.materialForm.name')}
           required
           value={form.name}
           onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
         />
         <div className="grid grid-cols-2 gap-3">
           <CRMSelect
-            label="Category"
+            label={t('atelie.materialForm.category')}
             options={CATEGORY_OPTIONS}
             value={form.category}
             onChange={(v) => setForm((f) => ({ ...f, category: v as MaterialCategory }))}
           />
           <CRMSelect
-            label="Unit"
+            label={t('atelie.materialForm.unit')}
             options={UNIT_OPTIONS}
             value={form.unit}
             onChange={(v) => setForm((f) => ({ ...f, unit: v as MaterialUnit }))}
@@ -135,14 +141,14 @@ export function MaterialFormModal({ open, onClose, onSaved, material }: Props) {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <CRMInput
-            label="Initial stock"
+            label={t('atelie.materialForm.initialStock')}
             type="number"
             min={0}
             value={form.stock ?? 0}
             onChange={(e) => setForm((f) => ({ ...f, stock: Number(e.target.value) }))}
           />
           <CRMInput
-            label="Low-stock threshold"
+            label={t('atelie.materialForm.lowThreshold')}
             type="number"
             min={0}
             value={form.lowStockThreshold ?? 0}
@@ -150,7 +156,7 @@ export function MaterialFormModal({ open, onClose, onSaved, material }: Props) {
           />
         </div>
         <CRMInput
-          label="Unit cost (MAD, optional)"
+          label={t('atelie.materialForm.unitCost')}
           type="number"
           min={0}
           step={0.01}
@@ -163,12 +169,12 @@ export function MaterialFormModal({ open, onClose, onSaved, material }: Props) {
           }
         />
         <CRMInput
-          label="Supplier"
+          label={t('atelie.materialForm.supplier')}
           value={form.supplier ?? ''}
           onChange={(e) => setForm((f) => ({ ...f, supplier: e.target.value }))}
         />
         <CRMInput
-          label="Notes"
+          label={t('atelie.materialForm.notes')}
           value={form.notes ?? ''}
           onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
         />

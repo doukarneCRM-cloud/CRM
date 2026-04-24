@@ -1,5 +1,6 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Plus, BarChart3, Trash2, Pencil } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { GlassCard, CRMButton } from '@/components/ui';
 import {
   atelieApi,
@@ -7,7 +8,7 @@ import {
   type AttendanceRow,
   type DayState,
 } from '@/services/atelieApi';
-import { DAY_LABELS, mondayOfWeekUTC, addWeeks, formatWeekRange } from '../utils/weekMath';
+import { mondayOfWeekUTC, addWeeks, formatWeekRange } from '../utils/weekMath';
 import { EmployeeFormModal } from './EmployeeFormModal';
 import { EmployeeKpiModal } from './EmployeeKpiModal';
 
@@ -46,6 +47,7 @@ function popcount(n: number): number {
 }
 
 export function AttendanceGrid() {
+  const { t } = useTranslation();
   const [weekStart, setWeekStart] = useState<Date>(() => mondayOfWeekUTC());
   const [rows, setRows] = useState<AttendanceRow[]>([]);
   const [employees, setEmployees] = useState<AtelieEmployee[]>([]);
@@ -56,6 +58,19 @@ export function AttendanceGrid() {
   const [editing, setEditing] = useState<AtelieEmployee | null>(null);
   const [kpiOpen, setKpiOpen] = useState(false);
   const [kpiEmp, setKpiEmp] = useState<{ id: string; name: string } | null>(null);
+
+  const dayLabels = useMemo(
+    () => [
+      t('atelie.attendance.days.mon'),
+      t('atelie.attendance.days.tue'),
+      t('atelie.attendance.days.wed'),
+      t('atelie.attendance.days.thu'),
+      t('atelie.attendance.days.fri'),
+      t('atelie.attendance.days.sat'),
+      t('atelie.attendance.days.sun'),
+    ],
+    [t],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -114,7 +129,7 @@ export function AttendanceGrid() {
   }
 
   async function deleteEmployee(emp: AtelieEmployee) {
-    if (!window.confirm(`Deactivate ${emp.name}?`)) return;
+    if (!window.confirm(t('atelie.attendance.confirmDeactivate', { name: emp.name }))) return;
     await atelieApi.deactivateEmployee(emp.id);
     load();
   }
@@ -126,7 +141,7 @@ export function AttendanceGrid() {
           <button
             onClick={() => setWeekStart((d) => addWeeks(d, -1))}
             className="flex h-8 w-8 items-center justify-center rounded-btn border border-gray-200 text-gray-500 hover:bg-gray-50"
-            aria-label="Previous week"
+            aria-label={t('atelie.attendance.previousWeek')}
           >
             <ChevronLeft size={14} />
           </button>
@@ -136,7 +151,7 @@ export function AttendanceGrid() {
           <button
             onClick={() => setWeekStart((d) => addWeeks(d, 1))}
             className="flex h-8 w-8 items-center justify-center rounded-btn border border-gray-200 text-gray-500 hover:bg-gray-50"
-            aria-label="Next week"
+            aria-label={t('atelie.attendance.nextWeek')}
           >
             <ChevronRight size={14} />
           </button>
@@ -145,7 +160,7 @@ export function AttendanceGrid() {
             size="sm"
             onClick={() => setWeekStart(mondayOfWeekUTC())}
           >
-            This week
+            {t('atelie.attendance.thisWeek')}
           </CRMButton>
         </div>
 
@@ -156,24 +171,24 @@ export function AttendanceGrid() {
             setFormOpen(true);
           }}
         >
-          Add employee
+          {t('atelie.attendance.addEmployee')}
         </CRMButton>
       </div>
 
       <div className="flex items-center gap-3 text-[11px] text-gray-500">
         <span className="flex items-center gap-1.5">
           <span className="inline-block h-3 w-3 rounded-sm border border-gray-200 bg-white" />
-          Absent
+          {t('atelie.attendance.legendAbsent')}
         </span>
         <span className="flex items-center gap-1.5">
           <span className="inline-block h-3 w-3 rounded-sm bg-primary" />
-          Full day
+          {t('atelie.attendance.legendFull')}
         </span>
         <span className="flex items-center gap-1.5">
           <span className="inline-block h-3 w-3 rounded-sm bg-amber-400" />
-          Half day
+          {t('atelie.attendance.legendHalf')}
         </span>
-        <span className="ml-auto text-gray-400">Click a cell to cycle: absent → full → half → absent</span>
+        <span className="ml-auto text-gray-400">{t('atelie.attendance.legendHint')}</span>
       </div>
 
       <GlassCard padding="none" className="overflow-hidden">
@@ -182,17 +197,25 @@ export function AttendanceGrid() {
             <thead className="bg-gray-50/70 text-xs text-gray-500">
               <tr>
                 <th className="sticky left-0 z-10 bg-gray-50/70 px-4 py-3 text-left font-medium">
-                  Employee
+                  {t('atelie.attendance.columns.employee')}
                 </th>
-                <th className="px-3 py-3 text-left font-medium">Role</th>
-                {DAY_LABELS.map((d) => (
+                <th className="px-3 py-3 text-left font-medium">
+                  {t('atelie.attendance.columns.role')}
+                </th>
+                {dayLabels.map((d) => (
                   <th key={d} className="px-2 py-3 text-center font-medium">
                     {d}
                   </th>
                 ))}
-                <th className="px-3 py-3 text-right font-medium">Days</th>
-                <th className="px-3 py-3 text-right font-medium">Salary</th>
-                <th className="px-3 py-3 text-right font-medium">Status</th>
+                <th className="px-3 py-3 text-right font-medium">
+                  {t('atelie.attendance.columns.days')}
+                </th>
+                <th className="px-3 py-3 text-right font-medium">
+                  {t('atelie.attendance.columns.salary')}
+                </th>
+                <th className="px-3 py-3 text-right font-medium">
+                  {t('atelie.attendance.columns.status')}
+                </th>
                 <th className="px-3 py-3 text-right font-medium"></th>
               </tr>
             </thead>
@@ -200,14 +223,14 @@ export function AttendanceGrid() {
               {loading && rows.length === 0 && (
                 <tr>
                   <td colSpan={12} className="px-4 py-6 text-center text-sm text-gray-400">
-                    Loading…
+                    {t('atelie.attendance.loading')}
                   </td>
                 </tr>
               )}
               {!loading && rows.length === 0 && (
                 <tr>
                   <td colSpan={12} className="px-4 py-6 text-center text-sm text-gray-400">
-                    No active employees. Add one to start tracking attendance.
+                    {t('atelie.attendance.empty')}
                   </td>
                 </tr>
               )}
@@ -219,7 +242,7 @@ export function AttendanceGrid() {
                       {r.employeeName}
                     </td>
                     <td className="px-3 py-2.5 capitalize text-gray-500">{r.role}</td>
-                    {DAY_LABELS.map((_, i) => {
+                    {dayLabels.map((_, i) => {
                       const state = cellState(r, i);
                       const isPending = pendingKey === `${r.employeeId}:${i}`;
                       const cls =
@@ -234,7 +257,7 @@ export function AttendanceGrid() {
                             onClick={() => !isPending && toggleCell(r, i)}
                             className={`h-7 w-7 rounded-btn transition-all ${cls}`}
                             disabled={isPending}
-                            aria-label={`Toggle ${DAY_LABELS[i]}`}
+                            aria-label={t('atelie.attendance.toggleDay', { day: dayLabels[i] })}
                             title={state}
                           >
                             {state === 'full' ? '✓' : state === 'half' ? '½' : ''}
@@ -256,7 +279,7 @@ export function AttendanceGrid() {
                             : 'rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-600'
                         }
                       >
-                        {r.isPaid ? 'Paid' : 'Unpaid'}
+                        {r.isPaid ? t('atelie.attendance.paid') : t('atelie.attendance.unpaid')}
                       </span>
                     </td>
                     <td className="px-3 py-2.5 text-right">
@@ -267,7 +290,7 @@ export function AttendanceGrid() {
                             setKpiOpen(true);
                           }}
                           className="flex h-7 w-7 items-center justify-center rounded-btn text-gray-400 hover:bg-accent hover:text-primary"
-                          aria-label="View KPIs"
+                          aria-label={t('atelie.attendance.viewKpis')}
                         >
                           <BarChart3 size={14} />
                         </button>
@@ -278,7 +301,7 @@ export function AttendanceGrid() {
                               setFormOpen(true);
                             }}
                             className="flex h-7 w-7 items-center justify-center rounded-btn text-gray-400 hover:bg-accent hover:text-primary"
-                            aria-label="Edit"
+                            aria-label={t('atelie.attendance.edit')}
                           >
                             <Pencil size={14} />
                           </button>
@@ -287,7 +310,7 @@ export function AttendanceGrid() {
                           <button
                             onClick={() => deleteEmployee(emp)}
                             className="flex h-7 w-7 items-center justify-center rounded-btn text-gray-400 hover:bg-red-50 hover:text-red-500"
-                            aria-label="Deactivate"
+                            aria-label={t('atelie.attendance.deactivate')}
                           >
                             <Trash2 size={14} />
                           </button>

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Paperclip, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { GlassModal, CRMInput, CRMButton } from '@/components/ui';
 import { atelieApi, type Task, type TaskVisibility } from '@/services/atelieApi';
 import { cn } from '@/lib/cn';
+import { apiErrorMessage } from '@/lib/apiError';
 
 const COLOR_SWATCHES = [
   '#18181B',
@@ -23,6 +25,7 @@ interface Props {
 }
 
 export function TaskFormModal({ open, onClose, onSaved, task }: Props) {
+  const { t } = useTranslation();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [visibility, setVisibility] = useState<TaskVisibility>('private');
@@ -54,7 +57,7 @@ export function TaskFormModal({ open, onClose, onSaved, task }: Props) {
 
   async function submit() {
     if (!title.trim()) {
-      setError('Title is required');
+      setError(t('atelie.taskForm.titleRequired'));
       return;
     }
     setSaving(true);
@@ -84,10 +87,7 @@ export function TaskFormModal({ open, onClose, onSaved, task }: Props) {
       onSaved();
       onClose();
     } catch (err) {
-      const msg =
-        (err as { response?: { data?: { error?: { message?: string } } } }).response?.data?.error
-          ?.message ?? 'Failed to save';
-      setError(msg);
+      setError(apiErrorMessage(err, t('atelie.taskForm.saveFailed')));
     } finally {
       setSaving(false);
     }
@@ -97,42 +97,46 @@ export function TaskFormModal({ open, onClose, onSaved, task }: Props) {
     <GlassModal
       open={open}
       onClose={onClose}
-      title={task ? 'Edit task' : 'New task'}
+      title={task ? t('atelie.taskForm.titleEdit') : t('atelie.taskForm.titleNew')}
       size="lg"
       footer={
         <div className="flex justify-end gap-2">
           <CRMButton variant="ghost" onClick={onClose} disabled={saving}>
-            Cancel
+            {t('common.cancel')}
           </CRMButton>
           <CRMButton onClick={submit} loading={saving}>
-            {task ? 'Save' : 'Create'}
+            {task ? t('atelie.taskForm.save') : t('atelie.taskForm.create')}
           </CRMButton>
         </div>
       }
     >
       <div className="flex flex-col gap-4">
         <CRMInput
-          label="Title"
+          label={t('atelie.taskForm.titleField')}
           required
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Cut 50m of navy cotton"
+          placeholder={t('atelie.taskForm.titlePlaceholder')}
         />
 
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">Description</label>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            {t('atelie.taskForm.description')}
+          </label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={4}
             className="w-full rounded-input border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-            placeholder="What needs to be done, references, dimensions, etc."
+            placeholder={t('atelie.taskForm.descriptionPlaceholder')}
           />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Visibility</label>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              {t('atelie.taskForm.visibility')}
+            </label>
             <div className="flex gap-2">
               <button
                 onClick={() => setVisibility('private')}
@@ -143,7 +147,7 @@ export function TaskFormModal({ open, onClose, onSaved, task }: Props) {
                     : 'border-gray-200 text-gray-500 hover:bg-gray-50',
                 )}
               >
-                Private
+                {t('atelie.taskForm.private')}
               </button>
               <button
                 onClick={() => setVisibility('shared')}
@@ -154,13 +158,13 @@ export function TaskFormModal({ open, onClose, onSaved, task }: Props) {
                     : 'border-gray-200 text-gray-500 hover:bg-gray-50',
                 )}
               >
-                Shared
+                {t('atelie.taskForm.shared')}
               </button>
             </div>
           </div>
 
           <CRMInput
-            label="Due date (optional)"
+            label={t('atelie.taskForm.dueOptional')}
             type="date"
             value={dueAt}
             onChange={(e) => setDueAt(e.target.value)}
@@ -168,7 +172,9 @@ export function TaskFormModal({ open, onClose, onSaved, task }: Props) {
         </div>
 
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">Color</label>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            {t('atelie.taskForm.color')}
+          </label>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setColor(null)}
@@ -176,7 +182,7 @@ export function TaskFormModal({ open, onClose, onSaved, task }: Props) {
                 'flex h-7 w-7 items-center justify-center rounded-full border-2 text-xs',
                 !color ? 'border-primary text-primary' : 'border-gray-200 text-gray-300',
               )}
-              title="No color"
+              title={t('atelie.taskForm.noColor')}
             >
               ✕
             </button>
@@ -196,14 +202,16 @@ export function TaskFormModal({ open, onClose, onSaved, task }: Props) {
         </div>
 
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">Attachments</label>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            {t('atelie.taskForm.attachments')}
+          </label>
           <div className="flex flex-col gap-2">
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               className="flex items-center justify-center gap-2 rounded-btn border border-dashed border-gray-300 bg-white px-3 py-2 text-sm text-gray-500 hover:border-primary hover:text-primary"
             >
-              <Paperclip size={14} /> Add files
+              <Paperclip size={14} /> {t('atelie.taskForm.addFiles')}
             </button>
             <input
               ref={fileInputRef}
@@ -233,7 +241,7 @@ export function TaskFormModal({ open, onClose, onSaved, task }: Props) {
                           setPendingFiles((prev) => prev.filter((_, i) => i !== idx))
                         }
                         className="flex h-5 w-5 items-center justify-center rounded text-gray-400 hover:bg-red-50 hover:text-red-500"
-                        aria-label="Remove"
+                        aria-label={t('atelie.taskForm.remove')}
                       >
                         <X size={12} />
                       </button>

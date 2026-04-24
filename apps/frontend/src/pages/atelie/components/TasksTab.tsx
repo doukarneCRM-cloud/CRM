@@ -10,6 +10,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { Plus, Search } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { CRMButton, CRMInput } from '@/components/ui';
 import { atelieApi, type Task, type TaskStatus } from '@/services/atelieApi';
 import { useAuthStore } from '@/store/authStore';
@@ -20,19 +21,12 @@ import { TaskFormModal } from './TaskFormModal';
 import { TaskDetailModal } from './TaskDetailModal';
 import { IncompleteReasonPrompt } from './IncompleteReasonPrompt';
 
-const COLUMNS: Array<{ status: TaskStatus; title: string; accent: string }> = [
-  { status: 'backlog', title: 'Backlog', accent: 'bg-gray-400' },
-  { status: 'processing', title: 'Processing', accent: 'bg-blue-500' },
-  { status: 'done', title: 'Done', accent: 'bg-green-500' },
-  { status: 'forgotten', title: 'Forgotten', accent: 'bg-gray-500' },
-  { status: 'incomplete', title: 'Incomplete', accent: 'bg-red-500' },
-];
-
 const POS_STEP = 1024;
 
 type TabFilter = 'all' | 'mine' | 'shared';
 
 export function TasksTab() {
+  const { t } = useTranslation();
   const me = useAuthStore((s) => s.user);
   const [mine, setMine] = useState<Task[]>([]);
   const [shared, setShared] = useState<Task[]>([]);
@@ -46,6 +40,17 @@ export function TasksTab() {
     taskId: string;
     targetPos: number;
   } | null>(null);
+
+  const COLUMNS = useMemo<Array<{ status: TaskStatus; title: string; accent: string }>>(
+    () => [
+      { status: 'backlog', title: t('atelie.tasks.columns.backlog'), accent: 'bg-gray-400' },
+      { status: 'processing', title: t('atelie.tasks.columns.processing'), accent: 'bg-blue-500' },
+      { status: 'done', title: t('atelie.tasks.columns.done'), accent: 'bg-green-500' },
+      { status: 'forgotten', title: t('atelie.tasks.columns.forgotten'), accent: 'bg-gray-500' },
+      { status: 'incomplete', title: t('atelie.tasks.columns.incomplete'), accent: 'bg-red-500' },
+    ],
+    [t],
+  );
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
@@ -95,9 +100,9 @@ export function TasksTab() {
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       return combined.filter(
-        (t) =>
-          t.title.toLowerCase().includes(q) ||
-          (t.description ?? '').toLowerCase().includes(q),
+        (task) =>
+          task.title.toLowerCase().includes(q) ||
+          (task.description ?? '').toLowerCase().includes(q),
       );
     }
     return combined;
@@ -111,7 +116,7 @@ export function TasksTab() {
       forgotten: [],
       incomplete: [],
     };
-    for (const t of allVisible) map[t.status].push(t);
+    for (const task of allVisible) map[task.status].push(task);
     for (const k of Object.keys(map) as TaskStatus[]) {
       map[k].sort((a, b) => a.position - b.position);
     }
@@ -123,21 +128,21 @@ export function TasksTab() {
     insertAtId: string | null,
     activeId: string,
   ): number {
-    const column = byStatus[targetStatus].filter((t) => t.id !== activeId);
+    const column = byStatus[targetStatus].filter((task) => task.id !== activeId);
     if (column.length === 0) return POS_STEP;
     if (!insertAtId) {
       // Dropped on column container → append
       return column[column.length - 1].position + POS_STEP;
     }
-    const idx = column.findIndex((t) => t.id === insertAtId);
+    const idx = column.findIndex((task) => task.id === insertAtId);
     if (idx === -1) return column[column.length - 1].position + POS_STEP;
     if (idx === 0) return column[0].position - POS_STEP;
     return (column[idx - 1].position + column[idx].position) / 2;
   }
 
   function handleDragStart(e: DragStartEvent) {
-    const t = [...mine, ...shared].find((x) => x.id === e.active.id);
-    if (t && me && t.ownerId === me.id) setActiveTask(t);
+    const task = [...mine, ...shared].find((x) => x.id === e.active.id);
+    if (task && me && task.ownerId === me.id) setActiveTask(task);
   }
 
   async function handleDragEnd(e: DragEndEvent) {
@@ -145,7 +150,7 @@ export function TasksTab() {
     const { active, over } = e;
     if (!over || !me) return;
 
-    const task = [...mine, ...shared].find((t) => t.id === active.id);
+    const task = [...mine, ...shared].find((x) => x.id === active.id);
     if (!task || task.ownerId !== me.id) return;
 
     // Drop target could be a card or a column
@@ -165,8 +170,8 @@ export function TasksTab() {
 
     // Optimistic update
     const patch = (arr: Task[]) =>
-      arr.map((t) =>
-        t.id === task.id ? { ...t, status: targetStatus, position: targetPos } : t,
+      arr.map((x) =>
+        x.id === task.id ? { ...x, status: targetStatus, position: targetPos } : x,
       );
     setMine((cur) => patch(cur));
     setShared((cur) => patch(cur));
@@ -198,6 +203,12 @@ export function TasksTab() {
     load();
   }
 
+  function filterLabel(f: TabFilter): string {
+    if (f === 'all') return t('atelie.tasks.filterAll');
+    if (f === 'mine') return t('atelie.tasks.filterMine');
+    return t('atelie.tasks.filterShared');
+  }
+
   return (
     <div className="flex h-full flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -212,7 +223,7 @@ export function TasksTab() {
                   : 'rounded-badge bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-500 hover:bg-gray-200'
               }
             >
-              {f === 'all' ? 'All' : f === 'mine' ? 'My tasks' : 'Shared'}
+              {filterLabel(f)}
             </button>
           ))}
           <div className="w-56">
@@ -220,17 +231,17 @@ export function TasksTab() {
               leftIcon={<Search size={14} />}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search tasks…"
+              placeholder={t('atelie.tasks.searchPlaceholder')}
             />
           </div>
         </div>
         <CRMButton leftIcon={<Plus size={14} />} onClick={() => setCreateOpen(true)}>
-          New task
+          {t('atelie.tasks.newTask')}
         </CRMButton>
       </div>
 
       {loading && allVisible.length === 0 ? (
-        <p className="py-10 text-center text-sm text-gray-400">Loading…</p>
+        <p className="py-10 text-center text-sm text-gray-400">{t('atelie.tasks.loading')}</p>
       ) : (
         <DndContext
           sensors={sensors}
@@ -248,7 +259,7 @@ export function TasksTab() {
                 tasks={byStatus[c.status]}
                 myUserId={me?.id ?? ''}
                 onCreate={c.status === 'backlog' ? () => setCreateOpen(true) : undefined}
-                onOpen={(t) => setDetailId(t.id)}
+                onOpen={(task) => setDetailId(task.id)}
                 onHide={hideTask}
               />
             ))}

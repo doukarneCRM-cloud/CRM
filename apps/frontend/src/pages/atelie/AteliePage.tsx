@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { PillTabGroup } from '@/components/ui';
 import { ROUTES } from '@/constants/routes';
 import { AttendanceGrid } from './components/AttendanceGrid';
@@ -8,13 +9,6 @@ import { StockTab } from './components/StockTab';
 import { TasksTab } from './components/TasksTab';
 
 type TabId = 'employees' | 'salary' | 'stock' | 'tasks';
-
-const TABS = [
-  { id: 'employees', label: 'Employees' },
-  { id: 'salary', label: 'Salary' },
-  { id: 'stock', label: 'Stock' },
-  { id: 'tasks', label: 'Team Tasks' },
-];
 
 const PATH_TO_TAB: Record<string, TabId> = {
   [ROUTES.ATELIE_EMPLOYEES]: 'employees',
@@ -31,10 +25,21 @@ const TAB_TO_PATH: Record<TabId, string> = {
 };
 
 export default function AteliePage() {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabId>(
     () => PATH_TO_TAB[location.pathname] ?? 'employees',
+  );
+
+  const TABS = useMemo(
+    () => [
+      { id: 'employees', label: t('atelie.tabs.employees') },
+      { id: 'salary', label: t('atelie.tabs.salary') },
+      { id: 'stock', label: t('atelie.tabs.stock') },
+      { id: 'tasks', label: t('atelie.tabs.tasks') },
+    ],
+    [t],
   );
 
   useEffect(() => {
@@ -53,10 +58,8 @@ export default function AteliePage() {
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
       <div className="mb-4">
-        <h1 className="text-lg font-bold text-gray-900">Atelie</h1>
-        <p className="text-xs text-gray-400">
-          Workshop staff, salary, stock (fabric rolls + accessories), and the team's task board.
-        </p>
+        <h1 className="text-lg font-bold text-gray-900">{t('atelie.page.title')}</h1>
+        <p className="text-xs text-gray-400">{t('atelie.page.subtitle')}</p>
       </div>
 
       <div className="mb-5">
