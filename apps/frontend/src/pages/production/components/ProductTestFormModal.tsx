@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { GlassModal, CRMInput, CRMSelect, CRMButton } from '@/components/ui';
 import { atelieApi, type FabricType, type Material } from '@/services/atelieApi';
 import { productionApi, type CreateProductTestPayload } from '@/services/productionApi';
 import { useToastStore } from '@/store/toastStore';
+import { apiErrorMessage } from '@/lib/apiError';
 
 interface Props {
   open: boolean;
@@ -12,6 +14,7 @@ interface Props {
 }
 
 export function ProductTestFormModal({ open, onClose, onSaved }: Props) {
+  const { t } = useTranslation();
   const pushToast = useToastStore((s) => s.push);
   const [fabricTypes, setFabricTypes] = useState<FabricType[]>([]);
   const [accessories, setAccessories] = useState<Material[]>([]);
@@ -56,12 +59,15 @@ export function ProductTestFormModal({ open, onClose, onSaved }: Props) {
         videoUrl: form.videoUrl?.trim() || null,
         notes: form.notes?.trim() || null,
       });
-      pushToast({ kind: 'success', title: 'Test saved' });
+      pushToast({ kind: 'success', title: t('production.testForm.toast.savedTitle') });
       onSaved();
       onClose();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Could not save';
-      pushToast({ kind: 'error', title: 'Save failed', body: msg });
+      pushToast({
+        kind: 'error',
+        title: t('production.testForm.toast.saveFailedTitle'),
+        body: apiErrorMessage(err, t('production.testForm.toast.saveFallback')),
+      });
     } finally {
       setSaving(false);
     }
@@ -95,7 +101,7 @@ export function ProductTestFormModal({ open, onClose, onSaved }: Props) {
     <GlassModal
       open={open}
       onClose={onClose}
-      title="New product test"
+      title={t('production.testForm.title')}
       size="lg"
       footer={
         <div className="flex items-center justify-end gap-2">
@@ -103,10 +109,10 @@ export function ProductTestFormModal({ open, onClose, onSaved }: Props) {
             onClick={onClose}
             className="rounded-btn border border-gray-200 bg-white px-3.5 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <CRMButton onClick={save} disabled={!form.name.trim() || saving}>
-            {saving ? 'Saving…' : 'Save test'}
+            {saving ? t('production.testForm.saving') : t('production.testForm.saveTest')}
           </CRMButton>
         </div>
       }
@@ -114,13 +120,13 @@ export function ProductTestFormModal({ open, onClose, onSaved }: Props) {
       <div className="flex flex-col gap-4">
         <div className="grid grid-cols-2 gap-3">
           <CRMInput
-            label="Name"
+            label={t('production.testForm.name')}
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
-            placeholder="Summer kaftan — model A"
+            placeholder={t('production.testForm.namePlaceholder')}
           />
           <CRMInput
-            label="Estimated MAD / piece"
+            label={t('production.testForm.estPerPiece')}
             type="number"
             value={form.estimatedCostPerPiece ?? ''}
             onChange={(e) =>
@@ -134,16 +140,18 @@ export function ProductTestFormModal({ open, onClose, onSaved }: Props) {
         </div>
 
         <CRMInput
-          label="Video URL (restricted — only visible to roles with view_video perm)"
+          label={t('production.testForm.videoUrl')}
           value={form.videoUrl ?? ''}
           onChange={(e) => setForm({ ...form, videoUrl: e.target.value })}
-          placeholder="https://…"
+          placeholder={t('production.testForm.videoUrlPlaceholder')}
         />
 
         {/* Fabrics */}
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-xs font-semibold text-gray-700">Fabrics needed</h3>
+            <h3 className="text-xs font-semibold text-gray-700">
+              {t('production.testForm.fabricsHeading')}
+            </h3>
             <button
               onClick={() =>
                 setForm({
@@ -153,7 +161,7 @@ export function ProductTestFormModal({ open, onClose, onSaved }: Props) {
               }
               className="inline-flex items-center gap-1 rounded-btn bg-accent px-2 py-1 text-[11px] font-semibold text-primary hover:bg-accent/70"
             >
-              <Plus size={11} /> Add fabric
+              <Plus size={11} /> {t('production.testForm.addFabric')}
             </button>
           </div>
           <div className="flex flex-col gap-2">
@@ -161,8 +169,8 @@ export function ProductTestFormModal({ open, onClose, onSaved }: Props) {
               <div key={i} className="flex items-center gap-2">
                 <CRMSelect
                   options={[
-                    { value: '', label: 'Select fabric…' },
-                    ...fabricTypes.map((t) => ({ value: t.id, label: t.name })),
+                    { value: '', label: t('production.testForm.selectFabric') },
+                    ...fabricTypes.map((ft) => ({ value: ft.id, label: ft.name })),
                   ]}
                   value={f.fabricTypeId}
                   onChange={(v) => updateFabric(i, { fabricTypeId: v as string })}
@@ -171,7 +179,7 @@ export function ProductTestFormModal({ open, onClose, onSaved }: Props) {
                 <CRMInput
                   className="w-36"
                   value={f.role}
-                  placeholder="main / lining"
+                  placeholder={t('production.testForm.rolePlaceholder')}
                   onChange={(e) => updateFabric(i, { role: e.target.value })}
                 />
                 <button
@@ -193,7 +201,9 @@ export function ProductTestFormModal({ open, onClose, onSaved }: Props) {
         {/* Sizes */}
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-xs font-semibold text-gray-700">Sizes & tracing</h3>
+            <h3 className="text-xs font-semibold text-gray-700">
+              {t('production.testForm.sizesHeading')}
+            </h3>
             <button
               onClick={() =>
                 setForm({
@@ -203,7 +213,7 @@ export function ProductTestFormModal({ open, onClose, onSaved }: Props) {
               }
               className="inline-flex items-center gap-1 rounded-btn bg-accent px-2 py-1 text-[11px] font-semibold text-primary hover:bg-accent/70"
             >
-              <Plus size={11} /> Add size
+              <Plus size={11} /> {t('production.testForm.addSize')}
             </button>
           </div>
           <div className="flex flex-col gap-2">
@@ -212,14 +222,14 @@ export function ProductTestFormModal({ open, onClose, onSaved }: Props) {
                 <CRMInput
                   className="w-24"
                   value={s.size}
-                  placeholder="S / M"
+                  placeholder={t('production.testForm.sizePlaceholder')}
                   onChange={(e) => updateSize(i, { size: e.target.value })}
                 />
                 <CRMInput
                   className="flex-1"
                   type="number"
                   value={s.tracingMeters}
-                  placeholder="Tracing (m)"
+                  placeholder={t('production.testForm.tracingPlaceholder')}
                   onChange={(e) =>
                     updateSize(i, { tracingMeters: Number(e.target.value) })
                   }
@@ -243,7 +253,9 @@ export function ProductTestFormModal({ open, onClose, onSaved }: Props) {
         {/* Accessories */}
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-xs font-semibold text-gray-700">Accessories per piece</h3>
+            <h3 className="text-xs font-semibold text-gray-700">
+              {t('production.testForm.accessoriesHeading')}
+            </h3>
             <button
               onClick={() =>
                 setForm({
@@ -256,7 +268,7 @@ export function ProductTestFormModal({ open, onClose, onSaved }: Props) {
               }
               className="inline-flex items-center gap-1 rounded-btn bg-accent px-2 py-1 text-[11px] font-semibold text-primary hover:bg-accent/70"
             >
-              <Plus size={11} /> Add accessory
+              <Plus size={11} /> {t('production.testForm.addAccessory')}
             </button>
           </div>
           <div className="flex flex-col gap-2">
@@ -264,8 +276,14 @@ export function ProductTestFormModal({ open, onClose, onSaved }: Props) {
               <div key={i} className="flex items-center gap-2">
                 <CRMSelect
                   options={[
-                    { value: '', label: 'Select accessory…' },
-                    ...accessories.map((m) => ({ value: m.id, label: `${m.name} (${m.unit})` })),
+                    { value: '', label: t('production.testForm.selectAccessory') },
+                    ...accessories.map((m) => ({
+                      value: m.id,
+                      label: t('production.testForm.accessoryLabel', {
+                        name: m.name,
+                        unit: m.unit,
+                      }),
+                    })),
                   ]}
                   value={a.materialId}
                   onChange={(v) => updateAcc(i, { materialId: v as string })}
@@ -275,7 +293,7 @@ export function ProductTestFormModal({ open, onClose, onSaved }: Props) {
                   className="w-32"
                   type="number"
                   value={a.quantityPerPiece}
-                  placeholder="Qty"
+                  placeholder={t('production.testForm.qtyPlaceholder')}
                   onChange={(e) =>
                     updateAcc(i, { quantityPerPiece: Number(e.target.value) })
                   }
@@ -297,7 +315,7 @@ export function ProductTestFormModal({ open, onClose, onSaved }: Props) {
         </div>
 
         <CRMInput
-          label="Notes"
+          label={t('production.testForm.notes')}
           value={form.notes ?? ''}
           onChange={(e) => setForm({ ...form, notes: e.target.value })}
         />

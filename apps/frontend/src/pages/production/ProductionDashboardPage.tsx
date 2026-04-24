@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Clock, CheckCircle2, Activity } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { GlassCard } from '@/components/ui';
 import { ROUTES } from '@/constants/routes';
 import { productionApi, type ProductionRun } from '@/services/productionApi';
 
 export default function ProductionDashboardPage() {
+  const { t } = useTranslation();
   const [runs, setRuns] = useState<ProductionRun[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -32,21 +34,21 @@ export default function ProductionDashboardPage() {
     <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6">
       <div className="mb-5 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-bold text-gray-900">Production</h1>
-          <p className="text-xs text-gray-400">Overview of product tests and production runs.</p>
+          <h1 className="text-lg font-bold text-gray-900">{t('production.dashboard.title')}</h1>
+          <p className="text-xs text-gray-400">{t('production.dashboard.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
           <Link
             to={ROUTES.PRODUCTION_TESTS}
             className="rounded-btn border border-gray-200 bg-white px-3.5 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
           >
-            Product tests →
+            {t('production.dashboard.productTestsLink')}
           </Link>
           <Link
             to={ROUTES.PRODUCTION_RUNS}
             className="rounded-btn bg-primary px-3.5 py-2 text-sm font-semibold text-white hover:bg-primary/90"
           >
-            Production runs →
+            {t('production.dashboard.productionRunsLink')}
           </Link>
         </div>
       </div>
@@ -58,7 +60,7 @@ export default function ProductionDashboardPage() {
               <Activity size={18} />
             </div>
             <div>
-              <p className="text-xs text-gray-400">Active runs</p>
+              <p className="text-xs text-gray-400">{t('production.dashboard.activeRuns')}</p>
               <p className="text-xl font-bold text-gray-900">{active.length}</p>
             </div>
           </div>
@@ -69,7 +71,7 @@ export default function ProductionDashboardPage() {
               <Clock size={18} />
             </div>
             <div>
-              <p className="text-xs text-gray-400">Draft runs</p>
+              <p className="text-xs text-gray-400">{t('production.dashboard.draftRuns')}</p>
               <p className="text-xl font-bold text-gray-900">{draft.length}</p>
             </div>
           </div>
@@ -80,8 +82,10 @@ export default function ProductionDashboardPage() {
               <CheckCircle2 size={18} />
             </div>
             <div>
-              <p className="text-xs text-gray-400">Spent last 7d</p>
-              <p className="text-xl font-bold text-gray-900">{weekCost.toFixed(0)} MAD</p>
+              <p className="text-xs text-gray-400">{t('production.dashboard.spentLast7d')}</p>
+              <p className="text-xl font-bold text-gray-900">
+                {t('production.dashboard.valueMad', { value: weekCost.toFixed(0) })}
+              </p>
             </div>
           </div>
         </GlassCard>
@@ -89,27 +93,41 @@ export default function ProductionDashboardPage() {
 
       <GlassCard padding="md" className="mt-5">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-gray-900">Recent runs</h2>
+          <h2 className="text-sm font-semibold text-gray-900">
+            {t('production.dashboard.recentRuns')}
+          </h2>
           <Link
             to={ROUTES.PRODUCTION_RUNS}
             className="text-xs font-semibold text-primary hover:underline"
           >
-            View all →
+            {t('production.dashboard.viewAll')}
           </Link>
         </div>
         {loading ? (
-          <p className="py-4 text-center text-sm text-gray-400">Loading…</p>
+          <p className="py-4 text-center text-sm text-gray-400">
+            {t('production.dashboard.loading')}
+          </p>
         ) : runs.length === 0 ? (
-          <p className="py-4 text-center text-sm text-gray-400">No runs yet.</p>
+          <p className="py-4 text-center text-sm text-gray-400">
+            {t('production.dashboard.emptyRuns')}
+          </p>
         ) : (
           <table className="w-full text-sm">
             <thead className="text-xs text-gray-500">
               <tr>
-                <th className="py-2 text-left font-medium">Ref</th>
-                <th className="py-2 text-left font-medium">Status</th>
-                <th className="py-2 text-left font-medium">Started</th>
-                <th className="py-2 text-right font-medium">Pieces</th>
-                <th className="py-2 text-right font-medium">Cost / piece</th>
+                <th className="py-2 text-left font-medium">{t('production.dashboard.col.ref')}</th>
+                <th className="py-2 text-left font-medium">
+                  {t('production.dashboard.col.status')}
+                </th>
+                <th className="py-2 text-left font-medium">
+                  {t('production.dashboard.col.started')}
+                </th>
+                <th className="py-2 text-right font-medium">
+                  {t('production.dashboard.col.pieces')}
+                </th>
+                <th className="py-2 text-right font-medium">
+                  {t('production.dashboard.col.costPerPiece')}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -123,7 +141,9 @@ export default function ProductionDashboardPage() {
                       {r.reference}
                     </Link>
                   </td>
-                  <td className="py-2 capitalize text-gray-600">{r.status}</td>
+                  <td className="py-2 text-gray-600">
+                    {t(`production.runs.status.${r.status}`)}
+                  </td>
                   <td className="py-2 text-gray-500">
                     {new Date(r.startDate).toLocaleDateString()}
                   </td>
@@ -131,7 +151,9 @@ export default function ProductionDashboardPage() {
                     {r.actualPieces} / {r.expectedPieces}
                   </td>
                   <td className="py-2 text-right text-gray-900">
-                    {r.costPerPiece > 0 ? `${r.costPerPiece.toFixed(2)} MAD` : '—'}
+                    {r.costPerPiece > 0
+                      ? t('production.dashboard.valueMad', { value: r.costPerPiece.toFixed(2) })
+                      : '\u2014'}
                   </td>
                 </tr>
               ))}

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, Plus, UserPlus, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { GlassCard, CRMInput, CRMSelect, CRMButton } from '@/components/ui';
 import { ROUTES } from '@/constants/routes';
 import {
@@ -17,6 +19,7 @@ import {
 } from '@/services/atelieApi';
 import { useAuthStore } from '@/store/authStore';
 import { useToastStore } from '@/store/toastStore';
+import { apiErrorMessage } from '@/lib/apiError';
 
 type Tab = 'overview' | 'materials' | 'workers' | 'cost' | 'finish';
 
@@ -28,6 +31,7 @@ const STATUS_CLASSES: Record<RunStatus, string> = {
 };
 
 export default function ProductionRunDetailPage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const pushToast = useToastStore((s) => s.push);
   const hasPermission = useAuthStore((s) => s.hasPermission);
@@ -43,8 +47,8 @@ export default function ProductionRunDetailPage() {
     if (!id) return;
     setLoading(true);
     try {
-      const r = await productionApi.getRun(id);
-      setRun(r);
+      const fetched = await productionApi.getRun(id);
+      setRun(fetched);
     } finally {
       setLoading(false);
     }
@@ -55,8 +59,21 @@ export default function ProductionRunDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  if (loading) return <div className="p-6 text-sm text-gray-400">Loading…</div>;
-  if (!run) return <div className="p-6 text-sm text-gray-400">Not found.</div>;
+  const tabs = useMemo<Array<{ id: Tab; label: string }>>(
+    () => [
+      { id: 'overview', label: t('production.runDetail.tabs.overview') },
+      { id: 'materials', label: t('production.runDetail.tabs.materials') },
+      { id: 'workers', label: t('production.runDetail.tabs.workers') },
+      ...(canViewCost
+        ? [{ id: 'cost' as const, label: t('production.runDetail.tabs.cost') }]
+        : []),
+      { id: 'finish', label: t('production.runDetail.tabs.finish') },
+    ],
+    [t, canViewCost],
+  );
+
+  if (loading) return <div className="p-6 text-sm text-gray-400">{t('production.runDetail.loading')}</div>;
+  if (!run) return <div className="p-6 text-sm text-gray-400">{t('production.runDetail.notFound')}</div>;
 
   async function updateActual(sizeId: string, actual: number) {
     if (!run) return;
@@ -81,8 +98,11 @@ export default function ProductionRunDetailPage() {
       const updated = await productionApi.updateRun(run.id, { sizes });
       setRun(updated);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Update failed';
-      pushToast({ kind: 'error', title: 'Save failed', body: msg });
+      pushToast({
+        kind: 'error',
+        title: t('production.runDetail.toast.saveFailedTitle'),
+        body: apiErrorMessage(err, t('production.runDetail.toast.saveFallback')),
+      });
     }
   }
 
@@ -91,28 +111,39 @@ export default function ProductionRunDetailPage() {
     try {
       const updated = await productionApi.updateRun(run.id, { status });
       setRun(updated);
-      pushToast({ kind: 'success', title: `Run is now ${status}` });
+      pushToast({
+        kind: 'success',
+        title: t('production.runDetail.toast.statusNowTitle', {
+          status: t(`production.runs.status.${status}`),
+        }),
+      });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Update failed';
-      pushToast({ kind: 'error', title: 'Status change failed', body: msg });
+      pushToast({
+        kind: 'error',
+        title: t('production.runDetail.toast.statusFailedTitle'),
+        body: apiErrorMessage(err, t('production.runDetail.toast.saveFallback')),
+      });
     }
   }
 
   async function finish() {
     if (!run) return;
-    if (!confirm(`Finish run ${run.reference}? This snapshots the cost and locks the run.`))
-      return;
+    if (!confirm(t('production.runDetail.confirmFinish', { ref: run.reference }))) return;
     try {
       const updated = await productionApi.finishRun(run.id);
       setRun(updated);
-      pushToast({ kind: 'success', title: 'Run finished' });
+      pushToast({ kind: 'success', title: t('production.runDetail.toast.finishedTitle') });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Finish failed';
-      pushToast({ kind: 'error', title: 'Finish failed', body: msg });
+      pushToast({
+        kind: 'error',
+        title: t('production.runDetail.toast.finishFailedTitle'),
+        body: apiErrorMessage(err, t('production.runDetail.toast.finishFallback')),
+      });
     }
   }
 
   const locked = run.status === 'finished' || run.status === 'cancelled';
+  const statusLabel = t(`production.runs.status.${run.status}`);
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
@@ -120,7 +151,7 @@ export default function ProductionRunDetailPage() {
         to={ROUTES.PRODUCTION_RUNS}
         className="mb-4 inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-primary"
       >
-        <ArrowLeft size={12} /> Back to runs
+        <ArrowLeft size={12} /> {t('production.runDetail.backToRuns')}
       </Link>
 
       <div className="mb-4 flex items-start justify-between">
@@ -130,23 +161,27 @@ export default function ProductionRunDetailPage() {
             <span
               className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${STATUS_CLASSES[run.status]}`}
             >
-              {run.status}
+              {statusLabel}
             </span>
           </div>
           <p className="text-xs text-gray-400">
-            {run.test?.name ?? 'No test'} • Started{' '}
-            {new Date(run.startDate).toLocaleDateString()}
-            {run.endDate && <> → {new Date(run.endDate).toLocaleDateString()}</>}
+            {run.test?.name ?? t('production.runDetail.noTest')} {'\u2022 '}
+            {t('production.runDetail.startedOn', {
+              date: new Date(run.startDate).toLocaleDateString(),
+            })}
+            {run.endDate && <> {'\u2192'} {new Date(run.endDate).toLocaleDateString()}</>}
           </p>
         </div>
         {canManage && !locked && (
           <div className="flex items-center gap-2">
             {run.status === 'draft' && (
-              <CRMButton onClick={() => changeStatus('active')}>Start run</CRMButton>
+              <CRMButton onClick={() => changeStatus('active')}>
+                {t('production.runDetail.startRun')}
+              </CRMButton>
             )}
             {run.status === 'active' && canFinish && (
               <CRMButton onClick={finish} leftIcon={<CheckCircle2 size={14} />}>
-                Finish
+                {t('production.runDetail.finish')}
               </CRMButton>
             )}
             {(run.status === 'draft' || run.status === 'active') && (
@@ -154,7 +189,7 @@ export default function ProductionRunDetailPage() {
                 onClick={() => changeStatus('cancelled')}
                 className="rounded-btn border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50"
               >
-                Cancel run
+                {t('production.runDetail.cancelRun')}
               </button>
             )}
           </div>
@@ -164,50 +199,42 @@ export default function ProductionRunDetailPage() {
       {/* KPI strip */}
       <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <GlassCard padding="md">
-          <p className="text-xs text-gray-400">Pieces</p>
+          <p className="text-xs text-gray-400">{t('production.runDetail.kpi.pieces')}</p>
           <p className="text-lg font-bold text-gray-900">
             {run.actualPieces} / {run.expectedPieces}
           </p>
         </GlassCard>
         <GlassCard padding="md">
-          <p className="text-xs text-gray-400">Materials</p>
+          <p className="text-xs text-gray-400">{t('production.runDetail.kpi.materials')}</p>
           <p className="text-lg font-bold text-gray-900">
             {run.materialsCost.toFixed(0)} MAD
           </p>
         </GlassCard>
         <GlassCard padding="md">
-          <p className="text-xs text-gray-400">Labor</p>
+          <p className="text-xs text-gray-400">{t('production.runDetail.kpi.labor')}</p>
           <p className="text-lg font-bold text-gray-900">{run.laborCost.toFixed(0)} MAD</p>
         </GlassCard>
         <GlassCard padding="md">
-          <p className="text-xs text-gray-400">Cost / piece</p>
+          <p className="text-xs text-gray-400">{t('production.runDetail.kpi.costPerPiece')}</p>
           <p className="text-lg font-bold text-primary">
-            {run.costPerPiece > 0 ? `${run.costPerPiece.toFixed(2)} MAD` : '—'}
+            {run.costPerPiece > 0 ? `${run.costPerPiece.toFixed(2)} MAD` : '\u2014'}
           </p>
         </GlassCard>
       </div>
 
       {/* Tabs */}
       <div className="mb-4 flex items-center gap-1 border-b border-gray-200">
-        {(
-          [
-            { id: 'overview', label: 'Overview' },
-            { id: 'materials', label: 'Fabric & accessories' },
-            { id: 'workers', label: 'Workers' },
-            ...(canViewCost ? [{ id: 'cost' as const, label: 'Cost breakdown' }] : []),
-            { id: 'finish', label: 'Finish' },
-          ] as Array<{ id: Tab; label: string }>
-        ).map((t) => (
+        {tabs.map((tabItem) => (
           <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
+            key={tabItem.id}
+            onClick={() => setTab(tabItem.id)}
             className={`px-3 py-2 text-xs font-semibold transition ${
-              tab === t.id
+              tab === tabItem.id
                 ? 'border-b-2 border-primary text-primary'
                 : 'text-gray-500 hover:text-gray-800'
             }`}
           >
-            {t.label}
+            {tabItem.label}
           </button>
         ))}
       </div>
@@ -240,20 +267,31 @@ function OverviewTab({
   locked: boolean;
   onUpdateActual: (sizeId: string, actual: number) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       <GlassCard padding="md">
-        <h3 className="mb-3 text-sm font-semibold text-gray-900">Sizes</h3>
+        <h3 className="mb-3 text-sm font-semibold text-gray-900">
+          {t('production.runDetail.overview.sizes')}
+        </h3>
         {run.sizes.length === 0 ? (
-          <p className="text-xs text-gray-400">No sizes configured.</p>
+          <p className="text-xs text-gray-400">{t('production.runDetail.overview.noSizes')}</p>
         ) : (
           <table className="w-full text-sm">
             <thead className="text-xs text-gray-500">
               <tr>
-                <th className="py-1.5 text-left font-medium">Size</th>
-                <th className="py-1.5 text-right font-medium">Tracing (m)</th>
-                <th className="py-1.5 text-right font-medium">Expected</th>
-                <th className="py-1.5 text-right font-medium">Actual</th>
+                <th className="py-1.5 text-left font-medium">
+                  {t('production.runDetail.overview.colSize')}
+                </th>
+                <th className="py-1.5 text-right font-medium">
+                  {t('production.runDetail.overview.colTracing')}
+                </th>
+                <th className="py-1.5 text-right font-medium">
+                  {t('production.runDetail.overview.colExpected')}
+                </th>
+                <th className="py-1.5 text-right font-medium">
+                  {t('production.runDetail.overview.colActual')}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -287,8 +325,10 @@ function OverviewTab({
       </GlassCard>
 
       <GlassCard padding="md">
-        <h3 className="mb-3 text-sm font-semibold text-gray-900">Notes</h3>
-        <p className="whitespace-pre-wrap text-sm text-gray-700">{run.notes || '—'}</p>
+        <h3 className="mb-3 text-sm font-semibold text-gray-900">
+          {t('production.runDetail.overview.notes')}
+        </h3>
+        <p className="whitespace-pre-wrap text-sm text-gray-700">{run.notes || '\u2014'}</p>
       </GlassCard>
     </div>
   );
@@ -307,6 +347,7 @@ function MaterialsTab({
   canManage: boolean;
   onChanged: () => void;
 }) {
+  const { t } = useTranslation();
   const pushToast = useToastStore((s) => s.push);
   const [tree, setTree] = useState<FabricTypeGroup[]>([]);
   const [accessories, setAccessories] = useState<Material[]>([]);
@@ -318,8 +359,8 @@ function MaterialsTab({
 
   useEffect(() => {
     Promise.all([atelieApi.fabricRollsTree(), atelieApi.listMaterials({})]).then(
-      ([t, mats]) => {
-        setTree(t);
+      ([newTree, mats]) => {
+        setTree(newTree);
         setAccessories(mats.filter((m) => m.category !== 'fabric' && m.isActive));
       },
     );
@@ -327,7 +368,7 @@ function MaterialsTab({
 
   const rollOptions = useMemo(() => {
     const opts: Array<{ value: string; label: string }> = [
-      { value: '', label: 'Select roll…' },
+      { value: '', label: t('production.runDetail.materials.selectRoll') },
     ];
     for (const g of tree) {
       for (const c of g.colors) {
@@ -335,13 +376,18 @@ function MaterialsTab({
           if (r.isDepleted) continue;
           opts.push({
             value: r.id,
-            label: `${g.typeName} · ${c.color} · ${r.remainingLength}m left @ ${r.unitCostPerMeter}/m`,
+            label: t('production.runDetail.materials.rollLabel', {
+              type: g.typeName,
+              color: c.color,
+              remaining: r.remainingLength,
+              rate: r.unitCostPerMeter,
+            }),
           });
         }
       }
     }
     return opts;
-  }, [tree]);
+  }, [tree, t]);
 
   async function addConsumption() {
     if (quantity <= 0) return;
@@ -353,20 +399,26 @@ function MaterialsTab({
         materialId: sourceType === 'accessory' ? materialId : undefined,
         quantity,
       });
-      pushToast({ kind: 'success', title: 'Consumption recorded' });
+      pushToast({
+        kind: 'success',
+        title: t('production.runDetail.toast.consumeRecordedTitle'),
+      });
       setQuantity(0);
       setFabricRollId('');
       setMaterialId('');
       onChanged();
-      const [t, mats] = await Promise.all([
+      const [newTree, mats] = await Promise.all([
         atelieApi.fabricRollsTree(),
         atelieApi.listMaterials({}),
       ]);
-      setTree(t);
+      setTree(newTree);
       setAccessories(mats.filter((m) => m.category !== 'fabric' && m.isActive));
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Consume failed';
-      pushToast({ kind: 'error', title: 'Consume failed', body: msg });
+      pushToast({
+        kind: 'error',
+        title: t('production.runDetail.toast.consumeFailedTitle'),
+        body: apiErrorMessage(err, t('production.runDetail.toast.consumeFallback')),
+      });
     } finally {
       setSaving(false);
     }
@@ -376,13 +428,21 @@ function MaterialsTab({
     <div className="flex flex-col gap-4">
       {canManage && !locked && (
         <GlassCard padding="md">
-          <h3 className="mb-3 text-sm font-semibold text-gray-900">Record consumption</h3>
+          <h3 className="mb-3 text-sm font-semibold text-gray-900">
+            {t('production.runDetail.materials.record')}
+          </h3>
           <div className="flex flex-wrap items-end gap-2">
             <CRMSelect
-              label="Source"
+              label={t('production.runDetail.materials.source')}
               options={[
-                { value: 'fabric_roll', label: 'Fabric roll' },
-                { value: 'accessory', label: 'Accessory' },
+                {
+                  value: 'fabric_roll',
+                  label: t('production.runDetail.materials.sourceFabric'),
+                },
+                {
+                  value: 'accessory',
+                  label: t('production.runDetail.materials.sourceAccessory'),
+                },
               ]}
               value={sourceType}
               onChange={(v) => setSourceType(v as 'fabric_roll' | 'accessory')}
@@ -390,7 +450,7 @@ function MaterialsTab({
             />
             {sourceType === 'fabric_roll' ? (
               <CRMSelect
-                label="Roll"
+                label={t('production.runDetail.materials.roll')}
                 options={rollOptions}
                 value={fabricRollId}
                 onChange={(v) => setFabricRollId(v as string)}
@@ -398,12 +458,17 @@ function MaterialsTab({
               />
             ) : (
               <CRMSelect
-                label="Accessory"
+                label={t('production.runDetail.materials.accessory')}
                 options={[
-                  { value: '', label: 'Select accessory…' },
+                  { value: '', label: t('production.runDetail.materials.selectAccessory') },
                   ...accessories.map((m) => ({
                     value: m.id,
-                    label: `${m.name} · ${m.stock} ${m.unit} @ ${m.unitCost ?? 0}/${m.unit}`,
+                    label: t('production.runDetail.materials.accessoryLabel', {
+                      name: m.name,
+                      stock: m.stock,
+                      unit: m.unit,
+                      cost: m.unitCost ?? 0,
+                    }),
                   })),
                 ]}
                 value={materialId}
@@ -412,7 +477,7 @@ function MaterialsTab({
               />
             )}
             <CRMInput
-              label="Quantity"
+              label={t('production.runDetail.materials.quantity')}
               type="number"
               value={quantity}
               onChange={(e) => setQuantity(Number(e.target.value))}
@@ -427,26 +492,42 @@ function MaterialsTab({
               }
               leftIcon={<Plus size={14} />}
             >
-              Consume
+              {t('production.runDetail.materials.consume')}
             </CRMButton>
           </div>
         </GlassCard>
       )}
 
       <GlassCard padding="md">
-        <h3 className="mb-3 text-sm font-semibold text-gray-900">History</h3>
+        <h3 className="mb-3 text-sm font-semibold text-gray-900">
+          {t('production.runDetail.materials.history')}
+        </h3>
         {run.consumptions.length === 0 ? (
-          <p className="py-4 text-center text-xs text-gray-400">Nothing consumed yet.</p>
+          <p className="py-4 text-center text-xs text-gray-400">
+            {t('production.runDetail.materials.empty')}
+          </p>
         ) : (
           <table className="w-full text-sm">
             <thead className="text-xs text-gray-500">
               <tr>
-                <th className="py-2 text-left font-medium">Date</th>
-                <th className="py-2 text-left font-medium">Source</th>
-                <th className="py-2 text-left font-medium">Item</th>
-                <th className="py-2 text-right font-medium">Qty</th>
-                <th className="py-2 text-right font-medium">Unit cost</th>
-                <th className="py-2 text-right font-medium">Subtotal</th>
+                <th className="py-2 text-left font-medium">
+                  {t('production.runDetail.materials.col.date')}
+                </th>
+                <th className="py-2 text-left font-medium">
+                  {t('production.runDetail.materials.col.source')}
+                </th>
+                <th className="py-2 text-left font-medium">
+                  {t('production.runDetail.materials.col.item')}
+                </th>
+                <th className="py-2 text-right font-medium">
+                  {t('production.runDetail.materials.col.qty')}
+                </th>
+                <th className="py-2 text-right font-medium">
+                  {t('production.runDetail.materials.col.unitCost')}
+                </th>
+                <th className="py-2 text-right font-medium">
+                  {t('production.runDetail.materials.col.subtotal')}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -455,13 +536,13 @@ function MaterialsTab({
                   <td className="py-2 text-gray-500">
                     {new Date(c.createdAt).toLocaleDateString()}
                   </td>
-                  <td className="py-2 capitalize text-gray-600">
-                    {c.sourceType.replace('_', ' ')}
+                  <td className="py-2 text-gray-600">
+                    {t(`production.runDetail.materials.sourceType.${c.sourceType}`)}
                   </td>
                   <td className="py-2 text-gray-900">
                     {c.fabricRoll
-                      ? `${c.fabricRoll.fabricType.name} · ${c.fabricRoll.color}`
-                      : (c.material?.name ?? '—')}
+                      ? `${c.fabricRoll.fabricType.name} \u00b7 ${c.fabricRoll.color}`
+                      : (c.material?.name ?? '\u2014')}
                   </td>
                   <td className="py-2 text-right text-gray-700">{c.quantity}</td>
                   <td className="py-2 text-right text-gray-600">
@@ -493,6 +574,7 @@ function WorkersTab({
   canManage: boolean;
   onChanged: () => void;
 }) {
+  const { t } = useTranslation();
   const pushToast = useToastStore((s) => s.push);
   const [employees, setEmployees] = useState<AtelieEmployee[]>([]);
   const [pickId, setPickId] = useState('');
@@ -508,23 +590,29 @@ function WorkersTab({
     if (!pickId) return;
     try {
       await productionApi.addWorker(run.id, pickId);
-      pushToast({ kind: 'success', title: 'Worker added' });
+      pushToast({ kind: 'success', title: t('production.runDetail.toast.workerAddedTitle') });
       setPickId('');
       onChanged();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed';
-      pushToast({ kind: 'error', title: 'Add failed', body: msg });
+      pushToast({
+        kind: 'error',
+        title: t('production.runDetail.toast.workerAddFailedTitle'),
+        body: apiErrorMessage(err, t('production.runDetail.toast.workerAddFallback')),
+      });
     }
   }
 
   async function remove(empId: string) {
     try {
       await productionApi.removeWorker(run.id, empId);
-      pushToast({ kind: 'success', title: 'Worker removed' });
+      pushToast({ kind: 'success', title: t('production.runDetail.toast.workerRemovedTitle') });
       onChanged();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed';
-      pushToast({ kind: 'error', title: 'Remove failed', body: msg });
+      pushToast({
+        kind: 'error',
+        title: t('production.runDetail.toast.workerRemoveFailedTitle'),
+        body: apiErrorMessage(err, t('production.runDetail.toast.workerRemoveFallback')),
+      });
     }
   }
 
@@ -533,10 +621,16 @@ function WorkersTab({
       {canManage && !locked && (
         <div className="mb-4 flex items-end gap-2">
           <CRMSelect
-            label="Add worker"
+            label={t('production.runDetail.workers.addWorker')}
             options={[
-              { value: '', label: 'Pick employee…' },
-              ...available.map((e) => ({ value: e.id, label: `${e.name} · ${e.role}` })),
+              { value: '', label: t('production.runDetail.workers.pickEmployee') },
+              ...available.map((e) => ({
+                value: e.id,
+                label: t('production.runDetail.workers.personLabel', {
+                  name: e.name,
+                  role: e.role,
+                }),
+              })),
             ]}
             value={pickId}
             onChange={(v) => setPickId(v as string)}
@@ -547,13 +641,15 @@ function WorkersTab({
             disabled={!pickId}
             leftIcon={<UserPlus size={14} />}
           >
-            Assign
+            {t('production.runDetail.workers.assign')}
           </CRMButton>
         </div>
       )}
 
       {run.workers.length === 0 ? (
-        <p className="py-4 text-center text-xs text-gray-400">No workers assigned.</p>
+        <p className="py-4 text-center text-xs text-gray-400">
+          {t('production.runDetail.workers.empty')}
+        </p>
       ) : (
         <ul className="flex flex-col gap-2">
           {run.workers.map((w) => (
@@ -565,7 +661,7 @@ function WorkersTab({
                 <p className="text-sm font-semibold text-gray-900">
                   {w.employee?.name ?? w.employeeId}
                 </p>
-                <p className="text-[11px] text-gray-500">{w.employee?.role ?? '—'}</p>
+                <p className="text-[11px] text-gray-500">{w.employee?.role ?? '\u2014'}</p>
               </div>
               {canManage && !locked && (
                 <button
@@ -586,6 +682,7 @@ function WorkersTab({
 // ─── Cost breakdown ────────────────────────────────────────────────────────
 
 function CostTab({ runId }: { runId: string }) {
+  const { t } = useTranslation();
   const [data, setData] = useState<CostBreakdown | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -597,31 +694,41 @@ function CostTab({ runId }: { runId: string }) {
   }, [runId]);
 
   if (loading) {
-    return <p className="py-4 text-center text-xs text-gray-400">Loading cost breakdown…</p>;
+    return (
+      <p className="py-4 text-center text-xs text-gray-400">
+        {t('production.runDetail.cost.loading')}
+      </p>
+    );
   }
   if (!data) {
-    return <p className="py-4 text-center text-xs text-gray-400">No data.</p>;
+    return (
+      <p className="py-4 text-center text-xs text-gray-400">
+        {t('production.runDetail.cost.noData')}
+      </p>
+    );
   }
 
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <GlassCard padding="md">
-          <p className="text-xs text-gray-400">Materials</p>
+          <p className="text-xs text-gray-400">{t('production.runDetail.cost.materials')}</p>
           <p className="text-base font-bold text-gray-900">
             {data.materialsCost.toFixed(2)}
           </p>
         </GlassCard>
         <GlassCard padding="md">
-          <p className="text-xs text-gray-400">Labor</p>
+          <p className="text-xs text-gray-400">{t('production.runDetail.cost.labor')}</p>
           <p className="text-base font-bold text-gray-900">{data.laborCost.toFixed(2)}</p>
         </GlassCard>
         <GlassCard padding="md">
-          <p className="text-xs text-gray-400">Total</p>
+          <p className="text-xs text-gray-400">{t('production.runDetail.cost.total')}</p>
           <p className="text-base font-bold text-gray-900">{data.totalCost.toFixed(2)}</p>
         </GlassCard>
         <GlassCard padding="md">
-          <p className="text-xs text-gray-400">Per piece ({data.actualPieces})</p>
+          <p className="text-xs text-gray-400">
+            {t('production.runDetail.cost.perPiece', { count: data.actualPieces })}
+          </p>
           <p className="text-base font-bold text-primary">
             {data.costPerPiece.toFixed(2)}
           </p>
@@ -629,26 +736,40 @@ function CostTab({ runId }: { runId: string }) {
       </div>
 
       <GlassCard padding="md">
-        <h3 className="mb-3 text-sm font-semibold text-gray-900">Materials</h3>
+        <h3 className="mb-3 text-sm font-semibold text-gray-900">
+          {t('production.runDetail.cost.materialsTitle')}
+        </h3>
         {data.materials.length === 0 ? (
-          <p className="py-2 text-xs text-gray-400">No consumption yet.</p>
+          <p className="py-2 text-xs text-gray-400">
+            {t('production.runDetail.cost.noConsumption')}
+          </p>
         ) : (
           <table className="w-full text-sm">
             <thead className="text-xs text-gray-500">
               <tr>
-                <th className="py-1.5 text-left font-medium">Item</th>
-                <th className="py-1.5 text-left font-medium">Source</th>
-                <th className="py-1.5 text-right font-medium">Qty</th>
-                <th className="py-1.5 text-right font-medium">Unit</th>
-                <th className="py-1.5 text-right font-medium">Subtotal</th>
+                <th className="py-1.5 text-left font-medium">
+                  {t('production.runDetail.cost.colItem')}
+                </th>
+                <th className="py-1.5 text-left font-medium">
+                  {t('production.runDetail.cost.colSource')}
+                </th>
+                <th className="py-1.5 text-right font-medium">
+                  {t('production.runDetail.cost.colQty')}
+                </th>
+                <th className="py-1.5 text-right font-medium">
+                  {t('production.runDetail.cost.colUnit')}
+                </th>
+                <th className="py-1.5 text-right font-medium">
+                  {t('production.runDetail.cost.colSubtotal')}
+                </th>
               </tr>
             </thead>
             <tbody>
               {data.materials.map((m, i) => (
                 <tr key={i} className="border-t border-gray-100">
                   <td className="py-1.5 text-gray-900">{m.name}</td>
-                  <td className="py-1.5 capitalize text-gray-500">
-                    {m.sourceType.replace('_', ' ')}
+                  <td className="py-1.5 text-gray-500">
+                    {t(`production.runDetail.materials.sourceType.${m.sourceType}`)}
                   </td>
                   <td className="py-1.5 text-right text-gray-600">{m.quantity}</td>
                   <td className="py-1.5 text-right text-gray-600">
@@ -665,51 +786,63 @@ function CostTab({ runId }: { runId: string }) {
       </GlassCard>
 
       <GlassCard padding="md">
-        <h3 className="mb-3 text-sm font-semibold text-gray-900">Labor (per day)</h3>
+        <h3 className="mb-3 text-sm font-semibold text-gray-900">
+          {t('production.runDetail.cost.laborTitle')}
+        </h3>
         <p className="mb-2 text-[11px] text-gray-400">
-          Each day, the worker's daily wage (base salary ÷ working days) is split equally
-          across every run they're active on, then weighted by attendance (full = 1, half =
-          0.5, absent = 0).
+          {t('production.runDetail.cost.laborHelp')}
         </p>
         {data.laborDaily.length === 0 ? (
-          <p className="py-2 text-xs text-gray-400">No labor recorded yet.</p>
+          <p className="py-2 text-xs text-gray-400">
+            {t('production.runDetail.cost.noLabor')}
+          </p>
         ) : (
           <div className="max-h-96 overflow-auto">
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-white text-xs text-gray-500">
                 <tr>
-                  <th className="py-1.5 text-left font-medium">Date</th>
-                  <th className="py-1.5 text-left font-medium">Worker</th>
-                  <th className="py-1.5 text-right font-medium">Daily rate</th>
-                  <th className="py-1.5 text-right font-medium">Runs</th>
-                  <th className="py-1.5 text-right font-medium">Share</th>
-                  <th className="py-1.5 text-right font-medium">Att.</th>
-                  <th className="py-1.5 text-right font-medium">Cost</th>
+                  <th className="py-1.5 text-left font-medium">
+                    {t('production.runDetail.cost.colDate')}
+                  </th>
+                  <th className="py-1.5 text-left font-medium">
+                    {t('production.runDetail.cost.colWorker')}
+                  </th>
+                  <th className="py-1.5 text-right font-medium">
+                    {t('production.runDetail.cost.colDailyRate')}
+                  </th>
+                  <th className="py-1.5 text-right font-medium">
+                    {t('production.runDetail.cost.colRuns')}
+                  </th>
+                  <th className="py-1.5 text-right font-medium">
+                    {t('production.runDetail.cost.colShare')}
+                  </th>
+                  <th className="py-1.5 text-right font-medium">
+                    {t('production.runDetail.cost.colAtt')}
+                  </th>
+                  <th className="py-1.5 text-right font-medium">
+                    {t('production.runDetail.cost.colCost')}
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {data.laborDaily.map((r, i) => (
+                {data.laborDaily.map((row, i) => (
                   <tr key={i} className="border-t border-gray-100">
                     <td className="py-1.5 text-gray-500">
-                      {new Date(r.date).toLocaleDateString()}
+                      {new Date(row.date).toLocaleDateString()}
                     </td>
-                    <td className="py-1.5 text-gray-900">{r.employeeName}</td>
+                    <td className="py-1.5 text-gray-900">{row.employeeName}</td>
                     <td className="py-1.5 text-right text-gray-600">
-                      {r.dailyRate.toFixed(2)}
+                      {row.dailyRate.toFixed(2)}
                     </td>
-                    <td className="py-1.5 text-right text-gray-600">{r.overlapCount}</td>
+                    <td className="py-1.5 text-right text-gray-600">{row.overlapCount}</td>
                     <td className="py-1.5 text-right text-gray-600">
-                      {r.share.toFixed(2)}
+                      {row.share.toFixed(2)}
                     </td>
                     <td className="py-1.5 text-right text-gray-600">
-                      {r.weight === 1
-                        ? 'full'
-                        : r.weight === 0.5
-                          ? 'half'
-                          : 'absent'}
+                      {weightLabel(row.weight, t)}
                     </td>
                     <td className="py-1.5 text-right font-semibold text-gray-900">
-                      {r.contribution.toFixed(2)}
+                      {row.contribution.toFixed(2)}
                     </td>
                   </tr>
                 ))}
@@ -720,6 +853,12 @@ function CostTab({ runId }: { runId: string }) {
       </GlassCard>
     </div>
   );
+}
+
+function weightLabel(weight: number, t: TFunction): string {
+  if (weight === 1) return t('production.runDetail.cost.attFull');
+  if (weight === 0.5) return t('production.runDetail.cost.attHalf');
+  return t('production.runDetail.cost.attAbsent');
 }
 
 // ─── Finish tab ────────────────────────────────────────────────────────────
@@ -735,42 +874,62 @@ function FinishTab({
   canFinish: boolean;
   onFinish: () => void;
 }) {
+  const { t } = useTranslation();
+  const statusLabel = t(`production.runs.status.${run.status}`);
   return (
     <GlassCard padding="md">
-      <h3 className="mb-3 text-sm font-semibold text-gray-900">Finish run</h3>
+      <h3 className="mb-3 text-sm font-semibold text-gray-900">
+        {t('production.runDetail.finish.title')}
+      </h3>
       {locked ? (
-        <p className="text-sm text-gray-600">
-          This run is <strong className="capitalize">{run.status}</strong>. The cost per piece
-          is snapshotted at{' '}
-          <strong className="text-primary">{run.costPerPiece.toFixed(2)} MAD</strong>.
-        </p>
+        <p
+          className="text-sm text-gray-600"
+          dangerouslySetInnerHTML={{
+            __html: t('production.runDetail.finish.lockedBody', {
+              status: escapeHtml(statusLabel),
+              cost: run.costPerPiece.toFixed(2),
+            }),
+          }}
+        />
       ) : (
         <>
-          <p className="mb-3 text-sm text-gray-600">
-            Finishing will lock the run, snapshot its cost per piece, and stop including it
-            in future labor allocation. <strong>It does not update</strong> the linked
-            product variant's <code>costPrice</code> — that remains admin-managed for
-            analytics.
-          </p>
+          <p
+            className="mb-3 text-sm text-gray-600"
+            dangerouslySetInnerHTML={{
+              __html: t('production.runDetail.finish.activeBody'),
+            }}
+          />
           <CRMButton
             onClick={onFinish}
             disabled={!canFinish || run.actualPieces <= 0}
             leftIcon={<CheckCircle2 size={14} />}
           >
-            Finish & snapshot
+            {t('production.runDetail.finish.button')}
           </CRMButton>
           {run.actualPieces <= 0 && (
             <p className="mt-2 text-[11px] text-amber-600">
-              Set an actual-pieces count in Overview before finishing.
+              {t('production.runDetail.finish.needActual')}
             </p>
           )}
           {!canFinish && (
-            <p className="mt-2 text-[11px] text-gray-500">
-              You don't have the <code>production:finish</code> permission.
-            </p>
+            <p
+              className="mt-2 text-[11px] text-gray-500"
+              dangerouslySetInnerHTML={{
+                __html: t('production.runDetail.finish.noPermission'),
+              }}
+            />
           )}
         </>
       )}
     </GlassCard>
   );
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }

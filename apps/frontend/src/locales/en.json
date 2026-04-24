@@ -2028,5 +2028,260 @@
       "body": "Tell the team why this task couldn't be finished.",
       "placeholder": "e.g. Missing fabric supplier"
     }
+  },
+  "production": {
+    "dashboard": {
+      "title": "Production",
+      "subtitle": "Overview of product tests and production runs.",
+      "productTestsLink": "Product tests →",
+      "productionRunsLink": "Production runs →",
+      "activeRuns": "Active runs",
+      "draftRuns": "Draft runs",
+      "spentLast7d": "Spent last 7d",
+      "recentRuns": "Recent runs",
+      "viewAll": "View all →",
+      "loading": "Loading…",
+      "emptyRuns": "No runs yet.",
+      "col": {
+        "ref": "Ref",
+        "status": "Status",
+        "started": "Started",
+        "pieces": "Pieces",
+        "costPerPiece": "Cost / piece"
+      },
+      "valueMad": "{{value}} MAD"
+    },
+    "runs": {
+      "title": "Production runs",
+      "subtitle": "Active builds — consume fabric rolls and accessories, assign workers, and see the cost per piece.",
+      "newRun": "New run",
+      "loading": "Loading…",
+      "empty": "No runs yet.",
+      "col": {
+        "ref": "Ref",
+        "status": "Status",
+        "test": "Test",
+        "dates": "Dates",
+        "pieces": "Pieces",
+        "materials": "Materials",
+        "labor": "Labor",
+        "costPerPiece": "Cost / piece"
+      },
+      "open": "open",
+      "status": {
+        "draft": "Draft",
+        "active": "Active",
+        "finished": "Finished",
+        "cancelled": "Cancelled"
+      }
+    },
+    "runDetail": {
+      "backToRuns": "Back to runs",
+      "loading": "Loading…",
+      "notFound": "Not found.",
+      "noTest": "No test",
+      "startedOn": "Started {{date}}",
+      "startRun": "Start run",
+      "finish": {
+        "title": "Finish run",
+        "lockedBody": "This run is <strong>{{status}}</strong>. The cost per piece is snapshotted at <strong>{{cost}} MAD</strong>.",
+        "activeBody": "Finishing will lock the run, snapshot its cost per piece, and stop including it in future labor allocation. <strong>It does not update</strong> the linked product variant's <code>costPrice</code> — that remains admin-managed for analytics.",
+        "button": "Finish & snapshot",
+        "needActual": "Set an actual-pieces count in Overview before finishing.",
+        "noPermission": "You don't have the <code>production:finish</code> permission."
+      },
+      "cancelRun": "Cancel run",
+      "confirmFinish": "Finish run {{ref}}? This snapshots the cost and locks the run.",
+      "toast": {
+        "saveFailedTitle": "Save failed",
+        "saveFallback": "Update failed",
+        "statusNowTitle": "Run is now {{status}}",
+        "statusFailedTitle": "Status change failed",
+        "finishedTitle": "Run finished",
+        "finishFailedTitle": "Finish failed",
+        "finishFallback": "Finish failed",
+        "consumeRecordedTitle": "Consumption recorded",
+        "consumeFailedTitle": "Consume failed",
+        "consumeFallback": "Consume failed",
+        "workerAddedTitle": "Worker added",
+        "workerAddFailedTitle": "Add failed",
+        "workerAddFallback": "Failed",
+        "workerRemovedTitle": "Worker removed",
+        "workerRemoveFailedTitle": "Remove failed",
+        "workerRemoveFallback": "Failed"
+      },
+      "kpi": {
+        "pieces": "Pieces",
+        "materials": "Materials",
+        "labor": "Labor",
+        "costPerPiece": "Cost / piece"
+      },
+      "tabs": {
+        "overview": "Overview",
+        "materials": "Fabric & accessories",
+        "workers": "Workers",
+        "cost": "Cost breakdown",
+        "finish": "Finish"
+      },
+      "overview": {
+        "sizes": "Sizes",
+        "noSizes": "No sizes configured.",
+        "colSize": "Size",
+        "colTracing": "Tracing (m)",
+        "colExpected": "Expected",
+        "colActual": "Actual",
+        "notes": "Notes"
+      },
+      "materials": {
+        "record": "Record consumption",
+        "source": "Source",
+        "sourceFabric": "Fabric roll",
+        "sourceAccessory": "Accessory",
+        "roll": "Roll",
+        "selectRoll": "Select roll…",
+        "rollLabel": "{{type}} · {{color}} · {{remaining}}m left @ {{rate}}/m",
+        "accessory": "Accessory",
+        "selectAccessory": "Select accessory…",
+        "accessoryLabel": "{{name}} · {{stock}} {{unit}} @ {{cost}}/{{unit}}",
+        "quantity": "Quantity",
+        "consume": "Consume",
+        "history": "History",
+        "empty": "Nothing consumed yet.",
+        "col": {
+          "date": "Date",
+          "source": "Source",
+          "item": "Item",
+          "qty": "Qty",
+          "unitCost": "Unit cost",
+          "subtotal": "Subtotal"
+        },
+        "sourceType": {
+          "fabric_roll": "Fabric roll",
+          "accessory": "Accessory"
+        }
+      },
+      "workers": {
+        "addWorker": "Add worker",
+        "pickEmployee": "Pick employee…",
+        "assign": "Assign",
+        "empty": "No workers assigned.",
+        "personLabel": "{{name}} · {{role}}"
+      },
+      "cost": {
+        "loading": "Loading cost breakdown…",
+        "noData": "No data.",
+        "materials": "Materials",
+        "labor": "Labor",
+        "total": "Total",
+        "perPiece": "Per piece ({{count}})",
+        "materialsTitle": "Materials",
+        "noConsumption": "No consumption yet.",
+        "colItem": "Item",
+        "colSource": "Source",
+        "colQty": "Qty",
+        "colUnit": "Unit",
+        "colSubtotal": "Subtotal",
+        "laborTitle": "Labor (per day)",
+        "laborHelp": "Each day, the worker's daily wage (base salary ÷ working days) is split equally across every run they're active on, then weighted by attendance (full = 1, half = 0.5, absent = 0).",
+        "noLabor": "No labor recorded yet.",
+        "colDate": "Date",
+        "colWorker": "Worker",
+        "colDailyRate": "Daily rate",
+        "colRuns": "Runs",
+        "colShare": "Share",
+        "colAtt": "Att.",
+        "colCost": "Cost",
+        "attFull": "full",
+        "attHalf": "half",
+        "attAbsent": "absent"
+      }
+    },
+    "tests": {
+      "title": "Product tests",
+      "subtitle": "Prototypes — video reference, fabrics needed, sizes, tracing, accessories, and a rough cost estimate.",
+      "newTest": "New test",
+      "loading": "Loading…",
+      "empty": "No product tests yet.",
+      "col": {
+        "name": "Name",
+        "product": "Product",
+        "estPerPiece": "Est. MAD / piece",
+        "sizes": "Sizes",
+        "created": "Created"
+      }
+    },
+    "testDetail": {
+      "backToTests": "Back to tests",
+      "loading": "Loading…",
+      "notFound": "Not found.",
+      "createdOn": "Created {{date}}",
+      "productLabel": "Product: {{name}}",
+      "watchReference": "Watch reference",
+      "fabrics": "Fabrics",
+      "noFabrics": "No fabrics declared.",
+      "sizesAndTracing": "Sizes & tracing",
+      "noSizes": "No sizes set.",
+      "colSize": "Size",
+      "colTracing": "Tracing (m)",
+      "accessoriesPerPiece": "Accessories per piece",
+      "noAccessories": "No accessories declared.",
+      "colItem": "Item",
+      "colQtyPerPiece": "Qty per piece",
+      "colUnit": "Unit",
+      "estimatedMadPerPiece": "Estimated MAD / piece",
+      "valueMad": "{{value}} MAD"
+    },
+    "newRun": {
+      "title": "New production run",
+      "saving": "Saving…",
+      "create": "Create run",
+      "basedOn": "Based on product test (optional — pre-fills sizes & fabrics)",
+      "noTest": "No test (blank run)",
+      "startDate": "Start date",
+      "endDate": "End date (optional)",
+      "sizesHeading": "Sizes & expected pieces",
+      "addSize": "Add size",
+      "sizePlaceholder": "S / M",
+      "tracingPlaceholder": "Tracing (m)",
+      "expectedPlaceholder": "Expected pieces",
+      "pickTestHint": "Pick a test above to pre-fill, or add sizes manually.",
+      "assignWorkers": "Assign workers",
+      "noEmployees": "No employees found.",
+      "notes": "Notes",
+      "toast": {
+        "createdTitle": "Run created",
+        "saveFailedTitle": "Save failed",
+        "saveFallback": "Could not create run"
+      }
+    },
+    "testForm": {
+      "title": "New product test",
+      "saving": "Saving…",
+      "saveTest": "Save test",
+      "name": "Name",
+      "namePlaceholder": "Summer kaftan — model A",
+      "estPerPiece": "Estimated MAD / piece",
+      "videoUrl": "Video URL (restricted — only visible to roles with view_video perm)",
+      "videoUrlPlaceholder": "https://…",
+      "fabricsHeading": "Fabrics needed",
+      "addFabric": "Add fabric",
+      "selectFabric": "Select fabric…",
+      "rolePlaceholder": "main / lining",
+      "sizesHeading": "Sizes & tracing",
+      "addSize": "Add size",
+      "sizePlaceholder": "S / M",
+      "tracingPlaceholder": "Tracing (m)",
+      "accessoriesHeading": "Accessories per piece",
+      "addAccessory": "Add accessory",
+      "selectAccessory": "Select accessory…",
+      "accessoryLabel": "{{name}} ({{unit}})",
+      "qtyPlaceholder": "Qty",
+      "notes": "Notes",
+      "toast": {
+        "savedTitle": "Test saved",
+        "saveFailedTitle": "Save failed",
+        "saveFallback": "Could not save"
+      }
+    }
   }
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { GlassModal, CRMInput, CRMSelect, CRMButton } from '@/components/ui';
 import { atelieApi, type AtelieEmployee } from '@/services/atelieApi';
 import {
@@ -8,6 +9,7 @@ import {
   type ProductTest,
 } from '@/services/productionApi';
 import { useToastStore } from '@/store/toastStore';
+import { apiErrorMessage } from '@/lib/apiError';
 
 interface Props {
   open: boolean;
@@ -20,6 +22,7 @@ function todayISO() {
 }
 
 export function NewRunModal({ open, onClose, onSaved }: Props) {
+  const { t } = useTranslation();
   const pushToast = useToastStore((s) => s.push);
   const [tests, setTests] = useState<ProductTest[]>([]);
   const [employees, setEmployees] = useState<AtelieEmployee[]>([]);
@@ -55,16 +58,16 @@ export function NewRunModal({ open, onClose, onSaved }: Props) {
   }, [open]);
 
   function applyTest(testId: string) {
-    const t = tests.find((x) => x.id === testId);
-    if (!t) {
+    const found = tests.find((x) => x.id === testId);
+    if (!found) {
       setForm({ ...form, testId: null, fabrics: [], sizes: [] });
       return;
     }
     setForm({
       ...form,
-      testId: t.id,
-      fabrics: t.fabrics.map((f) => ({ fabricTypeId: f.fabricTypeId, role: f.role })),
-      sizes: t.sizes.map((s) => ({
+      testId: found.id,
+      fabrics: found.fabrics.map((f) => ({ fabricTypeId: f.fabricTypeId, role: f.role })),
+      sizes: found.sizes.map((s) => ({
         size: s.size,
         tracingMeters: s.tracingMeters,
         expectedPieces: 0,
@@ -97,12 +100,15 @@ export function NewRunModal({ open, onClose, onSaved }: Props) {
         notes: form.notes?.trim() || null,
         endDate: form.endDate || null,
       });
-      pushToast({ kind: 'success', title: 'Run created' });
+      pushToast({ kind: 'success', title: t('production.newRun.toast.createdTitle') });
       onSaved();
       onClose();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Could not create run';
-      pushToast({ kind: 'error', title: 'Save failed', body: msg });
+      pushToast({
+        kind: 'error',
+        title: t('production.newRun.toast.saveFailedTitle'),
+        body: apiErrorMessage(err, t('production.newRun.toast.saveFallback')),
+      });
     } finally {
       setSaving(false);
     }
@@ -112,7 +118,7 @@ export function NewRunModal({ open, onClose, onSaved }: Props) {
     <GlassModal
       open={open}
       onClose={onClose}
-      title="New production run"
+      title={t('production.newRun.title')}
       size="lg"
       footer={
         <div className="flex items-center justify-end gap-2">
@@ -120,20 +126,20 @@ export function NewRunModal({ open, onClose, onSaved }: Props) {
             onClick={onClose}
             className="rounded-btn border border-gray-200 bg-white px-3.5 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <CRMButton onClick={save} disabled={saving || !form.startDate}>
-            {saving ? 'Saving…' : 'Create run'}
+            {saving ? t('production.newRun.saving') : t('production.newRun.create')}
           </CRMButton>
         </div>
       }
     >
       <div className="flex flex-col gap-4">
         <CRMSelect
-          label="Based on product test (optional — pre-fills sizes & fabrics)"
+          label={t('production.newRun.basedOn')}
           options={[
-            { value: '', label: 'No test (blank run)' },
-            ...tests.map((t) => ({ value: t.id, label: t.name })),
+            { value: '', label: t('production.newRun.noTest') },
+            ...tests.map((test) => ({ value: test.id, label: test.name })),
           ]}
           value={form.testId ?? ''}
           onChange={(v) => applyTest(v as string)}
@@ -141,13 +147,13 @@ export function NewRunModal({ open, onClose, onSaved }: Props) {
 
         <div className="grid grid-cols-2 gap-3">
           <CRMInput
-            label="Start date"
+            label={t('production.newRun.startDate')}
             type="date"
             value={form.startDate}
             onChange={(e) => setForm({ ...form, startDate: e.target.value })}
           />
           <CRMInput
-            label="End date (optional)"
+            label={t('production.newRun.endDate')}
             type="date"
             value={form.endDate ?? ''}
             onChange={(e) => setForm({ ...form, endDate: e.target.value || null })}
@@ -157,7 +163,9 @@ export function NewRunModal({ open, onClose, onSaved }: Props) {
         {/* Sizes with expected pieces */}
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-xs font-semibold text-gray-700">Sizes & expected pieces</h3>
+            <h3 className="text-xs font-semibold text-gray-700">
+              {t('production.newRun.sizesHeading')}
+            </h3>
             <button
               onClick={() =>
                 setForm({
@@ -170,7 +178,7 @@ export function NewRunModal({ open, onClose, onSaved }: Props) {
               }
               className="inline-flex items-center gap-1 rounded-btn bg-accent px-2 py-1 text-[11px] font-semibold text-primary hover:bg-accent/70"
             >
-              <Plus size={11} /> Add size
+              <Plus size={11} /> {t('production.newRun.addSize')}
             </button>
           </div>
           <div className="flex flex-col gap-2">
@@ -179,14 +187,14 @@ export function NewRunModal({ open, onClose, onSaved }: Props) {
                 <CRMInput
                   className="w-24"
                   value={s.size}
-                  placeholder="S / M"
+                  placeholder={t('production.newRun.sizePlaceholder')}
                   onChange={(e) => updateSize(i, { size: e.target.value })}
                 />
                 <CRMInput
                   className="w-32"
                   type="number"
                   value={s.tracingMeters}
-                  placeholder="Tracing (m)"
+                  placeholder={t('production.newRun.tracingPlaceholder')}
                   onChange={(e) =>
                     updateSize(i, { tracingMeters: Number(e.target.value) })
                   }
@@ -195,7 +203,7 @@ export function NewRunModal({ open, onClose, onSaved }: Props) {
                   className="flex-1"
                   type="number"
                   value={s.expectedPieces}
-                  placeholder="Expected pieces"
+                  placeholder={t('production.newRun.expectedPlaceholder')}
                   onChange={(e) =>
                     updateSize(i, { expectedPieces: Number(e.target.value) })
                   }
@@ -215,7 +223,7 @@ export function NewRunModal({ open, onClose, onSaved }: Props) {
             ))}
             {(form.sizes ?? []).length === 0 && (
               <p className="text-[11px] text-gray-400">
-                Pick a test above to pre-fill, or add sizes manually.
+                {t('production.newRun.pickTestHint')}
               </p>
             )}
           </div>
@@ -223,9 +231,11 @@ export function NewRunModal({ open, onClose, onSaved }: Props) {
 
         {/* Workers */}
         <div>
-          <h3 className="mb-2 text-xs font-semibold text-gray-700">Assign workers</h3>
+          <h3 className="mb-2 text-xs font-semibold text-gray-700">
+            {t('production.newRun.assignWorkers')}
+          </h3>
           {employees.length === 0 ? (
-            <p className="text-[11px] text-gray-400">No employees found.</p>
+            <p className="text-[11px] text-gray-400">{t('production.newRun.noEmployees')}</p>
           ) : (
             <div className="flex flex-wrap gap-2">
               {employees.map((e) => {
@@ -242,7 +252,7 @@ export function NewRunModal({ open, onClose, onSaved }: Props) {
                     }`}
                   >
                     {e.name}
-                    <span className="ml-1 text-[10px] opacity-70">· {e.role}</span>
+                    <span className="ml-1 text-[10px] opacity-70">{'\u00b7 '}{e.role}</span>
                   </button>
                 );
               })}
@@ -251,7 +261,7 @@ export function NewRunModal({ open, onClose, onSaved }: Props) {
         </div>
 
         <CRMInput
-          label="Notes"
+          label={t('production.newRun.notes')}
           value={form.notes ?? ''}
           onChange={(e) => setForm({ ...form, notes: e.target.value })}
         />

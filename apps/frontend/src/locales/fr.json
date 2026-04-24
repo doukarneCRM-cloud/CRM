@@ -2028,5 +2028,260 @@
       "body": "Dites à l'équipe pourquoi cette tâche n'a pas pu être terminée.",
       "placeholder": "p. ex. Fournisseur de tissu manquant"
     }
+  },
+  "production": {
+    "dashboard": {
+      "title": "Production",
+      "subtitle": "Vue d'ensemble des tests produits et des cycles de production.",
+      "productTestsLink": "Tests produits →",
+      "productionRunsLink": "Cycles de production →",
+      "activeRuns": "Cycles actifs",
+      "draftRuns": "Cycles en brouillon",
+      "spentLast7d": "Dépensé sur 7j",
+      "recentRuns": "Cycles récents",
+      "viewAll": "Voir tout →",
+      "loading": "Chargement…",
+      "emptyRuns": "Aucun cycle pour le moment.",
+      "col": {
+        "ref": "Réf.",
+        "status": "Statut",
+        "started": "Démarré",
+        "pieces": "Pièces",
+        "costPerPiece": "Coût / pièce"
+      },
+      "valueMad": "{{value}} MAD"
+    },
+    "runs": {
+      "title": "Cycles de production",
+      "subtitle": "Productions en cours — consommez les rouleaux de tissu et les accessoires, assignez les ouvriers et suivez le coût par pièce.",
+      "newRun": "Nouveau cycle",
+      "loading": "Chargement…",
+      "empty": "Aucun cycle pour le moment.",
+      "col": {
+        "ref": "Réf.",
+        "status": "Statut",
+        "test": "Test",
+        "dates": "Dates",
+        "pieces": "Pièces",
+        "materials": "Matières",
+        "labor": "Main d'œuvre",
+        "costPerPiece": "Coût / pièce"
+      },
+      "open": "ouvert",
+      "status": {
+        "draft": "Brouillon",
+        "active": "Actif",
+        "finished": "Terminé",
+        "cancelled": "Annulé"
+      }
+    },
+    "runDetail": {
+      "backToRuns": "Retour aux cycles",
+      "loading": "Chargement…",
+      "notFound": "Introuvable.",
+      "noTest": "Aucun test",
+      "startedOn": "Démarré le {{date}}",
+      "startRun": "Démarrer le cycle",
+      "finish": {
+        "title": "Terminer le cycle",
+        "lockedBody": "Ce cycle est <strong>{{status}}</strong>. Le coût par pièce est figé à <strong>{{cost}} MAD</strong>.",
+        "activeBody": "Terminer va verrouiller le cycle, figer son coût par pièce et l'exclure de la répartition future de la main d'œuvre. <strong>Cela ne met pas à jour</strong> le <code>costPrice</code> de la variante produit liée — il reste géré par l'admin pour les analyses.",
+        "button": "Terminer et figer",
+        "needActual": "Renseignez le nombre réel de pièces dans Aperçu avant de terminer.",
+        "noPermission": "Vous n'avez pas la permission <code>production:finish</code>."
+      },
+      "cancelRun": "Annuler le cycle",
+      "confirmFinish": "Terminer le cycle {{ref}} ? Le coût sera figé et le cycle verrouillé.",
+      "toast": {
+        "saveFailedTitle": "Enregistrement échoué",
+        "saveFallback": "Mise à jour échouée",
+        "statusNowTitle": "Le cycle est maintenant {{status}}",
+        "statusFailedTitle": "Changement de statut échoué",
+        "finishedTitle": "Cycle terminé",
+        "finishFailedTitle": "Clôture échouée",
+        "finishFallback": "Clôture échouée",
+        "consumeRecordedTitle": "Consommation enregistrée",
+        "consumeFailedTitle": "Consommation échouée",
+        "consumeFallback": "Consommation échouée",
+        "workerAddedTitle": "Ouvrier ajouté",
+        "workerAddFailedTitle": "Ajout échoué",
+        "workerAddFallback": "Échec",
+        "workerRemovedTitle": "Ouvrier retiré",
+        "workerRemoveFailedTitle": "Retrait échoué",
+        "workerRemoveFallback": "Échec"
+      },
+      "kpi": {
+        "pieces": "Pièces",
+        "materials": "Matières",
+        "labor": "Main d'œuvre",
+        "costPerPiece": "Coût / pièce"
+      },
+      "tabs": {
+        "overview": "Aperçu",
+        "materials": "Tissus & accessoires",
+        "workers": "Ouvriers",
+        "cost": "Détail du coût",
+        "finish": "Terminer"
+      },
+      "overview": {
+        "sizes": "Tailles",
+        "noSizes": "Aucune taille configurée.",
+        "colSize": "Taille",
+        "colTracing": "Traçage (m)",
+        "colExpected": "Prévu",
+        "colActual": "Réel",
+        "notes": "Notes"
+      },
+      "materials": {
+        "record": "Enregistrer une consommation",
+        "source": "Source",
+        "sourceFabric": "Rouleau de tissu",
+        "sourceAccessory": "Accessoire",
+        "roll": "Rouleau",
+        "selectRoll": "Sélectionner un rouleau…",
+        "rollLabel": "{{type}} · {{color}} · {{remaining}}m restants @ {{rate}}/m",
+        "accessory": "Accessoire",
+        "selectAccessory": "Sélectionner un accessoire…",
+        "accessoryLabel": "{{name}} · {{stock}} {{unit}} @ {{cost}}/{{unit}}",
+        "quantity": "Quantité",
+        "consume": "Consommer",
+        "history": "Historique",
+        "empty": "Aucune consommation pour le moment.",
+        "col": {
+          "date": "Date",
+          "source": "Source",
+          "item": "Article",
+          "qty": "Qté",
+          "unitCost": "Coût unitaire",
+          "subtotal": "Sous-total"
+        },
+        "sourceType": {
+          "fabric_roll": "Rouleau de tissu",
+          "accessory": "Accessoire"
+        }
+      },
+      "workers": {
+        "addWorker": "Ajouter un ouvrier",
+        "pickEmployee": "Choisir un employé…",
+        "assign": "Assigner",
+        "empty": "Aucun ouvrier assigné.",
+        "personLabel": "{{name}} · {{role}}"
+      },
+      "cost": {
+        "loading": "Chargement du détail du coût…",
+        "noData": "Aucune donnée.",
+        "materials": "Matières",
+        "labor": "Main d'œuvre",
+        "total": "Total",
+        "perPiece": "Par pièce ({{count}})",
+        "materialsTitle": "Matières",
+        "noConsumption": "Aucune consommation pour le moment.",
+        "colItem": "Article",
+        "colSource": "Source",
+        "colQty": "Qté",
+        "colUnit": "Unit.",
+        "colSubtotal": "Sous-total",
+        "laborTitle": "Main d'œuvre (par jour)",
+        "laborHelp": "Chaque jour, le salaire journalier de l'ouvrier (salaire de base ÷ jours travaillés) est réparti équitablement entre tous les cycles auxquels il est actif, puis pondéré par la présence (complète = 1, demi = 0,5, absent = 0).",
+        "noLabor": "Aucune main d'œuvre enregistrée.",
+        "colDate": "Date",
+        "colWorker": "Ouvrier",
+        "colDailyRate": "Taux journalier",
+        "colRuns": "Cycles",
+        "colShare": "Part",
+        "colAtt": "Prés.",
+        "colCost": "Coût",
+        "attFull": "complète",
+        "attHalf": "demi",
+        "attAbsent": "absent"
+      }
+    },
+    "tests": {
+      "title": "Tests produits",
+      "subtitle": "Prototypes — vidéo de référence, tissus nécessaires, tailles, traçage, accessoires et estimation de coût.",
+      "newTest": "Nouveau test",
+      "loading": "Chargement…",
+      "empty": "Aucun test produit pour le moment.",
+      "col": {
+        "name": "Nom",
+        "product": "Produit",
+        "estPerPiece": "MAD / pièce (est.)",
+        "sizes": "Tailles",
+        "created": "Créé"
+      }
+    },
+    "testDetail": {
+      "backToTests": "Retour aux tests",
+      "loading": "Chargement…",
+      "notFound": "Introuvable.",
+      "createdOn": "Créé le {{date}}",
+      "productLabel": "Produit : {{name}}",
+      "watchReference": "Voir la référence",
+      "fabrics": "Tissus",
+      "noFabrics": "Aucun tissu déclaré.",
+      "sizesAndTracing": "Tailles & traçage",
+      "noSizes": "Aucune taille définie.",
+      "colSize": "Taille",
+      "colTracing": "Traçage (m)",
+      "accessoriesPerPiece": "Accessoires par pièce",
+      "noAccessories": "Aucun accessoire déclaré.",
+      "colItem": "Article",
+      "colQtyPerPiece": "Qté par pièce",
+      "colUnit": "Unité",
+      "estimatedMadPerPiece": "MAD / pièce (estimé)",
+      "valueMad": "{{value}} MAD"
+    },
+    "newRun": {
+      "title": "Nouveau cycle de production",
+      "saving": "Enregistrement…",
+      "create": "Créer le cycle",
+      "basedOn": "Basé sur un test produit (facultatif — pré-remplit tailles & tissus)",
+      "noTest": "Aucun test (cycle vierge)",
+      "startDate": "Date de début",
+      "endDate": "Date de fin (facultative)",
+      "sizesHeading": "Tailles & pièces prévues",
+      "addSize": "Ajouter une taille",
+      "sizePlaceholder": "S / M",
+      "tracingPlaceholder": "Traçage (m)",
+      "expectedPlaceholder": "Pièces prévues",
+      "pickTestHint": "Choisissez un test ci-dessus pour pré-remplir, ou ajoutez les tailles manuellement.",
+      "assignWorkers": "Assigner les ouvriers",
+      "noEmployees": "Aucun employé trouvé.",
+      "notes": "Notes",
+      "toast": {
+        "createdTitle": "Cycle créé",
+        "saveFailedTitle": "Enregistrement échoué",
+        "saveFallback": "Impossible de créer le cycle"
+      }
+    },
+    "testForm": {
+      "title": "Nouveau test produit",
+      "saving": "Enregistrement…",
+      "saveTest": "Enregistrer le test",
+      "name": "Nom",
+      "namePlaceholder": "Caftan d'été — modèle A",
+      "estPerPiece": "MAD / pièce (estimé)",
+      "videoUrl": "URL vidéo (restreinte — visible uniquement aux rôles avec la perm view_video)",
+      "videoUrlPlaceholder": "https://…",
+      "fabricsHeading": "Tissus nécessaires",
+      "addFabric": "Ajouter un tissu",
+      "selectFabric": "Sélectionner un tissu…",
+      "rolePlaceholder": "principal / doublure",
+      "sizesHeading": "Tailles & traçage",
+      "addSize": "Ajouter une taille",
+      "sizePlaceholder": "S / M",
+      "tracingPlaceholder": "Traçage (m)",
+      "accessoriesHeading": "Accessoires par pièce",
+      "addAccessory": "Ajouter un accessoire",
+      "selectAccessory": "Sélectionner un accessoire…",
+      "accessoryLabel": "{{name}} ({{unit}})",
+      "qtyPlaceholder": "Qté",
+      "notes": "Notes",
+      "toast": {
+        "savedTitle": "Test enregistré",
+        "saveFailedTitle": "Enregistrement échoué",
+        "saveFallback": "Enregistrement impossible"
+      }
+    }
   }
 }
