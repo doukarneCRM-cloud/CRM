@@ -1,22 +1,12 @@
 import 'dotenv/config';
 import path from 'node:path';
 import Fastify, { type FastifyError } from 'fastify';
+import { validateEnv } from './shared/env';
 
-// Fail fast on missing ENCRYPTION_KEY in production rather than letting the
-// first provider-save request crash with a generic 500. The shipping provider
-// API key column stores AES-256-GCM blobs keyed by this env var.
-if (process.env.NODE_ENV === 'production') {
-  const key = process.env.ENCRYPTION_KEY;
-  if (!key || !/^[0-9a-fA-F]{64}$/.test(key)) {
-    console.error(
-      '[boot] ENCRYPTION_KEY is missing or malformed. ' +
-        'Set it to a 64-char hex string (generate with: ' +
-        'node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"). ' +
-        'Shipping provider API keys cannot be saved without it.',
-    );
-    process.exit(1);
-  }
-}
+// Validate all required env vars in production before any module that might
+// depend on them initialises. Exits with code 1 and a listed diagnostic on
+// failure. No-op outside production.
+validateEnv();
 
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';

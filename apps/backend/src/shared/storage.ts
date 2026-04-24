@@ -56,6 +56,20 @@ const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL;
 const useR2 =
   !!R2_ENDPOINT && !!R2_BUCKET && !!R2_ACCESS_KEY_ID && !!R2_SECRET_ACCESS_KEY && !!R2_PUBLIC_URL;
 
+// In production, refuse to boot with the local-disk fallback: Railway's
+// container filesystem is ephemeral, so every deploy would wipe uploaded
+// images, voice notes, and documents silently. Dev falls back to ./uploads
+// as before.
+if (!useR2 && process.env.NODE_ENV === 'production') {
+  // eslint-disable-next-line no-console
+  console.error(
+    '[boot] R2 storage is not configured but NODE_ENV=production. ' +
+      'Local-disk uploads are ephemeral on Railway and will be lost on redeploy. ' +
+      'Set R2_ENDPOINT, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_PUBLIC_URL.',
+  );
+  process.exit(1);
+}
+
 let s3Client: S3Client | null = null;
 if (useR2) {
   s3Client = new S3Client({

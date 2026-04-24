@@ -1,16 +1,30 @@
+import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 
-function requireSecret(envKey: string, devFallback: string): string {
+// Required in every environment. In production the process crashes if the var
+// is missing (fail fast, no silent fallback). In development we generate a
+// random per-process secret so local runs work without config — tokens become
+// invalid on restart, which is the desired behaviour for dev anyway.
+function requireSecret(envKey: string): string {
   const value = process.env[envKey];
-  if (value) return value;
+  if (value && value.length >= 32) return value;
   if (process.env.NODE_ENV === 'production') {
-    throw new Error(`${envKey} must be set in production`);
+    throw new Error(
+      `${envKey} must be set to a strong secret (>=32 chars) in production`,
+    );
   }
-  return devFallback;
+  const generated = crypto.randomBytes(32).toString('hex');
+  // eslint-disable-next-line no-console
+  console.warn(
+    `[jwt] ${envKey} not set — generated an ephemeral dev secret. ` +
+      `All existing tokens will be invalidated on every restart. ` +
+      `Set ${envKey} in .env to persist sessions across restarts.`,
+  );
+  return generated;
 }
 
-const ACCESS_SECRET = requireSecret('JWT_ACCESS_SECRET', 'dev_access_secret_change_in_production');
-const REFRESH_SECRET = requireSecret('JWT_REFRESH_SECRET', 'dev_refresh_secret_change_in_production');
+const ACCESS_SECRET = requireSecret('JWT_ACCESS_SECRET');
+const REFRESH_SECRET = requireSecret('JWT_REFRESH_SECRET');
 const ACCESS_EXPIRES = process.env.JWT_ACCESS_EXPIRES_IN ?? '15m';
 const REFRESH_EXPIRES = process.env.JWT_REFRESH_EXPIRES_IN ?? '7d';
 

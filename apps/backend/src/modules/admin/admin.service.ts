@@ -1,11 +1,18 @@
 import { prisma } from '../../shared/prisma';
 
 // ─── Reset-CRM confirmation code ─────────────────────────────────────────────
-// The code is checked server-side as well as client-side — a compromised
-// frontend (or a direct curl to the endpoint) still needs this string. Kept
-// as a plain constant because the primary gate is the `settings:reset_crm`
-// RBAC permission; the code is just a "are you sure?" typing exercise.
-const RESET_CODE = 'Newlifebb123';
+// Sourced from CRM_RESET_CODE env var so the literal string isn't baked into
+// the git repo. Primary gate is the `settings:reset_crm` RBAC permission;
+// this code is the "are you sure?" typing exercise. Dev fallback preserves
+// the previous behaviour so local setups keep working without extra config.
+const RESET_CODE =
+  process.env.CRM_RESET_CODE && process.env.CRM_RESET_CODE.length >= 6
+    ? process.env.CRM_RESET_CODE
+    : 'Newlifebb123';
+
+export function getResetCode(): string {
+  return RESET_CODE;
+}
 
 export type ResetCRMSummary = Record<string, number>;
 

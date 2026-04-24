@@ -13,10 +13,9 @@ import {
   playNotificationSound,
 } from '@/utils/sound';
 
-// Must match backend src/modules/admin/admin.service.ts::RESET_CODE. The
-// server re-validates the same string, so changing just the frontend won't
-// weaken the gate.
-const RESET_CONFIRMATION_CODE = 'Newlifebb123';
+// Expected confirmation code is fetched from the backend when the Danger Zone
+// modal opens — the server is the source of truth (set via CRM_RESET_CODE
+// env var), so the string never ships in the frontend bundle.
 
 export default function SettingsPage() {
   const user = useAuthStore((s) => s.user);
@@ -33,7 +32,8 @@ export default function SettingsPage() {
   const [resetOpen, setResetOpen] = useState(false);
   const [resetCode, setResetCode] = useState('');
   const [resetSubmitting, setResetSubmitting] = useState(false);
-  const codeMatches = resetCode === RESET_CONFIRMATION_CODE;
+  const [expectedCode, setExpectedCode] = useState<string | null>(null);
+  const codeMatches = expectedCode !== null && resetCode === expectedCode;
   const canResetCRM = hasPermission('settings:reset_crm');
 
   async function handleResetCRM() {
@@ -72,6 +72,35 @@ export default function SettingsPage() {
     setResetOpen(false);
     setResetCode('');
   }
+
+  // Fetch the expected code from the backend once the modal opens. Failing
+  // means the server-side permission or endpoint isn't available — the
+  // button stays disabled (codeMatches requires expectedCode !== null).
+  useEffect(() => {
+    if (!resetOpen) {
+      setExpectedCode(null);
+      return;
+    }
+    let cancelled = false;
+    api
+      .get<{ code: string }>('/admin/reset-code')
+      .then((res) => {
+        if (!cancelled) setExpectedCode(res.data.code);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setExpectedCode(null);
+          pushToast({
+            kind: 'error',
+            title: 'Could not load confirmation code',
+            body: 'Check that you have the settings:reset_crm permission and try again.',
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [resetOpen, pushToast]);
 
   // Persist sound prefs whenever they change — they are read live on every play
   useEffect(() => {
@@ -264,18 +293,23 @@ export default function SettingsPage() {
           </div>
           <p className="text-xs text-gray-500">
             To confirm, type the code below exactly:
-            {' '}<code className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[11px] text-gray-800">
-              {RESET_CONFIRMATION_CODE}
-            </code>
+            {' '}
+            {expectedCode ? (
+              <code className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[11px] text-gray-800">
+                {expectedCode}
+              </code>
+            ) : (
+              <span className="text-gray-400">loading…</span>
+            )}
           </p>
           <CRMInput
             autoFocus
             placeholder="Type the confirmation code"
             value={resetCode}
             onChange={(e) => setResetCode(e.target.value)}
-            disabled={resetSubmitting}
+            disabled={resetSubmitting || expectedCode === null}
             error={
-              resetCode.length > 0 && !codeMatches
+              expectedCode !== null && resetCode.length > 0 && !codeMatches
                 ? 'Code does not match'
                 : undefined
             }
