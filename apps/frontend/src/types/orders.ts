@@ -12,6 +12,11 @@ export interface OrderCustomer {
   city: string;
   address: string | null;
   tag: CustomerTag;
+  /** Total orders this customer has placed with us (across all statuses).
+   *  Shipped by the order-list endpoints so every row can show a "N orders"
+   *  badge next to the name without N+1 queries. Optional because not every
+   *  endpoint projects it. */
+  _count?: { orders: number };
 }
 
 export interface OrderAgent {

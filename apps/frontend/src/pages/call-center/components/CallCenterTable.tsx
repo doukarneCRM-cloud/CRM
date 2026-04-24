@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { CRMButton } from '@/components/ui/CRMButton';
+import { CustomerOrdersBadge } from '@/components/ui/CustomerOrdersBadge';
 import { OrderSourceIcon } from '@/components/ui/OrderSourceIcon';
 import { ordersApi } from '@/services/ordersApi';
 import { getSocket } from '@/services/socket';
@@ -309,16 +310,19 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
         {/* Customer */}
         <div className="flex items-start gap-2 px-3 py-2">
           <div className="min-w-0 flex-1">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenCustomer(order.customer.id);
-              }}
-              className="truncate text-left text-sm font-semibold text-gray-900 hover:text-primary active:text-primary"
-            >
-              {order.customer.fullName}
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenCustomer(order.customer.id);
+                }}
+                className="truncate text-left text-sm font-semibold text-gray-900 hover:text-primary active:text-primary"
+              >
+                {order.customer.fullName}
+              </button>
+              <CustomerOrdersBadge count={order.customer._count?.orders} />
+            </div>
             <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-gray-500">
               <span className="font-mono">{order.customer.phoneDisplay}</span>
               <span className="text-gray-300">·</span>
@@ -508,17 +512,20 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
         {/* Customer */}
         <div className="flex min-w-0 items-center gap-2">
           <div className="min-w-0 flex-1">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenCustomer(order.customer.id);
-              }}
-              className="truncate text-left text-sm font-semibold text-gray-900 hover:text-primary hover:underline"
-              title="View client history"
-            >
-              {order.customer.fullName}
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenCustomer(order.customer.id);
+                }}
+                className="truncate text-left text-sm font-semibold text-gray-900 hover:text-primary hover:underline"
+                title="View client history"
+              >
+                {order.customer.fullName}
+              </button>
+              <CustomerOrdersBadge count={order.customer._count?.orders} />
+            </div>
             <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-gray-500">
               <span className="font-mono">{order.customer.phoneDisplay}</span>
               <a

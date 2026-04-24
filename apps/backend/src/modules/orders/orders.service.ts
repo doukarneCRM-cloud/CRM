@@ -156,7 +156,15 @@ async function resolveCustomer(input: {
 /** Full include shape used for single-order responses */
 const ORDER_FULL_INCLUDE = {
   customer: {
-    select: { id: true, fullName: true, phoneDisplay: true, city: true, address: true, tag: true },
+    select: {
+      id: true,
+      fullName: true,
+      phoneDisplay: true,
+      city: true,
+      address: true,
+      tag: true,
+      _count: { select: { orders: true } },
+    },
   },
   agent: {
     select: { id: true, name: true, email: true, role: { select: { name: true, label: true } } },
@@ -222,7 +230,17 @@ export async function getOrders(query: OrderQueryInput) {
       take,
       orderBy: { createdAt: 'desc' },
       include: {
-        customer: { select: { id: true, fullName: true, phoneDisplay: true, city: true, address: true, tag: true } },
+        customer: {
+          select: {
+            id: true,
+            fullName: true,
+            phoneDisplay: true,
+            city: true,
+            address: true,
+            tag: true,
+            _count: { select: { orders: true } },
+          },
+        },
         agent: { select: { id: true, name: true } },
         items: {
           select: {

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { OrderSourceIcon } from '@/components/ui/OrderSourceIcon';
+import { CustomerOrdersBadge } from '@/components/ui/CustomerOrdersBadge';
 import { integrationsApi } from '@/services/integrationsApi';
 import type { Order } from '@/types/orders';
 import { cn } from '@/lib/cn';
@@ -282,6 +283,7 @@ export function OrdersTable({
                 >
                   {customer.fullName}
                 </button>
+                <CustomerOrdersBadge count={customer._count?.orders} />
                 <a
                   href={waLink}
                   target="_blank"
