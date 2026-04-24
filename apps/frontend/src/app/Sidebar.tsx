@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard,
   Package,
@@ -26,9 +27,10 @@ import { authService } from '@/services/api';
 import { resolveImageUrl } from '@/lib/imageUrl';
 
 // ─── Nav item config ──────────────────────────────────────────────────────────
+// labelKey is an i18n key under `nav.*`; resolved at render via t().
 
 interface NavItem {
-  label: string;
+  labelKey: string;
   icon: React.ElementType;
   to: string;
   permission?: string;
@@ -42,30 +44,30 @@ interface NavSection {
 const NAV_SECTIONS: NavSection[] = [
   {
     items: [
-      { label: 'Dashboard', icon: LayoutDashboard, to: ROUTES.DASHBOARD, permission: PERMISSIONS.DASHBOARD_VIEW },
-      { label: 'Orders', icon: Package, to: ROUTES.ORDERS, permission: PERMISSIONS.ORDERS_VIEW },
-      { label: 'Call Center', icon: Phone, to: ROUTES.CALL_CENTER, permission: PERMISSIONS.CALL_CENTER_VIEW },
-      { label: 'Products', icon: ShoppingBag, to: ROUTES.PRODUCTS_LIST, permission: PERMISSIONS.PRODUCTS_VIEW },
-      { label: 'Clients', icon: Users, to: ROUTES.CLIENTS, permission: PERMISSIONS.CLIENTS_VIEW },
-      { label: 'Team', icon: User, to: ROUTES.TEAM_AGENTS, permission: PERMISSIONS.TEAM_VIEW },
-      { label: 'Analytics', icon: BarChart3, to: ROUTES.ANALYTICS, permission: PERMISSIONS.ANALYTICS_VIEW },
-      { label: 'Money', icon: Wallet, to: ROUTES.MONEY, permission: PERMISSIONS.MONEY_VIEW },
-      { label: 'Returns', icon: PackageSearch, to: ROUTES.RETURNS, permission: PERMISSIONS.RETURNS_VERIFY },
-      { label: 'Integrations', icon: Link2, to: ROUTES.INTEGRATIONS_STORE, permission: PERMISSIONS.INTEGRATIONS_VIEW },
+      { labelKey: 'nav.dashboard', icon: LayoutDashboard, to: ROUTES.DASHBOARD, permission: PERMISSIONS.DASHBOARD_VIEW },
+      { labelKey: 'nav.orders', icon: Package, to: ROUTES.ORDERS, permission: PERMISSIONS.ORDERS_VIEW },
+      { labelKey: 'nav.callCenter', icon: Phone, to: ROUTES.CALL_CENTER, permission: PERMISSIONS.CALL_CENTER_VIEW },
+      { labelKey: 'nav.products', icon: ShoppingBag, to: ROUTES.PRODUCTS_LIST, permission: PERMISSIONS.PRODUCTS_VIEW },
+      { labelKey: 'nav.clients', icon: Users, to: ROUTES.CLIENTS, permission: PERMISSIONS.CLIENTS_VIEW },
+      { labelKey: 'nav.team', icon: User, to: ROUTES.TEAM_AGENTS, permission: PERMISSIONS.TEAM_VIEW },
+      { labelKey: 'nav.analytics', icon: BarChart3, to: ROUTES.ANALYTICS, permission: PERMISSIONS.ANALYTICS_VIEW },
+      { labelKey: 'nav.money', icon: Wallet, to: ROUTES.MONEY, permission: PERMISSIONS.MONEY_VIEW },
+      { labelKey: 'nav.returns', icon: PackageSearch, to: ROUTES.RETURNS, permission: PERMISSIONS.RETURNS_VERIFY },
+      { labelKey: 'nav.integrations', icon: Link2, to: ROUTES.INTEGRATIONS_STORE, permission: PERMISSIONS.INTEGRATIONS_VIEW },
     ],
   },
   {
     dividerBefore: true,
     items: [
-      { label: 'Atelie', icon: Factory, to: ROUTES.ATELIE_EMPLOYEES, permission: PERMISSIONS.ATELIE_VIEW },
-      { label: 'Production', icon: Scissors, to: ROUTES.PRODUCTION_DASHBOARD, permission: PERMISSIONS.PRODUCTION_VIEW },
+      { labelKey: 'nav.atelie', icon: Factory, to: ROUTES.ATELIE_EMPLOYEES, permission: PERMISSIONS.ATELIE_VIEW },
+      { labelKey: 'nav.production', icon: Scissors, to: ROUTES.PRODUCTION_DASHBOARD, permission: PERMISSIONS.PRODUCTION_VIEW },
     ],
   },
   {
     dividerBefore: true,
     items: [
-      { label: 'Automation', icon: MessageCircle, to: ROUTES.AUTOMATION, permission: PERMISSIONS.AUTOMATION_VIEW },
-      { label: 'Settings', icon: Settings, to: ROUTES.SETTINGS, permission: PERMISSIONS.SETTINGS_VIEW },
+      { labelKey: 'nav.automation', icon: MessageCircle, to: ROUTES.AUTOMATION, permission: PERMISSIONS.AUTOMATION_VIEW },
+      { labelKey: 'nav.settings', icon: Settings, to: ROUTES.SETTINGS, permission: PERMISSIONS.SETTINGS_VIEW },
     ],
   },
 ];
@@ -80,6 +82,8 @@ function SidebarNavItem({
   collapsed: boolean;
 }) {
   const Icon = item.icon;
+  const { t } = useTranslation();
+  const label = t(item.labelKey);
 
   return (
     <div className="group relative">
@@ -96,12 +100,12 @@ function SidebarNavItem({
         }
       >
         <Icon size={18} className="shrink-0" />
-        <span className={cn('truncate', collapsed && 'md:hidden')}>{item.label}</span>
+        <span className={cn('truncate', collapsed && 'md:hidden')}>{label}</span>
       </NavLink>
 
       {collapsed && (
         <div className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 hidden -translate-y-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 md:block">
-          {item.label}
+          {label}
           <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 border-4 border-transparent border-r-gray-900" />
         </div>
       )}
@@ -121,6 +125,7 @@ interface SidebarProps {
 export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: SidebarProps) {
   const { user, hasPermission, logout, refreshToken } = useAuthStore();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const handleLogout = async () => {
     try {
@@ -165,13 +170,13 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
           </div>
           <div className={cn('min-w-0 flex-1', collapsed && 'md:hidden')}>
             <p className="truncate text-sm font-bold text-primary">Anaqatoki</p>
-            <p className="text-[10px] text-gray-400">CRM Platform</p>
+            <p className="text-[10px] text-gray-400">{t('brand.tagline')}</p>
           </div>
           {/* Mobile close button */}
           <button
             onClick={onMobileClose}
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 md:hidden"
-            aria-label="Close menu"
+            aria-label={t('common.closeMenu')}
           >
             <X size={16} />
           </button>
@@ -232,12 +237,12 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
               )}
             >
               <LogOut size={16} className="shrink-0" />
-              <span className={cn(collapsed && 'md:hidden')}>Logout</span>
+              <span className={cn(collapsed && 'md:hidden')}>{t('common.logout')}</span>
             </button>
 
             {collapsed && (
               <div className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 hidden -translate-y-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100 md:block">
-                Logout
+                {t('common.logout')}
               </div>
             )}
           </div>
@@ -248,7 +253,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
           onClick={onToggle}
           className="absolute top-[72px] z-50 hidden h-6 w-6 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400 shadow-sm transition-colors hover:border-primary hover:text-primary md:flex"
           style={{ right: -12 }}
-          aria-label="Toggle sidebar"
+          aria-label={t('common.toggleSidebar')}
         >
           <ChevronLeft
             size={12}

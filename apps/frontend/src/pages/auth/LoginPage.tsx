@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { CRMInput } from '@/components/ui/CRMInput';
@@ -54,6 +55,11 @@ function useLockoutTimer(initialTTL: number | null) {
 }
 
 // ─── Logo ─────────────────────────────────────────────────────────────────────
+function LogoTagline() {
+  const { t } = useTranslation();
+  return <p className="text-xs text-gray-400 font-medium tracking-wide">{t('brand.tagline')}</p>;
+}
+
 function Logo() {
   return (
     <div className="flex flex-col items-center gap-2">
@@ -65,7 +71,7 @@ function Logo() {
       </div>
       <div className="text-center">
         <h1 className="text-lg font-bold text-primary">Anaqatoki</h1>
-        <p className="text-xs text-gray-400 font-medium tracking-wide">CRM Platform</p>
+        <LogoTagline />
       </div>
     </div>
   );
@@ -74,6 +80,7 @@ function Logo() {
 // ─── Login Page ───────────────────────────────────────────────────────────────
 export default function LoginPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { setAuth, isAuthenticated } = useAuthStore();
 
   const [email, setEmail] = useState('');
@@ -122,9 +129,9 @@ export default function LoginPage() {
       } else if (status === 401) {
         const remaining = errBody?.attemptsRemaining;
         setAttemptsRemaining(typeof remaining === 'number' ? remaining : null);
-        setError('Invalid email or password.');
+        setError(t('login.invalidCredentials'));
       } else {
-        setError('Something went wrong. Please try again.');
+        setError(t('login.genericError'));
       }
     } finally {
       setLoading(false);
@@ -162,8 +169,8 @@ export default function LoginPage() {
 
         {/* Heading */}
         <div className="mb-6 text-center">
-          <h2 className="text-xl font-bold text-gray-900">Welcome back</h2>
-          <p className="mt-1 text-sm text-gray-500">Sign in to Anaqatoki</p>
+          <h2 className="text-xl font-bold text-gray-900">{t('login.welcome')}</h2>
+          <p className="mt-1 text-sm text-gray-500">{t('login.subtitle')}</p>
         </div>
 
         {/* Lockout banner */}
@@ -171,8 +178,8 @@ export default function LoginPage() {
           <div className="mb-5 flex items-center gap-3 rounded-input border border-red-200 bg-red-50 px-4 py-3">
             <AlertCircle size={16} className="shrink-0 text-red-500" />
             <div>
-              <p className="text-sm font-semibold text-red-700">Account temporarily locked</p>
-              <p className="text-xs text-red-500">Try again in {lockoutFormatted}</p>
+              <p className="text-sm font-semibold text-red-700">{t('login.accountLocked')}</p>
+              <p className="text-xs text-red-500">{t('login.tryAgainIn', { time: lockoutFormatted })}</p>
             </div>
           </div>
         )}
@@ -180,7 +187,7 @@ export default function LoginPage() {
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
           <CRMInput
-            label="Email address"
+            label={t('login.email')}
             type="email"
             placeholder="agent@anaqatoki.ma"
             value={email}
@@ -192,7 +199,7 @@ export default function LoginPage() {
           />
 
           <CRMInput
-            label="Password"
+            label={t('login.password')}
             type={showPassword ? 'text' : 'password'}
             placeholder="••••••••"
             value={password}
@@ -243,7 +250,7 @@ export default function LoginPage() {
                 )}
               </div>
             </div>
-            <span className="text-sm text-gray-600">Remember me for 30 days</span>
+            <span className="text-sm text-gray-600">{t('login.rememberMe')}</span>
           </label>
 
           {/* Error message */}
@@ -254,7 +261,7 @@ export default function LoginPage() {
                 <p className="text-sm text-red-700">{error}</p>
                 {attemptsRemaining !== null && attemptsRemaining > 0 && (
                   <p className="mt-0.5 text-xs text-red-400">
-                    {attemptsRemaining} attempt{attemptsRemaining !== 1 ? 's' : ''} remaining
+                    {t('login.attemptsRemaining', { count: attemptsRemaining })}
                   </p>
                 )}
               </div>
@@ -269,13 +276,13 @@ export default function LoginPage() {
             disabled={isLocked || !email || !password}
             className="mt-1 w-full"
           >
-            {isLocked ? `Locked — ${lockoutFormatted}` : 'Sign In'}
+            {isLocked ? t('login.locked_short', { time: lockoutFormatted }) : t('login.signIn')}
           </CRMButton>
         </form>
 
         {/* Footer */}
         <p className="mt-6 text-center text-xs text-gray-400">
-          Anaqatoki CRM &copy; {new Date().getFullYear()}
+          {t('login.footer', { year: new Date().getFullYear() })}
         </p>
       </div>
     </div>

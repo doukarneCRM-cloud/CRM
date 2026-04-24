@@ -1,6 +1,7 @@
 import { useCallback, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown, LogOut, Menu, User } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { ROUTES } from '@/constants/routes';
@@ -13,23 +14,25 @@ import { resolveImageUrl } from '@/lib/imageUrl';
 import { NotificationPanel } from './NotificationPanel';
 import { GlobalSearch } from './GlobalSearch';
 import { ProfileModal } from './ProfileModal';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 // ─── Page title map ───────────────────────────────────────────────────────────
-const PAGE_TITLES: Record<string, string> = {
-  [ROUTES.DASHBOARD]: 'Dashboard',
-  [ROUTES.ORDERS]: 'Orders',
-  [ROUTES.CALL_CENTER]: 'Call Center',
-  [ROUTES.PRODUCTS_LIST]: 'Products',
-  [ROUTES.PRODUCTS_STOCK]: 'Stock Matrix',
-  [ROUTES.CLIENTS]: 'Clients',
-  [ROUTES.TEAM_AGENTS]: 'Team',
-  [ROUTES.ANALYTICS]: 'Analytics',
-  [ROUTES.INTEGRATIONS_STORE]: 'Integrations',
-  [ROUTES.ATELIE_EMPLOYEES]: 'Atelie',
-  [ROUTES.PRODUCTION_DASHBOARD]: 'Production',
-  [ROUTES.PRODUCTION_TESTS]: 'Product Tests',
-  [ROUTES.PRODUCTION_RUNS]: 'Production Runs',
-  [ROUTES.SETTINGS]: 'Settings',
+// Maps route → i18n key under `nav.*`. Resolved at render via t().
+const PAGE_TITLE_KEYS: Record<string, string> = {
+  [ROUTES.DASHBOARD]: 'nav.dashboard',
+  [ROUTES.ORDERS]: 'nav.orders',
+  [ROUTES.CALL_CENTER]: 'nav.callCenter',
+  [ROUTES.PRODUCTS_LIST]: 'nav.products',
+  [ROUTES.PRODUCTS_STOCK]: 'nav.stockMatrix',
+  [ROUTES.CLIENTS]: 'nav.clients',
+  [ROUTES.TEAM_AGENTS]: 'nav.team',
+  [ROUTES.ANALYTICS]: 'nav.analytics',
+  [ROUTES.INTEGRATIONS_STORE]: 'nav.integrations',
+  [ROUTES.ATELIE_EMPLOYEES]: 'nav.atelie',
+  [ROUTES.PRODUCTION_DASHBOARD]: 'nav.production',
+  [ROUTES.PRODUCTION_TESTS]: 'nav.productionTests',
+  [ROUTES.PRODUCTION_RUNS]: 'nav.productionRuns',
+  [ROUTES.SETTINGS]: 'nav.settings',
 };
 
 const AVATAR_COLORS = [
@@ -167,6 +170,7 @@ function OnlineAgents() {
 
 // ─── User dropdown ─────────────────────────────────────────────────────────────
 function UserDropdown() {
+  const { t } = useTranslation();
   const { user, logout, refreshToken } = useAuthStore();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -253,7 +257,7 @@ function UserDropdown() {
                   className="flex w-full items-center gap-2.5 px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-accent"
                 >
                   <User size={14} />
-                  Profile
+                  {t('common.profile')}
                 </button>
               </li>
               <li>
@@ -262,7 +266,7 @@ function UserDropdown() {
                   className="flex w-full items-center gap-2.5 px-4 py-2 text-sm text-red-600 transition-colors hover:bg-red-50"
                 >
                   <LogOut size={14} />
-                  Logout
+                  {t('common.logout')}
                 </button>
               </li>
             </ul>
@@ -284,8 +288,10 @@ interface TopBarProps {
 export function TopBar({ onMobileMenuOpen }: TopBarProps) {
   const { pathname } = useLocation();
   const { user, hasRole } = useAuthStore();
+  const { t } = useTranslation();
 
-  const pageTitle = PAGE_TITLES[pathname] ?? 'Anaqatoki CRM';
+  const titleKey = PAGE_TITLE_KEYS[pathname];
+  const pageTitle = titleKey ? t(titleKey) : 'Anaqatoki CRM';
   const isAdmin = hasRole('admin');
 
   return (
@@ -303,7 +309,7 @@ export function TopBar({ onMobileMenuOpen }: TopBarProps) {
         <button
           onClick={onMobileMenuOpen}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-btn text-gray-500 hover:bg-accent hover:text-primary md:hidden"
-          aria-label="Open menu"
+          aria-label={t('common.openMenu')}
         >
           <Menu size={20} />
         </button>
@@ -315,12 +321,15 @@ export function TopBar({ onMobileMenuOpen }: TopBarProps) {
         )}
       </div>
 
-      {/* Right: search + bell + user */}
+      {/* Right: search + lang + bell + user */}
       <div className="flex shrink-0 items-center gap-2 sm:gap-3">
         {/* Global search — hidden on very narrow screens */}
         <div className="hidden sm:block">
           <GlobalSearch />
         </div>
+
+        {/* Language switcher */}
+        <LanguageSwitcher />
 
         {/* Notification bell */}
         <NotificationPanel />
