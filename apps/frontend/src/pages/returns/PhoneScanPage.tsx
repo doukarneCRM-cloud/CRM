@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ScanLine, CheckCircle2, XCircle, AlertTriangle, Keyboard } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { CRMButton } from '@/components/ui/CRMButton';
@@ -49,6 +50,7 @@ function beep(ok: boolean) {
 }
 
 export default function PhoneScanPage() {
+  const { t } = useTranslation();
   const [feedback, setFeedback] = useState<Feedback>({ kind: 'idle' });
   const [manualMode, setManualMode] = useState(false);
   const [manual, setManual] = useState('');
@@ -87,7 +89,7 @@ export default function PhoneScanPage() {
         if (navigator.vibrate) navigator.vibrate(200);
         beep(false);
       } else {
-        setFeedback({ kind: 'error', message: 'Network error — try again' });
+        setFeedback({ kind: 'error', message: t('returns.phone.feedback.networkError') });
         beep(false);
       }
     } finally {
@@ -130,8 +132,8 @@ export default function PhoneScanPage() {
       } catch (e) {
         setCameraErr(
           e instanceof Error
-            ? `${e.message}. Switch to manual entry below.`
-            : 'Could not access the camera. Switch to manual entry below.',
+            ? t('returns.phone.cameraErrorFallback', { message: e.message })
+            : t('returns.phone.cameraErrorGeneric'),
         );
       }
     };
@@ -155,6 +157,7 @@ export default function PhoneScanPage() {
           });
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [manualMode]);
 
   const submitManual = () => {
@@ -169,10 +172,10 @@ export default function PhoneScanPage() {
       <header className="flex items-center justify-between border-b border-white/10 px-4 py-3">
         <div className="flex items-center gap-2">
           <ScanLine size={18} />
-          <h1 className="text-sm font-bold">Phone scan — Returns</h1>
+          <h1 className="text-sm font-bold">{t('returns.phone.title')}</h1>
         </div>
         <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-bold">
-          {scanCount} scanned
+          {t('returns.phone.scanCount', { count: scanCount })}
         </span>
       </header>
 
@@ -185,7 +188,7 @@ export default function PhoneScanPage() {
               !manualMode ? 'bg-primary text-white shadow-sm' : 'text-gray-300',
             )}
           >
-            <ScanLine size={13} /> Camera
+            <ScanLine size={13} /> {t('returns.phone.modeCamera')}
           </button>
           <button
             onClick={() => setManualMode(true)}
@@ -194,7 +197,7 @@ export default function PhoneScanPage() {
               manualMode ? 'bg-primary text-white shadow-sm' : 'text-gray-300',
             )}
           >
-            <Keyboard size={13} /> Manual
+            <Keyboard size={13} /> {t('returns.phone.modeManual')}
           </button>
         </div>
 
@@ -214,8 +217,8 @@ export default function PhoneScanPage() {
         ) : (
           <div className="flex flex-col gap-3 rounded-card border border-white/10 bg-white/5 p-3">
             <CRMInput
-              label="Tracking ID or reference"
-              placeholder="Type or paste code"
+              label={t('returns.phone.manualLabel')}
+              placeholder={t('returns.phone.manualPlaceholder')}
               value={manual}
               onChange={(e) => setManual(e.target.value)}
               onKeyDown={(e) => {
@@ -224,7 +227,7 @@ export default function PhoneScanPage() {
               autoFocus
             />
             <CRMButton onClick={submitManual} disabled={manual.trim().length === 0}>
-              Push to laptop
+              {t('returns.phone.push')}
             </CRMButton>
           </div>
         )}
@@ -232,8 +235,7 @@ export default function PhoneScanPage() {
         <FeedbackBanner feedback={feedback} />
 
         <p className="mt-auto text-center text-[11px] text-gray-400">
-          Point the camera at each parcel barcode. The order will open on your laptop
-          automatically — verify it there, then scan the next one.
+          {t('returns.phone.bottomHint')}
         </p>
       </div>
     </div>
@@ -241,10 +243,11 @@ export default function PhoneScanPage() {
 }
 
 function FeedbackBanner({ feedback }: { feedback: Feedback }) {
+  const { t } = useTranslation();
   if (feedback.kind === 'idle') {
     return (
       <div className="rounded-card border border-white/10 bg-white/5 px-3 py-3 text-center text-xs text-gray-400">
-        Waiting for a scan…
+        {t('returns.phone.waiting')}
       </div>
     );
   }
@@ -253,7 +256,7 @@ function FeedbackBanner({ feedback }: { feedback: Feedback }) {
       <div className="flex items-center gap-3 rounded-card border border-emerald-400/30 bg-emerald-500/10 px-3 py-3 text-emerald-100">
         <CheckCircle2 size={22} className="shrink-0" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold">Sent to laptop</p>
+          <p className="text-sm font-bold">{t('returns.phone.feedback.sent')}</p>
           <p className="truncate text-[11px] opacity-80">{feedback.reference}</p>
         </div>
       </div>
@@ -264,7 +267,7 @@ function FeedbackBanner({ feedback }: { feedback: Feedback }) {
       <div className="flex items-center gap-3 rounded-card border border-rose-400/30 bg-rose-500/10 px-3 py-3 text-rose-100">
         <XCircle size={22} className="shrink-0" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold">No order matches</p>
+          <p className="text-sm font-bold">{t('returns.phone.feedback.notFound')}</p>
           <p className="truncate font-mono text-[11px] opacity-80">{feedback.code}</p>
         </div>
       </div>

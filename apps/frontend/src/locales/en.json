@@ -909,9 +909,18 @@
   "money": {
     "title": "Money",
     "tabs": {
-      "expenses": { "label": "Expenses", "hint": "Operational costs — invoices, utilities, ad spend" },
-      "commission": { "label": "Commission", "hint": "Per-agent payouts with proof & history" },
-      "delivery": { "label": "Delivery Invoice", "hint": "Carrier fees on delivered orders" }
+      "expenses": {
+        "label": "Expenses",
+        "hint": "Operational costs — invoices, utilities, ad spend"
+      },
+      "commission": {
+        "label": "Commission",
+        "hint": "Per-agent payouts with proof & history"
+      },
+      "delivery": {
+        "label": "Delivery Invoice",
+        "hint": "Carrier fees on delivered orders"
+      }
     },
     "expenses": {
       "kpi": {
@@ -1109,6 +1118,104 @@
         },
         "statusReceived": "Received",
         "statusPending": "Pending"
+      }
+    }
+  },
+  "returns": {
+    "title": "Return Verification",
+    "subtitle": "Physically check orders the carrier bounced back. Restock saleable items.",
+    "pairPhone": "Pair phone",
+    "scanQr": "Scan QR",
+    "loadFailed": "Failed to load returns",
+    "scanFailed": "No order matches this scan",
+    "noMatchCode": "No order matches scanned code: {{code}}",
+    "kpi": {
+      "returnRate": "Return rate",
+      "returnRateSubtitle": "{{returned}} returned · {{delivered}} delivered",
+      "matchesDashboard": "Matches dashboard",
+      "pending": "Pending verification",
+      "pendingSubtitle": "Awaiting physical check",
+      "verified": "Verified",
+      "verifiedSubtitle": "{{rate}} of returns cleared"
+    },
+    "searchPlaceholder": "Search phone, name, city, reference, or tracking ID…",
+    "scope": {
+      "pending": "Pending",
+      "verified": "Verified",
+      "all": "All"
+    },
+    "empty": {
+      "search": "No orders match this search.",
+      "pending": "Nothing pending — all clear.",
+      "verified": "No verified returns yet."
+    },
+    "card": {
+      "itemCount_one": "{{count}} item",
+      "itemCount_other": "{{count}} items",
+      "verify": "Verify"
+    },
+    "status": {
+      "returned": "Returned",
+      "attempted": "Attempted",
+      "lost": "Lost",
+      "returnValidated": "Validated",
+      "returnRefused": "Refused"
+    },
+    "verify": {
+      "title": "Verify {{reference}}",
+      "failed": "Failed to verify",
+      "itemCount_one": "{{count}} item — match each against the parcel",
+      "itemCount_other": "{{count}} items — match each against the parcel",
+      "defaultVariant": "Default variant",
+      "sku": "SKU {{sku}}",
+      "alreadyVerified": "Already verified by {{name}}",
+      "unknown": "unknown",
+      "noteLabel": "Note (optional)",
+      "notePlaceholder": "Any detail worth keeping on the record",
+      "saving": "Saving…",
+      "actions": {
+        "doneLabel": "Done",
+        "doneHint": "Good — restock",
+        "damagedLabel": "Damaged",
+        "damagedHint": "Refuse — don't restock",
+        "skipLabel": "Skip",
+        "skipHint": "Decide later"
+      }
+    },
+    "scanner": {
+      "title": "Scan return",
+      "modeCamera": "Camera",
+      "modeManual": "Type manually",
+      "cameraHint": "Align the package's QR or barcode inside the frame. Scanning stops automatically on match.",
+      "trackingLabel": "Tracking ID or order reference",
+      "trackingPlaceholder": "e.g. CLX-1234567890 or ORD-26-00123",
+      "lookup": "Look up",
+      "cameraErrorFallback": "{{message}}. You can type the tracking ID manually instead.",
+      "cameraErrorGeneric": "Could not access the camera. You can type the tracking ID manually instead."
+    },
+    "pair": {
+      "title": "Pair your phone",
+      "subtitle": "Scan this QR with your phone camera. Sign in with the same account and start scanning parcels — each scan opens here automatically.",
+      "copy": "Copy",
+      "copied": "Copied",
+      "tip": "Tip: keep this tab open on the laptop — scans from the phone will pop the verify drawer right here."
+    },
+    "phone": {
+      "title": "Phone scan — Returns",
+      "scanCount": "{{count}} scanned",
+      "modeCamera": "Camera",
+      "modeManual": "Manual",
+      "manualLabel": "Tracking ID or reference",
+      "manualPlaceholder": "Type or paste code",
+      "push": "Push to laptop",
+      "cameraErrorFallback": "{{message}}. Switch to manual entry below.",
+      "cameraErrorGeneric": "Could not access the camera. Switch to manual entry below.",
+      "waiting": "Waiting for a scan…",
+      "bottomHint": "Point the camera at each parcel barcode. The order will open on your laptop automatically — verify it there, then scan the next one.",
+      "feedback": {
+        "sent": "Sent to laptop",
+        "notFound": "No order matches",
+        "networkError": "Network error — try again"
       }
     }
   }

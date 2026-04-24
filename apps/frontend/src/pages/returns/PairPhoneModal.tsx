@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { QRCodeSVG } from 'qrcode.react';
 import { Copy, Check, Smartphone } from 'lucide-react';
 import { GlassModal } from '@/components/ui/GlassModal';
@@ -11,6 +12,7 @@ import { ROUTES } from '@/constants/routes';
  * events to the `agent:${userId}` socket room.
  */
 export function PairPhoneModal({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
 
   const url = useMemo(
@@ -29,11 +31,10 @@ export function PairPhoneModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <GlassModal open onClose={onClose} title="Pair your phone" size="md">
+    <GlassModal open onClose={onClose} title={t('returns.pair.title')} size="md">
       <div className="flex flex-col items-center gap-4">
         <p className="text-center text-sm text-gray-600">
-          Scan this QR with your phone camera. Sign in with the same account and
-          start scanning parcels — each scan opens here automatically.
+          {t('returns.pair.subtitle')}
         </p>
 
         <div className="rounded-card border border-gray-200 bg-white p-4">
@@ -49,13 +50,12 @@ export function PairPhoneModal({ onClose }: { onClose: () => void }) {
             className="inline-flex shrink-0 items-center gap-1 rounded-btn bg-white px-2 py-1 text-[11px] font-semibold text-gray-700 hover:bg-gray-100"
           >
             {copied ? <Check size={12} /> : <Copy size={12} />}
-            {copied ? 'Copied' : 'Copy'}
+            {copied ? t('returns.pair.copied') : t('returns.pair.copy')}
           </button>
         </div>
 
         <p className="text-center text-[11px] text-gray-400">
-          Tip: keep this tab open on the laptop — scans from the phone will
-          pop the verify drawer right here.
+          {t('returns.pair.tip')}
         </p>
       </div>
     </GlassModal>

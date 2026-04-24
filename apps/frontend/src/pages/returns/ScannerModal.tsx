@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ScanLine, Keyboard, AlertTriangle } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { GlassModal } from '@/components/ui/GlassModal';
@@ -37,6 +38,7 @@ function playSuccessBeep() {
 }
 
 export function ScannerModal({ onClose, onResult }: Props) {
+  const { t } = useTranslation();
   const [mode, setMode] = useState<'scan' | 'manual'>('scan');
   const [manual, setManual] = useState('');
   const [err, setErr] = useState<string | null>(null);
@@ -84,8 +86,8 @@ export function ScannerModal({ onClose, onResult }: Props) {
       } catch (e) {
         setErr(
           e instanceof Error
-            ? `${e.message}. You can type the tracking ID manually instead.`
-            : 'Could not access the camera. You can type the tracking ID manually instead.',
+            ? t('returns.scanner.cameraErrorFallback', { message: e.message })
+            : t('returns.scanner.cameraErrorGeneric'),
         );
       }
     };
@@ -110,6 +112,7 @@ export function ScannerModal({ onClose, onResult }: Props) {
           });
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, onResult]);
 
   const submitManual = () => {
@@ -119,7 +122,7 @@ export function ScannerModal({ onClose, onResult }: Props) {
   };
 
   return (
-    <GlassModal open onClose={onClose} title="Scan return" size="lg">
+    <GlassModal open onClose={onClose} title={t('returns.scanner.title')} size="lg">
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-1 rounded-card border border-gray-100 bg-white p-1">
           <button
@@ -128,7 +131,7 @@ export function ScannerModal({ onClose, onResult }: Props) {
               mode === 'scan' ? 'bg-primary text-white shadow-sm' : 'text-gray-500 hover:bg-accent hover:text-primary'
             }`}
           >
-            <ScanLine size={13} /> Camera
+            <ScanLine size={13} /> {t('returns.scanner.modeCamera')}
           </button>
           <button
             onClick={() => setMode('manual')}
@@ -136,7 +139,7 @@ export function ScannerModal({ onClose, onResult }: Props) {
               mode === 'manual' ? 'bg-primary text-white shadow-sm' : 'text-gray-500 hover:bg-accent hover:text-primary'
             }`}
           >
-            <Keyboard size={13} /> Type manually
+            <Keyboard size={13} /> {t('returns.scanner.modeManual')}
           </button>
         </div>
 
@@ -155,14 +158,14 @@ export function ScannerModal({ onClose, onResult }: Props) {
               style={{ minHeight: 280 }}
             />
             <p className="text-center text-[11px] text-gray-400">
-              Align the package's QR or barcode inside the frame. Scanning stops automatically on match.
+              {t('returns.scanner.cameraHint')}
             </p>
           </div>
         ) : (
           <div className="flex flex-col gap-3">
             <CRMInput
-              label="Tracking ID or order reference"
-              placeholder="e.g. CLX-1234567890 or ORD-26-00123"
+              label={t('returns.scanner.trackingLabel')}
+              placeholder={t('returns.scanner.trackingPlaceholder')}
               value={manual}
               onChange={(e) => setManual(e.target.value)}
               onKeyDown={(e) => {
@@ -172,7 +175,7 @@ export function ScannerModal({ onClose, onResult }: Props) {
             />
             <div className="flex justify-end">
               <CRMButton onClick={submitManual} disabled={manual.trim().length === 0}>
-                Look up
+                {t('returns.scanner.lookup')}
               </CRMButton>
             </div>
           </div>

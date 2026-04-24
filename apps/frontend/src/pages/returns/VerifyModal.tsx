@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -28,6 +29,7 @@ interface Props {
  * physical check.
  */
 export function VerifyModal({ order, onClose, onVerified }: Props) {
+  const { t } = useTranslation();
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState<VerifyOutcome | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -44,13 +46,13 @@ export function VerifyModal({ order, onClose, onVerified }: Props) {
       await returnsApi.verify(order.id, { outcome, note: note.trim() || null });
       onVerified();
     } catch (e) {
-      setErr(apiErrorMessage(e, 'Failed to verify'));
+      setErr(apiErrorMessage(e, t('returns.verify.failed')));
       setSaving(null);
     }
   };
 
   return (
-    <GlassModal open onClose={onClose} title={`Verify ${order.reference}`} size="xl">
+    <GlassModal open onClose={onClose} title={t('returns.verify.title', { reference: order.reference })} size="xl">
       <div className="flex flex-col gap-4">
         {err && (
           <div className="rounded-card border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -86,7 +88,7 @@ export function VerifyModal({ order, onClose, onVerified }: Props) {
         {/* Items with photos — this is the main visual check */}
         <div>
           <p className="mb-2 text-[10px] uppercase tracking-wide text-gray-400">
-            {totalItems} item{totalItems !== 1 && 's'} — match each against the parcel
+            {t('returns.verify.itemCount', { count: totalItems })}
           </p>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {order.items.map((it) => {
@@ -117,10 +119,10 @@ export function VerifyModal({ order, onClose, onVerified }: Props) {
                       {it.variant.product.name}
                     </p>
                     <p className="truncate text-[11px] text-gray-500">
-                      {variantLabel || 'Default variant'}
+                      {variantLabel || t('returns.verify.defaultVariant')}
                     </p>
                     <p className="truncate font-mono text-[10px] text-gray-400">
-                      SKU {it.variant.sku}
+                      {t('returns.verify.sku', { sku: it.variant.sku })}
                     </p>
                   </div>
                 </div>
@@ -132,7 +134,7 @@ export function VerifyModal({ order, onClose, onVerified }: Props) {
         {isVerified ? (
           <div className="rounded-card border border-gray-100 bg-white px-3 py-3 text-sm">
             <p className="font-semibold text-gray-800">
-              Already verified by {order.returnVerifiedBy?.name ?? 'unknown'}
+              {t('returns.verify.alreadyVerified', { name: order.returnVerifiedBy?.name ?? t('returns.verify.unknown') })}
             </p>
             {order.returnNote && (
               <p className="mt-1 rounded-btn bg-gray-50 px-2 py-1 text-xs italic text-gray-600">
@@ -143,12 +145,12 @@ export function VerifyModal({ order, onClose, onVerified }: Props) {
         ) : (
           <>
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-gray-700">Note (optional)</label>
+              <label className="text-sm font-medium text-gray-700">{t('returns.verify.noteLabel')}</label>
               <textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 rows={2}
-                placeholder="Any detail worth keeping on the record"
+                placeholder={t('returns.verify.notePlaceholder')}
                 className="w-full resize-none rounded-input border border-gray-200 px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
@@ -156,8 +158,8 @@ export function VerifyModal({ order, onClose, onVerified }: Props) {
             {/* 3 big action buttons — single click to submit */}
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <ActionButton
-                label="Done"
-                hint="Good — restock"
+                label={t('returns.verify.actions.doneLabel')}
+                hint={t('returns.verify.actions.doneHint')}
                 Icon={CheckCircle2}
                 tone="good"
                 loading={saving === 'good'}
@@ -165,8 +167,8 @@ export function VerifyModal({ order, onClose, onVerified }: Props) {
                 onClick={() => submit('good')}
               />
               <ActionButton
-                label="Damaged"
-                hint="Refuse — don't restock"
+                label={t('returns.verify.actions.damagedLabel')}
+                hint={t('returns.verify.actions.damagedHint')}
                 Icon={AlertTriangle}
                 tone="bad"
                 loading={saving === 'damaged'}
@@ -174,8 +176,8 @@ export function VerifyModal({ order, onClose, onVerified }: Props) {
                 onClick={() => submit('damaged')}
               />
               <ActionButton
-                label="Skip"
-                hint="Decide later"
+                label={t('returns.verify.actions.skipLabel')}
+                hint={t('returns.verify.actions.skipHint')}
                 Icon={SkipForward}
                 tone="skip"
                 loading={false}
@@ -203,6 +205,7 @@ interface ActionButtonProps {
 }
 
 function ActionButton({ label, hint, Icon, tone, loading, disabled, onClick }: ActionButtonProps) {
+  const { t } = useTranslation();
   const classes: Record<Tone, string> = {
     good: 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 hover:border-emerald-400 active:bg-emerald-200',
     bad: 'border-rose-300 bg-rose-50 text-rose-800 hover:bg-rose-100 hover:border-rose-400 active:bg-rose-200',
@@ -219,7 +222,7 @@ function ActionButton({ label, hint, Icon, tone, loading, disabled, onClick }: A
       )}
     >
       <Icon size={28} strokeWidth={2.2} className={loading ? 'animate-pulse' : ''} />
-      <span className="text-base leading-none">{loading ? 'Saving…' : label}</span>
+      <span className="text-base leading-none">{loading ? t('returns.verify.saving') : label}</span>
       <span className="text-[11px] font-normal opacity-70">{hint}</span>
     </button>
   );

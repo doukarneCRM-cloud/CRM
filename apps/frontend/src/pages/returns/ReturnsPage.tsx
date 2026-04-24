@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import {
   PackageSearch,
@@ -41,6 +42,7 @@ function fmtDate(iso: string | null | undefined): string {
 type Scope = 'pending' | 'verified' | 'all';
 
 export default function ReturnsPage() {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialQ = searchParams.get('q') ?? '';
   const [scope, setScope] = useState<Scope>(initialQ ? 'all' : 'pending');
@@ -80,7 +82,7 @@ export default function ReturnsPage() {
         setOrders(r.data);
       })
       .catch((e) => {
-        if (!cancelled) setError(apiErrorMessage(e, 'Failed to load returns'));
+        if (!cancelled) setError(apiErrorMessage(e, t('returns.loadFailed')));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -117,7 +119,7 @@ export default function ReturnsPage() {
       setVerifying(order);
     };
     const onScanFailed = (payload: { code: string }) => {
-      setError(`No order matches scanned code: ${payload.code}`);
+      setError(t('returns.noMatchCode', { code: payload.code }));
     };
     socket.on('return:scanned', onScanned);
     socket.on('return:scan_failed', onScanFailed);
@@ -125,6 +127,7 @@ export default function ReturnsPage() {
       socket.off('return:scanned', onScanned);
       socket.off('return:scan_failed', onScanFailed);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleScanResult = async (value: string) => {
@@ -133,7 +136,7 @@ export default function ReturnsPage() {
       const order = await returnsApi.scan(value);
       setVerifying(order);
     } catch (e) {
-      setError(apiErrorMessage(e, 'No order matches this scan'));
+      setError(apiErrorMessage(e, t('returns.scanFailed')));
     }
   };
 
@@ -143,10 +146,8 @@ export default function ReturnsPage() {
     <div className="flex flex-col gap-4 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Return Verification</h1>
-          <p className="text-xs text-gray-400">
-            Physically check orders the carrier bounced back. Restock saleable items.
-          </p>
+          <h1 className="text-xl font-bold text-gray-900">{t('returns.title')}</h1>
+          <p className="text-xs text-gray-400">{t('returns.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
           <CRMButton
@@ -154,13 +155,13 @@ export default function ReturnsPage() {
             leftIcon={<Smartphone size={16} />}
             onClick={() => setPairOpen(true)}
           >
-            Pair phone
+            {t('returns.pairPhone')}
           </CRMButton>
           <CRMButton
             leftIcon={<ScanLine size={16} />}
             onClick={() => setScannerOpen(true)}
           >
-            Scan QR
+            {t('returns.scanQr')}
           </CRMButton>
         </div>
       </div>
@@ -173,27 +174,30 @@ export default function ReturnsPage() {
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         <KPICard
-          title="Return rate"
+          title={t('returns.kpi.returnRate')}
           value={stats ? formatPct(stats.returnRate) : '—'}
           subtitle={
             stats
-              ? `${stats.returnedTotal} returned · ${stats.deliveredCount} delivered`
-              : 'Matches dashboard'
+              ? t('returns.kpi.returnRateSubtitle', {
+                  returned: stats.returnedTotal,
+                  delivered: stats.deliveredCount,
+                })
+              : t('returns.kpi.matchesDashboard')
           }
           icon={Undo2}
           iconColor="#F43F5E"
         />
         <KPICard
-          title="Pending verification"
+          title={t('returns.kpi.pending')}
           value={stats ? stats.pendingCount.toString() : '—'}
-          subtitle="Awaiting physical check"
+          subtitle={t('returns.kpi.pendingSubtitle')}
           icon={Clock}
           iconColor="#F59E0B"
         />
         <KPICard
-          title="Verified"
+          title={t('returns.kpi.verified')}
           value={stats ? stats.verifiedTotal.toString() : '—'}
-          subtitle={stats ? `${formatPct(stats.verifiedRate)} of returns cleared` : undefined}
+          subtitle={stats ? t('returns.kpi.verifiedSubtitle', { rate: formatPct(stats.verifiedRate) }) : undefined}
           icon={CheckCircle2}
           iconColor="#10B981"
         />
@@ -203,7 +207,7 @@ export default function ReturnsPage() {
         <div className="flex flex-wrap items-center gap-3">
           <CRMInput
             leftIcon={<Search size={14} />}
-            placeholder="Search phone, name, city, reference, or tracking ID…"
+            placeholder={t('returns.searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             wrapperClassName="flex-1 min-w-[240px]"
@@ -211,25 +215,25 @@ export default function ReturnsPage() {
           <div className="flex items-center gap-1 rounded-card border border-gray-100 bg-white p-1">
             {(
               [
-                { id: 'pending' as Scope, label: 'Pending', icon: Clock },
-                { id: 'verified' as Scope, label: 'Verified', icon: History },
-                { id: 'all' as Scope, label: 'All', icon: Boxes },
+                { id: 'pending' as Scope, label: t('returns.scope.pending'), icon: Clock },
+                { id: 'verified' as Scope, label: t('returns.scope.verified'), icon: History },
+                { id: 'all' as Scope, label: t('returns.scope.all'), icon: Boxes },
               ]
-            ).map((t) => {
-              const Icon = t.icon;
+            ).map((tab) => {
+              const Icon = tab.icon;
               return (
                 <button
-                  key={t.id}
-                  onClick={() => setScope(t.id)}
+                  key={tab.id}
+                  onClick={() => setScope(tab.id)}
                   className={cn(
                     'inline-flex items-center gap-1.5 rounded-btn px-3 py-1.5 text-xs font-semibold transition-colors',
-                    scope === t.id
+                    scope === tab.id
                       ? 'bg-primary text-white shadow-sm'
                       : 'text-gray-500 hover:bg-accent hover:text-primary',
                   )}
                 >
                   <Icon size={12} />
-                  {t.label}
+                  {tab.label}
                 </button>
               );
             })}
@@ -247,10 +251,10 @@ export default function ReturnsPage() {
             <PackageSearch size={28} className="text-gray-300" />
             <p className="text-sm">
               {debounced
-                ? 'No orders match this search.'
+                ? t('returns.empty.search')
                 : scope === 'pending'
-                  ? 'Nothing pending — all clear.'
-                  : 'No verified returns yet.'}
+                  ? t('returns.empty.pending')
+                  : t('returns.empty.verified')}
             </p>
           </div>
         ) : (
@@ -285,6 +289,7 @@ export default function ReturnsPage() {
 // ─── Return card ────────────────────────────────────────────────────────────
 
 function ReturnCard({ order, onVerify }: { order: ReturnOrder; onVerify: () => void }) {
+  const { t } = useTranslation();
   const isVerified =
     order.shippingStatus === 'return_validated' || order.shippingStatus === 'return_refused';
   const isGood = order.shippingStatus === 'return_validated';
@@ -326,7 +331,7 @@ function ReturnCard({ order, onVerify }: { order: ReturnOrder; onVerify: () => v
             </div>
           )}
           <div className="mt-0.5 inline-flex items-center gap-1">
-            <Boxes size={10} /> {totalItems} item{totalItems !== 1 && 's'}
+            <Boxes size={10} /> {t('returns.card.itemCount', { count: totalItems })}
           </div>
         </div>
       </div>
@@ -344,7 +349,7 @@ function ReturnCard({ order, onVerify }: { order: ReturnOrder; onVerify: () => v
         </div>
       ) : (
         <CRMButton size="sm" onClick={onVerify} leftIcon={<CheckCircle2 size={13} />}>
-          Verify
+          {t('returns.card.verify')}
         </CRMButton>
       )}
     </div>
@@ -352,17 +357,18 @@ function ReturnCard({ order, onVerify }: { order: ReturnOrder; onVerify: () => v
 }
 
 function StatusPill({ status }: { status: string }) {
+  const { t } = useTranslation();
   const map: Record<string, { label: string; cls: string; Icon: typeof Clock }> = {
-    returned: { label: 'Returned', cls: 'bg-amber-100 text-amber-700', Icon: Clock },
-    attempted: { label: 'Attempted', cls: 'bg-amber-100 text-amber-700', Icon: Clock },
-    lost: { label: 'Lost', cls: 'bg-rose-100 text-rose-700', Icon: AlertTriangle },
+    returned: { label: t('returns.status.returned'), cls: 'bg-amber-100 text-amber-700', Icon: Clock },
+    attempted: { label: t('returns.status.attempted'), cls: 'bg-amber-100 text-amber-700', Icon: Clock },
+    lost: { label: t('returns.status.lost'), cls: 'bg-rose-100 text-rose-700', Icon: AlertTriangle },
     return_validated: {
-      label: 'Validated',
+      label: t('returns.status.returnValidated'),
       cls: 'bg-emerald-100 text-emerald-700',
       Icon: CheckCircle2,
     },
     return_refused: {
-      label: 'Refused',
+      label: t('returns.status.returnRefused'),
       cls: 'bg-rose-100 text-rose-700',
       Icon: XCircle,
     },

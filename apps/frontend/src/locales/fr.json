@@ -909,9 +909,18 @@
   "money": {
     "title": "Finances",
     "tabs": {
-      "expenses": { "label": "Dépenses", "hint": "Frais opérationnels — factures, abonnements, publicités" },
-      "commission": { "label": "Commissions", "hint": "Versements par agent avec justificatifs et historique" },
-      "delivery": { "label": "Facture livreur", "hint": "Frais du transporteur sur les commandes livrées" }
+      "expenses": {
+        "label": "Dépenses",
+        "hint": "Frais opérationnels — factures, abonnements, publicités"
+      },
+      "commission": {
+        "label": "Commissions",
+        "hint": "Versements par agent avec justificatifs et historique"
+      },
+      "delivery": {
+        "label": "Facture livreur",
+        "hint": "Frais du transporteur sur les commandes livrées"
+      }
     },
     "expenses": {
       "kpi": {
@@ -1109,6 +1118,104 @@
         },
         "statusReceived": "Reçu",
         "statusPending": "En attente"
+      }
+    }
+  },
+  "returns": {
+    "title": "Vérification des retours",
+    "subtitle": "Vérifiez physiquement les commandes renvoyées par le transporteur. Réapprovisionnez les articles revendables.",
+    "pairPhone": "Appairer le téléphone",
+    "scanQr": "Scanner le QR",
+    "loadFailed": "Échec du chargement des retours",
+    "scanFailed": "Aucune commande ne correspond à ce scan",
+    "noMatchCode": "Aucune commande ne correspond au code scanné : {{code}}",
+    "kpi": {
+      "returnRate": "Taux de retour",
+      "returnRateSubtitle": "{{returned}} retournées · {{delivered}} livrées",
+      "matchesDashboard": "Correspond au tableau de bord",
+      "pending": "Vérifications en attente",
+      "pendingSubtitle": "En attente de contrôle physique",
+      "verified": "Vérifiées",
+      "verifiedSubtitle": "{{rate}} des retours traités"
+    },
+    "searchPlaceholder": "Rechercher téléphone, nom, ville, référence ou ID de suivi…",
+    "scope": {
+      "pending": "En attente",
+      "verified": "Vérifiées",
+      "all": "Toutes"
+    },
+    "empty": {
+      "search": "Aucune commande ne correspond à cette recherche.",
+      "pending": "Rien en attente — tout est réglé.",
+      "verified": "Aucun retour vérifié pour le moment."
+    },
+    "card": {
+      "itemCount_one": "{{count}} article",
+      "itemCount_other": "{{count}} articles",
+      "verify": "Vérifier"
+    },
+    "status": {
+      "returned": "Retourné",
+      "attempted": "Tentative",
+      "lost": "Perdu",
+      "returnValidated": "Validé",
+      "returnRefused": "Refusé"
+    },
+    "verify": {
+      "title": "Vérifier {{reference}}",
+      "failed": "Échec de la vérification",
+      "itemCount_one": "{{count}} article — vérifiez chacun dans le colis",
+      "itemCount_other": "{{count}} articles — vérifiez chacun dans le colis",
+      "defaultVariant": "Variante par défaut",
+      "sku": "SKU {{sku}}",
+      "alreadyVerified": "Déjà vérifié par {{name}}",
+      "unknown": "inconnu",
+      "noteLabel": "Note (optionnelle)",
+      "notePlaceholder": "Tout détail qui mérite d'être conservé",
+      "saving": "Enregistrement…",
+      "actions": {
+        "doneLabel": "Conforme",
+        "doneHint": "Bon état — réapprovisionner",
+        "damagedLabel": "Endommagé",
+        "damagedHint": "Refuser — ne pas réapprovisionner",
+        "skipLabel": "Ignorer",
+        "skipHint": "Décider plus tard"
+      }
+    },
+    "scanner": {
+      "title": "Scanner un retour",
+      "modeCamera": "Caméra",
+      "modeManual": "Saisir manuellement",
+      "cameraHint": "Alignez le QR ou le code-barres du colis dans le cadre. Le scan s'arrête automatiquement à la détection.",
+      "trackingLabel": "ID de suivi ou référence de commande",
+      "trackingPlaceholder": "ex. CLX-1234567890 ou ORD-26-00123",
+      "lookup": "Rechercher",
+      "cameraErrorFallback": "{{message}}. Vous pouvez saisir l'ID manuellement.",
+      "cameraErrorGeneric": "Impossible d'accéder à la caméra. Vous pouvez saisir l'ID manuellement."
+    },
+    "pair": {
+      "title": "Appairer votre téléphone",
+      "subtitle": "Scannez ce QR avec la caméra de votre téléphone. Connectez-vous avec le même compte et commencez à scanner les colis — chaque scan s'ouvre ici automatiquement.",
+      "copy": "Copier",
+      "copied": "Copié",
+      "tip": "Astuce : gardez cet onglet ouvert sur le portable — les scans du téléphone y ouvriront la fenêtre de vérification."
+    },
+    "phone": {
+      "title": "Scan mobile — Retours",
+      "scanCount": "{{count}} scannés",
+      "modeCamera": "Caméra",
+      "modeManual": "Manuel",
+      "manualLabel": "ID de suivi ou référence",
+      "manualPlaceholder": "Saisir ou coller un code",
+      "push": "Envoyer au portable",
+      "cameraErrorFallback": "{{message}}. Passez à la saisie manuelle ci-dessous.",
+      "cameraErrorGeneric": "Impossible d'accéder à la caméra. Passez à la saisie manuelle ci-dessous.",
+      "waiting": "En attente d'un scan…",
+      "bottomHint": "Pointez la caméra vers chaque code-barres de colis. La commande s'ouvrira automatiquement sur votre portable — vérifiez-la puis scannez la suivante.",
+      "feedback": {
+        "sent": "Envoyé au portable",
+        "notFound": "Aucune commande ne correspond",
+        "networkError": "Erreur réseau — réessayez"
       }
     }
   }
