@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   MessageCircle, Check, X, Phone, PhoneOff, Ban, Calendar,
-  AlertTriangle, PackageX, Save, Lock, Clock, Plus, Trash2, Truck,
+  AlertTriangle, PackageX, Save, Lock, Clock, Plus, Trash2, Truck, Copy,
 } from 'lucide-react';
 import { GlassModal } from '@/components/ui/GlassModal';
 import { CRMInput } from '@/components/ui/CRMInput';
@@ -154,6 +154,10 @@ export function CallCenterOrderModal() {
   const [saving, setSaving] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Copy-phone transient feedback — flips for ~1.2s after the Copy icon fires
+  // so the agent sees confirmation without a toast system.
+  const [phoneCopied, setPhoneCopied] = useState(false);
 
   // Callback prompt state (only thing besides note that's needed for actions)
   const [callbackAt, setCallbackAt] = useState('');
@@ -646,15 +650,29 @@ export function CallCenterOrderModal() {
                       >
                         <Phone size={12} />
                       </a>
-                      <a
-                        href={`https://wa.me/${phoneDigits}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-btn bg-emerald-500 text-white hover:bg-emerald-600"
-                        title="WhatsApp"
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!form.customerPhone) return;
+                          try {
+                            await navigator.clipboard.writeText(form.customerPhone);
+                            setPhoneCopied(true);
+                            setTimeout(() => setPhoneCopied(false), 1200);
+                          } catch {
+                            // Silent — clipboard API may be blocked on insecure
+                            // contexts; no fallback needed for call-center use.
+                          }
+                        }}
+                        className={cn(
+                          'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-btn transition',
+                          phoneCopied
+                            ? 'bg-emerald-500 text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800',
+                        )}
+                        title={phoneCopied ? 'Copied!' : 'Copy phone number'}
                       >
-                        <MessageCircle size={12} />
-                      </a>
+                        {phoneCopied ? <Check size={12} /> : <Copy size={12} />}
+                      </button>
                     </div>
                   </div>
                   <CRMSelect
@@ -672,21 +690,37 @@ export function CallCenterOrderModal() {
                   />
                 </div>
 
-                {/* QR — scan with phone to dial customer directly */}
+                {/* Right rail — big WhatsApp CTA + QR-to-call. Both require a
+                    valid phone; they stack horizontally on mobile, vertically
+                    beside the customer fields on desktop. */}
                 {phoneValid !== false && phoneDigits && (
-                  <div className="flex w-full shrink-0 flex-row items-center justify-center gap-2 rounded-btn border border-primary/10 bg-gradient-to-br from-white to-accent/30 p-2 sm:w-[104px] sm:flex-col sm:self-stretch">
-                    <div className="rounded-md bg-white p-1 ring-1 ring-gray-100">
-                      <QRCodeSVG
-                        value={`tel:+212${phoneDigits.replace(/^0/, '')}`}
-                        size={84}
-                        level="M"
-                        bgColor="#ffffff"
-                        fgColor="#1e293b"
-                      />
+                  <div className="flex w-full shrink-0 flex-row items-stretch justify-center gap-2 sm:w-[104px] sm:flex-col sm:self-stretch">
+                    <a
+                      href={`https://wa.me/212${phoneDigits.replace(/^0/, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group flex flex-1 flex-col items-center justify-center gap-1 rounded-btn bg-gradient-to-br from-emerald-500 to-emerald-600 px-3 py-2 text-white shadow-sm transition hover:from-emerald-600 hover:to-emerald-700 hover:shadow-md sm:flex-initial sm:py-3"
+                      title="Open WhatsApp chat"
+                    >
+                      <MessageCircle size={32} strokeWidth={2.2} className="transition group-hover:scale-110" />
+                      <span className="text-[9px] font-bold uppercase tracking-wider">
+                        WhatsApp
+                      </span>
+                    </a>
+                    <div className="flex flex-1 flex-col items-center justify-center gap-1 rounded-btn border border-primary/10 bg-gradient-to-br from-white to-accent/30 p-2 sm:flex-initial">
+                      <div className="rounded-md bg-white p-1 ring-1 ring-gray-100">
+                        <QRCodeSVG
+                          value={`tel:+212${phoneDigits.replace(/^0/, '')}`}
+                          size={72}
+                          level="M"
+                          bgColor="#ffffff"
+                          fgColor="#1e293b"
+                        />
+                      </div>
+                      <span className="text-center text-[9px] font-bold uppercase tracking-wider text-gray-500">
+                        Scan to call
+                      </span>
                     </div>
-                    <span className="text-center text-[9px] font-bold uppercase tracking-wider text-gray-500">
-                      Scan to call
-                    </span>
                   </div>
                 )}
               </div>
