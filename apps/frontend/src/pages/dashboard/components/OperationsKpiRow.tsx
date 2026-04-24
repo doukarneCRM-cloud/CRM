@@ -9,13 +9,13 @@ import { returnsApi } from '@/services/returnsApi';
 
 interface Stats {
   unpaidCommissionMAD: number | null;
-  unpaidCarrierMAD: number | null;
+  unpaidPayoutMAD: number | null;
   pendingReturns: number | null;
 }
 
 const EMPTY: Stats = {
   unpaidCommissionMAD: null,
-  unpaidCarrierMAD: null,
+  unpaidPayoutMAD: null,
   pendingReturns: null,
 };
 
@@ -43,7 +43,7 @@ export function OperationsKpiRow() {
       canSeeMoney
         ? moneyApi
             .listDeliveryInvoice({ paidOnly: 'unpaid' })
-            .then((r) => r.totals.unpaidFees)
+            .then((r) => r.totals.unpaidPayout)
             .catch(() => null)
         : Promise.resolve(null),
       canSeeReturns
@@ -52,9 +52,9 @@ export function OperationsKpiRow() {
             .then((r) => r.pagination.total)
             .catch(() => null)
         : Promise.resolve(null),
-    ]).then(([unpaidCommissionMAD, unpaidCarrierMAD, pendingReturns]) => {
+    ]).then(([unpaidCommissionMAD, unpaidPayoutMAD, pendingReturns]) => {
       if (cancelled) return;
-      setStats({ unpaidCommissionMAD, unpaidCarrierMAD, pendingReturns });
+      setStats({ unpaidCommissionMAD, unpaidPayoutMAD, pendingReturns });
       setLoading(false);
     });
     return () => {
@@ -81,10 +81,10 @@ export function OperationsKpiRow() {
       )}
       {canSeeMoney && (
         <KPICard
-          title={t('dashboard.kpi.unpaidCarrier')}
-          value={loading ? '…' : fmtMAD(stats.unpaidCarrierMAD)}
+          title={t('dashboard.kpi.unpaidPayout')}
+          value={loading ? '…' : fmtMAD(stats.unpaidPayoutMAD)}
           unit="MAD"
-          subtitle={t('dashboard.kpi.unpaidCarrierSub')}
+          subtitle={t('dashboard.kpi.unpaidPayoutSub')}
           icon={Truck}
           iconColor="#7C3AED"
         />

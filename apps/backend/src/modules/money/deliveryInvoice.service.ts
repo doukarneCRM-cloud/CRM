@@ -1,10 +1,21 @@
 /**
- * Money → Delivery Invoice. Reconciles what we owe the carrier for every
- * delivered order, grouped by month. Per-order fee is looked up from the
- * ShippingCity table by matching the customer's city name (case-insensitive).
+ * Money → Delivery Invoice. Reconciles the payout Coliix owes us for every
+ * delivered order, grouped by month.
  *
- * Until the Coliix invoice API is wired up, paid/unpaid is a manual flag on
- * each order. Supports bulk mark-paid per month.
+ * Business model: Coliix collects cash on delivery from the customer, keeps
+ * their carrier fee (ShippingCity.price, by city), and remits the rest to us.
+ *
+ *   orderTotal     = what the customer pays  (order.total)
+ *   carrierFee     = what Coliix keeps       (ShippingCity.price for the city)
+ *   netPayout      = what we should receive  = orderTotal − carrierFee
+ *
+ * So per order we track BOTH:
+ *   - carrierFee (informational — what Coliix takes)
+ *   - netPayout  (what we should get paid; this is the real receivable)
+ *
+ * The `paidToCarrier` flag on Order — despite its name — is used here as
+ * "payout reconciled": flipped to true once we've received the remittance
+ * from Coliix. Until the Coliix invoice API is wired up, it's a manual flag.
  */
 
 import { prisma } from '../../shared/prisma';
@@ -15,7 +26,9 @@ export interface DeliveryInvoiceOrder {
   deliveredAt: string | null;
   trackingId: string | null;
   customer: { fullName: string; phone: string; city: string };
-  shippingFee: number;
+  orderTotal: number;
+  shippingFee: number;   // Coliix fee (what they keep)
+  netPayout: number;     // orderTotal − shippingFee (what we should receive)
   paidToCarrier: boolean;
   paidToCarrierAt: string | null;
 }
@@ -29,6 +42,9 @@ export interface DeliveryInvoiceMonth {
   totalFees: number;
   paidFees: number;
   unpaidFees: number;
+  totalPayout: number;
+  paidPayout: number;
+  unpaidPayout: number;
   orders: DeliveryInvoiceOrder[];
 }
 
@@ -44,7 +60,20 @@ export async function listDeliveryInvoice(params: {
   dateTo?: string;
   paidOnly?: 'paid' | 'unpaid' | 'all';
   search?: string;
-}): Promise<{ months: DeliveryInvoiceMonth[]; totals: { orders: number; paid: number; unpaid: number; totalFees: number; paidFees: number; unpaidFees: number } }> {
+}): Promise<{
+  months: DeliveryInvoiceMonth[];
+  totals: {
+    orders: number;
+    paid: number;
+    unpaid: number;
+    totalFees: number;
+    paidFees: number;
+    unpaidFees: number;
+    totalPayout: number;
+    paidPayout: number;
+    unpaidPayout: number;
+  };
+}> {
   const where: Record<string, unknown> = {
     shippingStatus: 'delivered',
     isArchived: false,
@@ -80,6 +109,7 @@ export async function listDeliveryInvoice(params: {
       select: {
         id: true,
         reference: true,
+        total: true,
         deliveredAt: true,
         coliixTrackingId: true,
         paidToCarrier: true,
@@ -94,6 +124,8 @@ export async function listDeliveryInvoice(params: {
   const feeByCity = new Map<string, number>();
   for (const c of cities) feeByCity.set(c.name.trim().toLowerCase(), c.price);
 
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+
   const byMonth = new Map<string, DeliveryInvoiceMonth>();
   let tOrders = 0;
   let tPaid = 0;
@@ -101,6 +133,9 @@ export async function listDeliveryInvoice(params: {
   let tFees = 0;
   let tPaidFees = 0;
   let tUnpaidFees = 0;
+  let tPayout = 0;
+  let tPaidPayout = 0;
+  let tUnpaidPayout = 0;
 
   for (const o of orders) {
     const { key, label } = monthKey(o.deliveredAt);
@@ -115,18 +150,29 @@ export async function listDeliveryInvoice(params: {
         totalFees: 0,
         paidFees: 0,
         unpaidFees: 0,
+        totalPayout: 0,
+        paidPayout: 0,
+        unpaidPayout: 0,
         orders: [],
       } satisfies DeliveryInvoiceMonth);
 
     const fee = feeByCity.get(o.customer.city.trim().toLowerCase()) ?? 0;
+    // `order.total` is Prisma Decimal — coerce via Number() to avoid NaN from
+    // string ops later. Net payout is what Coliix remits to us.
+    const orderTotal = Number(o.total);
+    const netPayout = orderTotal - fee;
+
     bucket.orderCount += 1;
     bucket.totalFees += fee;
+    bucket.totalPayout += netPayout;
     if (o.paidToCarrier) {
       bucket.paidCount += 1;
       bucket.paidFees += fee;
+      bucket.paidPayout += netPayout;
     } else {
       bucket.unpaidCount += 1;
       bucket.unpaidFees += fee;
+      bucket.unpaidPayout += netPayout;
     }
     bucket.orders.push({
       id: o.id,
@@ -134,7 +180,9 @@ export async function listDeliveryInvoice(params: {
       deliveredAt: o.deliveredAt ? o.deliveredAt.toISOString() : null,
       trackingId: o.coliixTrackingId,
       customer: o.customer,
+      orderTotal: round2(orderTotal),
       shippingFee: fee,
+      netPayout: round2(netPayout),
       paidToCarrier: o.paidToCarrier,
       paidToCarrierAt: o.paidToCarrierAt ? o.paidToCarrierAt.toISOString() : null,
     });
@@ -142,13 +190,26 @@ export async function listDeliveryInvoice(params: {
     byMonth.set(key, bucket);
     tOrders += 1;
     tFees += fee;
+    tPayout += netPayout;
     if (o.paidToCarrier) {
       tPaid += 1;
       tPaidFees += fee;
+      tPaidPayout += netPayout;
     } else {
       tUnpaid += 1;
       tUnpaidFees += fee;
+      tUnpaidPayout += netPayout;
     }
+  }
+
+  // Round each month's aggregates in place so downstream fmt doesn't need to.
+  for (const m of byMonth.values()) {
+    m.totalFees = round2(m.totalFees);
+    m.paidFees = round2(m.paidFees);
+    m.unpaidFees = round2(m.unpaidFees);
+    m.totalPayout = round2(m.totalPayout);
+    m.paidPayout = round2(m.paidPayout);
+    m.unpaidPayout = round2(m.unpaidPayout);
   }
 
   const months = Array.from(byMonth.values()).sort((a, b) => {
@@ -163,9 +224,12 @@ export async function listDeliveryInvoice(params: {
       orders: tOrders,
       paid: tPaid,
       unpaid: tUnpaid,
-      totalFees: Math.round(tFees * 100) / 100,
-      paidFees: Math.round(tPaidFees * 100) / 100,
-      unpaidFees: Math.round(tUnpaidFees * 100) / 100,
+      totalFees: round2(tFees),
+      paidFees: round2(tPaidFees),
+      unpaidFees: round2(tUnpaidFees),
+      totalPayout: round2(tPayout),
+      paidPayout: round2(tPaidPayout),
+      unpaidPayout: round2(tUnpaidPayout),
     },
   };
 }

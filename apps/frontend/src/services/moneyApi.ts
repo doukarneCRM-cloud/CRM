@@ -83,7 +83,9 @@ export interface DeliveryInvoiceOrder {
   deliveredAt: string | null;
   trackingId: string | null;
   customer: { fullName: string; phone: string; city: string };
-  shippingFee: number;
+  orderTotal: number;   // What the customer paid (order.total)
+  shippingFee: number;  // Coliix fee (what they keep)
+  netPayout: number;    // orderTotal − shippingFee (what we should receive)
   paidToCarrier: boolean;
   paidToCarrierAt: string | null;
 }
@@ -97,6 +99,9 @@ export interface DeliveryInvoiceMonth {
   totalFees: number;
   paidFees: number;
   unpaidFees: number;
+  totalPayout: number;
+  paidPayout: number;
+  unpaidPayout: number;
   orders: DeliveryInvoiceOrder[];
 }
 
@@ -109,6 +114,9 @@ export interface DeliveryInvoicePayload {
     totalFees: number;
     paidFees: number;
     unpaidFees: number;
+    totalPayout: number;
+    paidPayout: number;
+    unpaidPayout: number;
   };
 }
 

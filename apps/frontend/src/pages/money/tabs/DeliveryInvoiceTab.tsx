@@ -8,8 +8,8 @@ import {
   ChevronUp,
   MapPin,
   Hash,
-  DollarSign,
   Download,
+  Wallet,
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { CRMButton } from '@/components/ui/CRMButton';
@@ -34,7 +34,18 @@ function fmtDate(iso: string | null): string {
 
 function exportMonthCsv(m: DeliveryInvoiceMonth) {
   const csv = rowsToCsv(
-    ['Reference', 'Delivered', 'Customer', 'Phone', 'City', 'Tracking', 'Fee (MAD)', 'Status'],
+    [
+      'Reference',
+      'Delivered',
+      'Customer',
+      'Phone',
+      'City',
+      'Tracking',
+      'Order Total (MAD)',
+      'Carrier Fee (MAD)',
+      'Net Payout (MAD)',
+      'Status',
+    ],
     m.orders.map((o) => [
       o.reference,
       o.deliveredAt ? o.deliveredAt.slice(0, 10) : '',
@@ -42,8 +53,10 @@ function exportMonthCsv(m: DeliveryInvoiceMonth) {
       o.customer.phone,
       o.customer.city,
       o.trackingId ?? '',
+      o.orderTotal.toFixed(2),
       o.shippingFee.toFixed(2),
-      o.paidToCarrier ? 'Paid' : 'Unpaid',
+      o.netPayout.toFixed(2),
+      o.paidToCarrier ? 'Received' : 'Pending',
     ]),
   );
   downloadCsv(`delivery-invoice_${m.period}.csv`, csv);
@@ -142,24 +155,28 @@ export function DeliveryInvoiceTab() {
         <KPICard
           title="Delivered Orders"
           value={totals?.orders.toLocaleString('fr-MA') ?? '0'}
+          subtitle={`${fmtMAD(totals?.totalFees ?? 0)} in carrier fees`}
           icon={Truck}
           iconColor="#6366F1"
         />
         <KPICard
-          title="Total Fees"
-          value={fmtMAD(totals?.totalFees ?? 0)}
-          icon={DollarSign}
+          title="Total Payout"
+          value={fmtMAD(totals?.totalPayout ?? 0)}
+          subtitle="Customer total − carrier fees"
+          icon={Wallet}
           iconColor="#0EA5E9"
         />
         <KPICard
-          title="Unpaid"
-          value={fmtMAD(totals?.unpaidFees ?? 0)}
+          title="Unpaid Payout"
+          value={fmtMAD(totals?.unpaidPayout ?? 0)}
+          subtitle="Coliix hasn't remitted yet"
           icon={Clock}
           iconColor="#F59E0B"
         />
         <KPICard
-          title="Paid"
-          value={fmtMAD(totals?.paidFees ?? 0)}
+          title="Received"
+          value={fmtMAD(totals?.paidPayout ?? 0)}
+          subtitle="Reconciled to your account"
           icon={Check}
           iconColor="#10B981"
         />
@@ -207,7 +224,7 @@ export function DeliveryInvoiceTab() {
                 onClick={() => setOrderPaid(Array.from(selected), false)}
                 loading={bulkLoading}
               >
-                Mark unpaid
+                Mark pending
               </CRMButton>
               <CRMButton
                 size="sm"
@@ -215,7 +232,7 @@ export function DeliveryInvoiceTab() {
                 onClick={() => setOrderPaid(Array.from(selected), true)}
                 loading={bulkLoading}
               >
-                Mark paid
+                Mark received
               </CRMButton>
             </div>
           )}
@@ -251,12 +268,16 @@ export function DeliveryInvoiceTab() {
                     </div>
                     <div className="flex shrink-0 items-center gap-4">
                       <div className="text-right">
-                        <p className="text-[10px] uppercase tracking-wide text-gray-400">Unpaid</p>
-                        <p className="text-sm font-bold text-amber-600">{fmtMAD(m.unpaidFees)}</p>
+                        <p className="text-[10px] uppercase tracking-wide text-gray-400">Unpaid payout</p>
+                        <p className="text-sm font-bold text-amber-600">{fmtMAD(m.unpaidPayout)}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-[10px] uppercase tracking-wide text-gray-400">Total</p>
-                        <p className="text-sm font-bold text-gray-900">{fmtMAD(m.totalFees)}</p>
+                        <p className="text-[10px] uppercase tracking-wide text-gray-400">Total payout</p>
+                        <p className="text-sm font-bold text-gray-900">{fmtMAD(m.totalPayout)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] uppercase tracking-wide text-gray-400">Fees</p>
+                        <p className="text-xs font-semibold text-gray-500">{fmtMAD(m.totalFees)}</p>
                       </div>
                       <CRMButton
                         size="sm"
@@ -282,7 +303,7 @@ export function DeliveryInvoiceTab() {
                           }}
                           disabled={bulkLoading}
                         >
-                          Mark month paid
+                          Mark month received
                         </CRMButton>
                       )}
                       {isOpen ? (
@@ -325,7 +346,9 @@ export function DeliveryInvoiceTab() {
                             <th className="px-3 py-2 text-left">Delivered</th>
                             <th className="px-3 py-2 text-left">Customer</th>
                             <th className="px-3 py-2 text-left">Tracking</th>
+                            <th className="px-3 py-2 text-right">Total</th>
                             <th className="px-3 py-2 text-right">Fee</th>
+                            <th className="px-3 py-2 text-right">Payout</th>
                             <th className="px-3 py-2 text-right">Status</th>
                           </tr>
                         </thead>
@@ -363,17 +386,23 @@ export function DeliveryInvoiceTab() {
                                   <span className="text-gray-300">—</span>
                                 )}
                               </td>
+                              <td className="px-3 py-2.5 text-right text-gray-600">
+                                {fmtMAD(o.orderTotal)}
+                              </td>
+                              <td className="px-3 py-2.5 text-right text-gray-500">
+                                −{fmtMAD(o.shippingFee)}
+                              </td>
                               <td className="px-3 py-2.5 text-right font-semibold text-gray-900">
-                                {fmtMAD(o.shippingFee)}
+                                {fmtMAD(o.netPayout)}
                               </td>
                               <td className="px-3 py-2.5 text-right">
                                 {o.paidToCarrier ? (
                                   <span className="inline-flex items-center gap-1 rounded-badge bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                                    <Check size={10} /> Paid
+                                    <Check size={10} /> Received
                                   </span>
                                 ) : (
                                   <span className="inline-flex items-center gap-1 rounded-badge bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">
-                                    <Clock size={10} /> Unpaid
+                                    <Clock size={10} /> Pending
                                   </span>
                                 )}
                               </td>
