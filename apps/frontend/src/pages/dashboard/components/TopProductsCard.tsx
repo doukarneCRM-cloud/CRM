@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Package } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import type { DashboardTopProduct } from '@/services/dashboardApi';
@@ -8,13 +9,14 @@ interface Props {
 }
 
 export function TopProductsCard({ products, loading }: Props) {
+  const { t } = useTranslation();
   const max = Math.max(1, ...products.map((p) => p.orders));
 
   return (
     <GlassCard className="flex flex-col gap-3">
       <div>
-        <h3 className="text-sm font-semibold text-gray-900">Top Products</h3>
-        <p className="text-[11px] text-gray-400">By order volume</p>
+        <h3 className="text-sm font-semibold text-gray-900">{t('dashboard.topProducts')}</h3>
+        <p className="text-[11px] text-gray-400">{t('dashboard.topProductsSub')}</p>
       </div>
 
       {loading ? (
@@ -25,7 +27,7 @@ export function TopProductsCard({ products, loading }: Props) {
         </div>
       ) : products.length === 0 ? (
         <div className="flex h-[180px] items-center justify-center text-xs text-gray-400">
-          No product sales
+          {t('dashboard.noProductSales')}
         </div>
       ) : (
         <ul className="flex flex-col gap-2">
@@ -58,7 +60,7 @@ export function TopProductsCard({ products, loading }: Props) {
                     />
                   </div>
                   <span className="text-[10px] text-gray-400">
-                    {p.revenue.toLocaleString('fr-MA')} MAD delivered
+                    {t('dashboard.productDeliveredRevenue', { revenue: p.revenue.toLocaleString('fr-MA') })}
                   </span>
                 </div>
               </li>

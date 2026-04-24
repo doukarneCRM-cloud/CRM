@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Wallet, Truck, PackageSearch } from 'lucide-react';
 import { KPICard } from '@/components/ui/KPICard';
 import { useAuthStore } from '@/store/authStore';
@@ -19,6 +20,7 @@ const EMPTY: Stats = {
 };
 
 export function OperationsKpiRow() {
+  const { t } = useTranslation();
   const canSeeMoney = useAuthStore((s) => s.hasPermission(PERMISSIONS.MONEY_VIEW));
   const canSeeReturns = useAuthStore((s) => s.hasPermission(PERMISSIONS.RETURNS_VERIFY));
   const [stats, setStats] = useState<Stats>(EMPTY);
@@ -69,27 +71,27 @@ export function OperationsKpiRow() {
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {canSeeMoney && (
         <KPICard
-          title="Unpaid commission"
+          title={t('dashboard.kpi.unpaidCommission')}
           value={loading ? '…' : fmtMAD(stats.unpaidCommissionMAD)}
           unit="MAD"
-          subtitle="Owed to agents across all pending orders"
+          subtitle={t('dashboard.kpi.unpaidCommissionSub')}
           icon={Wallet}
           iconColor="#D97706"
         />
       )}
       {canSeeMoney && (
         <KPICard
-          title="Unpaid to carrier"
+          title={t('dashboard.kpi.unpaidCarrier')}
           value={loading ? '…' : fmtMAD(stats.unpaidCarrierMAD)}
           unit="MAD"
-          subtitle="Delivered orders not yet settled"
+          subtitle={t('dashboard.kpi.unpaidCarrierSub')}
           icon={Truck}
           iconColor="#7C3AED"
         />
       )}
       {canSeeReturns && (
         <KPICard
-          title="Pending returns"
+          title={t('dashboard.kpi.pendingReturns')}
           value={
             loading
               ? '…'
@@ -97,7 +99,7 @@ export function OperationsKpiRow() {
                 ? '—'
                 : stats.pendingReturns.toString()
           }
-          subtitle="Returned / attempted / lost — awaiting physical check"
+          subtitle={t('dashboard.kpi.pendingReturnsSub')}
           icon={PackageSearch}
           iconColor="#DC2626"
         />

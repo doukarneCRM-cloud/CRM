@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { SHIPPING_STATUS_COLORS, type ShippingStatus } from '@/constants/statusColors';
 import { SHIPPING_HEX } from '../statusHex';
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export function DeliveryStatusBars({ breakdown, loading }: Props) {
+  const { t } = useTranslation();
   const { rows, max } = useMemo(() => {
     const entries = Object.entries(breakdown)
       .filter(([, n]) => n > 0)
@@ -28,15 +30,15 @@ export function DeliveryStatusBars({ breakdown, loading }: Props) {
   return (
     <GlassCard className="flex flex-col gap-3">
       <div>
-        <h3 className="text-sm font-semibold text-gray-900">Delivery Status</h3>
-        <p className="text-[11px] text-gray-400">Orders by shipping state</p>
+        <h3 className="text-sm font-semibold text-gray-900">{t('dashboard.deliveryStatus')}</h3>
+        <p className="text-[11px] text-gray-400">{t('dashboard.deliveryStatusSub')}</p>
       </div>
 
       {loading ? (
         <div className="skeleton h-[180px] w-full rounded-xl" />
       ) : rows.length === 0 ? (
         <div className="flex h-[180px] items-center justify-center text-xs text-gray-400">
-          No shipping data
+          {t('dashboard.noShippingData')}
         </div>
       ) : (
         <div className="flex flex-col gap-2">

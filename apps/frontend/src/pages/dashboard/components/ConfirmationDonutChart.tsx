@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { GlassCard } from '@/components/ui/GlassCard';
 import {
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function ConfirmationDonutChart({ breakdown, loading }: Props) {
+  const { t } = useTranslation();
   const { slices, total } = useMemo(() => {
     const entries = Object.entries(breakdown)
       .filter(([, n]) => n > 0)
@@ -33,15 +35,15 @@ export function ConfirmationDonutChart({ breakdown, loading }: Props) {
   return (
     <GlassCard className="flex flex-col gap-3">
       <div>
-        <h3 className="text-sm font-semibold text-gray-900">Confirmation Status</h3>
-        <p className="text-[11px] text-gray-400">Orders breakdown by confirmation state</p>
+        <h3 className="text-sm font-semibold text-gray-900">{t('dashboard.confirmationStatus')}</h3>
+        <p className="text-[11px] text-gray-400">{t('dashboard.confirmationStatusSub')}</p>
       </div>
 
       {loading ? (
         <div className="skeleton h-[180px] w-full rounded-xl" />
       ) : total === 0 ? (
         <div className="flex h-[180px] items-center justify-center text-xs text-gray-400">
-          No data
+          {t('dashboard.noData')}
         </div>
       ) : (
         <>
@@ -71,7 +73,7 @@ export function ConfirmationDonutChart({ breakdown, loading }: Props) {
               </PieChart>
             </ResponsiveContainer>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-[10px] uppercase tracking-wide text-gray-400">Total</span>
+              <span className="text-[10px] uppercase tracking-wide text-gray-400">{t('common.total')}</span>
               <span className="text-xl font-bold text-gray-900">{total}</span>
             </div>
           </div>

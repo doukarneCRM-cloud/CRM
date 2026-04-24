@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { cn } from '@/lib/cn';
 import type { DashboardTrendPoint } from '@/services/dashboardApi';
@@ -11,6 +12,7 @@ interface Props {
 // Dot-matrix trend: each day = vertical stack of dots sized to its volume
 // relative to the max day in the range. Inspired by LoopAI activity charts.
 export function OrderTrendChart({ data, loading }: Props) {
+  const { t } = useTranslation();
   const [hover, setHover] = useState<DashboardTrendPoint | null>(null);
 
   const { max, normalized } = useMemo(() => {
@@ -30,11 +32,11 @@ export function OrderTrendChart({ data, loading }: Props) {
     <GlassCard className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-gray-900">Order Trend</h3>
-          <p className="text-[11px] text-gray-400">Volume per day</p>
+          <h3 className="text-sm font-semibold text-gray-900">{t('dashboard.orderTrend')}</h3>
+          <p className="text-[11px] text-gray-400">{t('dashboard.orderTrendSub')}</p>
         </div>
         <div className="text-right">
-          <p className="text-[10px] uppercase tracking-wide text-gray-400">Peak</p>
+          <p className="text-[10px] uppercase tracking-wide text-gray-400">{t('dashboard.peak')}</p>
           <p className="text-sm font-bold text-primary">{max}</p>
         </div>
       </div>
@@ -43,7 +45,7 @@ export function OrderTrendChart({ data, loading }: Props) {
         <div className="skeleton h-[120px] w-full rounded-xl" />
       ) : data.length === 0 ? (
         <div className="flex h-[120px] items-center justify-center text-xs text-gray-400">
-          No orders in range
+          {t('dashboard.noOrdersInRange')}
         </div>
       ) : (
         <div className="relative">

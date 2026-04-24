@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { MapPin } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import type { DashboardTopCity } from '@/services/dashboardApi';
@@ -8,13 +9,14 @@ interface Props {
 }
 
 export function TopCitiesCard({ cities, loading }: Props) {
+  const { t } = useTranslation();
   const max = Math.max(1, ...cities.map((c) => c.orders));
 
   return (
     <GlassCard className="flex flex-col gap-3">
       <div>
-        <h3 className="text-sm font-semibold text-gray-900">Top Cities</h3>
-        <p className="text-[11px] text-gray-400">By order volume</p>
+        <h3 className="text-sm font-semibold text-gray-900">{t('dashboard.topCities')}</h3>
+        <p className="text-[11px] text-gray-400">{t('dashboard.topProductsSub')}</p>
       </div>
 
       {loading ? (
@@ -25,7 +27,7 @@ export function TopCitiesCard({ cities, loading }: Props) {
         </div>
       ) : cities.length === 0 ? (
         <div className="flex h-[180px] items-center justify-center text-xs text-gray-400">
-          No city activity
+          {t('dashboard.noCityActivity')}
         </div>
       ) : (
         <ul className="flex flex-col gap-2">
@@ -56,7 +58,7 @@ export function TopCitiesCard({ cities, loading }: Props) {
                     />
                   </div>
                   <span className="text-[10px] text-gray-400">
-                    {c.delivered} delivered · {Math.round(c.deliveryRate)}%
+                    {t('dashboard.cityDeliveredRate', { delivered: c.delivered, rate: Math.round(c.deliveryRate) })}
                   </span>
                 </div>
               </li>

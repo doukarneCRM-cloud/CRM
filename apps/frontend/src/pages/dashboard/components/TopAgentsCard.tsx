@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { AvatarChip } from '@/components/ui/AvatarChip';
 import { CircleProgress } from '@/components/ui/CircleProgress';
@@ -9,13 +10,14 @@ interface Props {
 }
 
 export function TopAgentsCard({ agents, loading }: Props) {
+  const { t } = useTranslation();
   const ranked = [...agents].sort((a, b) => b.confirmationRate - a.confirmationRate).slice(0, 5);
 
   return (
     <GlassCard className="flex flex-col gap-3">
       <div>
-        <h3 className="text-sm font-semibold text-gray-900">Top Agents</h3>
-        <p className="text-[11px] text-gray-400">Ranked by confirmation rate</p>
+        <h3 className="text-sm font-semibold text-gray-900">{t('dashboard.topAgents')}</h3>
+        <p className="text-[11px] text-gray-400">{t('dashboard.topAgentsSub')}</p>
       </div>
 
       {loading ? (
@@ -26,7 +28,7 @@ export function TopAgentsCard({ agents, loading }: Props) {
         </div>
       ) : ranked.length === 0 ? (
         <div className="flex h-[180px] items-center justify-center text-xs text-gray-400">
-          No agent activity
+          {t('dashboard.noAgentActivity')}
         </div>
       ) : (
         <ul className="flex flex-col gap-2">
@@ -37,7 +39,7 @@ export function TopAgentsCard({ agents, loading }: Props) {
             >
               <AvatarChip
                 name={a.agentName}
-                subtitle={`${a.confirmed} confirmed · ${a.delivered} delivered`}
+                subtitle={t('dashboard.agentKpiSubtitle', { confirmed: a.confirmed, delivered: a.delivered })}
                 size="sm"
                 className="min-w-0 flex-1"
               />

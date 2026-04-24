@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { ShoppingCart, CheckCircle2, Truck, Undo2, GitMerge, Coins, TrendingUp } from 'lucide-react';
 import { KPICard } from '@/components/ui/KPICard';
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -21,6 +22,8 @@ interface Props {
 }
 
 export function DashboardKpiRow({ kpis, loading, className }: Props) {
+  const { t } = useTranslation();
+
   if (loading || !kpis) {
     return (
       <div className={cn('grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7', className)}>
@@ -38,62 +41,62 @@ export function DashboardKpiRow({ kpis, loading, className }: Props) {
   return (
     <div className={cn('grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7', className)}>
       <KPICard
-        title="Orders"
+        title={t('dashboard.kpi.orders')}
         value={kpis.totalOrders}
         icon={ShoppingCart}
         iconColor="#18181B"
         percentageChange={changes.totalOrders}
       />
       <KPICard
-        title="Confirmation"
+        title={t('dashboard.kpi.confirmation')}
         value={kpis.confirmationRate}
         unit="%"
-        subtitle={`${fmt(c.confirmed)} of ${fmt(c.confirmationDenom)} pending`}
+        subtitle={t('dashboard.kpi.confirmedSubtitle', { confirmed: fmt(c.confirmed), total: fmt(c.confirmationDenom) })}
         icon={CheckCircle2}
         iconColor="#16A34A"
         percentageChange={changes.confirmationRate}
       />
       <KPICard
-        title="Delivery"
+        title={t('dashboard.kpi.delivery')}
         value={kpis.deliveryRate}
         unit="%"
-        subtitle={`${fmt(c.delivered)} of ${fmt(c.deliveryDenom)} shipped`}
+        subtitle={t('dashboard.kpi.deliveredSubtitle', { delivered: fmt(c.delivered), total: fmt(c.deliveryDenom) })}
         icon={Truck}
         iconColor="#7C3AED"
         percentageChange={changes.deliveryRate}
       />
       <KPICard
-        title="Return"
+        title={t('dashboard.kpi.return')}
         value={kpis.returnRate}
         unit="%"
-        subtitle={`${fmt(c.returned)} of ${fmt(c.returnDenom)} closed`}
+        subtitle={t('dashboard.kpi.returnedSubtitle', { returned: fmt(c.returned), total: fmt(c.returnDenom) })}
         icon={Undo2}
         iconColor="#DC2626"
         percentageChange={changes.returnRate}
       />
       <KPICard
-        title="Merged"
+        title={t('dashboard.kpi.merged')}
         value={kpis.mergedRate}
         unit="%"
-        subtitle={`${fmt(c.merged)} of ${fmt(c.mergedDenom)} merged`}
+        subtitle={t('dashboard.kpi.mergedSubtitle', { merged: fmt(c.merged), total: fmt(c.mergedDenom) })}
         icon={GitMerge}
         iconColor="#F59E0B"
         percentageChange={changes.mergedRate}
       />
       <KPICard
-        title="Revenue"
+        title={t('dashboard.kpi.revenue')}
         value={kpis.revenue.toLocaleString('fr-MA')}
         unit="MAD"
-        subtitle={`${fmt(c.delivered)} delivered`}
+        subtitle={t('dashboard.kpi.deliveredLabel', { count: c.delivered })}
         icon={Coins}
         iconColor="#D97706"
         percentageChange={changes.revenue}
       />
       <KPICard
-        title="Profit"
+        title={t('dashboard.kpi.profit')}
         value={kpis.profit.toLocaleString('fr-MA')}
         unit="MAD"
-        subtitle={`${fmt(c.delivered)} delivered`}
+        subtitle={t('dashboard.kpi.deliveredLabel', { count: c.delivered })}
         icon={TrendingUp}
         iconColor="#059669"
         percentageChange={changes.profit}

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CalendarClock } from 'lucide-react';
 import { GlobalFilterBar, type FilterChipConfig } from '@/components/ui/GlobalFilterBar';
 import { FbDateRangePicker } from '@/components/ui/FbDateRangePicker';
@@ -19,24 +20,6 @@ import { DeliveryStatusBars } from './components/DeliveryStatusBars';
 import { TopAgentsCard } from './components/TopAgentsCard';
 import { TopProductsCard } from './components/TopProductsCard';
 import { TopCitiesCard } from './components/TopCitiesCard';
-
-const STATIC_FILTER_CONFIGS: FilterChipConfig[] = [
-  {
-    key: 'confirmationStatuses',
-    label: 'Confirmation',
-    options: CONFIRMATION_STATUS_OPTIONS,
-  },
-  {
-    key: 'shippingStatuses',
-    label: 'Shipping',
-    options: SHIPPING_STATUS_OPTIONS,
-  },
-  {
-    key: 'sources',
-    label: 'Source',
-    options: SOURCE_OPTIONS,
-  },
-];
 
 function daysBetween(fromISO: string, toISO: string): number {
   const from = new Date(fromISO);
@@ -66,6 +49,7 @@ function previousPeriod(
 }
 
 export default function DashboardPage() {
+  const { t } = useTranslation();
   const { dateRange } = useFilterStore();
   const [compareFrom, setCompareFrom] = useState<string | null>(null);
   const [compareTo, setCompareTo] = useState<string | null>(null);
@@ -82,25 +66,40 @@ export default function DashboardPage() {
   }, []);
 
   const filterConfigs = useMemo<FilterChipConfig[]>(() => {
-    if (agents.length === 0) return STATIC_FILTER_CONFIGS;
+    const staticConfigs: FilterChipConfig[] = [
+      {
+        key: 'confirmationStatuses',
+        label: t('dashboard.filterConfirmation'),
+        options: CONFIRMATION_STATUS_OPTIONS,
+      },
+      {
+        key: 'shippingStatuses',
+        label: t('dashboard.filterShipping'),
+        options: SHIPPING_STATUS_OPTIONS,
+      },
+      {
+        key: 'sources',
+        label: t('dashboard.filterSource'),
+        options: SOURCE_OPTIONS,
+      },
+    ];
+    if (agents.length === 0) return staticConfigs;
     return [
-      ...STATIC_FILTER_CONFIGS,
+      ...staticConfigs,
       {
         key: 'agentIds',
-        label: 'Agent',
+        label: t('dashboard.filterAgent'),
         options: agents.map((a) => ({ value: a.id, label: a.name })),
       },
     ];
-  }, [agents]);
+  }, [agents, t]);
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-xs text-gray-400">
-            Company-wide KPIs across every order in the CRM
-          </p>
+          <h1 className="text-xl font-bold text-gray-900">{t('nav.dashboard')}</h1>
+          <p className="text-xs text-gray-400">{t('dashboard.subtitle')}</p>
         </div>
       </div>
 
@@ -112,14 +111,14 @@ export default function DashboardPage() {
           className="flex-1 min-w-0"
         />
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-gray-500">Compare to:</span>
+          <span className="text-xs font-medium text-gray-500">{t('dashboard.compareTo')}</span>
           <FbDateRangePicker
             value={{ from: compareFrom, to: compareTo }}
             onChange={(r) => {
               setCompareFrom(r.from);
               setCompareTo(r.to);
             }}
-            placeholder="Compare range"
+            placeholder={t('dashboard.compareRange')}
             icon={CalendarClock}
           />
           {prevPreset && !(compareFrom && compareTo) && (
@@ -130,7 +129,7 @@ export default function DashboardPage() {
               }}
               className="rounded-badge border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-500 hover:border-primary hover:text-primary"
             >
-              Previous period
+              {t('dashboard.previousPeriod')}
             </button>
           )}
         </div>
@@ -138,8 +137,8 @@ export default function DashboardPage() {
       {resolvedCompare?.from && resolvedCompare?.to && (
         <div className="flex justify-end -mt-2">
           <span className="text-[11px] text-gray-400">
-            vs. {resolvedCompare.from} → {resolvedCompare.to}
-            {!compareFrom && !compareTo && ' (auto)'}
+            {t('dashboard.vsRange', { from: resolvedCompare.from, to: resolvedCompare.to })}
+            {!compareFrom && !compareTo && ` ${t('dashboard.auto')}`}
           </span>
         </div>
       )}
