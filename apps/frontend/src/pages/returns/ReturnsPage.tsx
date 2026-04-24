@@ -13,6 +13,8 @@ import {
   Clock,
   Boxes,
   History,
+  Undo2,
+  Smartphone,
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { CRMButton } from '@/components/ui/CRMButton';
@@ -20,9 +22,11 @@ import { CRMInput } from '@/components/ui/CRMInput';
 import { KPICard } from '@/components/ui/KPICard';
 import { apiErrorMessage } from '@/lib/apiError';
 import { cn } from '@/lib/cn';
-import { returnsApi, type ReturnOrder } from '@/services/returnsApi';
+import { returnsApi, type ReturnOrder, type ReturnStats } from '@/services/returnsApi';
+import { getSocket } from '@/services/socket';
 import { ScannerModal } from './ScannerModal';
 import { VerifyModal } from './VerifyModal';
+import { PairPhoneModal } from './PairPhoneModal';
 
 function fmtDate(iso: string | null | undefined): string {
   if (!iso) return '—';
@@ -43,12 +47,13 @@ export default function ReturnsPage() {
   const [search, setSearch] = useState(initialQ);
   const [debounced, setDebounced] = useState(initialQ);
   const [orders, setOrders] = useState<ReturnOrder[]>([]);
-  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [pairOpen, setPairOpen] = useState(false);
   const [verifying, setVerifying] = useState<ReturnOrder | null>(null);
+  const [stats, setStats] = useState<ReturnStats | null>(null);
 
   useEffect(() => {
     const id = setTimeout(() => setDebounced(search.trim()), 300);
@@ -73,7 +78,6 @@ export default function ReturnsPage() {
       .then((r) => {
         if (cancelled) return;
         setOrders(r.data);
-        setTotal(r.pagination.total);
       })
       .catch((e) => {
         if (!cancelled) setError(apiErrorMessage(e, 'Failed to load returns'));
@@ -86,6 +90,43 @@ export default function ReturnsPage() {
     };
   }, [scope, debounced, reloadKey]);
 
+  // Stats are global (no filter dependency) so we refresh only when a verify
+  // completes — those are the only writes that move the numbers.
+  useEffect(() => {
+    let cancelled = false;
+    returnsApi
+      .stats()
+      .then((s) => {
+        if (!cancelled) setStats(s);
+      })
+      .catch(() => {
+        // Non-fatal; the rest of the page still works. Dashboard is authoritative.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
+
+  // Phone→laptop scan bridge. When the agent scans a parcel on their phone,
+  // backend pushes the resolved order to this same user's sockets and we
+  // auto-open the VerifyModal so they can act immediately.
+  useEffect(() => {
+    const socket = getSocket();
+    const onScanned = (order: ReturnOrder) => {
+      setError(null);
+      setVerifying(order);
+    };
+    const onScanFailed = (payload: { code: string }) => {
+      setError(`No order matches scanned code: ${payload.code}`);
+    };
+    socket.on('return:scanned', onScanned);
+    socket.on('return:scan_failed', onScanFailed);
+    return () => {
+      socket.off('return:scanned', onScanned);
+      socket.off('return:scan_failed', onScanFailed);
+    };
+  }, []);
+
   const handleScanResult = async (value: string) => {
     setScannerOpen(false);
     try {
@@ -96,7 +137,7 @@ export default function ReturnsPage() {
     }
   };
 
-  const pendingCount = scope === 'pending' ? total : undefined;
+  const formatPct = (r: number) => `${(r * 100).toFixed(1)}%`;
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -107,12 +148,21 @@ export default function ReturnsPage() {
             Physically check orders the carrier bounced back. Restock saleable items.
           </p>
         </div>
-        <CRMButton
-          leftIcon={<ScanLine size={16} />}
-          onClick={() => setScannerOpen(true)}
-        >
-          Scan QR
-        </CRMButton>
+        <div className="flex items-center gap-2">
+          <CRMButton
+            variant="secondary"
+            leftIcon={<Smartphone size={16} />}
+            onClick={() => setPairOpen(true)}
+          >
+            Pair phone
+          </CRMButton>
+          <CRMButton
+            leftIcon={<ScanLine size={16} />}
+            onClick={() => setScannerOpen(true)}
+          >
+            Scan QR
+          </CRMButton>
+        </div>
       </div>
 
       {error && (
@@ -123,21 +173,28 @@ export default function ReturnsPage() {
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         <KPICard
+          title="Return rate"
+          value={stats ? formatPct(stats.returnRate) : '—'}
+          subtitle={
+            stats
+              ? `${stats.returnedTotal} returned · ${stats.deliveredCount} delivered`
+              : 'Matches dashboard'
+          }
+          icon={Undo2}
+          iconColor="#F43F5E"
+        />
+        <KPICard
           title="Pending verification"
-          value={(pendingCount ?? '—').toString()}
+          value={stats ? stats.pendingCount.toString() : '—'}
+          subtitle="Awaiting physical check"
           icon={Clock}
           iconColor="#F59E0B"
         />
         <KPICard
-          title="Showing"
-          value={orders.length.toString()}
-          icon={PackageSearch}
-          iconColor="#6366F1"
-        />
-        <KPICard
-          title="Total in scope"
-          value={total.toString()}
-          icon={Boxes}
+          title="Verified"
+          value={stats ? stats.verifiedTotal.toString() : '—'}
+          subtitle={stats ? `${formatPct(stats.verifiedRate)} of returns cleared` : undefined}
+          icon={CheckCircle2}
           iconColor="#10B981"
         />
       </div>
@@ -208,6 +265,8 @@ export default function ReturnsPage() {
       {scannerOpen && (
         <ScannerModal onClose={() => setScannerOpen(false)} onResult={handleScanResult} />
       )}
+
+      {pairOpen && <PairPhoneModal onClose={() => setPairOpen(false)} />}
 
       {verifying && (
         <VerifyModal

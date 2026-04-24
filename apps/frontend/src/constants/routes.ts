@@ -31,6 +31,7 @@ export const ROUTES = {
 
   // Returns
   RETURNS: '/returns',
+  RETURNS_PHONE_SCAN: '/returns/phone-scan',
 
   // Integrations
   INTEGRATIONS_STORE: '/integrations/store',

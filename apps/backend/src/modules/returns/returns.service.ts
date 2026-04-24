@@ -12,7 +12,7 @@
 
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../shared/prisma';
-import { emitToRoom } from '../../shared/socket';
+import { emitToRoom, emitToUser } from '../../shared/socket';
 
 export type VerifyOutcome = 'good' | 'damaged' | 'wrong';
 
@@ -88,7 +88,7 @@ export async function listReturns(params: ListParams) {
                 color: true,
                 size: true,
                 stock: true,
-                product: { select: { id: true, name: true } },
+                product: { select: { id: true, name: true, imageUrl: true } },
               },
             },
           },
@@ -110,9 +110,76 @@ export async function listReturns(params: ListParams) {
 }
 
 /**
+ * Page-level stats for the Returns section. Matches the dashboard's
+ * `returnRate` formula (`returned / (delivered + returned)`) so the
+ * warehouse view and the leadership dashboard always agree on the headline
+ * number — it's the first thing an agent cross-checks.
+ */
+export async function getReturnStats() {
+  const [deliveredCount, pendingCount, verifiedGoodCount, verifiedRefusedCount] = await Promise.all([
+    prisma.order.count({ where: { shippingStatus: 'delivered', isArchived: false } }),
+    prisma.order.count({
+      where: {
+        shippingStatus: { in: PENDING_STATUSES as unknown as Prisma.EnumShippingStatusFilter['in'] },
+        isArchived: false,
+      },
+    }),
+    prisma.order.count({ where: { shippingStatus: 'return_validated', isArchived: false } }),
+    prisma.order.count({ where: { shippingStatus: 'return_refused', isArchived: false } }),
+  ]);
+
+  const returnedTotal = pendingCount + verifiedGoodCount + verifiedRefusedCount;
+  const verifiedTotal = verifiedGoodCount + verifiedRefusedCount;
+  const rateDenominator = deliveredCount + returnedTotal;
+
+  return {
+    // Headline number that matches the dashboard card.
+    returnRate: rateDenominator > 0 ? returnedTotal / rateDenominator : 0,
+    returnedTotal,
+    deliveredCount,
+    pendingCount,
+    verifiedTotal,
+    // Share of returns actually verified — lets the warehouse gauge backlog.
+    verifiedRate: returnedTotal > 0 ? verifiedTotal / returnedTotal : 0,
+  };
+}
+
+/**
  * Scan lookup — resolves a single order by tracking ID or reference so the
  * scanner modal can open the verify drawer instantly.
  */
+// Match the listReturns projection exactly — the VerifyModal reads the same
+// fields whether the order came from the list or from a scan.
+const RETURN_SCAN_SELECT = {
+  id: true,
+  reference: true,
+  shippingStatus: true,
+  total: true,
+  coliixTrackingId: true,
+  returnNote: true,
+  returnVerifiedAt: true,
+  returnVerifiedBy: { select: { id: true, name: true } },
+  updatedAt: true,
+  deliveredAt: true,
+  customer: { select: { fullName: true, phone: true, phoneDisplay: true, city: true, address: true } },
+  items: {
+    select: {
+      id: true,
+      quantity: true,
+      variant: {
+        select: {
+          id: true,
+          sku: true,
+          color: true,
+          size: true,
+          stock: true,
+          product: { select: { id: true, name: true, imageUrl: true } },
+        },
+      },
+    },
+  },
+} as const;
+
 export async function findByScan(query: string) {
   const q = query.trim();
   if (!q) return null;
@@ -126,30 +193,26 @@ export async function findByScan(query: string) {
         { reference: { contains: q, mode: 'insensitive' } },
       ],
     },
-    select: {
-      id: true,
-      reference: true,
-      shippingStatus: true,
-      coliixTrackingId: true,
-      returnVerifiedAt: true,
-      customer: { select: { fullName: true, phone: true, phoneDisplay: true, city: true } },
-      items: {
-        select: {
-          id: true,
-          quantity: true,
-          variant: {
-            select: {
-              id: true,
-              sku: true,
-              color: true,
-              size: true,
-              product: { select: { id: true, name: true } },
-            },
-          },
-        },
-      },
-    },
+    select: RETURN_SCAN_SELECT,
   });
+}
+
+/**
+ * Phone→laptop scan pipeline. The agent scans a parcel barcode on their
+ * phone; we resolve it here and emit either `return:scanned` (with the full
+ * order payload) or `return:scan_failed` (with the raw code so the phone
+ * can show a "not found" toast) to the agent's own user room. Only that
+ * user's sockets receive the event — a second agent scanning at the same
+ * time doesn't collide.
+ */
+export async function pushScanToUser(userId: string, code: string) {
+  const order = await findByScan(code);
+  if (!order) {
+    emitToUser(userId, 'return:scan_failed', { code });
+    return { found: false as const, code };
+  }
+  emitToUser(userId, 'return:scanned', order);
+  return { found: true as const, order };
 }
 
 export interface VerifyInput {

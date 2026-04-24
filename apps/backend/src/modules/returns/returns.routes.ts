@@ -11,11 +11,21 @@ import { z } from 'zod';
 import { verifyJWT } from '../../shared/middleware/verifyJWT';
 import { requirePermission } from '../../shared/middleware/rbac.middleware';
 import { prisma } from '../../shared/prisma';
-import { listReturns, findByScan, verifyReturn } from './returns.service';
+import {
+  listReturns,
+  findByScan,
+  verifyReturn,
+  getReturnStats,
+  pushScanToUser,
+} from './returns.service';
 
 const VerifySchema = z.object({
   outcome: z.enum(['good', 'damaged', 'wrong']),
   note: z.string().max(1000).nullable().optional(),
+});
+
+const ScanPushSchema = z.object({
+  code: z.string().trim().min(1).max(200),
 });
 
 function replyError(reply: FastifyReply, err: unknown): FastifyReply {
@@ -44,6 +54,15 @@ export async function returnsRoutes(app: FastifyInstance) {
     },
   );
 
+  app.get(
+    '/stats',
+    { preHandler: [verifyJWT, requirePermission('returns:verify')] },
+    async (_request, reply) => {
+      const stats = await getReturnStats();
+      return reply.send(stats);
+    },
+  );
+
   app.get<{ Params: { query: string } }>(
     '/scan/:query',
     { preHandler: [verifyJWT, requirePermission('returns:verify')] },
@@ -59,6 +78,40 @@ export async function returnsRoutes(app: FastifyInstance) {
         });
       }
       return reply.send(order);
+    },
+  );
+
+  // Phone device posts a scanned code here — backend resolves it and pushes
+  // the full order payload to this same user's laptop over socket.io. The
+  // phone just needs a found/not-found acknowledgement to give the agent
+  // haptic/visual feedback so they can move on to the next parcel.
+  app.post(
+    '/scan/push',
+    { preHandler: [verifyJWT, requirePermission('returns:verify')] },
+    async (request, reply) => {
+      const parsed = ScanPushSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Invalid payload',
+            statusCode: 400,
+            issues: parsed.error.issues,
+          },
+        });
+      }
+      const result = await pushScanToUser(request.user.sub, parsed.data.code);
+      if (!result.found) {
+        return reply.status(404).send({
+          error: {
+            code: 'NOT_FOUND',
+            message: 'No order matches this tracking ID or reference',
+            statusCode: 404,
+            code_scanned: result.code,
+          },
+        });
+      }
+      return reply.send({ found: true, reference: result.order.reference });
     },
   );
 

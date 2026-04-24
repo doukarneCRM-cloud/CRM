@@ -9,8 +9,17 @@ export interface ReturnOrderItem {
     color: string | null;
     size: string | null;
     stock?: number;
-    product: { id: string; name: string };
+    product: { id: string; name: string; imageUrl?: string | null };
   };
+}
+
+export interface ReturnStats {
+  returnRate: number;      // returned / (delivered + returned)
+  returnedTotal: number;   // all returned orders (pending + verified)
+  deliveredCount: number;
+  pendingCount: number;
+  verifiedTotal: number;
+  verifiedRate: number;    // verified / returnedTotal
 }
 
 export interface ReturnOrder {
@@ -48,6 +57,8 @@ export const returnsApi = {
     scope?: 'pending' | 'verified' | 'all';
     search?: string;
   }) => api.get<ReturnListResponse>('/returns', { params }).then((r) => r.data),
+
+  stats: () => api.get<ReturnStats>('/returns/stats').then((r) => r.data),
 
   scan: (query: string) =>
     api.get<ReturnOrder>(`/returns/scan/${encodeURIComponent(query)}`).then((r) => r.data),

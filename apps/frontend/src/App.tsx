@@ -23,6 +23,7 @@ import AssignmentPage from '@/pages/team/AssignmentPage';
 import AnalyticsPage from '@/pages/analytics/AnalyticsPage';
 import MoneyPage from '@/pages/money/MoneyPage';
 import ReturnsPage from '@/pages/returns/ReturnsPage';
+import PhoneScanPage from '@/pages/returns/PhoneScanPage';
 import IntegrationsPage from '@/pages/integrations/IntegrationsPage';
 import OAuthCallbackPage from '@/pages/integrations/OAuthCallbackPage';
 import AteliePage from '@/pages/atelie/AteliePage';
@@ -48,6 +49,16 @@ export default function App() {
 
       {/* ── Authenticated ───────────────────────────────────────────────── */}
       <Route element={<AuthGuard />}>
+        {/* Phone-side scanner — no sidebar, fullscreen mobile-first UI */}
+        <Route
+          path={ROUTES.RETURNS_PHONE_SCAN}
+          element={
+            <PermissionGuard requires={PERMISSIONS.RETURNS_VERIFY}>
+              <PhoneScanPage />
+            </PermissionGuard>
+          }
+        />
+
         <Route element={<AppLayout />}>
 
           <Route
