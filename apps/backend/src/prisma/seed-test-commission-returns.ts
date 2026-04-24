@@ -72,6 +72,9 @@ const CUSTOMERS = [
   { fullName: 'Othmane Cherkaoui', phoneRaw: '0622883344', city: 'Casablanca', address: 'Bourgogne, Rue Moulay Ismail' },
   { fullName: 'Asmaa El Haddaoui', phoneRaw: '0688112233', city: 'Tanger', address: 'Malabata' },
   { fullName: 'Anas Berrechid', phoneRaw: '0699001122', city: 'Fès', address: 'Narjiss' },
+  { fullName: 'Rim El Moudni', phoneRaw: '0677445588', city: 'Rabat', address: 'Hay Nahda' },
+  { fullName: 'Bilal Ait Ouarit', phoneRaw: '0644991177', city: 'Agadir', address: 'Dakhla, Lot 23' },
+  { fullName: 'Kenza Bouhaddou', phoneRaw: '0611556699', city: 'Casablanca', address: 'CIL, Rue Strasbourg' },
 ];
 
 interface OrderSpec {
@@ -90,16 +93,19 @@ interface OrderSpec {
 }
 
 // Commission test cases — admin is the agent on every row so the per-agent
-// card on the Commission tab lights up.
+// card on the Commission tab lights up. 8 pending + 2 paid = 10 delivered.
 const COMMISSION_ORDERS: OrderSpec[] = [
-  { customerIdx: 0, source: 'youcan',    confirmationStatus: 'confirmed', shippingStatus: 'delivered', productIdx: 0, variantIdx: 0, quantity: 1, deliveredDaysAgo: 6,  createdDaysAgo: 9 },
-  { customerIdx: 1, source: 'whatsapp',  confirmationStatus: 'confirmed', shippingStatus: 'delivered', productIdx: 0, variantIdx: 1, quantity: 2, deliveredDaysAgo: 5,  createdDaysAgo: 8 },
-  { customerIdx: 2, source: 'manual',    confirmationStatus: 'confirmed', shippingStatus: 'delivered', productIdx: 1, variantIdx: 0, quantity: 1, deliveredDaysAgo: 4,  createdDaysAgo: 7 },
-  { customerIdx: 3, source: 'instagram', confirmationStatus: 'confirmed', shippingStatus: 'delivered', productIdx: 1, variantIdx: 1, quantity: 1, deliveredDaysAgo: 3,  createdDaysAgo: 6 },
-  { customerIdx: 4, source: 'youcan',    confirmationStatus: 'confirmed', shippingStatus: 'delivered', productIdx: 0, variantIdx: 2, quantity: 1, deliveredDaysAgo: 2,  createdDaysAgo: 5 },
+  { customerIdx: 0,  source: 'youcan',    confirmationStatus: 'confirmed', shippingStatus: 'delivered', productIdx: 0, variantIdx: 0, quantity: 1, deliveredDaysAgo: 6,  createdDaysAgo: 9 },
+  { customerIdx: 1,  source: 'whatsapp',  confirmationStatus: 'confirmed', shippingStatus: 'delivered', productIdx: 0, variantIdx: 1, quantity: 2, deliveredDaysAgo: 5,  createdDaysAgo: 8 },
+  { customerIdx: 2,  source: 'manual',    confirmationStatus: 'confirmed', shippingStatus: 'delivered', productIdx: 1, variantIdx: 0, quantity: 1, deliveredDaysAgo: 4,  createdDaysAgo: 7 },
+  { customerIdx: 3,  source: 'instagram', confirmationStatus: 'confirmed', shippingStatus: 'delivered', productIdx: 1, variantIdx: 1, quantity: 1, deliveredDaysAgo: 3,  createdDaysAgo: 6 },
+  { customerIdx: 4,  source: 'youcan',    confirmationStatus: 'confirmed', shippingStatus: 'delivered', productIdx: 0, variantIdx: 2, quantity: 1, deliveredDaysAgo: 2,  createdDaysAgo: 5 },
+  { customerIdx: 12, source: 'manual',    confirmationStatus: 'confirmed', shippingStatus: 'delivered', productIdx: 0, variantIdx: 3, quantity: 1, deliveredDaysAgo: 2,  createdDaysAgo: 4 },
+  { customerIdx: 13, source: 'whatsapp',  confirmationStatus: 'confirmed', shippingStatus: 'delivered', productIdx: 1, variantIdx: 2, quantity: 2, deliveredDaysAgo: 1,  createdDaysAgo: 3 },
+  { customerIdx: 14, source: 'instagram', confirmationStatus: 'confirmed', shippingStatus: 'delivered', productIdx: 0, variantIdx: 1, quantity: 1, deliveredDaysAgo: 1,  createdDaysAgo: 2 },
   // Already paid — lands in the "Paid" bucket
-  { customerIdx: 5, source: 'whatsapp',  confirmationStatus: 'confirmed', shippingStatus: 'delivered', productIdx: 1, variantIdx: 2, quantity: 1, deliveredDaysAgo: 20, commissionPaid: true, createdDaysAgo: 25 },
-  { customerIdx: 6, source: 'youcan',    confirmationStatus: 'confirmed', shippingStatus: 'delivered', productIdx: 0, variantIdx: 0, quantity: 2, deliveredDaysAgo: 18, commissionPaid: true, createdDaysAgo: 23 },
+  { customerIdx: 5,  source: 'whatsapp',  confirmationStatus: 'confirmed', shippingStatus: 'delivered', productIdx: 1, variantIdx: 2, quantity: 1, deliveredDaysAgo: 20, commissionPaid: true, createdDaysAgo: 25 },
+  { customerIdx: 6,  source: 'youcan',    confirmationStatus: 'confirmed', shippingStatus: 'delivered', productIdx: 0, variantIdx: 0, quantity: 2, deliveredDaysAgo: 18, commissionPaid: true, createdDaysAgo: 23 },
 ];
 
 // Returns test cases
@@ -120,11 +126,17 @@ function daysAgo(n: number): Date {
 }
 
 async function nextReference(createdAt: Date): Promise<string> {
+  // Pick the highest existing suffix and add one so wipes/re-seeds never
+  // collide with references still in the table. Using count+1 is unsafe —
+  // deleted rows leave gaps but kept rows may already occupy (count+1).
   const yy = String(createdAt.getFullYear()).slice(-2);
-  const count = await prisma.order.count({
+  const latest = await prisma.order.findFirst({
     where: { reference: { startsWith: `ORD-${yy}-` } },
+    orderBy: { reference: 'desc' },
+    select: { reference: true },
   });
-  return `ORD-${yy}-${String(count + 1).padStart(5, '0')}`;
+  const lastNum = latest ? Number(latest.reference.split('-')[2] ?? '0') : 0;
+  return `ORD-${yy}-${String(lastNum + 1).padStart(5, '0')}`;
 }
 
 // ─── Main ───────────────────────────────────────────────────────────────────
@@ -136,20 +148,28 @@ async function main() {
   const admin = await prisma.user.findUnique({ where: { email: 'admin@anaqatoki.ma' } });
   if (!admin) throw new Error('Admin user missing — run `pnpm seed` first');
 
-  // 2) Commission rules (idempotent)
-  for (const rule of [
-    { type: 'onConfirm', value: 10 },
-    { type: 'onDeliver', value: 25 },
-  ]) {
-    const exists = await prisma.commissionRule.findFirst({
-      where: { agentId: admin.id, type: rule.type },
+  // 2) Commission rules — do NOT overwrite if the admin has already configured
+  // them. Only seed defaults when none exist, so the UI stays authoritative.
+  const existingRules = await prisma.commissionRule.findMany({
+    where: { agentId: admin.id },
+    select: { type: true, value: true },
+  });
+  if (existingRules.length === 0) {
+    await prisma.commissionRule.createMany({
+      data: [
+        { agentId: admin.id, type: 'onConfirm', value: 10 },
+        { agentId: admin.id, type: 'onDeliver', value: 25 },
+      ],
     });
-    if (!exists) {
-      await prisma.commissionRule.create({ data: { agentId: admin.id, ...rule } });
-    }
   }
-  const perOrderRate = 35;
-  console.log(`✅ commission rules (onConfirm=10 + onDeliver=25 = ${perOrderRate} MAD/order)`);
+  const rules = await prisma.commissionRule.findMany({
+    where: { agentId: admin.id },
+    select: { type: true, value: true },
+  });
+  const perOrderRate =
+    Number(rules.find((r) => r.type === 'onConfirm')?.value ?? 0) +
+    Number(rules.find((r) => r.type === 'onDeliver')?.value ?? 0);
+  console.log(`✅ commission rate = ${perOrderRate} MAD/order (onConfirm + onDeliver)`);
 
   // 3) Cities
   for (const c of CITIES) {
@@ -224,7 +244,11 @@ async function main() {
 
     const createdAt = daysAgo(spec.createdDaysAgo);
 
-    const existing = await prisma.order.findFirst({ where: { customerId, createdAt } });
+    // These customer phones are seed-only — one order per customer. If this
+    // customer already has ANY order, treat this spec as already applied.
+    // Using createdAt for dedup is unsafe because daysAgo() uses Date.now()
+    // so timestamps drift between runs, duplicating instead of skipping.
+    const existing = await prisma.order.findFirst({ where: { customerId } });
     if (existing) {
       skipped += 1;
       continue;
@@ -256,8 +280,12 @@ async function main() {
           labelSent: true,
           labelSentAt: createdAt,
           deliveredAt,
-          // Lock in commissionAmount so paid/pending buckets are deterministic.
-          commissionAmount: isDelivered ? perOrderRate : null,
+          // PAID orders lock in the amount that was paid out. PENDING delivered
+          // orders leave commissionAmount=null so the Money tab always shows
+          // the current per-order rate from the agent's rules — change the
+          // rule and pending payouts update instantly.
+          commissionAmount:
+            isDelivered && spec.commissionPaid ? perOrderRate : null,
           commissionPaid: spec.commissionPaid ?? false,
           commissionPaidAt: spec.commissionPaid ? daysAgo(1) : null,
           returnNote: spec.returnNote ?? null,
@@ -326,7 +354,7 @@ async function main() {
   };
 
   console.log(`\n✅ orders created=${created} skipped=${skipped}`);
-  console.log(`   commission: ${summary.commissionPending} pending (${summary.commissionPending * perOrderRate} MAD) + ${summary.commissionPaid} paid`);
+  console.log(`   commission: ${summary.commissionPending} pending (~${summary.commissionPending * perOrderRate} MAD at current rate) + ${summary.commissionPaid} paid`);
   console.log(`   returns:    ${summary.returnsPending} pending + ${summary.returnsVerified} verified`);
   console.log('🎉 Commission + Returns seed complete\n');
 }
