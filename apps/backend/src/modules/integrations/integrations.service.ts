@@ -5,6 +5,7 @@
 import crypto from 'node:crypto';
 import { prisma } from '../../shared/prisma';
 import { normalizePhone, isValidMoroccanPhone } from '../../utils/phoneNormalize';
+import { stripHtml } from '../../utils/stripHtml';
 import {
   buildAuthUrl,
   exchangeCode,
@@ -204,7 +205,15 @@ export async function importProducts(
     const yp = raw as Record<string, any>;
     const ypName: string = yp.name ?? yp.title ?? 'Untitled Product';
     const ypId: string | null = yp.id ?? null;
-    const ypDescription: string | null = yp.description ?? null;
+    // YouCan ships descriptions as marketing-grade HTML (`<p>`, `<strong>`,
+    // `&nbsp;`, occasionally inline imgs). Storing the raw HTML made the
+    // edit modal unreadable AND blew past Zod's max-length validator on
+    // PATCH. Strip to plain text on the way in so the DB stays clean and
+    // the textarea shows real prose. Existing rows are healed by the
+    // one-shot boot backfill (utils/backfillStripDescriptions.ts).
+    const rawDesc = yp.description ?? null;
+    const ypDescription: string | null =
+      rawDesc != null ? stripHtml(rawDesc) || null : null;
     const ypPrice: number = Number(yp.price ?? 0);
     const ypInventory: number = Number(yp.inventory ?? 0);
     const ypThumbnail: string | null = coerceImage(yp.thumbnail) ?? coerceImage(yp.images?.[0]) ?? null;

@@ -25,6 +25,7 @@ import { productsRoutes } from './modules/products/products.routes';
 import { teamRoutes } from './modules/team/team.routes';
 import { integrationsRoutes } from './modules/integrations/integrations.routes';
 import { startOrderPoller } from './modules/integrations/orderPoller';
+import { backfillStripDescriptionsOnce } from './jobs/backfillStripDescriptions';
 import { listProvidersPublic } from './modules/integrations/providers.service';
 import { startColiixTracker } from './modules/integrations/coliixTracker';
 import { shippingCitiesRoutes } from './modules/shippingCities/shippingCities.routes';
@@ -439,6 +440,14 @@ async function start() {
     // Near-instant order sync — polls every 15s for new YouCan orders on every
     // connected store and broadcasts them to clients via socket.
     startOrderPoller();
+
+    // One-shot data heal: strip HTML from product descriptions imported
+    // before the strip-on-import code landed. Gated by a Setting sentinel
+    // — runs once, then every subsequent boot returns immediately.
+    // Fire-and-forget so it doesn't gate readiness.
+    backfillStripDescriptionsOnce(app.log).catch((err) => {
+      app.log.warn({ err }, '[backfill] strip-html boot job crashed');
+    });
 
     // Seed known shipping providers (Coliix, …) so the Integrations page has
     // rows to render from the first boot. No-op if rows already exist.
