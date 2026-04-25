@@ -360,6 +360,16 @@ export async function createOrder(input: CreateOrderInput, actor: JwtPayload) {
 
   const actorName = await getActorName(actor);
 
+  // When an agent creates an order manually (no explicit `agentId` in the
+  // payload), assign it to themselves so it shows up under their queue
+  // instead of being thrown into the round-robin pool. Admin / supervisor
+  // creates without `agentId` keep the existing auto-assign behavior so
+  // they can still create unassigned orders that get routed by the engine.
+  const isAdminLike =
+    actor.roleName === 'admin' || actor.roleName === 'supervisor';
+  const effectiveAgentId: string | null | undefined =
+    input.agentId ?? (isAdminLike ? null : actor.sub);
+
   // Retry on reference collisions — the Counter can drift below reality
   // after imports / manual INSERTs / partial resets. First collision runs
   // healReferenceCounter() to jump past the true max in one hop; any
@@ -382,8 +392,8 @@ export async function createOrder(input: CreateOrderInput, actor: JwtPayload) {
             customerId,
             source: input.source,
             storeId: input.storeId,
-            agentId: input.agentId,
-            assignedAt: input.agentId ? new Date() : undefined,
+            agentId: effectiveAgentId ?? undefined,
+            assignedAt: effectiveAgentId ? new Date() : undefined,
             discountType: input.discountType,
             discountAmount: input.discountAmount,
             shippingPrice: input.shippingPrice ?? 0,
@@ -407,11 +417,14 @@ export async function createOrder(input: CreateOrderInput, actor: JwtPayload) {
                   performedBy: actorName,
                   userId: actor.sub,
                 },
-                ...(input.agentId
+                ...(effectiveAgentId
                   ? [
                       {
                         type: 'system' as const,
-                        action: `Assigned to agent on creation`,
+                        action:
+                          effectiveAgentId === actor.sub
+                            ? `Self-assigned on creation`
+                            : `Assigned to agent on creation`,
                         performedBy: actorName,
                         userId: actor.sub,
                       },
@@ -459,9 +472,10 @@ export async function createOrder(input: CreateOrderInput, actor: JwtPayload) {
   emitToRoom('orders:all', 'order:created', { orderId: order.id, reference: order.reference });
   emitToRoom('dashboard', 'kpi:refresh', {});
 
-  // Auto-assign if no agent was set on creation — fire-and-forget so order
-  // creation stays fast even if the engine is slow / the lock is busy.
-  if (!input.agentId) {
+  // Auto-assign only when the order is still unassigned (admin created
+  // without picking an agent). When an agent self-creates, effectiveAgentId
+  // is already their own id, so we skip the rotation.
+  if (!effectiveAgentId) {
     autoAssign(order.id).catch(() => {
       // Swallow — order exists unassigned, and the engine logs its own reasons.
     });
