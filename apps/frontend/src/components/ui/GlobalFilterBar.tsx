@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { X, SlidersHorizontal, ChevronDown, Check } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useFilterStore } from '@/store/filterStore';
@@ -37,6 +38,7 @@ function FilterChip({
   onToggle: (value: string) => void;
   onClear: () => void;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -113,7 +115,7 @@ function FilterChip({
                   }}
                   className="text-xs font-medium text-red-500 hover:text-red-600"
                 >
-                  Clear filter
+                  {t('shared.filterBar.clearFilter')}
                 </button>
               </div>
             )}
@@ -133,6 +135,7 @@ const GlobalFilterBar = ({
   sticky = true,
   className,
 }: GlobalFilterBarProps) => {
+  const { t } = useTranslation();
   const { clearAll, hasActiveFilters, activeFilterCount, toggleArrayFilter, clearFilter } =
     useFilterStore();
   const storeState = useFilterStore();
@@ -152,7 +155,7 @@ const GlobalFilterBar = ({
       {/* Icon */}
       <div className="flex shrink-0 items-center gap-2 text-gray-500">
         <SlidersHorizontal size={15} />
-        <span className="text-sm font-medium">Filters</span>
+        <span className="text-sm font-medium">{t('shared.filterBar.filters')}</span>
         {count > 0 && (
           <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
             {count}
@@ -181,7 +184,7 @@ const GlobalFilterBar = ({
         <>
           <div className="h-4 w-px shrink-0 bg-gray-200" />
           <CRMButton variant="ghost" size="sm" onClick={clearAll} leftIcon={<X size={12} />}>
-            Clear all
+            {t('shared.filterBar.clearAll')}
           </CRMButton>
         </>
       )}

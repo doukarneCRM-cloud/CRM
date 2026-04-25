@@ -2659,5 +2659,145 @@
         "importFailed": "Import failed"
       }
     }
+  },
+  "shared": {
+    "appName": "Anaqatoki CRM",
+    "topbar": {
+      "online": "Online"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "ariaLabel": "Notifications",
+      "updating": "Updating…",
+      "noneYet": "No notifications yet",
+      "lastN": "Last {{count}}",
+      "allCaughtUp": "You're all caught up.",
+      "timeJustNow": "just now",
+      "timeMinutes": "{{count}}m ago",
+      "timeHours": "{{count}}h ago",
+      "timeDays": "{{count}}d ago"
+    },
+    "profile": {
+      "title": "My profile",
+      "saveChanges": "Save changes",
+      "changeAvatar": "Change avatar",
+      "changePhoto": "Change photo",
+      "uploading": "Uploading…",
+      "avatarHelp": "PNG, JPEG, WebP or GIF. Max 8 MB.",
+      "displayName": "Display name",
+      "displayNamePlaceholder": "Your full name",
+      "displayNameHelp": "This is the name teammates will see. 2–80 characters.",
+      "email": "Email",
+      "role": "Role",
+      "updated": "Profile updated",
+      "updatedBody": "Your display name was saved.",
+      "updateFailed": "Update failed",
+      "updateError": "Could not update profile",
+      "unsupportedFormat": "Unsupported format",
+      "unsupportedFormatBody": "Only PNG, JPEG, WebP, or GIF.",
+      "fileTooLarge": "File too large",
+      "fileTooLargeBody": "Image must be 8 MB or smaller.",
+      "avatarUpdated": "Avatar updated",
+      "uploadFailed": "Upload failed",
+      "uploadError": "Could not upload avatar"
+    },
+    "search": {
+      "placeholder": "Search orders, clients, products…",
+      "clear": "Clear",
+      "searching": "Searching…",
+      "noResults": "No results for “{{query}}”",
+      "orders": "Orders",
+      "clients": "Clients",
+      "products": "Products",
+      "noSku": "No SKU",
+      "skuLabel": "SKU: {{sku}}",
+      "orderCount_one": "{{count}} order",
+      "orderCount_other": "{{count}} orders"
+    },
+    "modal": {
+      "close": "Close"
+    },
+    "select": {
+      "placeholder": "Select...",
+      "searchPlaceholder": "Search...",
+      "noOptions": "No options found",
+      "selectedCount": "{{count}} selected"
+    },
+    "table": {
+      "noData": "No data found",
+      "rowsPerPage": "Rows per page:",
+      "rowsShort": "Rows:",
+      "all": "All",
+      "rangeOf": "{{from}} – {{to}} of {{total}}",
+      "selectedCount": "{{count}} selected",
+      "select": "Select",
+      "clear": "Clear"
+    },
+    "datePicker": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "last7": "Last 7 days",
+      "last15": "Last 15 days",
+      "thisMonth": "This month",
+      "lastMonth": "Last month",
+      "custom": "Custom",
+      "startDate": "Start date",
+      "rangePlaceholder": "Date range",
+      "apply": "Apply",
+      "cancel": "Cancel",
+      "clear": "Clear",
+      "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+      "weekdays": ["S", "M", "T", "W", "T", "F", "S"]
+    },
+    "filterBar": {
+      "filters": "Filters",
+      "clearFilter": "Clear filter",
+      "clearAll": "Clear all"
+    },
+    "history": {
+      "view": "View history"
+    },
+    "filePreview": {
+      "attachment": "Attachment",
+      "openInTab": "Open in tab",
+      "download": "Download",
+      "previewUnsupported": "Preview not supported for this file type.",
+      "useButtons": "Use the buttons below to open or download.",
+      "couldNotLoad": "Couldn't load the image."
+    },
+    "orderSource": {
+      "manual": "Manual"
+    },
+    "customerOrders": {
+      "tooltip": "{{count}} orders placed — click the name to view history"
+    },
+    "toaster": {
+      "ariaLabel": "Notifications",
+      "dismiss": "Dismiss"
+    },
+    "statusBadge": {
+      "pending": "Pending",
+      "awaiting": "Awaiting",
+      "confirmed": "Confirmed",
+      "cancelled": "Cancelled",
+      "unreachable": "Unreachable",
+      "callback": "Callback",
+      "fake": "Fake",
+      "out_of_stock": "Out of Stock",
+      "reported": "Reported",
+      "not_shipped": "Not Shipped",
+      "label_created": "Label Created",
+      "picked_up": "Picked Up",
+      "in_transit": "In Transit",
+      "out_for_delivery": "Out for Delivery",
+      "delivered": "Delivered",
+      "attempted": "Attempted",
+      "returned": "Returned",
+      "return_validated": "Return Validated",
+      "return_refused": "Return Refused",
+      "exchange": "Exchange",
+      "lost": "Lost",
+      "destroyed": "Destroyed"
+    }
   }
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useFilterStore } from '@/store/filterStore';
@@ -26,8 +27,8 @@ function addMonths(d: Date, n: number) { const r = new Date(d); r.setMonth(r.get
 function sameDay(a: Date, b: Date) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
 function between(d: Date, from: Date, to: Date) { return d.getTime() >= from.getTime() && d.getTime() <= to.getTime(); }
 
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const FALLBACK_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const FALLBACK_WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 // ─── Presets ──────────────────────────────────────────────────────────────────
 
@@ -63,15 +64,7 @@ function detectPreset(from: Date | null, to: Date | null): PresetKey {
   return 'custom';
 }
 
-const PRESETS: { key: PresetKey; label: string }[] = [
-  { key: 'today', label: 'Today' },
-  { key: 'yesterday', label: 'Yesterday' },
-  { key: 'last7', label: 'Last 7 days' },
-  { key: 'last15', label: 'Last 15 days' },
-  { key: 'thisMonth', label: 'This month' },
-  { key: 'lastMonth', label: 'Last month' },
-  { key: 'custom', label: 'Custom' },
-];
+const PRESET_KEYS: PresetKey[] = ['today', 'yesterday', 'last7', 'last15', 'thisMonth', 'lastMonth', 'custom'];
 
 // ─── Calendar grid ────────────────────────────────────────────────────────────
 
@@ -82,6 +75,7 @@ function MonthGrid({
   hover,
   onHover,
   onPick,
+  weekdays,
 }: {
   month: Date;
   from: Date | null;
@@ -89,6 +83,7 @@ function MonthGrid({
   hover: Date | null;
   onHover: (d: Date | null) => void;
   onPick: (d: Date) => void;
+  weekdays: string[];
 }) {
   const firstOfMonth = new Date(month.getFullYear(), month.getMonth(), 1);
   const startWeekday = firstOfMonth.getDay();
@@ -117,7 +112,7 @@ function MonthGrid({
     <div className="flex flex-col">
       {/* Day headers */}
       <div className="grid grid-cols-7 gap-y-1 pb-1.5">
-        {DAY_LABELS.map((l, i) => (
+        {weekdays.map((l, i) => (
           <span key={i} className="text-center text-[10px] font-semibold uppercase text-gray-400">
             {l}
           </span>
@@ -188,9 +183,19 @@ export function FbDateRangePicker({
   className,
   value,
   onChange,
-  placeholder = 'Date range',
+  placeholder,
   icon: IconOverride,
 }: FbDateRangePickerProps) {
+  const { t } = useTranslation();
+  const monthsTranslated = t('shared.datePicker.months', { returnObjects: true }) as unknown;
+  const weekdaysTranslated = t('shared.datePicker.weekdays', { returnObjects: true }) as unknown;
+  const MONTH_NAMES = Array.isArray(monthsTranslated) ? (monthsTranslated as string[]) : FALLBACK_MONTHS;
+  const DAY_LABELS = Array.isArray(weekdaysTranslated) ? (weekdaysTranslated as string[]) : FALLBACK_WEEKDAYS;
+  const effectivePlaceholder = placeholder ?? t('shared.datePicker.rangePlaceholder');
+  const PRESETS: { key: PresetKey; label: string }[] = PRESET_KEYS.map((k) => ({
+    key: k,
+    label: t(`shared.datePicker.${k}`),
+  }));
   const store = useFilterStore();
   const controlled = value !== undefined && onChange !== undefined;
   const dateRange: DateRangeValue = controlled ? value! : store.dateRange;
@@ -294,7 +299,7 @@ export function FbDateRangePicker({
   };
   const label = hasRange
     ? `${fmt(dateRange.from)}${dateRange.to && dateRange.to !== dateRange.from ? ` – ${fmt(dateRange.to)}` : ''}`
-    : placeholder;
+    : effectivePlaceholder;
 
   const rightMonth = addMonths(leftMonth, 1);
   const TriggerIcon = IconOverride ?? Calendar;
@@ -337,7 +342,7 @@ export function FbDateRangePicker({
             {/* Header */}
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
               <h3 className="text-sm font-bold text-gray-800">
-                {draftFrom ? fmt(toISO(draftFrom)) : 'Start date'}
+                {draftFrom ? fmt(toISO(draftFrom)) : t('shared.datePicker.startDate')}
                 {draftTo && !sameDay(draftFrom!, draftTo) && ` – ${fmt(toISO(draftTo))}`}
               </h3>
               <button
@@ -395,8 +400,8 @@ export function FbDateRangePicker({
 
                 {/* Two months */}
                 <div className="grid grid-cols-2 gap-6">
-                  <MonthGrid month={leftMonth} from={draftFrom} to={draftTo} hover={hover} onHover={setHover} onPick={handlePick} />
-                  <MonthGrid month={rightMonth} from={draftFrom} to={draftTo} hover={hover} onHover={setHover} onPick={handlePick} />
+                  <MonthGrid month={leftMonth} from={draftFrom} to={draftTo} hover={hover} onHover={setHover} onPick={handlePick} weekdays={DAY_LABELS} />
+                  <MonthGrid month={rightMonth} from={draftFrom} to={draftTo} hover={hover} onHover={setHover} onPick={handlePick} weekdays={DAY_LABELS} />
                 </div>
               </div>
             </div>
@@ -408,14 +413,14 @@ export function FbDateRangePicker({
                 onClick={handleClear}
                 className="text-xs font-medium text-gray-500 hover:text-red-500"
               >
-                Clear
+                {t('shared.datePicker.clear')}
               </button>
               <div className="flex gap-2">
                 <CRMButton variant="secondary" size="sm" onClick={() => setOpen(false)}>
-                  Cancel
+                  {t('shared.datePicker.cancel')}
                 </CRMButton>
                 <CRMButton variant="primary" size="sm" onClick={handleApply} disabled={!draftFrom}>
-                  Apply
+                  {t('shared.datePicker.apply')}
                 </CRMButton>
               </div>
             </div>

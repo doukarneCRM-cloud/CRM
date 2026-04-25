@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { ShoppingBag, MessageCircle, Instagram, PenLine } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
@@ -46,8 +47,10 @@ const OrderSourceIcon = ({
   size = 14,
   className,
 }: OrderSourceIconProps) => {
+  const { t } = useTranslation();
   const config = SOURCE_CONFIG[source] ?? SOURCE_CONFIG.manual;
   const Icon = config.icon;
+  const tooltipLabel = source === 'manual' ? t('shared.orderSource.manual') : config.label;
 
   return (
     <div className={cn('group relative inline-flex', className)}>
@@ -62,7 +65,7 @@ const OrderSourceIcon = ({
       </div>
       {showTooltip && (
         <div className="pointer-events-none absolute bottom-full left-1/2 mb-1 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2 py-1 text-[11px] text-white opacity-0 transition-opacity group-hover:opacity-100">
-          {config.label}
+          {tooltipLabel}
         </div>
       )}
     </div>

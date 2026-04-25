@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { createPortal } from 'react-dom';
@@ -31,6 +32,7 @@ const GlassModal = ({
   className,
   footer,
 }: GlassModalProps) => {
+  const { t } = useTranslation();
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -79,7 +81,7 @@ const GlassModal = ({
             <button
               onClick={onClose}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-              aria-label="Close"
+              aria-label={t('shared.modal.close')}
             >
               <X size={16} />
             </button>

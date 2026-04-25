@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import { getStatusConfig, type OrderStatus } from '@/constants/statusColors';
 
@@ -15,7 +16,13 @@ const sizeMap = {
 };
 
 const StatusBadge = ({ status, size = 'md', showDot = false }: StatusBadgeProps) => {
+  const { t, i18n } = useTranslation();
   const config = getStatusConfig(status as OrderStatus);
+  // Look up translated label by canonical status key. Fall back to the
+  // English label from statusColors for any non-canonical/unknown key.
+  const i18nKey = `shared.statusBadge.${status}`;
+  const hasTranslation = i18n.exists(i18nKey);
+  const label = hasTranslation ? t(i18nKey) : config.label;
 
   return (
     <span
@@ -29,7 +36,7 @@ const StatusBadge = ({ status, size = 'md', showDot = false }: StatusBadgeProps)
       {showDot && (
         <span className={cn('inline-block h-1.5 w-1.5 rounded-full', config.dot)} />
       )}
-      {config.label}
+      {label}
     </span>
   );
 };

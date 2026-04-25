@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Camera, Loader2 } from 'lucide-react';
 import { GlassModal } from '@/components/ui/GlassModal';
 import { useAuthStore } from '@/store/authStore';
@@ -17,6 +18,7 @@ const ALLOWED_MIME = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
 const MAX_BYTES = 8 * 1024 * 1024;
 
 export function ProfileModal({ open, onClose }: ProfileModalProps) {
+  const { t } = useTranslation();
   const { user, updateUser } = useAuthStore();
   const pushToast = useToastStore((s) => s.push);
 
@@ -41,11 +43,11 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
     try {
       const res = await authService.updateProfile({ name: nameTrimmed });
       updateUser(res.data as AuthUser);
-      pushToast({ kind: 'success', title: 'Profile updated', body: 'Your display name was saved.' });
+      pushToast({ kind: 'success', title: t('shared.profile.updated'), body: t('shared.profile.updatedBody') });
       onClose();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Could not update profile';
-      pushToast({ kind: 'error', title: 'Update failed', body: msg });
+      const msg = err instanceof Error ? err.message : t('shared.profile.updateError');
+      pushToast({ kind: 'error', title: t('shared.profile.updateFailed'), body: msg });
     } finally {
       setSavingName(false);
     }
@@ -59,11 +61,11 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
     if (!file) return;
 
     if (!ALLOWED_MIME.includes(file.type)) {
-      pushToast({ kind: 'error', title: 'Unsupported format', body: 'Only PNG, JPEG, WebP, or GIF.' });
+      pushToast({ kind: 'error', title: t('shared.profile.unsupportedFormat'), body: t('shared.profile.unsupportedFormatBody') });
       return;
     }
     if (file.size > MAX_BYTES) {
-      pushToast({ kind: 'error', title: 'File too large', body: 'Image must be 8 MB or smaller.' });
+      pushToast({ kind: 'error', title: t('shared.profile.fileTooLarge'), body: t('shared.profile.fileTooLargeBody') });
       return;
     }
 
@@ -71,10 +73,10 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
     try {
       const res = await authService.uploadAvatar(file);
       updateUser(res.data as AuthUser);
-      pushToast({ kind: 'success', title: 'Avatar updated' });
+      pushToast({ kind: 'success', title: t('shared.profile.avatarUpdated') });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Could not upload avatar';
-      pushToast({ kind: 'error', title: 'Upload failed', body: msg });
+      const msg = err instanceof Error ? err.message : t('shared.profile.uploadError');
+      pushToast({ kind: 'error', title: t('shared.profile.uploadFailed'), body: msg });
     } finally {
       setUploadingAvatar(false);
     }
@@ -87,7 +89,7 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
     <GlassModal
       open={open}
       onClose={onClose}
-      title="My profile"
+      title={t('shared.profile.title')}
       size="md"
       footer={
         <div className="flex items-center justify-end gap-2">
@@ -96,7 +98,7 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
             onClick={onClose}
             className="rounded-btn border border-gray-200 bg-white px-3.5 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
           >
-            Close
+            {t('common.close')}
           </button>
           <button
             type="button"
@@ -105,7 +107,7 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
             className="inline-flex items-center gap-1.5 rounded-btn bg-primary px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {savingName && <Loader2 size={14} className="animate-spin" />}
-            Save changes
+            {t('shared.profile.saveChanges')}
           </button>
         </div>
       }
@@ -117,7 +119,7 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
           onClick={handlePickFile}
           disabled={uploadingAvatar}
           className="group relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-sm"
-          aria-label="Change avatar"
+          aria-label={t('shared.profile.changeAvatar')}
         >
           {avatarSrc ? (
             <img src={avatarSrc} alt={user.name} className="h-full w-full object-cover" />
@@ -152,29 +154,29 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
           disabled={uploadingAvatar}
           className="text-xs font-semibold text-primary hover:underline disabled:opacity-50"
         >
-          {uploadingAvatar ? 'Uploading…' : 'Change photo'}
+          {uploadingAvatar ? t('shared.profile.uploading') : t('shared.profile.changePhoto')}
         </button>
-        <p className="-mt-2 text-[11px] text-gray-400">PNG, JPEG, WebP or GIF. Max 8 MB.</p>
+        <p className="-mt-2 text-[11px] text-gray-400">{t('shared.profile.avatarHelp')}</p>
       </div>
 
       <div className="mt-6 space-y-4">
         <div>
-          <label className="mb-1.5 block text-xs font-semibold text-gray-700">Display name</label>
+          <label className="mb-1.5 block text-xs font-semibold text-gray-700">{t('shared.profile.displayName')}</label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={80}
-            placeholder="Your full name"
+            placeholder={t('shared.profile.displayNamePlaceholder')}
             className="w-full rounded-input border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
           />
           <p className="mt-1 text-[11px] text-gray-400">
-            This is the name teammates will see. 2–80 characters.
+            {t('shared.profile.displayNameHelp')}
           </p>
         </div>
 
         <div>
-          <label className="mb-1.5 block text-xs font-semibold text-gray-700">Email</label>
+          <label className="mb-1.5 block text-xs font-semibold text-gray-700">{t('shared.profile.email')}</label>
           <input
             type="email"
             value={user.email}
@@ -184,7 +186,7 @@ export function ProfileModal({ open, onClose }: ProfileModalProps) {
         </div>
 
         <div>
-          <label className="mb-1.5 block text-xs font-semibold text-gray-700">Role</label>
+          <label className="mb-1.5 block text-xs font-semibold text-gray-700">{t('shared.profile.role')}</label>
           <input
             type="text"
             value={user.role.label}

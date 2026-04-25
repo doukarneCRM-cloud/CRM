@@ -2659,5 +2659,145 @@
         "importFailed": "Échec de l'importation"
       }
     }
+  },
+  "shared": {
+    "appName": "Anaqatoki CRM",
+    "topbar": {
+      "online": "En ligne"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "ariaLabel": "Notifications",
+      "updating": "Mise à jour…",
+      "noneYet": "Aucune notification pour le moment",
+      "lastN": "Dernières {{count}}",
+      "allCaughtUp": "Tout est à jour.",
+      "timeJustNow": "à l'instant",
+      "timeMinutes": "il y a {{count}} min",
+      "timeHours": "il y a {{count}} h",
+      "timeDays": "il y a {{count}} j"
+    },
+    "profile": {
+      "title": "Mon profil",
+      "saveChanges": "Enregistrer",
+      "changeAvatar": "Changer l'avatar",
+      "changePhoto": "Changer la photo",
+      "uploading": "Téléversement…",
+      "avatarHelp": "PNG, JPEG, WebP ou GIF. Max 8 Mo.",
+      "displayName": "Nom affiché",
+      "displayNamePlaceholder": "Votre nom complet",
+      "displayNameHelp": "C'est le nom que verront vos collègues. 2 à 80 caractères.",
+      "email": "E-mail",
+      "role": "Rôle",
+      "updated": "Profil mis à jour",
+      "updatedBody": "Votre nom affiché a été enregistré.",
+      "updateFailed": "Échec de la mise à jour",
+      "updateError": "Impossible de mettre à jour le profil",
+      "unsupportedFormat": "Format non pris en charge",
+      "unsupportedFormatBody": "Uniquement PNG, JPEG, WebP ou GIF.",
+      "fileTooLarge": "Fichier trop volumineux",
+      "fileTooLargeBody": "L'image doit faire 8 Mo ou moins.",
+      "avatarUpdated": "Avatar mis à jour",
+      "uploadFailed": "Échec du téléversement",
+      "uploadError": "Impossible de téléverser l'avatar"
+    },
+    "search": {
+      "placeholder": "Rechercher commandes, clients, produits…",
+      "clear": "Effacer",
+      "searching": "Recherche…",
+      "noResults": "Aucun résultat pour « {{query}} »",
+      "orders": "Commandes",
+      "clients": "Clients",
+      "products": "Produits",
+      "noSku": "Sans SKU",
+      "skuLabel": "SKU : {{sku}}",
+      "orderCount_one": "{{count}} commande",
+      "orderCount_other": "{{count}} commandes"
+    },
+    "modal": {
+      "close": "Fermer"
+    },
+    "select": {
+      "placeholder": "Sélectionner...",
+      "searchPlaceholder": "Rechercher...",
+      "noOptions": "Aucune option trouvée",
+      "selectedCount": "{{count}} sélectionné(s)"
+    },
+    "table": {
+      "noData": "Aucune donnée",
+      "rowsPerPage": "Lignes par page :",
+      "rowsShort": "Lignes :",
+      "all": "Tout",
+      "rangeOf": "{{from}} – {{to}} sur {{total}}",
+      "selectedCount": "{{count}} sélectionné(s)",
+      "select": "Sélectionner",
+      "clear": "Effacer"
+    },
+    "datePicker": {
+      "today": "Aujourd'hui",
+      "yesterday": "Hier",
+      "last7": "7 derniers jours",
+      "last15": "15 derniers jours",
+      "thisMonth": "Ce mois-ci",
+      "lastMonth": "Mois dernier",
+      "custom": "Personnalisé",
+      "startDate": "Date de début",
+      "rangePlaceholder": "Plage de dates",
+      "apply": "Appliquer",
+      "cancel": "Annuler",
+      "clear": "Effacer",
+      "months": ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."],
+      "weekdays": ["D", "L", "M", "M", "J", "V", "S"]
+    },
+    "filterBar": {
+      "filters": "Filtres",
+      "clearFilter": "Effacer le filtre",
+      "clearAll": "Tout effacer"
+    },
+    "history": {
+      "view": "Voir l'historique"
+    },
+    "filePreview": {
+      "attachment": "Pièce jointe",
+      "openInTab": "Ouvrir dans un onglet",
+      "download": "Télécharger",
+      "previewUnsupported": "Aperçu non disponible pour ce type de fichier.",
+      "useButtons": "Utilisez les boutons ci-dessous pour ouvrir ou télécharger.",
+      "couldNotLoad": "Impossible de charger l'image."
+    },
+    "orderSource": {
+      "manual": "Manuel"
+    },
+    "customerOrders": {
+      "tooltip": "{{count}} commandes passées — cliquez sur le nom pour voir l'historique"
+    },
+    "toaster": {
+      "ariaLabel": "Notifications",
+      "dismiss": "Fermer"
+    },
+    "statusBadge": {
+      "pending": "En attente",
+      "awaiting": "À traiter",
+      "confirmed": "Confirmé",
+      "cancelled": "Annulé",
+      "unreachable": "Injoignable",
+      "callback": "Rappel",
+      "fake": "Faux",
+      "out_of_stock": "Rupture de stock",
+      "reported": "Signalé",
+      "not_shipped": "Non expédié",
+      "label_created": "Étiquette créée",
+      "picked_up": "Collecté",
+      "in_transit": "En transit",
+      "out_for_delivery": "En livraison",
+      "delivered": "Livré",
+      "attempted": "Tentative échouée",
+      "returned": "Retourné",
+      "return_validated": "Retour validé",
+      "return_refused": "Retour refusé",
+      "exchange": "Échange",
+      "lost": "Perdu",
+      "destroyed": "Détruit"
+    }
   }
 }

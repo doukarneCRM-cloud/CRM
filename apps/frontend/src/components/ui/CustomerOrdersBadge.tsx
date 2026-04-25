@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 
 interface Props {
@@ -14,6 +15,7 @@ interface Props {
  * for making the name itself clickable (opening CustomerHistoryModal).
  */
 export function CustomerOrdersBadge({ count, className }: Props) {
+  const { t } = useTranslation();
   if (!count || count <= 1) return null;
   return (
     <span
@@ -21,7 +23,7 @@ export function CustomerOrdersBadge({ count, className }: Props) {
         'inline-flex h-4 shrink-0 items-center rounded-full bg-primary/10 px-1.5 text-[10px] font-bold leading-none text-primary',
         className,
       )}
-      title={`${count} orders placed — click the name to view history`}
+      title={t('shared.customerOrders.tooltip', { count })}
     >
       {count}×
     </span>

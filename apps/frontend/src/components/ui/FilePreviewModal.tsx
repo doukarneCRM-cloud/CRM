@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Download, ExternalLink, FileText, ImageOff } from 'lucide-react';
 import { GlassModal } from './GlassModal';
 import { CRMButton } from './CRMButton';
@@ -18,8 +19,9 @@ function detectKind(url: string): 'image' | 'pdf' | 'other' {
 }
 
 export function FilePreviewModal({ open, onClose, url, filename, title }: Props) {
+  const { t } = useTranslation();
   const kind = detectKind(url);
-  const displayName = filename ?? url.split('/').pop() ?? 'Attachment';
+  const displayName = filename ?? url.split('/').pop() ?? t('shared.filePreview.attachment');
 
   return (
     <GlassModal
@@ -39,7 +41,7 @@ export function FilePreviewModal({ open, onClose, url, filename, title }: Props)
               leftIcon={<ExternalLink size={13} />}
               onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}
             >
-              Open in tab
+              {t('shared.filePreview.openInTab')}
             </CRMButton>
             <CRMButton
               size="sm"
@@ -53,7 +55,7 @@ export function FilePreviewModal({ open, onClose, url, filename, title }: Props)
                 a.remove();
               }}
             >
-              Download
+              {t('shared.filePreview.download')}
             </CRMButton>
           </div>
         </div>
@@ -80,8 +82,8 @@ export function FilePreviewModal({ open, onClose, url, filename, title }: Props)
         ) : (
           <div className="flex flex-col items-center gap-2 text-gray-400">
             <FileText size={40} className="text-gray-300" />
-            <p className="text-sm">Preview not supported for this file type.</p>
-            <p className="text-[11px]">Use the buttons below to open or download.</p>
+            <p className="text-sm">{t('shared.filePreview.previewUnsupported')}</p>
+            <p className="text-[11px]">{t('shared.filePreview.useButtons')}</p>
           </div>
         )}
         {kind === 'image' && (
@@ -90,7 +92,7 @@ export function FilePreviewModal({ open, onClose, url, filename, title }: Props)
             style={{ display: 'none' }}
           >
             <ImageOff size={40} className="text-gray-300" />
-            <p className="text-sm">Couldn't load the image.</p>
+            <p className="text-sm">{t('shared.filePreview.couldNotLoad')}</p>
           </div>
         )}
       </div>

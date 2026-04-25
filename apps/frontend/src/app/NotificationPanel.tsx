@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Bell,
   CheckCircle2,
@@ -18,6 +19,7 @@ import {
   type Notification,
   type NotificationKind,
 } from '@/services/notificationsApi';
+import type { TFunction } from 'i18next';
 
 const KIND_ICON: Record<NotificationKind, typeof Bell> = {
   order_assigned: UserPlus,
@@ -31,19 +33,20 @@ const KIND_ACCENT: Record<NotificationKind, string> = {
   order_new: 'bg-sky-100 text-sky-700',
 };
 
-function timeAgo(iso: string): string {
+function timeAgo(iso: string, t: TFunction): string {
   const diff = Date.now() - new Date(iso).getTime();
   const s = Math.round(diff / 1000);
-  if (s < 60) return 'just now';
+  if (s < 60) return t('shared.notifications.timeJustNow');
   const m = Math.round(s / 60);
-  if (m < 60) return `${m}m ago`;
+  if (m < 60) return t('shared.notifications.timeMinutes', { count: m });
   const h = Math.round(m / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return t('shared.notifications.timeHours', { count: h });
   const d = Math.round(h / 24);
-  return `${d}d ago`;
+  return t('shared.notifications.timeDays', { count: d });
 }
 
 export function NotificationPanel() {
+  const { t } = useTranslation();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -119,7 +122,7 @@ export function NotificationPanel() {
       <button
         onClick={handleToggle}
         className="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-accent hover:text-primary"
-        aria-label="Notifications"
+        aria-label={t('shared.notifications.ariaLabel')}
       >
         <Bell size={16} />
       </button>
@@ -133,9 +136,13 @@ export function NotificationPanel() {
         <div className="absolute right-0 top-full z-50 mt-2 w-[360px] overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-hover">
           <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
             <div>
-              <p className="text-sm font-semibold text-gray-900">Notifications</p>
+              <p className="text-sm font-semibold text-gray-900">{t('shared.notifications.title')}</p>
               <p className="text-[11px] text-gray-400">
-                {loading ? 'Updating…' : items.length === 0 ? 'No notifications yet' : `Last ${items.length}`}
+                {loading
+                  ? t('shared.notifications.updating')
+                  : items.length === 0
+                    ? t('shared.notifications.noneYet')
+                    : t('shared.notifications.lastN', { count: items.length })}
               </p>
             </div>
           </div>
@@ -144,7 +151,7 @@ export function NotificationPanel() {
             {items.length === 0 ? (
               <div className="flex flex-col items-center gap-2 px-4 py-8 text-gray-400">
                 <Inbox size={28} />
-                <p className="text-xs">You're all caught up.</p>
+                <p className="text-xs">{t('shared.notifications.allCaughtUp')}</p>
               </div>
             ) : (
               <ul>
@@ -187,7 +194,7 @@ export function NotificationPanel() {
                               )}
                             </div>
                           )}
-                          <p className="mt-1 text-[10px] text-gray-400">{timeAgo(n.createdAt)}</p>
+                          <p className="mt-1 text-[10px] text-gray-400">{timeAgo(n.createdAt, t)}</p>
                         </div>
                         {!n.readAt && (
                           <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-red-500" />

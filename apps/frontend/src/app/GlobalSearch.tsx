@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Search, X, Loader2, Package, User, ShoppingBag } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -21,6 +22,7 @@ const PER_SECTION = 5;
 const MIN_QUERY_LEN = 2;
 
 export function GlobalSearch() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [value, setValue] = useState('');
   const [open, setOpen] = useState(false);
@@ -98,7 +100,7 @@ export function GlobalSearch() {
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          placeholder="Search orders, clients, products…"
+          placeholder={t('shared.search.placeholder')}
           className="w-56 bg-transparent text-sm text-gray-900 outline-none placeholder-gray-400"
         />
         {loading ? (
@@ -110,7 +112,7 @@ export function GlobalSearch() {
               inputRef.current?.focus();
             }}
             className="text-gray-400 hover:text-gray-600"
-            aria-label="Clear"
+            aria-label={t('shared.search.clear')}
           >
             <X size={14} />
           </button>
@@ -122,18 +124,18 @@ export function GlobalSearch() {
           {loading && totalResults === 0 && (
             <div className="flex items-center justify-center gap-2 py-8 text-xs text-gray-400">
               <Loader2 size={14} className="animate-spin" />
-              Searching…
+              {t('shared.search.searching')}
             </div>
           )}
 
           {!loading && totalResults === 0 && (
             <div className="px-4 py-8 text-center text-xs text-gray-400">
-              No results for “{debounced}”
+              {t('shared.search.noResults', { query: debounced })}
             </div>
           )}
 
           {results.orders.length > 0 && (
-            <Section icon={ShoppingBag} title="Orders">
+            <Section icon={ShoppingBag} title={t('shared.search.orders')}>
               {results.orders.map((o) => (
                 <ResultRow
                   key={o.id}
@@ -147,13 +149,13 @@ export function GlobalSearch() {
           )}
 
           {results.clients.length > 0 && (
-            <Section icon={User} title="Clients">
+            <Section icon={User} title={t('shared.search.clients')}>
               {results.clients.map((c) => (
                 <ResultRow
                   key={c.id}
                   title={c.fullName}
                   subtitle={`${c.phoneDisplay} · ${c.city}`}
-                  meta={`${c.totalOrders} order${c.totalOrders === 1 ? '' : 's'}`}
+                  meta={t('shared.search.orderCount', { count: c.totalOrders })}
                   onClick={() => closeAndGo(ROUTES.CLIENTS)}
                 />
               ))}
@@ -161,12 +163,12 @@ export function GlobalSearch() {
           )}
 
           {results.products.length > 0 && (
-            <Section icon={Package} title="Products">
+            <Section icon={Package} title={t('shared.search.products')}>
               {results.products.map((p) => (
                 <ResultRow
                   key={p.id}
                   title={p.name}
-                  subtitle={p.sku ? `SKU: ${p.sku}` : 'No SKU'}
+                  subtitle={p.sku ? t('shared.search.skuLabel', { sku: p.sku }) : t('shared.search.noSku')}
                   onClick={() => closeAndGo(ROUTES.PRODUCTS_LIST)}
                 />
               ))}

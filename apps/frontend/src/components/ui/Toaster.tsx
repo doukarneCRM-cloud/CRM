@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   CheckCircle2,
   UserPlus,
@@ -30,12 +31,13 @@ const ACCENTS: Record<ToastKind, { bar: string; icon: string; iconBg: string }> 
 };
 
 export function Toaster() {
+  const { t } = useTranslation();
   const toasts = useToastStore((s) => s.toasts);
 
   return (
     <div
       aria-live="polite"
-      aria-label="Notifications"
+      aria-label={t('shared.toaster.ariaLabel')}
       className="pointer-events-none fixed bottom-4 right-4 z-[60] flex flex-col-reverse gap-2"
     >
       {toasts.map((t) => (
@@ -46,6 +48,7 @@ export function Toaster() {
 }
 
 function ToastCard({ toast }: { toast: Toast }) {
+  const { t } = useTranslation();
   const dismiss = useToastStore((s) => s.dismiss);
   const navigate = useNavigate();
   const [entered, setEntered] = useState(false);
@@ -123,7 +126,7 @@ function ToastCard({ toast }: { toast: Toast }) {
             dismiss(toast.id);
           }}
           className="shrink-0 rounded-md p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
-          aria-label="Dismiss"
+          aria-label={t('shared.toaster.dismiss')}
         >
           <X size={14} />
         </button>

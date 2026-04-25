@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   useReactTable,
   getCoreRowModel,
@@ -79,7 +80,7 @@ function CRMTable<TData extends object>({
   columns,
   data,
   loading = false,
-  emptyMessage = 'No data found',
+  emptyMessage,
   emptyIcon,
   selectable = false,
   onSelectionChange,
@@ -87,6 +88,8 @@ function CRMTable<TData extends object>({
   defaultPageSize = 20,
   className,
 }: CRMTableProps<TData>) {
+  const { t } = useTranslation();
+  const effectiveEmpty = emptyMessage ?? t('shared.table.noData');
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
@@ -160,7 +163,7 @@ function CRMTable<TData extends object>({
         ) : rows.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-16 text-gray-400">
             {emptyIcon && <div className="text-gray-300">{emptyIcon}</div>}
-            <p className="text-sm">{emptyMessage}</p>
+            <p className="text-sm">{effectiveEmpty}</p>
           </div>
         ) : (
           rows.map((row) => {
@@ -180,7 +183,7 @@ function CRMTable<TData extends object>({
                 {selectCell && (
                   <div className="mb-2 flex items-center gap-2 border-b border-gray-50 pb-2">
                     {flexRender(selectCell.column.columnDef.cell, selectCell.getContext())}
-                    <span className="text-xs font-medium text-gray-400">Select</span>
+                    <span className="text-xs font-medium text-gray-400">{t('shared.table.select')}</span>
                   </div>
                 )}
                 <div className="flex flex-col gap-1.5">
@@ -235,7 +238,7 @@ function CRMTable<TData extends object>({
                 <SkeletonRow key={i} cols={allColumns.length} />
               ))
             ) : table.getRowModel().rows.length === 0 ? (
-              <EmptyState message={emptyMessage} icon={emptyIcon} />
+              <EmptyState message={effectiveEmpty} icon={emptyIcon} />
             ) : (
               table.getRowModel().rows.map((row) => (
                 <tr
@@ -261,8 +264,8 @@ function CRMTable<TData extends object>({
       <div className="flex flex-wrap items-center justify-between gap-y-2 border-t border-gray-100 px-3 py-3 sm:px-4">
         {/* Page size */}
         <div className="flex items-center gap-2 text-sm text-gray-500">
-          <span className="hidden sm:inline">Rows per page:</span>
-          <span className="sm:hidden">Rows:</span>
+          <span className="hidden sm:inline">{t('shared.table.rowsPerPage')}</span>
+          <span className="sm:hidden">{t('shared.table.rowsShort')}</span>
           <div className="relative">
             <select
               value={pagination.pageSize}
@@ -276,7 +279,7 @@ function CRMTable<TData extends object>({
                   {size}
                 </option>
               ))}
-              <option value={data.length}>All</option>
+              <option value={data.length}>{t('shared.table.all')}</option>
             </select>
             <ChevronDown
               size={12}
@@ -288,15 +291,15 @@ function CRMTable<TData extends object>({
         {/* Page info + nav */}
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-500">
-            {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1}
-            {' – '}
-            {Math.min(
-              (table.getState().pagination.pageIndex + 1) *
-                table.getState().pagination.pageSize,
-              data.length,
-            )}
-            {' of '}
-            {data.length}
+            {t('shared.table.rangeOf', {
+              from: table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1,
+              to: Math.min(
+                (table.getState().pagination.pageIndex + 1) *
+                  table.getState().pagination.pageSize,
+                data.length,
+              ),
+              total: data.length,
+            })}
           </span>
           <div className="flex items-center gap-1">
             <button
@@ -322,7 +325,7 @@ function CRMTable<TData extends object>({
         <div className="slide-up fixed bottom-3 left-3 right-3 z-50 sm:bottom-6 sm:left-1/2 sm:right-auto sm:-translate-x-1/2">
           <div className="glass flex flex-wrap items-center justify-center gap-2 px-3 py-2.5 shadow-hover sm:flex-nowrap sm:gap-3 sm:px-5 sm:py-3">
             <span className="text-sm font-semibold text-gray-700">
-              {selectedCount} selected
+              {t('shared.table.selectedCount', { count: selectedCount })}
             </span>
             <div className="h-4 w-px bg-gray-200" />
             {bulkActions.map((action, i) => (
@@ -340,7 +343,7 @@ function CRMTable<TData extends object>({
               onClick={() => setRowSelection({})}
               className="ml-1 text-xs text-gray-400 hover:text-gray-600"
             >
-              Clear
+              {t('shared.table.clear')}
             </button>
           </div>
         </div>

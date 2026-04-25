@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown, Check, Search, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
@@ -25,7 +26,7 @@ const CRMSelect = ({
   options,
   value,
   onChange,
-  placeholder = 'Select...',
+  placeholder,
   label,
   error,
   multi = false,
@@ -33,6 +34,8 @@ const CRMSelect = ({
   disabled = false,
   className,
 }: CRMSelectProps) => {
+  const { t } = useTranslation();
+  const effectivePlaceholder = placeholder ?? t('shared.select.placeholder');
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   // Menu position (fixed-coord in viewport) is recomputed on open + on
@@ -101,14 +104,14 @@ const CRMSelect = ({
   };
 
   const displayLabel = () => {
-    if (selectedValues.length === 0) return placeholder;
+    if (selectedValues.length === 0) return effectivePlaceholder;
     if (multi) {
       if (selectedValues.length === 1) {
-        return options.find((o) => o.value === selectedValues[0])?.label ?? placeholder;
+        return options.find((o) => o.value === selectedValues[0])?.label ?? effectivePlaceholder;
       }
-      return `${selectedValues.length} selected`;
+      return t('shared.select.selectedCount', { count: selectedValues.length });
     }
-    return options.find((o) => o.value === selectedValues[0])?.label ?? placeholder;
+    return options.find((o) => o.value === selectedValues[0])?.label ?? effectivePlaceholder;
   };
 
   return (
@@ -166,7 +169,7 @@ const CRMSelect = ({
                     autoFocus
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search..."
+                    placeholder={t('shared.select.searchPlaceholder')}
                     className="w-full bg-transparent text-sm text-gray-700 outline-none placeholder-gray-400"
                   />
                 </div>
@@ -174,7 +177,7 @@ const CRMSelect = ({
             )}
             <ul className="max-h-60 overflow-y-auto py-1">
               {filtered.length === 0 && (
-                <li className="px-4 py-3 text-sm text-gray-400">No options found</li>
+                <li className="px-4 py-3 text-sm text-gray-400">{t('shared.select.noOptions')}</li>
               )}
               {filtered.map((option) => {
                 const isSelected = selectedValues.includes(option.value);

@@ -53,6 +53,7 @@ interface AgentPillData {
 }
 
 function AgentPill({ agent }: { agent: AgentPillData }) {
+  const { t } = useTranslation();
   const pillRef = useRef<HTMLDivElement>(null);
   const [card, setCard] = useState<{ top: number; left: number } | null>(null);
 
@@ -128,7 +129,7 @@ function AgentPill({ agent }: { agent: AgentPillData }) {
                     {agent.roleName}
                   </p>
                 )}
-                <p className="mt-0.5 text-[10px] font-semibold text-emerald-600">● Online</p>
+                <p className="mt-0.5 text-[10px] font-semibold text-emerald-600">● {t('shared.topbar.online')}</p>
               </div>
             </div>
           </div>,
@@ -291,7 +292,7 @@ export function TopBar({ onMobileMenuOpen }: TopBarProps) {
   const { t } = useTranslation();
 
   const titleKey = PAGE_TITLE_KEYS[pathname];
-  const pageTitle = titleKey ? t(titleKey) : 'Anaqatoki CRM';
+  const pageTitle = titleKey ? t(titleKey) : t('shared.appName');
   const isAdmin = hasRole('admin');
 
   return (
