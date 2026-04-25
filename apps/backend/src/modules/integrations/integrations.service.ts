@@ -958,6 +958,17 @@ export async function importSingleOrder(
       }
     | undefined;
   let healedOnce = false;
+  // Preserve YouCan's original placement time so the CRM list mirrors the
+  // store's chronology. Without this, every batch import collapses to
+  // `now()` and the list ends up sorted by Prisma insert order (which
+  // reverses YouCan's newest-first response — newest YouCan order ends up
+  // at the bottom). Fall back to `now()` if the API ever returns a
+  // missing/garbage timestamp so we never block an import.
+  const youcanCreatedAt = (() => {
+    if (!yo.created_at) return new Date();
+    const parsed = new Date(yo.created_at);
+    return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  })();
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const reference = await generateReference();
     try {
@@ -972,6 +983,7 @@ export async function importSingleOrder(
           shippingPrice,
           total,
           confirmationNote: yo.notes,
+          createdAt: youcanCreatedAt,
           items: { create: items },
           logs: {
             create: [{
