@@ -25,6 +25,7 @@ import {
   healReferenceCounter,
   isReferenceCollision,
 } from '../orders/orders.service';
+import { autoAssign } from '../../utils/autoAssign';
 
 // ─── Store CRUD ─────────────────────────────────────────────────────────────
 
@@ -1071,6 +1072,19 @@ export async function importSingleOrder(
     body: `${created.customer.fullName} · ${created.customer.city}`,
     href: '/orders',
     orderId: created.id,
+  });
+
+  // Run the assignment rule. Without this every YouCan-imported order
+  // landed unassigned regardless of the round-robin / bounce / agent-pool
+  // configuration — the rule was only honored on manual order creation
+  // (orders.service.ts → autoAssign). Fire-and-forget so a slow rotation
+  // never blocks the import response or the webhook ack; autoAssign emits
+  // its own `order:assigned` socket event when the pick lands. Behaviour
+  // is identical to the manual-create path and is gated by the rule's
+  // own isActive / eligibleAgentIds checks.
+  void autoAssign(created.id).catch(() => {
+    // Swallow — autoAssign logs its own reasons; the order stays
+    // unassigned and a supervisor can pick manually.
   });
 
   return 'imported';
