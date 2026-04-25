@@ -175,6 +175,27 @@ export async function integrationsRoutes(app: FastifyInstance) {
     return reply.send(result);
   });
 
+  // ── Coliix tracking — manual diagnostics ──────────────────────────────────
+  // The poller runs every 5 minutes; these endpoints let an admin force a
+  // refresh now and inspect the raw Coliix response (state + history) so the
+  // mapping can be verified end-to-end without waiting for the next tick.
+
+  app.get('/coliix/in-flight', { preHandler: [verifyJWT, requirePermission('shipping:push')] }, async (_req, reply) => {
+    const orders = await coliix.listInFlightOrders();
+    return reply.send({ total: orders.length, orders });
+  });
+
+  app.post('/coliix/track/:orderId', { preHandler: [verifyJWT, requirePermission('shipping:push')] }, async (req, reply) => {
+    const { orderId } = req.params as { orderId: string };
+    const result = await coliix.trackOrderNow(orderId);
+    return reply.status(result.ok ? 200 : 400).send(result);
+  });
+
+  app.post('/coliix/refresh-all', { preHandler: [verifyJWT, requirePermission('shipping:push')] }, async (_req, reply) => {
+    const result = await coliix.refreshAllInFlight();
+    return reply.send(result);
+  });
+
   // ── Coliix webhook — instant status updates ───────────────────────────────
   // Coliix calls this URL (GET or POST) whenever a parcel state changes. The
   // path-segment secret is how we authenticate — no header, no HMAC, so don't

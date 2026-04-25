@@ -16,7 +16,7 @@
 import { Prisma, type ShippingStatus } from '@prisma/client';
 import { prisma } from '../../shared/prisma';
 import { emitToRoom } from '../../shared/socket';
-import { createParcel, ColiixError } from './coliixClient';
+import { createParcel, trackParcel, ColiixError, type ColiixTrackEvent } from './coliixClient';
 import { mapColiixState } from './coliixStateMap';
 import type { JwtPayload } from '../../shared/jwt';
 import { dispatchOrderStatusChange } from '../automation/dispatcher';
@@ -369,5 +369,192 @@ export async function exportOrders(orderIds: string[], actor: JwtPayload): Promi
   return {
     results,
     summary: { total: results.length, ok, failed: results.length - ok },
+  };
+}
+
+// ─── On-demand tracking diagnostics ─────────────────────────────────────────
+//
+// The poller runs every 5 minutes — fine for production but useless when
+// you're standing in front of a parcel that just changed state and want to
+// confirm the pipeline works. These helpers expose the same machinery the
+// poller uses, but on demand and with the full Coliix payload returned so
+// admins can see exactly what arrived and how it was mapped.
+
+const NON_TERMINAL_STATUSES: ShippingStatus[] = [
+  'label_created',
+  'picked_up',
+  'in_transit',
+  'out_for_delivery',
+  'attempted',
+];
+
+export interface InFlightOrder {
+  orderId: string;
+  reference: string;
+  customerName: string;
+  city: string;
+  shippingStatus: ShippingStatus;
+  coliixTrackingId: string;
+  lastTrackedAt: Date | null;
+  labelSentAt: Date | null;
+}
+
+/** Orders currently moving through Coliix — eligible for a status refresh. */
+export async function listInFlightOrders(): Promise<InFlightOrder[]> {
+  const rows = await prisma.order.findMany({
+    where: {
+      trackingProvider: 'coliix',
+      coliixTrackingId: { not: null },
+      shippingStatus: { in: NON_TERMINAL_STATUSES },
+    },
+    orderBy: [{ lastTrackedAt: 'asc' }, { labelSentAt: 'desc' }],
+    select: {
+      id: true,
+      reference: true,
+      shippingStatus: true,
+      coliixTrackingId: true,
+      lastTrackedAt: true,
+      labelSentAt: true,
+      customer: { select: { fullName: true, city: true } },
+    },
+  });
+  return rows.map((r) => ({
+    orderId: r.id,
+    reference: r.reference,
+    customerName: r.customer.fullName,
+    city: r.customer.city,
+    shippingStatus: r.shippingStatus,
+    coliixTrackingId: r.coliixTrackingId!,
+    lastTrackedAt: r.lastTrackedAt,
+    labelSentAt: r.labelSentAt,
+  }));
+}
+
+export interface TrackNowResult {
+  ok: boolean;
+  orderId: string;
+  reference: string;
+  tracking: string;
+  prevStatus: ShippingStatus;
+  // What Coliix said this minute.
+  coliix: {
+    currentState: string;       // raw text Coliix returned
+    events: ColiixTrackEvent[]; // full history they expose
+  } | null;
+  // What the mapping produced and whether the order was updated.
+  mapped: ShippingStatus | null;
+  changed: boolean;
+  newStatus?: ShippingStatus;
+  error?: string;
+  reason?: string;
+}
+
+/**
+ * Run the same track→ingest pipeline the background poller uses, but on
+ * demand and with the raw Coliix response returned for inspection. Use this
+ * to test the status mapping or to force-refresh a single order without
+ * waiting for the next poller tick.
+ */
+export async function trackOrderNow(orderId: string): Promise<TrackNowResult> {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: {
+      id: true,
+      reference: true,
+      shippingStatus: true,
+      coliixTrackingId: true,
+      trackingProvider: true,
+    },
+  });
+  if (!order) {
+    return {
+      ok: false,
+      orderId,
+      reference: '?',
+      tracking: '',
+      prevStatus: 'not_shipped',
+      coliix: null,
+      mapped: null,
+      changed: false,
+      error: 'Order not found',
+    };
+  }
+  if (order.trackingProvider !== 'coliix' || !order.coliixTrackingId) {
+    return {
+      ok: false,
+      orderId: order.id,
+      reference: order.reference,
+      tracking: order.coliixTrackingId ?? '',
+      prevStatus: order.shippingStatus,
+      coliix: null,
+      mapped: null,
+      changed: false,
+      error: 'Order has no Coliix tracking code',
+    };
+  }
+
+  try {
+    const track = await trackParcel(order.coliixTrackingId);
+    const ingest = await ingestStatus({
+      tracking: order.coliixTrackingId,
+      rawState: track.currentState,
+      driverNote: track.events[0]?.driverNote ?? null,
+      eventDate: track.events[0]?.date ? new Date(track.events[0].date) : null,
+      source: 'poller',
+    });
+    return {
+      ok: true,
+      orderId: order.id,
+      reference: order.reference,
+      tracking: order.coliixTrackingId,
+      prevStatus: order.shippingStatus,
+      coliix: { currentState: track.currentState, events: track.events },
+      mapped: ingest.newStatus ?? mapColiixState(track.currentState),
+      changed: ingest.changed,
+      newStatus: ingest.newStatus,
+      reason: ingest.reason,
+    };
+  } catch (err) {
+    const message =
+      err instanceof ColiixError ? err.message : err instanceof Error ? err.message : String(err);
+    return {
+      ok: false,
+      orderId: order.id,
+      reference: order.reference,
+      tracking: order.coliixTrackingId,
+      prevStatus: order.shippingStatus,
+      coliix: null,
+      mapped: null,
+      changed: false,
+      error: message,
+    };
+  }
+}
+
+export interface RefreshAllResult {
+  total: number;
+  changed: number;
+  unchanged: number;
+  failed: number;
+  results: TrackNowResult[];
+}
+
+/**
+ * Refresh every in-flight order in one shot — same pipeline as the poller,
+ * sequential to stay polite to Coliix. Useful as a manual "kick" after
+ * webhooks have been silent for a while.
+ */
+export async function refreshAllInFlight(): Promise<RefreshAllResult> {
+  const inFlight = await listInFlightOrders();
+  const results: TrackNowResult[] = [];
+  for (const o of inFlight) {
+    results.push(await trackOrderNow(o.orderId));
+  }
+  return {
+    total: results.length,
+    changed: results.filter((r) => r.changed).length,
+    unchanged: results.filter((r) => r.ok && !r.changed).length,
+    failed: results.filter((r) => !r.ok).length,
+    results,
   };
 }
