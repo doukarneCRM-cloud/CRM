@@ -24,7 +24,9 @@ export const ImportProductsSchema = z.object({
 export type ImportProductsInput = z.infer<typeof ImportProductsSchema>;
 
 export const ImportOrdersSchema = z.object({
-  count: z.number().int().min(1).max(500).optional(), // if empty → import all
+  // Upper bound is generous (10k) so admins can pull a full backlog in one
+  // call when seeding a new install. Empty/undefined → import all.
+  count: z.number().int().min(1).max(10_000).optional(),
 });
 export type ImportOrdersInput = z.infer<typeof ImportOrdersSchema>;
 

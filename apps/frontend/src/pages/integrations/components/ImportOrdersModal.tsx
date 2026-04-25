@@ -166,7 +166,7 @@ export function ImportOrdersModal({ storeId, open, onClose, onDone }: Props) {
                 <input
                   type="number"
                   min={1}
-                  max={500}
+                  max={10000}
                   value={customCount}
                   onChange={(e) => setCustomCount(e.target.value)}
                   placeholder={t('integrations.importOrders.customPlaceholder')}
