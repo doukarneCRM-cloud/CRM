@@ -78,8 +78,11 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
   const [mappingSaving, setMappingSaving] = useState(false);
   const [mappingError, setMappingError] = useState<string | null>(null);
 
-  // Step 2 — orders
-  const [orderChoice, setOrderChoice] = useState<number | 'all' | 'skip' | null>(null);
+  // Step 2 — orders. Default to 'skip' so a click-through never accidentally
+  // pulls the entire YouCan order history. The admin has to actively pick a
+  // preset to import past orders; new orders flow in via the auto-sync that
+  // gets enabled once the wizard finishes (see step='done' effect below).
+  const [orderChoice, setOrderChoice] = useState<number | 'all' | 'skip'>('skip');
   const [orderImporting, setOrderImporting] = useState(false);
   const [orderResult, setOrderResult] = useState<ImportResult | null>(null);
   const [orderError, setOrderError] = useState<string | null>(null);
@@ -98,6 +101,37 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
   const [productResult, setProductResult] = useState<ImportResult | null>(null);
   const [productError, setProductError] = useState<string | null>(null);
 
+  // ── Wizard finished → enable auto-sync ───────────────────────────────────
+  // Flips the store's `autoSyncEnabled` flag once the admin completes the
+  // wizard. From that moment the 15s background poller starts pulling any
+  // newly placed YouCan orders automatically — no further admin action
+  // needed. The flag is what gates `orderPoller.ts`; without this call a
+  // freshly linked store would stay silent forever unless someone manually
+  // toggled the switch in Configure or hit the Import Orders button.
+  // Webhook delivery (truly instant) still requires a public BACKEND_URL,
+  // but the poller is the safety net so "auto" is honored either way.
+  const autoSyncEnabledRef = useRef(false);
+  useEffect(() => {
+    if (step !== 'done' || !store) return;
+    if (autoSyncEnabledRef.current) return;
+    autoSyncEnabledRef.current = true;
+    integrationsApi
+      .updateStore(store.id, { autoSyncEnabled: true })
+      .then(() => onFinished())
+      .catch((e: any) => {
+        // Non-fatal — the wizard's "done" screen still shows. The admin can
+        // still flip the toggle manually from the Configure modal.
+        console.error('[onboarding] enable auto-sync failed:', e);
+      });
+  }, [step, store, onFinished]);
+
+  // Reset the auto-sync guard whenever the wizard reopens, so a re-link of
+  // the same store still re-asserts the flag (in case the admin had
+  // switched it off in the meantime).
+  useEffect(() => {
+    if (open) autoSyncEnabledRef.current = false;
+  }, [open]);
+
   // ── Reset on open ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!open || !store) return;
@@ -106,7 +140,7 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
     setFields(null);
     setFieldsError(null);
     setMappingError(null);
-    setOrderChoice(null);
+    setOrderChoice('skip');
     setOrderResult(null);
     setOrderError(null);
     setProductChoice(null);
@@ -159,7 +193,7 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
 
   // ── Step 2: import orders ────────────────────────────────────────────────
   const handleImportOrders = async () => {
-    if (!store || orderChoice === null) return;
+    if (!store) return;
     if (orderChoice === 'skip') {
       setStep('products');
       return;
@@ -436,7 +470,6 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
                     variant="primary"
                     size="sm"
                     leftIcon={orderChoice === 'skip' ? <ChevronRight size={12} /> : <Download size={12} />}
-                    disabled={orderChoice === null}
                     loading={orderImporting}
                     onClick={handleImportOrders}
                   >

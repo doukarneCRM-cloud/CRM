@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Link2, Unlink, Power, Trash2, Package, ShoppingCart,
   AlertCircle, CheckCircle2, Clock, Settings2, Wand2, Loader2,
+  Zap, Timer,
 } from 'lucide-react';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { cn } from '@/lib/cn';
@@ -67,7 +68,7 @@ export function StoreCard({
             )}
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
           <span className={cn(
             'inline-flex items-center gap-1 rounded-badge px-2 py-0.5 text-[10px] font-semibold',
             store.isConnected
@@ -80,6 +81,38 @@ export function StoreCard({
               <><AlertCircle size={9} /> {t('integrations.storeCard.disconnected')}</>
             )}
           </span>
+          {/* Real-time delivery indicator. Green = YouCan webhook is live and
+              orders arrive within ~1s. Amber = no webhook (either subscription
+              failed at OAuth time or the backend wasn't publicly reachable);
+              the 15s background poller is the safety net while auto-sync is
+              on. Hidden when the store isn't connected at all. */}
+          {store.isConnected && (
+            <span
+              className={cn(
+                'inline-flex items-center gap-1 rounded-badge px-2 py-0.5 text-[10px] font-semibold',
+                store.webhookId
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : store.autoSyncEnabled
+                    ? 'bg-amber-50 text-amber-700'
+                    : 'bg-gray-100 text-gray-500',
+              )}
+              title={
+                store.webhookId
+                  ? t('integrations.storeCard.realtimeOnTitle')
+                  : store.autoSyncEnabled
+                    ? t('integrations.storeCard.pollingTitle')
+                    : t('integrations.storeCard.manualTitle')
+              }
+            >
+              {store.webhookId ? (
+                <><Zap size={9} /> {t('integrations.storeCard.realtimeOn')}</>
+              ) : store.autoSyncEnabled ? (
+                <><Timer size={9} /> {t('integrations.storeCard.polling')}</>
+              ) : (
+                <><Clock size={9} /> {t('integrations.storeCard.manual')}</>
+              )}
+            </span>
+          )}
           {!store.isActive && (
             <span className="inline-flex items-center gap-1 rounded-badge bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-600">
               {t('integrations.storeCard.storeDisabled')}

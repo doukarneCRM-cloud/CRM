@@ -36,6 +36,8 @@ export async function listStores() {
       slug: true,
       isActive: true,
       isConnected: true,
+      autoSyncEnabled: true,
+      webhookId: true,
       lastSyncAt: true,
       lastError: true,
       fieldMapping: true,
@@ -108,16 +110,32 @@ export async function handleOAuthCallback(storeId: string, code: string) {
   await exchangeCode(storeId, code);
   await logImport(storeId, 'connection', 'info', 'Store connected via OAuth');
 
-  // Auto-subscribe webhook for order.create
+  // Re-link case — clean up the previous resthook on YouCan's side so we
+  // don't leave orphan subscriptions every time the admin re-links. Best
+  // effort: a stale id is harmless beyond a single warning entry, so we
+  // never block the new subscribe on this.
+  const prior = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: { webhookId: true },
+  });
+  if (prior?.webhookId) {
+    try { await unsubscribeWebhook(storeId, prior.webhookId); } catch { /* best effort */ }
+    // Clear the stale id immediately so the UI's real-time badge doesn't
+    // show green during the brief window before the new subscribe lands —
+    // and so a failed subscribe leaves the row in the correct (off) state.
+    await prisma.store.update({ where: { id: storeId }, data: { webhookId: null } });
+  }
+
+  // Auto-subscribe webhook for order.create.
   try {
     const baseUrl = process.env.BACKEND_URL ?? `http://localhost:${process.env.PORT ?? 3001}`;
     const targetUrl = `${baseUrl}/api/v1/integrations/youcan/webhook/${storeId}`;
     const webhookId = await subscribeWebhook(storeId, 'order.create', targetUrl);
     await prisma.store.update({ where: { id: storeId }, data: { webhookId } });
-    await logImport(storeId, 'connection', 'info', 'Webhook subscribed for order.create');
+    await logImport(storeId, 'connection', 'info', `Webhook subscribed for order.create → ${targetUrl}`);
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Unknown error';
-    await logImport(storeId, 'connection', 'warning', `Webhook subscription failed: ${msg}. Orders won't sync in real-time.`);
+    await logImport(storeId, 'connection', 'warning', `Webhook subscription failed: ${msg}. Orders won't sync in real-time — falling back to 15s polling.`);
   }
 }
 

@@ -425,7 +425,20 @@ export async function subscribeWebhook(storeId: string, event: string, targetUrl
     body: JSON.stringify({ event, target_url: targetUrl }),
   });
   const body = (await res.json()) as Record<string, any>;
-  return body.data?.id ?? body.id ?? '';
+  const id = body.data?.id ?? body.id ?? '';
+  // YouCan should always echo the subscription id on success. If it doesn't,
+  // treat the call as failed — otherwise we'd persist `webhookId = ''` on the
+  // store row, which the UI's real-time badge would mis-read as "registered"
+  // and the admin would never know to re-link. Failing loudly keeps the
+  // OAuth-callback log explicit and routes the store onto the polling
+  // fallback until the issue is fixed.
+  if (!id) {
+    throw new YoucanError(
+      'Webhook subscription returned no id — instant delivery not active',
+      'WEBHOOK_SUBSCRIBE_FAILED',
+    );
+  }
+  return id;
 }
 
 export async function unsubscribeWebhook(storeId: string, webhookId: string): Promise<void> {
