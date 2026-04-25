@@ -120,8 +120,24 @@ export function useOrderNotifications() {
     };
 
     const handleNotification = (payload: NotificationNewPayload) => {
-      if (payload.kind !== 'order_new') return;
       if (!isAdmin) return;
+
+      // Webhook auto-import failure — surface immediately so the team can
+      // investigate before more orders pile up. Dedupe by notification id
+      // since `orderId` is null for these (the order never got created).
+      if (payload.kind === 'integration_error') {
+        if (withinDedupe(recentNewOrder, payload.id)) return;
+        playNotificationSound('assignment');
+        pushToast({
+          kind: 'error',
+          title: payload.title,
+          body: payload.body ?? undefined,
+          href: payload.href ?? '/integrations',
+        });
+        return;
+      }
+
+      if (payload.kind !== 'order_new') return;
       const dedupeKey = payload.orderId ?? payload.id;
       if (withinDedupe(recentNewOrder, dedupeKey)) return;
 

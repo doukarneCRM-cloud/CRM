@@ -1,7 +1,11 @@
 import { prisma } from '../../shared/prisma';
 import { emitToUser } from '../../shared/socket';
 
-export type NotificationKind = 'order_assigned' | 'order_confirmed' | 'order_new';
+export type NotificationKind =
+  | 'order_assigned'
+  | 'order_confirmed'
+  | 'order_new'
+  | 'integration_error';
 
 export interface CreateNotificationInput {
   userId: string;

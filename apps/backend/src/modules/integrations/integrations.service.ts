@@ -1065,6 +1065,15 @@ export async function processWebhookOrder(storeId: string, payload: YoucanOrder)
       `Failed to import order ${payload.ref} via webhook: ${msg}`,
       { error: msg, orderRef: payload.ref },
     );
+    // Surface the failure live — admins/supervisors get a bell + toast
+    // pointing at the integrations page so they can investigate before
+    // more orders arrive and fail for the same reason.
+    void createAdminNotification({
+      kind: 'integration_error',
+      title: `YouCan auto-import failed (${store.name})`,
+      body: `Order ${payload.ref}: ${msg}`,
+      href: '/integrations',
+    });
   }
 }
 
