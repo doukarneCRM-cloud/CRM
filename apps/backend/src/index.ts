@@ -29,6 +29,7 @@ import { listProvidersPublic } from './modules/integrations/providers.service';
 import { startColiixTracker } from './modules/integrations/coliixTracker';
 import { shippingCitiesRoutes } from './modules/shippingCities/shippingCities.routes';
 import { shippingStatusGroupsRoutes } from './modules/shippingStatusGroups/shippingStatusGroups.routes';
+import { broadcastsRoutes } from './modules/broadcasts/broadcasts.routes';
 import { atelieRoutes } from './modules/atelie/atelie.routes';
 import { atelieStockRoutes } from './modules/atelieStock/atelieStock.routes';
 import { fabricRoutes } from './modules/atelieStock/fabric.routes';
@@ -383,6 +384,7 @@ app.get('/api/v1/kpi/dashboard', { preHandler: [verifyJWT] }, async (request, re
 // legacy `/shipping-cities` callers keep working unchanged.
 app.register(shippingCitiesRoutes, { prefix: '/api/v1/shipping-cities' });
 app.register(shippingStatusGroupsRoutes, { prefix: '/api/v1/shipping-status-groups' });
+app.register(broadcastsRoutes, { prefix: '/api/v1/broadcasts' });
 
 // Atelie — Employees, Attendance, Salary (Phase 14.A)
 app.register(atelieRoutes, { prefix: '/api/v1/atelie' });

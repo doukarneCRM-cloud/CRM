@@ -20,6 +20,7 @@ import ClientsPage from '@/pages/clients/ClientsPage';
 import AgentsPage from '@/pages/team/AgentsPage';
 import RolesPage from '@/pages/team/RolesPage';
 import AssignmentPage from '@/pages/team/AssignmentPage';
+import BroadcastsPage from '@/pages/team/BroadcastsPage';
 import AnalyticsPage from '@/pages/analytics/AnalyticsPage';
 import MoneyPage from '@/pages/money/MoneyPage';
 import ReturnsPage from '@/pages/returns/ReturnsPage';
@@ -138,6 +139,15 @@ export default function App() {
             element={
               <PermissionGuard requires={PERMISSIONS.TEAM_VIEW}>
                 <AssignmentPage />
+              </PermissionGuard>
+            }
+          />
+
+          <Route
+            path={ROUTES.TEAM_BROADCASTS}
+            element={
+              <PermissionGuard requires={PERMISSIONS.BROADCASTS_MANAGE}>
+                <BroadcastsPage />
               </PermissionGuard>
             }
           />

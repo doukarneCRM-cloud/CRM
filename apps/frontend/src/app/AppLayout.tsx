@@ -6,6 +6,7 @@ import { useSocket } from '@/hooks/useSocket';
 import { useOrderNotifications } from '@/hooks/useOrderNotifications';
 import { unlockAudioOnFirstGesture } from '@/utils/sound';
 import { Toaster } from '@/components/ui/Toaster';
+import { BroadcastPopupGate } from '@/components/broadcasts/BroadcastPopupGate';
 import { authService } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 
@@ -53,6 +54,7 @@ export default function AppLayout() {
         </main>
       </div>
       <Toaster />
+      <BroadcastPopupGate />
     </div>
   );
 }

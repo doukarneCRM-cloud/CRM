@@ -7,6 +7,7 @@ import { CallCenterTable } from './components/CallCenterTable';
 import { CallCenterOrderModal } from './components/CallCenterOrderModal';
 import { useCallCenterStore } from './callCenterStore';
 import { OrderCreateModal } from '../orders/components/OrderCreateModal';
+import { BroadcastTopBar } from '@/components/broadcasts/BroadcastTopBar';
 
 export default function CallCenterPage() {
   const { t } = useTranslation();
@@ -23,6 +24,8 @@ export default function CallCenterPage() {
           {t('callCenter.subtitle')}
         </p>
       </header>
+
+      <BroadcastTopBar />
 
       <AgentKpiCards />
 

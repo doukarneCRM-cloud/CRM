@@ -22,6 +22,7 @@ export const ROUTES = {
   TEAM_AGENTS: '/team/agents',
   TEAM_ROLES: '/team/roles',
   TEAM_ASSIGNMENT: '/team/assignment',
+  TEAM_BROADCASTS: '/team/broadcasts',
 
   // Analytics
   ANALYTICS: '/analytics',

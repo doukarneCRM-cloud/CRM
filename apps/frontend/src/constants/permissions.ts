@@ -82,6 +82,9 @@ export const PERMISSIONS = {
   AUTOMATION_MONITOR: 'automation:monitor',
   WHATSAPP_VIEW: 'whatsapp:view',
   WHATSAPP_CONNECT: 'whatsapp:connect',
+
+  // Broadcasts (admin push notifications)
+  BROADCASTS_MANAGE: 'broadcasts:manage',
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

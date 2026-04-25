@@ -131,6 +131,8 @@ model User {
   assignedThreads     WhatsAppThread[]    @relation("ThreadAssignee")
   whatsappMessages    WhatsAppMessage[]   @relation("MessageAuthor")
   createdStatusGroups ShippingStatusGroup[] @relation("StatusGroupAuthor")
+  broadcastsAuthored  Broadcast[]           @relation("BroadcastAuthor")
+  broadcastsReceived  BroadcastRecipient[]  @relation("BroadcastTarget")
 }
 
 model RefreshToken {
@@ -1085,4 +1087,53 @@ model ShippingStatusGroup {
   createdBy   User?    @relation("StatusGroupAuthor", fields: [createdById], references: [id])
 
   @@index([position])
+}
+
+// ─── Broadcasts (admin push notifications) ──────────────────────────────────
+
+// Admin-pushed announcements aimed at one or more agents. Two kinds:
+//  - POPUP: blocking modal that re-shows on every page load until the agent
+//    clicks OK. The OK click counts as "read" and the popup never returns
+//    for that agent.
+//  - BAR: sticky banner at the top of the Call Center page. Agents cannot
+//    dismiss; only the admin can flip `isActive` to false to retire it.
+// Each broadcast can carry text + optional image + optional clickable link.
+// Per-recipient rows track delivery / acknowledgement / link clicks so the
+// admin can audit who actually saw the message.
+enum BroadcastKind {
+  POPUP
+  BAR
+}
+
+model Broadcast {
+  id            String        @id @default(cuid())
+  kind          BroadcastKind
+  title         String
+  body          String?
+  imageUrl      String?
+  linkUrl       String?
+  isActive      Boolean       @default(true)
+  createdById   String
+  createdBy     User          @relation("BroadcastAuthor", fields: [createdById], references: [id])
+  createdAt     DateTime      @default(now())
+  deactivatedAt DateTime?
+
+  recipients BroadcastRecipient[]
+
+  @@index([kind, isActive, createdAt])
+}
+
+model BroadcastRecipient {
+  id          String    @id @default(cuid())
+  broadcastId String
+  broadcast   Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation("BroadcastTarget", fields: [userId], references: [id], onDelete: Cascade)
+  deliveredAt DateTime?
+  ackedAt     DateTime?
+  clickedAt   DateTime?
+  clickCount  Int       @default(0)
+
+  @@unique([broadcastId, userId])
+  @@index([userId, ackedAt])
 }

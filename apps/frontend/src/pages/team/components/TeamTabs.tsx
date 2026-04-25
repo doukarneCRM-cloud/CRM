@@ -1,15 +1,23 @@
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Users as UsersIcon, Shield, GitBranch } from 'lucide-react';
+import { Users as UsersIcon, Shield, GitBranch, Megaphone } from 'lucide-react';
 import { ROUTES } from '@/constants/routes';
+import { PERMISSIONS } from '@/constants/permissions';
+import { useAuthStore } from '@/store/authStore';
 import { cn } from '@/lib/cn';
 
 export function TeamTabs() {
   const { t } = useTranslation();
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const canManageBroadcasts = hasPermission(PERMISSIONS.BROADCASTS_MANAGE);
+
   const tabs = [
     { to: ROUTES.TEAM_AGENTS,     label: t('team.tabs.agents'),     icon: UsersIcon },
     { to: ROUTES.TEAM_ROLES,      label: t('team.tabs.roles'),      icon: Shield    },
     { to: ROUTES.TEAM_ASSIGNMENT, label: t('team.tabs.assignment'), icon: GitBranch },
+    ...(canManageBroadcasts
+      ? [{ to: ROUTES.TEAM_BROADCASTS, label: t('team.tabs.broadcasts'), icon: Megaphone }]
+      : []),
   ];
 
   return (
