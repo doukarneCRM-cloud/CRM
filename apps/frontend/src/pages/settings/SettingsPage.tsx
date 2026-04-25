@@ -34,6 +34,7 @@ export default function SettingsPage() {
   const [resetOpen, setResetOpen] = useState(false);
   const [resetCode, setResetCode] = useState('');
   const [resetSubmitting, setResetSubmitting] = useState(false);
+  const [wipeOtherUsers, setWipeOtherUsers] = useState(false);
   const [expectedCode, setExpectedCode] = useState<string | null>(null);
   const codeMatches = expectedCode !== null && resetCode === expectedCode;
   const canResetCRM = hasPermission('settings:reset_crm');
@@ -44,6 +45,7 @@ export default function SettingsPage() {
     try {
       await api.post('/admin/reset-crm', {
         confirmationCode: resetCode,
+        wipeOtherUsers,
       });
       pushToast({
         kind: 'confirmed',
@@ -73,6 +75,7 @@ export default function SettingsPage() {
     if (resetSubmitting) return;
     setResetOpen(false);
     setResetCode('');
+    setWipeOtherUsers(false);
   }
 
   // Fetch the expected code from the backend once the modal opens. Failing
@@ -306,6 +309,20 @@ export default function SettingsPage() {
                 : undefined
             }
           />
+
+          <label className="mt-1 flex items-start gap-2 rounded-card border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+            <input
+              type="checkbox"
+              checked={wipeOtherUsers}
+              onChange={(e) => setWipeOtherUsers(e.target.checked)}
+              disabled={resetSubmitting}
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-amber-400 text-red-600 focus:ring-red-500"
+            />
+            <span className="leading-snug">
+              <span className="font-semibold">{t('settings.danger.wipeUsersLabel')}</span>{' '}
+              {t('settings.danger.wipeUsersHint')}
+            </span>
+          </label>
         </div>
       </GlassModal>
     </div>

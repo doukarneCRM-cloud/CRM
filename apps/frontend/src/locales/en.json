@@ -2712,6 +2712,8 @@
       "loadingCode": "loading…",
       "confirmPlaceholder": "Type the confirmation code",
       "codeMismatch": "Code does not match",
+      "wipeUsersLabel": "Also delete every other user.",
+      "wipeUsersHint": "Removes every account except yours so you can rebuild the team from scratch. Your own login stays active.",
       "cancel": "Cancel",
       "resetEverything": "Reset everything",
       "resetting": "Resetting…",
