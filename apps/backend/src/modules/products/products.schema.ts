@@ -35,10 +35,18 @@ export const MeasurementsSchema = z
 export const CreateProductSchema = z.object({
   name: z.string().min(2).max(120),
   sku: z.string().min(1).max(80),
-  description: z.string().max(1000).nullable().optional(),
+  // YouCan-imported products arrive with rich HTML descriptions (multiple
+  // <p>, <strong>, &nbsp; entities, sometimes inline imgs) that easily blow
+  // past 1k. The DB column is String? / Postgres TEXT, so the cap is purely
+  // a guard against abuse — 50k is generous for legitimate marketing copy
+  // while still bounded.
+  description: z.string().max(50_000).nullable().optional(),
   imageUrl: z
     .string()
-    .max(500)
+    // CDN URLs with cache-busting query params (?v=, ?w=…&h=…&fit=…) can
+    // legitimately push past the previous 500-char cap, especially for
+    // YouCan / R2 signed URLs.
+    .max(2000)
     .regex(/^(https?:\/\/|\/uploads\/)/, 'imageUrl must be an absolute URL or /uploads path')
     .nullable()
     .optional(),
@@ -51,10 +59,18 @@ export const CreateProductSchema = z.object({
 export const UpdateProductSchema = z.object({
   name: z.string().min(2).max(120).optional(),
   sku: z.string().min(1).max(80).optional(),
-  description: z.string().max(1000).nullable().optional(),
+  // YouCan-imported products arrive with rich HTML descriptions (multiple
+  // <p>, <strong>, &nbsp; entities, sometimes inline imgs) that easily blow
+  // past 1k. The DB column is String? / Postgres TEXT, so the cap is purely
+  // a guard against abuse — 50k is generous for legitimate marketing copy
+  // while still bounded.
+  description: z.string().max(50_000).nullable().optional(),
   imageUrl: z
     .string()
-    .max(500)
+    // CDN URLs with cache-busting query params (?v=, ?w=…&h=…&fit=…) can
+    // legitimately push past the previous 500-char cap, especially for
+    // YouCan / R2 signed URLs.
+    .max(2000)
     .regex(/^(https?:\/\/|\/uploads\/)/, 'imageUrl must be an absolute URL or /uploads path')
     .nullable()
     .optional(),
