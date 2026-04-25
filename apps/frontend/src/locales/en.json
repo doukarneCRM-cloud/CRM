@@ -909,6 +909,17 @@
         "byProduct": "By product",
         "byProductHelp": "Falls back to round-robin until product → agent mapping is configured."
       },
+      "eligible": {
+        "title": "Eligible agents",
+        "subtitle": "Pick which agents take part in the rotation. Anyone unchecked will not be auto-assigned, even if they hold the confirmation:view permission.",
+        "selectAll": "Allow everyone",
+        "lockCurrent": "Lock to current list",
+        "empty": "No agents have the confirmation:view permission yet. Grant it to a role on the Roles tab and they'll appear here.",
+        "userInactive": "Inactive",
+        "statusAll": "All {{count}} agents are eligible (default).",
+        "statusCount": "{{count}} of {{total}} agents selected.",
+        "warnNone": "No agent is selected — auto-assignment will fall through and orders will stay unassigned. Pick at least one agent or enable everyone."
+      },
       "bounce": {
         "title": "Bounce count",
         "subtitle": "How many orders each agent receives before the rotation moves on."

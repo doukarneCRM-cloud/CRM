@@ -909,6 +909,17 @@
         "byProduct": "Par produit",
         "byProductHelp": "Revient au tour de rôle tant qu'aucun mappage produit → agent n'est configuré."
       },
+      "eligible": {
+        "title": "Agents éligibles",
+        "subtitle": "Choisissez les agents qui participent à la rotation. Les agents décochés ne recevront aucune commande automatique, même s'ils ont la permission confirmation:view.",
+        "selectAll": "Autoriser tout le monde",
+        "lockCurrent": "Verrouiller la liste actuelle",
+        "empty": "Aucun agent n'a encore la permission confirmation:view. Attribuez-la à un rôle dans l'onglet Rôles et ils apparaîtront ici.",
+        "userInactive": "Inactif",
+        "statusAll": "Les {{count}} agents sont éligibles (défaut).",
+        "statusCount": "{{count}} sur {{total}} agents sélectionnés.",
+        "warnNone": "Aucun agent sélectionné — l'auto-assignation échouera et les commandes resteront non attribuées. Sélectionnez au moins un agent ou activez tout le monde."
+      },
       "bounce": {
         "title": "Nombre par agent",
         "subtitle": "Nombre de commandes reçues par un agent avant que la rotation n'avance."

@@ -93,3 +93,8 @@ export async function updateAssignmentRule(request: FastifyRequest, reply: Fasti
   const rule = await svc.updateAssignmentRule(input);
   return reply.send(rule);
 }
+
+export async function listAssignmentCandidates(_request: FastifyRequest, reply: FastifyReply) {
+  const data = await svc.listAssignmentCandidates();
+  return reply.send({ data });
+}

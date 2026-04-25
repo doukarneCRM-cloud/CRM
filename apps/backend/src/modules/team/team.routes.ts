@@ -70,4 +70,14 @@ export async function teamRoutes(app: FastifyInstance) {
     { preHandler: [verifyJWT, requirePermission('team:manage_roles')] },
     ctrl.updateAssignmentRule,
   );
+
+  // Candidate pool the picker on the assignment-rules page renders. These
+  // are the users that hold confirmation:view — i.e. the maximum set the
+  // round-robin can ever rotate through. The rule's `eligibleAgentIds`
+  // narrows this further; an empty allowlist means "all of these".
+  app.get(
+    '/assignment-rules/candidates',
+    { preHandler: [verifyJWT, requirePermission('team:view')] },
+    ctrl.listAssignmentCandidates,
+  );
 }

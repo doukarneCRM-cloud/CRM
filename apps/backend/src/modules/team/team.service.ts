@@ -412,9 +412,10 @@ export async function payoutAgentCommission(agentId: string) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ASSIGN_KEYS = {
-  isActive:    'assignment.isActive',
-  strategy:    'assignment.strategy',
-  bounceCount: 'assignment.bounceCount',
+  isActive:         'assignment.isActive',
+  strategy:         'assignment.strategy',
+  bounceCount:      'assignment.bounceCount',
+  eligibleAgentIds: 'assignment.eligibleAgentIds',
 } as const;
 
 const ASSIGN_DEFAULTS = {
@@ -427,6 +428,22 @@ export interface AssignmentRuleState {
   isActive: boolean;
   strategy: 'round_robin' | 'by_product';
   bounceCount: number;
+  // Allowlist of user ids that participate in the rotation. Empty array =
+  // "everyone with confirmation:view" (back-compat). The autoAssign and
+  // simulator both intersect this with the live permission pool, so a
+  // listed-then-deactivated user is silently skipped.
+  eligibleAgentIds: string[];
+}
+
+function parseEligibleAgentIds(raw: string | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const v = JSON.parse(raw);
+    if (!Array.isArray(v)) return [];
+    return v.filter((x): x is string => typeof x === 'string' && x.length > 0);
+  } catch {
+    return [];
+  }
 }
 
 export async function getAssignmentRule(): Promise<AssignmentRuleState> {
@@ -443,6 +460,7 @@ export async function getAssignmentRule(): Promise<AssignmentRuleState> {
     isActive: (map.get(ASSIGN_KEYS.isActive) ?? String(ASSIGN_DEFAULTS.isActive)) === 'true',
     strategy,
     bounceCount: Number(map.get(ASSIGN_KEYS.bounceCount) ?? ASSIGN_DEFAULTS.bounceCount),
+    eligibleAgentIds: parseEligibleAgentIds(map.get(ASSIGN_KEYS.eligibleAgentIds)),
   };
 }
 
@@ -477,7 +495,38 @@ export async function updateAssignmentRule(
       }),
     );
   }
+  if (input.eligibleAgentIds !== undefined) {
+    // Dedupe + drop empties so the stored value is canonical and the
+    // round-robin cursor lookup stays stable.
+    const cleaned = Array.from(new Set(input.eligibleAgentIds.filter((s) => s && s.length > 0)));
+    const value = JSON.stringify(cleaned);
+    writes.push(
+      prisma.setting.upsert({
+        where: { key: ASSIGN_KEYS.eligibleAgentIds },
+        update: { value },
+        create: { key: ASSIGN_KEYS.eligibleAgentIds, value },
+      }),
+    );
+  }
   if (writes.length) await prisma.$transaction(writes);
 
   return getAssignmentRule();
+}
+
+// Candidate pool for the picker: every user that holds the permission
+// required to actually receive auto-assigned orders. The picker UI shows
+// these names with a checkbox; the rule's `eligibleAgentIds` is a subset.
+// Returning the live pool means the UI naturally hides users whose role
+// changes (e.g. permission revoked) without the admin having to clean up
+// the allowlist by hand.
+export async function listAssignmentCandidates(): Promise<
+  Array<{ id: string; name: string; isActive: boolean }>
+> {
+  return prisma.user.findMany({
+    where: {
+      role: { permissions: { some: { permission: { key: 'confirmation:view' } } } },
+    },
+    select: { id: true, name: true, isActive: true },
+    orderBy: { name: 'asc' },
+  });
 }

@@ -78,6 +78,16 @@ export interface AssignmentRuleState {
   isActive: boolean;
   strategy: 'round_robin' | 'by_product';
   bounceCount: number;
+  // User ids opted into the rotation. Empty array = "everyone holding the
+  // confirmation:view permission" (back-compat). Send the full desired
+  // list on every patch — backend overwrites, doesn't merge.
+  eligibleAgentIds: string[];
+}
+
+export interface AssignmentCandidate {
+  id: string;
+  name: string;
+  isActive: boolean;
 }
 
 // ─── API ─────────────────────────────────────────────────────────────────────
@@ -125,4 +135,9 @@ export const teamApi = {
     api
       .get<{ count: number; sequence: string[] }>('/assignment-rules/simulate', { params: { count } })
       .then((r) => r.data),
+
+  listAssignmentCandidates: () =>
+    api
+      .get<{ data: AssignmentCandidate[] }>('/assignment-rules/candidates')
+      .then((r) => r.data.data),
 };

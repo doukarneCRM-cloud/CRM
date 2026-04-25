@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Play, Power, Shuffle, Package } from 'lucide-react';
+import { Play, Power, Shuffle, Package, Users, AlertTriangle } from 'lucide-react';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { useAuthStore } from '@/store/authStore';
 import { PERMISSIONS } from '@/constants/permissions';
 import {
   teamApi,
+  type AssignmentCandidate,
   type AssignmentRuleState,
   type CommissionRule,
   type TeamUser,
@@ -40,6 +41,7 @@ export default function AssignmentPage() {
 
   const [rule, setRule] = useState<AssignmentRuleState | null>(null);
   const [users, setUsers] = useState<TeamUser[]>([]);
+  const [candidates, setCandidates] = useState<AssignmentCandidate[]>([]);
   const [commission, setCommission] = useState<CommissionRule[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -51,14 +53,16 @@ export default function AssignmentPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [r, u, c] = await Promise.all([
+      const [r, u, c, cand] = await Promise.all([
         teamApi.getAssignmentRule(),
         teamApi.listUsers(),
         teamApi.listCommission(),
+        teamApi.listAssignmentCandidates(),
       ]);
       setRule(r);
       setUsers(u);
       setCommission(c);
+      setCandidates(cand);
     } finally {
       setLoading(false);
     }
@@ -182,6 +186,122 @@ export default function AssignmentPage() {
               );
             })}
           </div>
+        </section>
+
+        {/* Eligible agents picker */}
+        <section className="rounded-card border border-gray-100 bg-white p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">{t('team.assignment.eligible.title')}</h3>
+              <p className="mt-1 text-xs text-gray-500">
+                {t('team.assignment.eligible.subtitle')}
+              </p>
+            </div>
+            {canManage && candidates.length > 0 && (
+              <div className="flex items-center gap-2 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => patchRule({ eligibleAgentIds: [] })}
+                  disabled={saving}
+                  className="rounded-btn px-2 py-1 font-semibold text-primary hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {t('team.assignment.eligible.selectAll')}
+                </button>
+                <span className="text-gray-300">·</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    patchRule({ eligibleAgentIds: candidates.map((c) => c.id) })
+                  }
+                  disabled={saving}
+                  className="rounded-btn px-2 py-1 font-semibold text-gray-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {t('team.assignment.eligible.lockCurrent')}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {candidates.length === 0 ? (
+            <div className="mt-3 rounded-btn bg-gray-50 px-3 py-3 text-xs text-gray-500">
+              {t('team.assignment.eligible.empty')}
+            </div>
+          ) : (
+            <>
+              {(() => {
+                // Empty allowlist = "everyone with confirmation:view" (back-
+                // compat). Render all candidates as checked in that mode so
+                // the picker reflects the actual rotation.
+                const allowAll = rule.eligibleAgentIds.length === 0;
+                const selected = new Set(rule.eligibleAgentIds);
+                const isChecked = (id: string) => allowAll || selected.has(id);
+                const toggle = (id: string) => {
+                  const base = allowAll
+                    ? candidates.map((c) => c.id)
+                    : Array.from(selected);
+                  const next = base.includes(id)
+                    ? base.filter((x) => x !== id)
+                    : [...base, id];
+                  patchRule({ eligibleAgentIds: next });
+                };
+                const checkedCount = allowAll
+                  ? candidates.length
+                  : candidates.filter((c) => selected.has(c.id)).length;
+                const noneSelected = !allowAll && checkedCount === 0;
+
+                return (
+                  <>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      {candidates.map((c) => {
+                        const checked = isChecked(c.id);
+                        const inactive = !c.isActive;
+                        return (
+                          <label
+                            key={c.id}
+                            className={cn(
+                              'flex items-center gap-2 rounded-btn border px-3 py-2 transition-colors',
+                              checked
+                                ? 'border-primary/40 bg-accent/40'
+                                : 'border-gray-100 bg-white hover:border-gray-200',
+                              (!canManage || saving) && 'cursor-not-allowed opacity-70',
+                            )}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              disabled={!canManage || saving}
+                              onChange={() => canManage && toggle(c.id)}
+                              className="h-4 w-4 accent-primary"
+                            />
+                            <Users size={14} className="text-gray-400" />
+                            <span className="text-sm font-medium text-gray-900">{c.name}</span>
+                            {inactive && (
+                              <span className="ml-auto rounded-badge bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-500">
+                                {t('team.assignment.eligible.userInactive')}
+                              </span>
+                            )}
+                          </label>
+                        );
+                      })}
+                    </div>
+
+                    <p className="mt-2 text-[11px] text-gray-500">
+                      {allowAll
+                        ? t('team.assignment.eligible.statusAll', { count: candidates.length })
+                        : t('team.assignment.eligible.statusCount', { count: checkedCount, total: candidates.length })}
+                    </p>
+
+                    {noneSelected && (
+                      <div className="mt-3 flex items-start gap-2 rounded-btn bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+                        <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                        <span>{t('team.assignment.eligible.warnNone')}</span>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </>
+          )}
         </section>
 
         {/* Bounce count */}

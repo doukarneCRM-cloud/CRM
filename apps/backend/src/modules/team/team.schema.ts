@@ -59,6 +59,11 @@ export const UpdateAssignmentRuleSchema = z.object({
   isActive: z.boolean().optional(),
   strategy: AssignmentStrategy.optional(),
   bounceCount: z.number().int().min(1).max(20).optional(),
+  // Restrict the rotation to specific agents. Empty array = "everyone with
+  // confirmation:view permission" (back-compat with the original behavior
+  // before this picker existed). Send the full desired list on every patch
+  // — the backend overwrites, it does not merge.
+  eligibleAgentIds: z.array(z.string().min(1)).max(200).optional(),
 });
 
 // ─── Inferred ─────────────────────────────────────────────────────────────────

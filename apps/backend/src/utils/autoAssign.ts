@@ -50,12 +50,22 @@ interface Candidate {
 
 /**
  * Agents eligible for auto-assignment: active + online + hold the
- * confirmation:view permission. Fallback to active (offline ok) if nobody is
- * online — better to assign than drop orders on the floor.
+ * confirmation:view permission, AND (when the admin has narrowed the pool)
+ * present in the rule's `eligibleAgentIds` allowlist. Falls back to all
+ * active permission-holders if nobody is online — better to assign than to
+ * drop orders on the floor. The allowlist filter is applied to both
+ * branches so a stock manager who holds confirmation:view but is excluded
+ * from the rotation never receives an order, even when they're the only
+ * one online.
  */
-async function eligibleAgents(): Promise<Candidate[]> {
+async function eligibleAgents(allowlist: string[] = []): Promise<Candidate[]> {
+  const allowFilter = allowlist.length > 0
+    ? { id: { in: allowlist } }
+    : {};
+
   const online = await prisma.user.findMany({
     where: {
+      ...allowFilter,
       isActive: true,
       isOnline: true,
       role: { permissions: { some: { permission: { key: 'confirmation:view' } } } },
@@ -67,6 +77,7 @@ async function eligibleAgents(): Promise<Candidate[]> {
 
   return prisma.user.findMany({
     where: {
+      ...allowFilter,
       isActive: true,
       role: { permissions: { some: { permission: { key: 'confirmation:view' } } } },
     },
@@ -170,7 +181,7 @@ export async function autoAssign(orderId: string): Promise<AutoAssignResult> {
     });
     if (fresh?.agentId) return { assigned: false, reason: 'already assigned' };
 
-    const agents = await eligibleAgents();
+    const agents = await eligibleAgents(rule.eligibleAgentIds);
     if (agents.length === 0) return { assigned: false, reason: 'no eligible agents' };
 
     const picked = rule.strategy === 'by_product'
@@ -208,7 +219,7 @@ export async function autoAssign(orderId: string): Promise<AutoAssignResult> {
  */
 export async function simulateAssign(count: number): Promise<string[]> {
   const rule = await getAssignmentRule();
-  const agents = await eligibleAgents();
+  const agents = await eligibleAgents(rule.eligibleAgentIds);
   if (agents.length === 0) return [];
 
   const result: string[] = [];
