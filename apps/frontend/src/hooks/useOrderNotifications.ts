@@ -48,6 +48,7 @@ export function useOrderNotifications() {
   const pushToast = useToastStore((s) => s.push);
   const recentAssign = useRef<Map<string, number>>(new Map());
   const recentConfirm = useRef<Map<string, number>>(new Map());
+  const recentDelivered = useRef<Map<string, number>>(new Map());
   const recentNewOrder = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
@@ -63,10 +64,16 @@ export function useOrderNotifications() {
     const roleName = user.role.name.toLowerCase();
     const isAdmin = roleName === 'admin' || roleName === 'supervisor';
 
+    // Dedupe is only meant to catch the *same event arriving twice* (e.g.
+    // both a private-room echo and a broadcast hit on the same socket within
+    // a few hundred ms). 3000 ms was too long — legitimate, distinct
+    // notifications happening seconds apart on the same orderId would get
+    // dropped silently, which the call-center team felt as "toasts skipping".
+    // 800 ms is plenty to dedupe true echoes without eating real updates.
     const withinDedupe = (
       map: MutableRefObject<Map<string, number>>,
       orderId: string,
-      windowMs = 3000,
+      windowMs = 800,
     ) => {
       const bucket = map.current;
       const now = Date.now();
@@ -119,6 +126,26 @@ export function useOrderNotifications() {
       });
     };
 
+    const handleDelivered = (payload: ConfirmedPayload) => {
+      if (!isAdmin) return;
+      if (withinDedupe(recentDelivered, payload.orderId)) return;
+
+      // "Cha-ching" cue — celebratory two-bell synth designed to be
+      // recognizable from across the room when an order delivers.
+      playNotificationSound('delivered');
+
+      const ref = payload.reference ? ` #${payload.reference}` : '';
+      pushToast({
+        kind: 'delivered',
+        title: `Order delivered${ref}`,
+        body: [payload.customerName, payload.agentName ? `by ${payload.agentName}` : null]
+          .filter(Boolean)
+          .join(' · ') || undefined,
+        href: ROUTES.ORDERS,
+        product: payload.product ?? null,
+      });
+    };
+
     const handleNotification = (payload: NotificationNewPayload) => {
       if (!isAdmin) return;
 
@@ -154,10 +181,12 @@ export function useOrderNotifications() {
 
     socket.on('order:assigned', handleAssigned);
     socket.on('order:confirmed', handleConfirmed);
+    socket.on('order:delivered', handleDelivered);
     socket.on('notification:new', handleNotification);
     return () => {
       socket.off('order:assigned', handleAssigned);
       socket.off('order:confirmed', handleConfirmed);
+      socket.off('order:delivered', handleDelivered);
       socket.off('notification:new', handleNotification);
     };
   }, [isAuthenticated, user, pushToast]);

@@ -934,6 +934,27 @@ export async function updateOrderStatus(id: string, input: UpdateStatusInput, ac
     });
   }
 
+  // Cha-ching trigger for admin when an order transitions to delivered.
+  // Same shape as `order:confirmed` so the frontend hook can mirror its
+  // toast + sound logic without special-casing.
+  if (becomingDelivered) {
+    const deliveredProduct = await fetchOrderProductMeta(id);
+    emitToRoom('admin', 'order:delivered', {
+      orderId: id,
+      reference: order.reference,
+      customerName: order.customer.fullName,
+      agentName: order.agent?.name ?? actorName,
+      product: deliveredProduct,
+    });
+    void createAdminNotification({
+      kind: 'order_delivered',
+      title: `Order delivered #${order.reference}`,
+      body: `${order.customer.fullName} · ${order.agent?.name ?? actorName}`,
+      href: '/orders',
+      orderId: id,
+    });
+  }
+
   return updatedOrder ? withStockWarning(updatedOrder) : updatedOrder;
 }
 

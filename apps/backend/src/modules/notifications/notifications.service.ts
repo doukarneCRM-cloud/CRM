@@ -4,6 +4,7 @@ import { emitToUser } from '../../shared/socket';
 export type NotificationKind =
   | 'order_assigned'
   | 'order_confirmed'
+  | 'order_delivered'
   | 'order_new'
   | 'integration_error';
 

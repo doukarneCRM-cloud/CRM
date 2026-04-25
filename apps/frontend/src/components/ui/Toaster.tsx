@@ -9,12 +9,14 @@ import {
   X,
   ShoppingBag,
   Package,
+  PackageCheck,
 } from 'lucide-react';
 import { useToastStore, type Toast, type ToastKind } from '@/store/toastStore';
 
 const ICONS: Record<ToastKind, typeof CheckCircle2> = {
   assignment: UserPlus,
   confirmed: CheckCircle2,
+  delivered: PackageCheck,
   new_order: ShoppingBag,
   success: CheckCircle2,
   info: Info,
@@ -24,6 +26,7 @@ const ICONS: Record<ToastKind, typeof CheckCircle2> = {
 const ACCENTS: Record<ToastKind, { bar: string; icon: string; iconBg: string }> = {
   assignment: { bar: 'bg-amber-500', icon: 'text-amber-600', iconBg: 'bg-amber-50' },
   confirmed:  { bar: 'bg-emerald-500', icon: 'text-emerald-600', iconBg: 'bg-emerald-50' },
+  delivered:  { bar: 'bg-emerald-600', icon: 'text-emerald-700', iconBg: 'bg-emerald-100' },
   new_order:  { bar: 'bg-sky-500', icon: 'text-sky-600', iconBg: 'bg-sky-50' },
   success:    { bar: 'bg-emerald-500', icon: 'text-emerald-600', iconBg: 'bg-emerald-50' },
   info:       { bar: 'bg-sky-500', icon: 'text-sky-600', iconBg: 'bg-sky-50' },

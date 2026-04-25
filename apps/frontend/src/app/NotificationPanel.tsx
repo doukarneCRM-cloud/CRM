@@ -9,6 +9,7 @@ import {
   Inbox,
   ShoppingBag,
   Package,
+  PackageCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/store/authStore';
@@ -24,12 +25,14 @@ import type { TFunction } from 'i18next';
 const KIND_ICON: Record<NotificationKind, typeof Bell> = {
   order_assigned: UserPlus,
   order_confirmed: CheckCircle2,
+  order_delivered: PackageCheck,
   order_new: ShoppingBag,
 };
 
 const KIND_ACCENT: Record<NotificationKind, string> = {
   order_assigned: 'bg-amber-100 text-amber-700',
   order_confirmed: 'bg-emerald-100 text-emerald-700',
+  order_delivered: 'bg-emerald-200 text-emerald-800',
   order_new: 'bg-sky-100 text-sky-700',
 };
 

@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 
-export type ToastKind = 'assignment' | 'confirmed' | 'new_order' | 'info' | 'success' | 'error';
+export type ToastKind =
+  | 'assignment'
+  | 'confirmed'
+  | 'delivered'
+  | 'new_order'
+  | 'info'
+  | 'success'
+  | 'error';
 
 export interface ToastProductMeta {
   name: string;
@@ -40,7 +47,10 @@ function readEnabled(): boolean {
   }
 }
 
-const MAX_TOASTS = 4;
+// Higher cap so a burst of "order delivered" toasts during a daily Coliix
+// dump doesn't silently swallow newer ones. Old toasts still drop off when
+// the cap is hit, but the window before that happens is bigger.
+const MAX_TOASTS = 8;
 const DEFAULT_DURATION = 5000;
 
 export const useToastStore = create<ToastState>((set, get) => ({

@@ -1,6 +1,10 @@
 import { api } from './api';
 
-export type NotificationKind = 'order_assigned' | 'order_confirmed' | 'order_new';
+export type NotificationKind =
+  | 'order_assigned'
+  | 'order_confirmed'
+  | 'order_delivered'
+  | 'order_new';
 
 export interface NotificationProductMeta {
   name: string;
