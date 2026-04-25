@@ -14,6 +14,7 @@ import {
   type ImportResult,
 } from '@/services/integrationsApi';
 import { cn } from '@/lib/cn';
+import { useToastStore } from '@/store/toastStore';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -40,6 +41,7 @@ const CRM_FIELD_KEYS = ['name', 'phone', 'city', 'address'] as const;
 
 export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
   const { t } = useTranslation();
+  const pushToast = useToastStore((s) => s.push);
   const [step, setStep] = useState<StepKey>('mapping');
 
   const STEPS = useMemo(
@@ -168,8 +170,28 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
       const count = orderChoice === 'all' ? undefined : orderChoice;
       const r = await integrationsApi.importOrders(store.id, count);
       setOrderResult(r);
+      // Visible feedback when an import lands with errors — the wizard's
+      // result panel already shows them inline, but a toast wakes anyone
+      // who tabbed away during a long import.
+      if (r.errors > 0) {
+        const sample = r.details
+          .filter((d) => d.toLowerCase().startsWith('error'))
+          .slice(0, 2)
+          .join(' · ');
+        pushToast({
+          kind: 'error',
+          title: t('integrations.importOrders.someFailedTitle', { count: r.errors }),
+          body: sample || t('integrations.importOrders.someFailedBody'),
+        });
+      }
     } catch (e: any) {
-      setOrderError(e?.response?.data?.error?.message ?? t('integrations.onboarding.orders.importFailed'));
+      const msg = e?.response?.data?.error?.message ?? t('integrations.onboarding.orders.importFailed');
+      setOrderError(msg);
+      pushToast({
+        kind: 'error',
+        title: t('integrations.importOrders.importFailedTitle'),
+        body: msg,
+      });
     } finally {
       setOrderImporting(false);
     }
@@ -239,8 +261,25 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
       const r = await integrationsApi.importProducts(store.id, productIds);
       setProductResult(r);
       onFinished();
+      if (r.errors > 0) {
+        const sample = r.details
+          .filter((d) => d.toLowerCase().startsWith('error'))
+          .slice(0, 2)
+          .join(' · ');
+        pushToast({
+          kind: 'error',
+          title: t('integrations.importOrders.someFailedTitle', { count: r.errors }),
+          body: sample || t('integrations.importOrders.someFailedBody'),
+        });
+      }
     } catch (e: any) {
-      setProductError(e?.response?.data?.error?.message ?? t('integrations.onboarding.products.importFailed'));
+      const msg = e?.response?.data?.error?.message ?? t('integrations.onboarding.products.importFailed');
+      setProductError(msg);
+      pushToast({
+        kind: 'error',
+        title: t('integrations.importOrders.importFailedTitle'),
+        body: msg,
+      });
     } finally {
       setProductImporting(false);
     }

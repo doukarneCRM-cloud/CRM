@@ -2402,6 +2402,13 @@
       "errorsLabel_one": "{{count}} error",
       "errorsLabel_other": "{{count}} errors",
       "importFailed": "Import failed",
+      "importFailedTitle": "Import failed",
+      "someFailedTitle_one": "Import finished with {{count}} error",
+      "someFailedTitle_other": "Import finished with {{count}} errors",
+      "someFailedBody": "Some orders could not be imported. Open the import dialog to see the details.",
+      "allImportedTitle": "Orders imported",
+      "allImportedBody_one": "{{count}} order imported successfully.",
+      "allImportedBody_other": "{{count}} orders imported successfully.",
       "close": "Close"
     },
     "importProducts": {

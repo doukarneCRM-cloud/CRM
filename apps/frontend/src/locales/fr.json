@@ -2402,6 +2402,13 @@
       "errorsLabel_one": "{{count}} erreur",
       "errorsLabel_other": "{{count}} erreurs",
       "importFailed": "Échec de l'import",
+      "importFailedTitle": "Échec de l'import",
+      "someFailedTitle_one": "Import terminé avec {{count}} erreur",
+      "someFailedTitle_other": "Import terminé avec {{count}} erreurs",
+      "someFailedBody": "Certaines commandes n'ont pas pu être importées. Ouvrez la fenêtre d'import pour voir les détails.",
+      "allImportedTitle": "Commandes importées",
+      "allImportedBody_one": "{{count}} commande importée avec succès.",
+      "allImportedBody_other": "{{count}} commandes importées avec succès.",
       "close": "Fermer"
     },
     "importProducts": {

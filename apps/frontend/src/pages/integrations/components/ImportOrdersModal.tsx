@@ -6,6 +6,7 @@ import { Download } from 'lucide-react';
 import { integrationsApi, type ImportResult } from '@/services/integrationsApi';
 import { cn } from '@/lib/cn';
 import { apiErrorMessage } from '@/lib/apiError';
+import { useToastStore } from '@/store/toastStore';
 
 interface Props {
   storeId: string | null;
@@ -16,6 +17,7 @@ interface Props {
 
 export function ImportOrdersModal({ storeId, open, onClose, onDone }: Props) {
   const { t } = useTranslation();
+  const pushToast = useToastStore((s) => s.push);
   const [mode, setMode] = useState<'preset' | 'custom' | 'all'>('preset');
   const [presetCount, setPresetCount] = useState(50);
   const [customCount, setCustomCount] = useState('');
@@ -46,8 +48,36 @@ export function ImportOrdersModal({ storeId, open, onClose, onDone }: Props) {
       const r = await integrationsApi.importOrders(storeId, count);
       setResult(r);
       onDone();
+
+      // Surface partial failures as a toast so the user notices even if
+      // they navigate away from the modal. Show the first couple of error
+      // detail lines so they can spot the pattern (e.g. unique-constraint
+      // collisions, payload validation, network).
+      if (r.errors > 0) {
+        const sample = r.details
+          .filter((d) => d.toLowerCase().startsWith('error'))
+          .slice(0, 2)
+          .join(' · ');
+        pushToast({
+          kind: 'error',
+          title: t('integrations.importOrders.someFailedTitle', { count: r.errors }),
+          body: sample || t('integrations.importOrders.someFailedBody'),
+        });
+      } else if (r.imported > 0) {
+        pushToast({
+          kind: 'confirmed',
+          title: t('integrations.importOrders.allImportedTitle'),
+          body: t('integrations.importOrders.allImportedBody', { count: r.imported }),
+        });
+      }
     } catch (e: unknown) {
-      setError(apiErrorMessage(e, t('integrations.importOrders.importFailed')));
+      const msg = apiErrorMessage(e, t('integrations.importOrders.importFailed'));
+      setError(msg);
+      pushToast({
+        kind: 'error',
+        title: t('integrations.importOrders.importFailedTitle'),
+        body: msg,
+      });
     } finally {
       setImporting(false);
     }

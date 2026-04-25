@@ -19,6 +19,11 @@ import {
 } from '../../shared/youcanClient';
 import { emitToAll } from '../../shared/socket';
 import { createAdminNotification } from '../notifications/notifications.service';
+import {
+  generateReference,
+  healReferenceCounter,
+  isReferenceCollision,
+} from '../orders/orders.service';
 
 // ─── Store CRUD ─────────────────────────────────────────────────────────────
 
@@ -933,42 +938,75 @@ export async function importSingleOrder(
     });
   }
 
-  // Generate CRM reference
-  const year = new Date().getFullYear().toString().slice(-2);
-  const count = await prisma.order.count();
-  const reference = `ORD-${year}-${String(count + 1).padStart(5, '0')}`;
-
   const subtotal = items.reduce((s, i) => s + i.total, 0);
   const shippingPrice = yo.shipping?.price ?? 0;
   const total = subtotal + shippingPrice;
 
-  const created = await prisma.order.create({
-    data: {
-      reference,
-      source: 'youcan',
-      customerId,
-      storeId,
-      youcanOrderId: yo.id,
-      subtotal,
-      shippingPrice,
-      total,
-      confirmationNote: yo.notes,
-      items: { create: items },
-      logs: {
-        create: [{
-          type: 'system',
-          action: `Imported from YouCan (${yo.ref})`,
-          performedBy: 'System',
-        }],
-      },
-    },
-    select: {
-      id: true,
-      reference: true,
-      total: true,
-      customer: { select: { fullName: true, city: true } },
-    },
-  });
+  // Reference generation uses an atomic Counter (see orders.service.ts).
+  // The previous `prisma.order.count() + 1` approach collided whenever the
+  // counter drifted below the live max — manual order inserts, partial
+  // import retries, or cross-source creation all create that drift. We
+  // retry on P2002 against `reference` and self-heal the counter once
+  // per import to jump past stale rows in a single hop.
+  const MAX_ATTEMPTS = 5;
+  let created:
+    | {
+        id: string;
+        reference: string;
+        total: number;
+        customer: { fullName: string; city: string };
+      }
+    | undefined;
+  let healedOnce = false;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const reference = await generateReference();
+    try {
+      created = await prisma.order.create({
+        data: {
+          reference,
+          source: 'youcan',
+          customerId,
+          storeId,
+          youcanOrderId: yo.id,
+          subtotal,
+          shippingPrice,
+          total,
+          confirmationNote: yo.notes,
+          items: { create: items },
+          logs: {
+            create: [{
+              type: 'system',
+              action: `Imported from YouCan (${yo.ref})`,
+              performedBy: 'System',
+            }],
+          },
+        },
+        select: {
+          id: true,
+          reference: true,
+          total: true,
+          customer: { select: { fullName: true, city: true } },
+        },
+      });
+      break;
+    } catch (err) {
+      if (isReferenceCollision(err)) {
+        if (!healedOnce) {
+          await healReferenceCounter();
+          healedOnce = true;
+        }
+        continue;
+      }
+      throw err;
+    }
+  }
+  if (!created) {
+    throw {
+      statusCode: 500,
+      code: 'REFERENCE_GEN_FAILED',
+      message: `Could not generate a unique order reference for ${yo.ref} after ${MAX_ATTEMPTS} attempts`,
+    };
+  }
 
   // Notify connected clients so tables refresh live
   emitToAll('order:created', { source: 'youcan', youcanRef: yo.ref });

@@ -29,7 +29,7 @@ import type {
 // ORD-YY-XXXXX. The next value comes from an atomic UPDATE on the Counter
 // row (one row per year), so concurrent creates never collide and archived
 // orders never free up a reference number.
-async function generateReference(): Promise<string> {
+export async function generateReference(): Promise<string> {
   const year = new Date().getFullYear().toString().slice(-2);
   const key = `order_ref_${year}`;
   const counter = await prisma.counter.upsert({
@@ -45,7 +45,7 @@ async function generateReference(): Promise<string> {
 // behind. We scan for the largest live ORD-YY-XXXXX this year and jump
 // the counter past it so the next generateReference() starts from a
 // free slot in one hop (instead of burning a retry per stale row).
-async function healReferenceCounter(): Promise<void> {
+export async function healReferenceCounter(): Promise<void> {
   const year = new Date().getFullYear().toString().slice(-2);
   const key = `order_ref_${year}`;
   const prefix = `ORD-${year}-`;
@@ -70,7 +70,7 @@ async function healReferenceCounter(): Promise<void> {
 
 // Narrow type guard — Prisma's P2002 with `target` pointing at the
 // Order.reference column is the only case we want to recover from.
-function isReferenceCollision(err: unknown): boolean {
+export function isReferenceCollision(err: unknown): boolean {
   if (!(err instanceof Prisma.PrismaClientKnownRequestError)) return false;
   if (err.code !== 'P2002') return false;
   const target = (err.meta as { target?: unknown } | null | undefined)?.target;
