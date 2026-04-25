@@ -8,6 +8,9 @@ export type CreateStoreInput = z.infer<typeof CreateStoreSchema>;
 export const UpdateStoreSchema = z.object({
   name: z.string().min(1).optional(),
   isActive: z.boolean().optional(),
+  // When false, the background poller and the order.create webhook both
+  // skip this store — only the manual "Import orders" button pulls data.
+  autoSyncEnabled: z.boolean().optional(),
   fieldMapping: z.record(z.string(), z.string()).optional(),
 });
 export type UpdateStoreInput = z.infer<typeof UpdateStoreSchema>;

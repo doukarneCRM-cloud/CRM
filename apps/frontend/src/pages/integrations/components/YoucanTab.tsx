@@ -42,6 +42,7 @@ export function YoucanTab() {
 
   const [reconcilingStoreId, setReconcilingStoreId] = useState<string | null>(null);
   const [reconcileMessage, setReconcileMessage] = useState<string | null>(null);
+  const [autoSyncTogglingId, setAutoSyncTogglingId] = useState<string | null>(null);
 
   const loadStores = useCallback(async () => {
     try {
@@ -130,6 +131,41 @@ export function YoucanTab() {
       loadStores();
     } catch {
       /* ignore */
+    }
+  };
+
+  const handleToggleAutoSync = async (store: Store) => {
+    // Confirm the FIRST time turning it on so the admin understands what
+    // they're enabling. Turning OFF is single-click — that's the safer
+    // direction. Same logic in reverse keeps "Just turn it off, fast"
+    // working as expected.
+    if (!store.autoSyncEnabled) {
+      const ok = window.confirm(t('integrations.youcan.enableAutoSyncConfirm') as string);
+      if (!ok) return;
+    }
+    setAutoSyncTogglingId(store.id);
+    try {
+      await integrationsApi.updateStore(store.id, {
+        autoSyncEnabled: !store.autoSyncEnabled,
+      });
+      await loadStores();
+      pushToast({
+        kind: 'confirmed',
+        title: !store.autoSyncEnabled
+          ? t('integrations.youcan.autoSyncEnabledToast')
+          : t('integrations.youcan.autoSyncDisabledToast'),
+      });
+    } catch (e) {
+      const msg =
+        (e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
+          ?.message ?? t('integrations.youcan.autoSyncToggleFailed');
+      pushToast({
+        kind: 'error',
+        title: t('integrations.youcan.autoSyncToggleFailedTitle'),
+        body: msg,
+      });
+    } finally {
+      setAutoSyncTogglingId(null);
     }
   };
 
@@ -283,7 +319,9 @@ export function YoucanTab() {
               onImportProducts={() => setImportProductsStoreId(store.id)}
               onImportOrders={() => setImportOrdersStoreId(store.id)}
               onReconcile={() => handleReconcile(store.id)}
+              onToggleAutoSync={() => handleToggleAutoSync(store)}
               reconciling={reconcilingStoreId === store.id}
+              togglingAutoSync={autoSyncTogglingId === store.id}
             />
           ))}
         </div>

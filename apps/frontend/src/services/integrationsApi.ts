@@ -8,6 +8,10 @@ export interface Store {
   slug: string | null;
   isActive: boolean;
   isConnected: boolean;
+  // Default false on a freshly-linked store. When false, the background
+  // poller and the order.create webhook both skip this store — only the
+  // manual "Import orders" button pulls anything.
+  autoSyncEnabled: boolean;
   lastSyncAt: string | null;
   lastError: string | null;
   fieldMapping: Record<string, string> | null;

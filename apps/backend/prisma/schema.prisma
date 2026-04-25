@@ -244,6 +244,11 @@ model Store {
   // State
   isActive       Boolean   @default(true)
   isConnected    Boolean   @default(false)
+  // When false, the background poller skips this store and the order.create
+  // webhook stops auto-importing — admin still has the manual "Import
+  // orders" button. Defaults to false so freshly-linked stores don't pull
+  // in any data until the admin explicitly opts in.
+  autoSyncEnabled Boolean  @default(false)
   lastSyncAt     DateTime?
   lastError      String?
   createdAt      DateTime  @default(now())

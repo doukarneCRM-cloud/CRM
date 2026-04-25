@@ -30,8 +30,12 @@ async function pollOnce() {
   if (running) return;
   running = true;
   try {
+    // Only stores the admin has explicitly opted into auto-sync. New
+    // OAuth links default to autoSyncEnabled=false — the admin has to
+    // flip the toggle in the store config (or click manual Import
+    // orders) before the poller touches them.
     const stores = await prisma.store.findMany({
-      where: { isActive: true, isConnected: true },
+      where: { isActive: true, isConnected: true, autoSyncEnabled: true },
       select: { id: true, fieldMapping: true },
     });
     for (const store of stores) {

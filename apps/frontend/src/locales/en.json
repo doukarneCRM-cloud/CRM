@@ -2641,7 +2641,15 @@
       "relinkTitle": "Promote any placeholder products created from orders into real products by re-fetching them from YouCan.",
       "enable": "Enable",
       "disable": "Disable",
-      "delete": "Delete"
+      "delete": "Delete",
+      "autoSyncOn": "Auto-sync ON",
+      "autoSyncOff": "Auto-sync OFF",
+      "autoSyncOnTooltip": "New YouCan orders are imported automatically (poller every 15s + webhook).",
+      "autoSyncOffTooltip": "No automatic imports. Use \"Import Orders\" to pull manually.",
+      "enableAutoSync": "Enable auto-sync",
+      "disableAutoSync": "Disable auto-sync",
+      "enableAutoSyncTitle": "Start importing new YouCan orders automatically.",
+      "disableAutoSyncTitle": "Stop automatic imports — only manual \"Import Orders\" will pull data."
     },
     "youcan": {
       "subtitle": "Connect your YouCan stores to import products and receive orders in real-time.",
@@ -2668,6 +2676,11 @@
       "backfillDoneBody": "Updated {{updated}} · already correct {{unchanged}} · scanned {{scanned}}",
       "backfillFailedNote_one": "{{count}} failed",
       "backfillFailedNote_other": "{{count}} failed",
+      "enableAutoSyncConfirm": "Enable auto-sync? Every new YouCan order on this store will be imported automatically (poller every 15s + webhook). You can turn this off again any time.",
+      "autoSyncEnabledToast": "Auto-sync enabled — new YouCan orders will import automatically.",
+      "autoSyncDisabledToast": "Auto-sync disabled — only manual imports will pull data.",
+      "autoSyncToggleFailed": "Could not update the auto-sync setting.",
+      "autoSyncToggleFailedTitle": "Auto-sync change failed",
       "backfillFailedTitle": "Repair failed",
       "backfillFailed": "Could not repair order dates"
     }
