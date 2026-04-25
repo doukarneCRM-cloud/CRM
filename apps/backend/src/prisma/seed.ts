@@ -70,6 +70,10 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
   agent: [
     'call_center:view', 'confirmation:view', 'confirmation:update_status',
     'confirmation:add_note', 'products:view',
+    // Agents may pair their personal WhatsApp via the Sessions tab. Grants
+    // access to the focused self-view in SessionsTab — no admin-level
+    // session list (whatsapp:view) included.
+    'whatsapp:connect',
   ],
   shipping: [
     'shipping:view', 'shipping:push', 'shipping:return_validate',

@@ -251,7 +251,9 @@ export default function App() {
           <Route
             path={ROUTES.AUTOMATION}
             element={
-              <PermissionGuard requires={PERMISSIONS.AUTOMATION_VIEW}>
+              <PermissionGuard
+                requires={[PERMISSIONS.AUTOMATION_VIEW, PERMISSIONS.WHATSAPP_CONNECT]}
+              >
                 <AutomationPage />
               </PermissionGuard>
             }

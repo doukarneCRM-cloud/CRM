@@ -33,7 +33,10 @@ interface NavItem {
   labelKey: string;
   icon: React.ElementType;
   to: string;
-  permission?: string;
+  // Single permission key, OR an array meaning "any of these grants access".
+  // Used by the Automation entry so an agent with only `whatsapp:connect`
+  // (no `automation:view`) still sees the menu and can reach the Sessions tab.
+  permission?: string | readonly string[];
 }
 
 interface NavSection {
@@ -66,7 +69,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     dividerBefore: true,
     items: [
-      { labelKey: 'nav.automation', icon: MessageCircle, to: ROUTES.AUTOMATION, permission: PERMISSIONS.AUTOMATION_VIEW },
+      { labelKey: 'nav.automation', icon: MessageCircle, to: ROUTES.AUTOMATION, permission: [PERMISSIONS.AUTOMATION_VIEW, PERMISSIONS.WHATSAPP_CONNECT] },
       { labelKey: 'nav.settings', icon: Settings, to: ROUTES.SETTINGS, permission: PERMISSIONS.SETTINGS_VIEW },
     ],
   },
@@ -191,7 +194,11 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
               )}
               <div className={cn('flex flex-col gap-0.5', collapsed ? 'px-3 md:px-2' : 'px-3')}>
                 {section.items
-                  .filter((item) => !item.permission || hasPermission(item.permission))
+                  .filter((item) => {
+                    if (!item.permission) return true;
+                    if (typeof item.permission === 'string') return hasPermission(item.permission);
+                    return item.permission.some((p) => hasPermission(p));
+                  })
                   .map((item) => (
                     <SidebarNavItem key={item.to} item={item} collapsed={collapsed} />
                   ))}

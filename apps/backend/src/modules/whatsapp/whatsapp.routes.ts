@@ -14,6 +14,18 @@ export async function whatsappRoutes(app: FastifyInstance) {
     },
   );
 
+  // Agent-scoped: return (and lazily create) the caller's own session. Lets
+  // an agent who only has `whatsapp:connect` reach the QR flow without
+  // exposing the full session list (`whatsapp:view`).
+  app.get(
+    '/sessions/mine',
+    { preHandler: [verifyJWT, requirePermission('whatsapp:connect')] },
+    async (req, reply) => {
+      const session = await svc.getOrCreateMySession(req.user.sub);
+      return reply.send(session);
+    },
+  );
+
   app.post(
     '/sessions',
     { preHandler: [verifyJWT, requirePermission('whatsapp:connect')] },

@@ -71,6 +71,10 @@ export interface InboxMessage {
 export const whatsappApi = {
   list: () =>
     api.get<{ data: WhatsAppSession[] }>('/whatsapp/sessions').then((r) => r.data.data),
+  // Agent-scoped: fetch (and lazily create) the caller's own session. Used
+  // by SessionsTab when the user only has `whatsapp:connect`.
+  getMine: () =>
+    api.get<WhatsAppSession>('/whatsapp/sessions/mine').then((r) => r.data),
   create: (userId: string | null) =>
     api.post<WhatsAppSession>('/whatsapp/sessions', { userId }).then((r) => r.data),
   getQr: (id: string) =>

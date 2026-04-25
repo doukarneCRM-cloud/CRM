@@ -24,10 +24,29 @@ const STATUS_COLOR: Record<WhatsAppSessionStatus, string> = {
 };
 
 export function SessionsTab() {
-  const { t } = useTranslation();
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canConnect = hasPermission(PERMISSIONS.WHATSAPP_CONNECT);
   const canManage = hasPermission(PERMISSIONS.AUTOMATION_MANAGE);
+  // Only admins (and supervisors) get the full session list — see
+  // `whatsapp.routes.ts` GET /sessions which is gated by `whatsapp:view`.
+  // Agents who only have `whatsapp:connect` get the focused self-view below.
+  const canSeeAllSessions = hasPermission(PERMISSIONS.WHATSAPP_VIEW);
+
+  if (!canSeeAllSessions) {
+    return <AgentSelfSessionView />;
+  }
+
+  return <AdminSessionsView canConnect={canConnect} canManage={canManage} />;
+}
+
+function AdminSessionsView({
+  canConnect,
+  canManage,
+}: {
+  canConnect: boolean;
+  canManage: boolean;
+}) {
+  const { t } = useTranslation();
   const pushToast = useToastStore((s) => s.push);
 
   const [sessions, setSessions] = useState<WhatsAppSession[]>([]);
@@ -269,6 +288,116 @@ export function SessionsTab() {
         session={qrSession}
         onClose={() => setQrSession(null)}
         onConnected={() => void load()}
+      />
+    </div>
+  );
+}
+
+// Focused self-view shown to agents who only have `whatsapp:connect`. They
+// see one card with their personal session status and a single Connect /
+// Disconnect button — no system session, no agent table, no roster.
+function AgentSelfSessionView() {
+  const { t } = useTranslation();
+  const pushToast = useToastStore((s) => s.push);
+  const [session, setSession] = useState<WhatsAppSession | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [qrSession, setQrSession] = useState<WhatsAppSession | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const s = await whatsappApi.getMine();
+      setSession(s);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { error?: { message?: string } } }; message?: string };
+      const msg =
+        err?.response?.data?.error?.message ?? err?.message ?? t('automation.sessions.unknownError');
+      pushToast({ kind: 'error', title: t('automation.sessions.loadFailed'), body: msg });
+    } finally {
+      setLoading(false);
+    }
+  }, [pushToast, t]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  // Light polling so the status badge follows reality without forcing a
+  // manual refresh after the agent finishes the QR scan on their phone.
+  useEffect(() => {
+    const handle = setInterval(() => {
+      void whatsappApi.getMine().then(setSession).catch(() => {});
+    }, 5000);
+    return () => clearInterval(handle);
+  }, []);
+
+  const disconnect = async () => {
+    if (!session) return;
+    if (!window.confirm(t('automation.sessions.disconnectConfirm'))) return;
+    try {
+      await whatsappApi.disconnect(session.id);
+      await load();
+    } catch {
+      pushToast({ kind: 'error', title: t('automation.sessions.disconnectFailed') });
+    }
+  };
+
+  if (loading) {
+    return <div className="skeleton h-32 rounded-card" />;
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <GlassCard padding="md">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">
+              {t('automation.sessions.mySessionTitle')}
+            </h3>
+            <p className="mt-0.5 text-xs text-gray-500">
+              {t('automation.sessions.mySessionSubtitle')}
+            </p>
+          </div>
+          {session && session.status !== 'connected' && (
+            <CRMButton
+              size="sm"
+              leftIcon={<QrCode size={14} />}
+              onClick={() => setQrSession(session)}
+            >
+              {t('automation.sessions.actions.connect')}
+            </CRMButton>
+          )}
+          {session && session.status === 'connected' && (
+            <CRMButton
+              size="sm"
+              variant="ghost"
+              leftIcon={<LogOut size={14} />}
+              onClick={disconnect}
+            >
+              {t('automation.sessions.actions.disconnect')}
+            </CRMButton>
+          )}
+        </div>
+
+        {session && (
+          <div className="mt-3 flex items-center gap-3 border-t border-gray-100 pt-3 text-sm">
+            <span className={`h-2.5 w-2.5 rounded-full ${STATUS_COLOR[session.status]}`} />
+            <span className="font-medium text-gray-700">
+              {t(`automation.sessions.statusLabels.${session.status}`)}
+            </span>
+            <span className="text-gray-500">{session.phoneNumber ?? '—'}</span>
+          </div>
+        )}
+      </GlassCard>
+
+      <QrModal
+        open={!!qrSession}
+        session={qrSession}
+        onClose={() => setQrSession(null)}
+        onConnected={() => {
+          setQrSession(null);
+          void load();
+        }}
       />
     </div>
   );

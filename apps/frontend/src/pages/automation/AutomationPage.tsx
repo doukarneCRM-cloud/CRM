@@ -30,14 +30,17 @@ export default function AutomationPage() {
   const { t } = useTranslation();
   const hasPermission = useAuthStore((s) => s.hasPermission);
 
+  // Tab visibility is per-permission. The Sessions tab is the only one
+  // visible to agents (gated by whatsapp:connect) — everything else is
+  // admin/supervisor work and requires automation:* permissions.
   const TABS = useMemo<TabDef[]>(
     () => [
-      { id: 'overview', label: t('automation.tabs.overview'), icon: Activity, permission: PERMISSIONS.AUTOMATION_MONITOR },
-      { id: 'inbox', label: t('automation.tabs.inbox'), icon: Inbox, permission: PERMISSIONS.WHATSAPP_VIEW },
-      { id: 'rules', label: t('automation.tabs.rules'), icon: SlidersHorizontal },
-      { id: 'templates', label: t('automation.tabs.templates'), icon: MessageSquare },
-      { id: 'sessions', label: t('automation.tabs.sessions'), icon: Smartphone },
-      { id: 'logs', label: t('automation.tabs.logs'), icon: ScrollText },
+      { id: 'overview',  label: t('automation.tabs.overview'),  icon: Activity,           permission: PERMISSIONS.AUTOMATION_MONITOR },
+      { id: 'inbox',     label: t('automation.tabs.inbox'),     icon: Inbox,              permission: PERMISSIONS.WHATSAPP_VIEW },
+      { id: 'rules',     label: t('automation.tabs.rules'),     icon: SlidersHorizontal,  permission: PERMISSIONS.AUTOMATION_MANAGE },
+      { id: 'templates', label: t('automation.tabs.templates'), icon: MessageSquare,      permission: PERMISSIONS.AUTOMATION_MANAGE },
+      { id: 'sessions',  label: t('automation.tabs.sessions'),  icon: Smartphone,         permission: PERMISSIONS.WHATSAPP_CONNECT },
+      { id: 'logs',      label: t('automation.tabs.logs'),      icon: ScrollText,         permission: PERMISSIONS.AUTOMATION_MANAGE },
     ],
     [t],
   );

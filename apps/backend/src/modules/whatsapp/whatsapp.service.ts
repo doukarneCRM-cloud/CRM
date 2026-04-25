@@ -74,6 +74,34 @@ export async function createSession(userId: string | null) {
   });
 }
 
+/**
+ * Agent-scoped session lookup. Returns the calling user's session row,
+ * creating one on the fly if it doesn't exist yet (so a brand-new agent
+ * can land on /automation, hit the Connect button, and immediately scan
+ * a QR without an admin having to pre-provision a session for them).
+ *
+ * Side-effect on first call: spins up a fresh Evolution instance and
+ * persists the session row in 'connecting' state. Idempotent for repeat
+ * calls — falls through to `createSession` which short-circuits when a
+ * session already exists for that userId.
+ */
+export async function getOrCreateMySession(userId: string) {
+  const existing = await prisma.whatsAppSession.findUnique({
+    where: { userId },
+    include: { user: { select: { id: true, name: true, phone: true } } },
+  });
+  if (existing) return existing;
+  await createSession(userId);
+  // Re-read with the same `include` shape used by listSessions so the
+  // frontend gets consistent payloads regardless of which endpoint it hit.
+  const created = await prisma.whatsAppSession.findUnique({
+    where: { userId },
+    include: { user: { select: { id: true, name: true, phone: true } } },
+  });
+  if (!created) throw { statusCode: 500, code: 'SESSION_CREATE_FAILED', message: 'Failed to create session' };
+  return created;
+}
+
 export async function getSessionQr(id: string) {
   const session = await prisma.whatsAppSession.findUnique({ where: { id } });
   if (!session) throw { statusCode: 404, code: 'NOT_FOUND', message: 'Session not found' };

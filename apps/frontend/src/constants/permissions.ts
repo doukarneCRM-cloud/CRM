@@ -122,6 +122,9 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     PERMISSIONS.CONFIRMATION_UPDATE_STATUS,
     PERMISSIONS.CONFIRMATION_ADD_NOTE,
     PERMISSIONS.PRODUCTS_VIEW,
+    // Pair their personal WhatsApp from the Sessions tab. Doesn't grant
+    // access to the admin session list (whatsapp:view).
+    PERMISSIONS.WHATSAPP_CONNECT,
   ],
   shipping: [
     PERMISSIONS.SHIPPING_VIEW,
