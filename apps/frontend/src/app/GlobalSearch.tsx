@@ -87,8 +87,8 @@ export function GlobalSearch() {
     <div ref={ref} className="relative">
       <div
         className={cn(
-          'hidden w-full items-center gap-2 rounded-input border border-white/10 bg-white/95 px-3 py-1.5 md:flex',
-          'focus-within:border-white focus-within:bg-white focus-within:shadow-sm',
+          'hidden w-full items-center gap-2 rounded-input border border-gray-200 bg-gray-50/80 px-3 py-1.5 md:flex',
+          'focus-within:border-gray-300 focus-within:bg-white focus-within:shadow-sm',
         )}
       >
         <Search size={14} className="text-gray-400" />

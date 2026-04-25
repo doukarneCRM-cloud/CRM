@@ -118,8 +118,8 @@ function SkeletonRow({ cols }: { cols: number }) {
           key={i}
           className={cn(
             'border-y border-gray-100 bg-white px-4 py-3',
-            i === 0 && 'rounded-l-lg border-l',
-            i === cols - 1 && 'rounded-r-lg border-r',
+            i === 0 && 'rounded-l-xl border-l',
+            i === cols - 1 && 'rounded-r-xl border-r',
           )}
         >
           <div className={cn('skeleton h-4 rounded', i < 2 ? 'w-28' : 'w-20')} />
@@ -777,16 +777,18 @@ export function OrdersTable({
               table.getRowModel().rows.map((row) => {
                 const isSelected = selectedSet.has(row.original.id);
                 return (
-                  <tr key={row.id} className="group transition-colors">
+                  <tr key={row.id} className="group transition-shadow">
                     {row.getVisibleCells().map((cell, idx, arr) => (
                       <td
                         key={cell.id}
                         className={cn(
-                          'border-y border-gray-100 px-3 py-2 align-top text-gray-700 transition-colors',
-                          'group-hover:border-primary/30 group-hover:bg-primary/5',
-                          isSelected ? 'bg-accent/60' : 'bg-white',
-                          idx === 0 && 'rounded-l-lg border-l',
-                          idx === arr.length - 1 && 'rounded-r-lg border-r',
+                          'border-y border-gray-100 px-3 py-2.5 align-top text-gray-700 transition-colors',
+                          'group-hover:border-gray-200 group-hover:bg-gray-50/60',
+                          isSelected
+                            ? 'bg-accent/60'
+                            : 'bg-white',
+                          idx === 0 && 'rounded-l-xl border-l',
+                          idx === arr.length - 1 && 'rounded-r-xl border-r',
                         )}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}

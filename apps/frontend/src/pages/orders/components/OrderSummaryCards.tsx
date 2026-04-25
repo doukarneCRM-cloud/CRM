@@ -149,19 +149,18 @@ export function OrderSummaryCards({ className }: OrderSummaryCardsProps) {
 
   return (
     <div className={cn('grid grid-cols-2 gap-4 lg:grid-cols-5', className)}>
-      {/* All five cards share the caramel palette so the row reads as a
-          single themed unit — the icons themselves keep each metric
-          distinguishable. The "free" badge stays orange because it's a
-          warning, not a metric color. */}
+      {/* Unified neutral-gray palette: muted icon tile + dark value lets
+          the numbers pop without yelling, dappr-style. Per-metric Lucide
+          icons still distinguish each card. The "free" badge stays orange
+          because it's a warning, not a metric color. */}
 
       {/* 1 — Pending */}
       <SummaryCard
         title={t('orders.summary.pending')}
         value={s.pending.total}
         icon={Clock}
-        iconBg="bg-caramel-50"
-        iconColor="text-caramel-600"
-        valueColor="text-caramel-700"
+        iconBg="bg-gray-100"
+        iconColor="text-gray-600"
         subtitle={
           <div className="flex items-center gap-3">
             <span className="text-gray-500">
@@ -181,9 +180,8 @@ export function OrderSummaryCards({ className }: OrderSummaryCardsProps) {
         title={t('orders.summary.confirmed')}
         value={s.confirmed.total}
         icon={CheckCircle}
-        iconBg="bg-caramel-50"
-        iconColor="text-caramel-600"
-        valueColor="text-caramel-700"
+        iconBg="bg-gray-100"
+        iconColor="text-gray-600"
         subtitle={<span className="text-gray-400">{t('orders.summary.readyForShipping')}</span>}
       />
 
@@ -192,9 +190,8 @@ export function OrderSummaryCards({ className }: OrderSummaryCardsProps) {
         title={t('orders.summary.outForDelivery')}
         value={s.outForDelivery.total}
         icon={Truck}
-        iconBg="bg-caramel-50"
-        iconColor="text-caramel-600"
-        valueColor="text-caramel-700"
+        iconBg="bg-gray-100"
+        iconColor="text-gray-600"
         subtitle={<span className="text-gray-400">{t('orders.summary.inTransitToday')}</span>}
       />
 
@@ -203,9 +200,8 @@ export function OrderSummaryCards({ className }: OrderSummaryCardsProps) {
         title={t('orders.summary.delivered')}
         value={s.delivered.total}
         icon={PackageCheck}
-        iconBg="bg-caramel-50"
-        iconColor="text-caramel-600"
-        valueColor="text-caramel-700"
+        iconBg="bg-gray-100"
+        iconColor="text-gray-600"
         subtitle={<span className="text-gray-400">{t('orders.summary.successfullyDelivered')}</span>}
       />
 
@@ -215,9 +211,8 @@ export function OrderSummaryCards({ className }: OrderSummaryCardsProps) {
         value={s.delivered.revenue}
         unit="MAD"
         icon={DollarSign}
-        iconBg="bg-caramel-50"
-        iconColor="text-caramel-600"
-        valueColor="text-caramel-700"
+        iconBg="bg-gray-100"
+        iconColor="text-gray-600"
         subtitle={<span className="text-gray-400">{t('orders.summary.fromDelivered')}</span>}
       />
     </div>

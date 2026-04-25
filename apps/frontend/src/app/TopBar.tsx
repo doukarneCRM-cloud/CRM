@@ -200,7 +200,7 @@ function UserDropdown() {
       <div ref={ref} className="relative">
         <button
           onClick={() => setOpen((v) => !v)}
-          className="flex items-center gap-2.5 rounded-btn px-3 py-1.5 transition-colors hover:bg-white/10"
+          className="flex items-center gap-2.5 rounded-btn px-3 py-1.5 transition-colors hover:bg-gray-100"
         >
           {avatarSrc ? (
             <img
@@ -211,13 +211,13 @@ function UserDropdown() {
           ) : (
             <div
               className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white"
-              style={{ background: 'linear-gradient(135deg, #3F3F46, #52525B)' }}
+              style={{ background: 'linear-gradient(135deg, #4B5563, #6B7280)' }}
             >
               {initials}
             </div>
           )}
           <div className="hidden text-left md:block">
-            <p className="text-xs font-semibold text-white">{user.name}</p>
+            <p className="text-xs font-semibold text-gray-900">{user.name}</p>
             <p className="text-[10px] text-gray-400">{user.role.label}</p>
           </div>
           <ChevronDown
@@ -297,7 +297,7 @@ export function TopBar({ onMobileMenuOpen }: TopBarProps) {
 
   return (
     <header
-      className="flex h-14 shrink-0 items-center gap-2 border-b border-black/40 bg-primary px-3 text-white shadow-sm sm:gap-3 sm:px-5"
+      className="flex h-14 shrink-0 items-center gap-2 border-b border-gray-100 bg-white/95 px-3 text-gray-900 shadow-[0_1px_2px_rgba(16,24,40,0.04)] backdrop-blur-sm sm:gap-3 sm:px-5"
       style={{
         position: 'sticky',
         top: 0,
@@ -309,12 +309,12 @@ export function TopBar({ onMobileMenuOpen }: TopBarProps) {
       <div className="flex min-w-0 flex-1 basis-0 items-center gap-2 sm:gap-3">
         <button
           onClick={onMobileMenuOpen}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-btn text-gray-300 hover:bg-white/10 hover:text-white md:hidden"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-btn text-gray-500 hover:bg-gray-100 hover:text-gray-900 md:hidden"
           aria-label={t('common.openMenu')}
         >
           <Menu size={20} />
         </button>
-        <h1 className="shrink-0 text-base font-semibold text-white">{pageTitle}</h1>
+        <h1 className="shrink-0 text-base font-semibold text-gray-900">{pageTitle}</h1>
         {isAdmin && user && (
           <div className="hidden min-w-0 flex-1 lg:block">
             <OnlineAgents />
