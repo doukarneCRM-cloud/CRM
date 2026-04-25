@@ -27,12 +27,15 @@ export function SessionsTab() {
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canConnect = hasPermission(PERMISSIONS.WHATSAPP_CONNECT);
   const canManage = hasPermission(PERMISSIONS.AUTOMATION_MANAGE);
-  // Only admins (and supervisors) get the full session list — see
-  // `whatsapp.routes.ts` GET /sessions which is gated by `whatsapp:view`.
-  // Agents who only have `whatsapp:connect` get the focused self-view below.
-  const canSeeAllSessions = hasPermission(PERMISSIONS.WHATSAPP_VIEW);
+  // Branch on automation:manage rather than whatsapp:view — agents are
+  // commonly granted whatsapp:view so they can use the WhatsApp Inbox,
+  // but we don't want that to bleed into showing them the system-session
+  // card. Only users who can manage automation see the full admin view;
+  // everyone else (including agents with inbox access) gets the focused
+  // self-view below.
+  const isAdminView = canManage;
 
-  if (!canSeeAllSessions) {
+  if (!isAdminView) {
     return <AgentSelfSessionView />;
   }
 
