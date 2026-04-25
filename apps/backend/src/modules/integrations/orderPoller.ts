@@ -8,10 +8,25 @@ const PAGE_SIZE = 25;
 let running = false;
 let timer: NodeJS.Timeout | null = null;
 
-async function pollStore(storeId: string, fieldMapping: Record<string, string> | null) {
+async function pollStore(
+  storeId: string,
+  fieldMapping: Record<string, string> | null,
+  cutoff: Date | null,
+) {
   const result = await fetchOrders(storeId, 1, PAGE_SIZE);
   let imported = 0;
   for (const yo of result.data) {
+    // Hard date filter: the poller's job is to catch orders placed AFTER
+    // the integration started syncing — never to bulk-import history.
+    // Without this, flipping autoSyncEnabled on a fresh store would
+    // immediately pull the last 25 historical YouCan orders even when
+    // the admin chose Skip in the wizard. The cutoff is set at OAuth
+    // time (handleOAuthCallback) and refreshed at the end of every poll
+    // cycle below.
+    if (cutoff) {
+      const placedAt = new Date(yo.created_at);
+      if (!Number.isNaN(placedAt.getTime()) && placedAt <= cutoff) continue;
+    }
     try {
       const outcome = await importSingleOrder(storeId, yo, fieldMapping);
       if (outcome === 'imported') imported++;
@@ -36,11 +51,15 @@ async function pollOnce() {
     // orders) before the poller touches them.
     const stores = await prisma.store.findMany({
       where: { isActive: true, isConnected: true, autoSyncEnabled: true },
-      select: { id: true, fieldMapping: true },
+      select: { id: true, fieldMapping: true, lastSyncAt: true },
     });
     for (const store of stores) {
       try {
-        await pollStore(store.id, store.fieldMapping as Record<string, string> | null);
+        await pollStore(
+          store.id,
+          store.fieldMapping as Record<string, string> | null,
+          store.lastSyncAt,
+        );
       } catch {
         // Skip this store on transient failures; next tick will retry.
       }

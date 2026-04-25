@@ -108,6 +108,20 @@ export function getOAuthUrl(storeId: string) {
 
 export async function handleOAuthCallback(storeId: string, code: string) {
   await exchangeCode(storeId, code);
+
+  // Establish the auto-sync cutoff at OAuth time. The 15s background
+  // poller only imports YouCan orders placed AFTER `lastSyncAt`, so
+  // setting it to `now()` here means historical orders are never
+  // bulk-imported when autoSyncEnabled flips on at the end of the
+  // wizard. Importing past orders stays an explicit choice (wizard
+  // step 2 or the Import Orders button). Re-link case is fine too —
+  // the existing lastSyncAt is overwritten with `now()`, which the
+  // admin can interpret as "fresh start from this moment."
+  await prisma.store.update({
+    where: { id: storeId },
+    data: { lastSyncAt: new Date() },
+  });
+
   await logImport(storeId, 'connection', 'info', 'Store connected via OAuth');
 
   // Re-link case — clean up the previous resthook on YouCan's side so we
