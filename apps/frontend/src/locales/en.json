@@ -2641,15 +2641,7 @@
       "relinkTitle": "Promote any placeholder products created from orders into real products by re-fetching them from YouCan.",
       "enable": "Enable",
       "disable": "Disable",
-      "delete": "Delete",
-      "autoSyncOn": "Background sync ON",
-      "autoSyncOff": "Background sync OFF",
-      "autoSyncOnTooltip": "Periodic 15s poller is on — catches any orders the real-time webhook might have missed. New orders always import via webhook regardless of this setting.",
-      "autoSyncOffTooltip": "Periodic poller is off. New orders still import in real-time via the YouCan webhook. Use \"Import Orders\" to backfill historical orders manually.",
-      "enableAutoSync": "Enable background sync",
-      "disableAutoSync": "Disable background sync",
-      "enableAutoSyncTitle": "Turn on the 15s poller (catches webhook misses). Real-time webhook stays on either way.",
-      "disableAutoSyncTitle": "Stop the periodic poller. Real-time webhook still imports new orders."
+      "delete": "Delete"
     },
     "youcan": {
       "subtitle": "Connect your YouCan stores to import products and receive orders in real-time.",
@@ -2676,11 +2668,6 @@
       "backfillDoneBody": "Updated {{updated}} · already correct {{unchanged}} · scanned {{scanned}}",
       "backfillFailedNote_one": "{{count}} failed",
       "backfillFailedNote_other": "{{count}} failed",
-      "enableAutoSyncConfirm": "Enable the 15-second background poller? It catches orders the real-time webhook might have missed. New orders always come in via webhook regardless. You can turn this off any time.",
-      "autoSyncEnabledToast": "Background sync enabled.",
-      "autoSyncDisabledToast": "Background sync disabled — real-time webhook still active.",
-      "autoSyncToggleFailed": "Could not update the background-sync setting.",
-      "autoSyncToggleFailedTitle": "Background sync change failed",
       "backfillFailedTitle": "Repair failed",
       "backfillFailed": "Could not repair order dates"
     }

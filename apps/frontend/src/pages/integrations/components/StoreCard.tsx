@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Link2, Unlink, Power, Trash2, Package, ShoppingCart,
-  AlertCircle, CheckCircle2, Clock, Settings2, Wand2, Loader2, Zap, ZapOff,
+  AlertCircle, CheckCircle2, Clock, Settings2, Wand2, Loader2,
 } from 'lucide-react';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { cn } from '@/lib/cn';
@@ -17,9 +17,7 @@ interface Props {
   onImportProducts: () => void;
   onImportOrders: () => void;
   onReconcile: () => void;
-  onToggleAutoSync: () => void;
   reconciling?: boolean;
-  togglingAutoSync?: boolean;
 }
 
 export function StoreCard({
@@ -31,9 +29,7 @@ export function StoreCard({
   onImportProducts,
   onImportOrders,
   onReconcile,
-  onToggleAutoSync,
   reconciling,
-  togglingAutoSync,
 }: Props) {
   const { t } = useTranslation();
   const [deleting, setDeleting] = useState(false);
@@ -89,27 +85,6 @@ export function StoreCard({
               {t('integrations.storeCard.storeDisabled')}
             </span>
           )}
-          {store.isConnected && (
-            <span
-              className={cn(
-                'inline-flex items-center gap-1 rounded-badge px-2 py-0.5 text-[10px] font-semibold',
-                store.autoSyncEnabled
-                  ? 'bg-emerald-50 text-emerald-700'
-                  : 'bg-amber-50 text-amber-700',
-              )}
-              title={
-                store.autoSyncEnabled
-                  ? t('integrations.storeCard.autoSyncOnTooltip')
-                  : t('integrations.storeCard.autoSyncOffTooltip')
-              }
-            >
-              {store.autoSyncEnabled ? (
-                <><Zap size={9} /> {t('integrations.storeCard.autoSyncOn')}</>
-              ) : (
-                <><ZapOff size={9} /> {t('integrations.storeCard.autoSyncOff')}</>
-              )}
-            </span>
-          )}
         </div>
       </div>
 
@@ -162,36 +137,6 @@ export function StoreCard({
             </div>
             <CRMButton variant="ghost" size="sm" leftIcon={<Settings2 size={12} />} onClick={onConfigure} className="w-full">
               {t('integrations.storeCard.configure')}
-            </CRMButton>
-            <CRMButton
-              variant="ghost"
-              size="sm"
-              leftIcon={
-                togglingAutoSync ? (
-                  <Loader2 size={12} className="animate-spin" />
-                ) : store.autoSyncEnabled ? (
-                  <ZapOff size={12} />
-                ) : (
-                  <Zap size={12} />
-                )
-              }
-              onClick={onToggleAutoSync}
-              disabled={togglingAutoSync}
-              className={cn(
-                'w-full',
-                store.autoSyncEnabled
-                  ? 'text-amber-700 hover:bg-amber-50'
-                  : 'text-emerald-700 hover:bg-emerald-50',
-              )}
-              title={
-                store.autoSyncEnabled
-                  ? t('integrations.storeCard.disableAutoSyncTitle')
-                  : t('integrations.storeCard.enableAutoSyncTitle')
-              }
-            >
-              {store.autoSyncEnabled
-                ? t('integrations.storeCard.disableAutoSync')
-                : t('integrations.storeCard.enableAutoSync')}
             </CRMButton>
             <CRMButton
               variant="ghost"

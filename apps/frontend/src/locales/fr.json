@@ -2641,15 +2641,7 @@
       "relinkTitle": "Promouvoir les produits provisoires créés depuis les commandes en vrais produits en les récupérant à nouveau depuis YouCan.",
       "enable": "Activer",
       "disable": "Désactiver",
-      "delete": "Supprimer",
-      "autoSyncOn": "Sync en arrière-plan ON",
-      "autoSyncOff": "Sync en arrière-plan OFF",
-      "autoSyncOnTooltip": "Le polling 15s est activé — il rattrape les commandes que le webhook temps-réel aurait pu manquer. Les nouvelles commandes arrivent toujours via webhook, quoi qu'il arrive.",
-      "autoSyncOffTooltip": "Le polling périodique est désactivé. Les nouvelles commandes continuent d'arriver en temps réel via le webhook YouCan. Utilisez « Importer les commandes » pour rattraper l'historique manuellement.",
-      "enableAutoSync": "Activer la sync en arrière-plan",
-      "disableAutoSync": "Désactiver la sync en arrière-plan",
-      "enableAutoSyncTitle": "Activer le polling 15s (rattrape ce que le webhook aurait pu manquer). Le webhook temps-réel reste actif.",
-      "disableAutoSyncTitle": "Stopper le polling périodique. Le webhook temps-réel continue d'importer les nouvelles commandes."
+      "delete": "Supprimer"
     },
     "youcan": {
       "subtitle": "Connectez vos boutiques YouCan pour importer les produits et recevoir les commandes en temps réel.",
@@ -2676,11 +2668,6 @@
       "backfillDoneBody": "Mises à jour {{updated}} · déjà correctes {{unchanged}} · analysées {{scanned}}",
       "backfillFailedNote_one": "{{count}} échec",
       "backfillFailedNote_other": "{{count}} échecs",
-      "enableAutoSyncConfirm": "Activer le polling 15s ? Il rattrape les commandes que le webhook temps-réel aurait pu manquer. Les nouvelles commandes arrivent toujours via webhook, quoi qu'il arrive. Vous pouvez désactiver à tout moment.",
-      "autoSyncEnabledToast": "Sync en arrière-plan activée.",
-      "autoSyncDisabledToast": "Sync en arrière-plan désactivée — le webhook temps-réel reste actif.",
-      "autoSyncToggleFailed": "Impossible de mettre à jour la sync en arrière-plan.",
-      "autoSyncToggleFailedTitle": "Échec du changement de sync en arrière-plan",
       "backfillFailedTitle": "Échec de la réparation",
       "backfillFailed": "Impossible de réparer les dates des commandes"
     }
