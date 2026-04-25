@@ -2554,5 +2554,110 @@
       "reconcileEnd": ".",
       "reconcileFailed": "Re-link failed"
     }
+  },
+  "settings": {
+    "page": {
+      "title": "Settings",
+      "subtitle": "Manage how Anaqatoki looks, sounds, and notifies you."
+    },
+    "account": {
+      "title": "Account"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "intro": "Pop-ups that slide in from the bottom-right when orders are assigned to you or confirmed by your team.",
+      "showLabel": "Show notification pop-ups",
+      "showDescription": "When disabled, you won't see any toasts — socket events still run in the background.",
+      "sendTest": "Send test notification",
+      "testTitle": "Test notification",
+      "testBody": "This is how confirmed orders will appear."
+    },
+    "sounds": {
+      "title": "Sounds",
+      "intro": "Short tones play when you're assigned an order (agents) or when an order is confirmed (admins).",
+      "playLabel": "Play notification sounds",
+      "playDescription": "Turn off if you prefer silent alerts.",
+      "volume": "Volume",
+      "previewConfirmed": "Preview confirmed",
+      "previewAssignment": "Preview assignment"
+    },
+    "danger": {
+      "title": "Danger zone",
+      "intro": "Wipe all business data and start fresh. Useful after a test phase or when migrating to a new workflow.",
+      "resetTitle": "Reset full CRM",
+      "resetDescription": "Deletes every order, customer, product, variant, integration (Youcan stores), message log, notification, commission record, expense, automation template, WhatsApp session, and atelie row (employees, tasks, production runs, fabrics, materials). Your user account, roles, and app settings are preserved.",
+      "cannotUndo": "This cannot be undone.",
+      "resetButton": "Reset full CRM…",
+      "modalTitle": "Reset full CRM",
+      "modalWarning": "All business data will be deleted permanently",
+      "modalWarningTail": " — orders, customers, products, integrations, atelie records, messages, notifications, commissions, expenses. Users and roles stay intact.",
+      "confirmInstruction": "To confirm, type the code below exactly:",
+      "loadingCode": "loading…",
+      "confirmPlaceholder": "Type the confirmation code",
+      "codeMismatch": "Code does not match",
+      "cancel": "Cancel",
+      "resetEverything": "Reset everything",
+      "resetting": "Resetting…",
+      "resetCompleteTitle": "CRM reset complete",
+      "resetCompleteBody": "All business data cleared. Reloading…",
+      "resetFailedTitle": "Reset failed",
+      "resetFailedDefault": "Reset failed",
+      "codeLoadFailedTitle": "Could not load confirmation code",
+      "codeLoadFailedBody": "Check that you have the settings:reset_crm permission and try again."
+    },
+    "cities": {
+      "summary_zero": "No cities yet · {{active}} active. These are used to validate the city on every order and to compute the shipping fee.",
+      "summary_one": "{{count}} city total · {{active}} active. These are used to validate the city on every order and to compute the shipping fee.",
+      "summary_other": "{{count}} cities total · {{active}} active. These are used to validate the city on every order and to compute the shipping fee.",
+      "template": "Template",
+      "importCsv": "Import CSV",
+      "importing": "Importing…",
+      "importTitle": "Upsert adds + updates. Replace also deactivates cities not in the CSV.",
+      "modeUpsert": "Upsert",
+      "modeReplace": "Replace",
+      "importDone": "Import done",
+      "importSummary": "Created {{created}} · Updated {{updated}} · Unchanged {{unchanged}}{{deactivatedTail}}{{skippedTail}}",
+      "deactivatedTail": " · Deactivated {{count}}",
+      "skippedTail": " · Skipped {{count}}",
+      "csvIssuesTitle": "CSV issues ({{count}})",
+      "csvIssuesMore": "…and {{count}} more",
+      "addTitle": "Add a city",
+      "addNamePlaceholder": "City name",
+      "addPricePlaceholder": "Price (MAD)",
+      "addZonePlaceholder": "Zone (optional)",
+      "add": "Add",
+      "adding": "Adding…",
+      "searchPlaceholder": "Search by name or zone",
+      "columns": {
+        "city": "City",
+        "price": "Price (MAD)",
+        "zone": "Zone",
+        "active": "Active",
+        "actions": "Actions"
+      },
+      "loading": "Loading…",
+      "emptyNoCities": "No cities yet. Add one above or import a CSV.",
+      "emptyNoMatches": "No matches.",
+      "clickToEdit": "Click to edit",
+      "save": "Save",
+      "cancel": "Cancel",
+      "deleteTitle": "Delete",
+      "deleteConfirm": "Delete {{name}}? Orders that reference this city will keep their stored city name.",
+      "dismiss": "Dismiss",
+      "errors": {
+        "loadFailed": "Failed to load cities",
+        "addInvalid": "Enter a name and a non-negative price",
+        "addFailed": "Failed to add city",
+        "editInvalid": "Invalid price for {{name}}",
+        "saveFailed": "Failed to save city",
+        "toggleFailed": "Failed to toggle city",
+        "deleteFailed": "Failed to delete city",
+        "csvEmpty": "CSV is empty",
+        "noValidRows": "No valid rows found in CSV",
+        "lineMissingName": "Line {{line}}: missing city name",
+        "lineInvalidPrice": "Line {{line}}: invalid price \"{{price}}\"",
+        "importFailed": "Import failed"
+      }
+    }
   }
 }

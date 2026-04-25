@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AlertTriangle, Bell, Volume2, Play, User } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { GlassModal } from '@/components/ui/GlassModal';
@@ -18,6 +19,7 @@ import {
 // env var), so the string never ships in the frontend bundle.
 
 export default function SettingsPage() {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const toastEnabled = useToastStore((s) => s.enabled);
@@ -45,8 +47,8 @@ export default function SettingsPage() {
       });
       pushToast({
         kind: 'confirmed',
-        title: 'CRM reset complete',
-        body: 'All business data cleared. Reloading…',
+        title: t('settings.danger.resetCompleteTitle'),
+        body: t('settings.danger.resetCompleteBody'),
       });
       // Full reload so every cached list (orders, customers, products,
       // integrations…) refetches from a now-empty DB. Small delay so the
@@ -57,10 +59,10 @@ export default function SettingsPage() {
     } catch (err) {
       const msg =
         (err as { response?: { data?: { error?: { message?: string } } } })
-          ?.response?.data?.error?.message ?? 'Reset failed';
+          ?.response?.data?.error?.message ?? t('settings.danger.resetFailedDefault');
       pushToast({
         kind: 'error',
-        title: 'Reset failed',
+        title: t('settings.danger.resetFailedTitle'),
         body: msg,
       });
       setResetSubmitting(false);
@@ -92,15 +94,15 @@ export default function SettingsPage() {
           setExpectedCode(null);
           pushToast({
             kind: 'error',
-            title: 'Could not load confirmation code',
-            body: 'Check that you have the settings:reset_crm permission and try again.',
+            title: t('settings.danger.codeLoadFailedTitle'),
+            body: t('settings.danger.codeLoadFailedBody'),
           });
         }
       });
     return () => {
       cancelled = true;
     };
-  }, [resetOpen, pushToast]);
+  }, [resetOpen, pushToast, t]);
 
   // Persist sound prefs whenever they change — they are read live on every play
   useEffect(() => {
@@ -110,15 +112,15 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <header>
-        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('settings.page.title')}</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Manage how Anaqatoki looks, sounds, and notifies you.
+          {t('settings.page.subtitle')}
         </p>
       </header>
 
       {user && (
         <GlassCard padding="md">
-          <SectionHeader icon={User} title="Account" />
+          <SectionHeader icon={User} title={t('settings.account.title')} />
           <div className="mt-4 flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent text-lg font-semibold text-primary">
               {user.name.charAt(0).toUpperCase()}
@@ -135,15 +137,14 @@ export default function SettingsPage() {
       )}
 
       <GlassCard padding="md">
-        <SectionHeader icon={Bell} title="Notifications" />
+        <SectionHeader icon={Bell} title={t('settings.notifications.title')} />
         <p className="mt-1 text-xs text-gray-500">
-          Pop-ups that slide in from the bottom-right when orders are assigned to
-          you or confirmed by your team.
+          {t('settings.notifications.intro')}
         </p>
         <div className="mt-5 flex flex-col gap-3">
           <ToggleRow
-            label="Show notification pop-ups"
-            description="When disabled, you won't see any toasts — socket events still run in the background."
+            label={t('settings.notifications.showLabel')}
+            description={t('settings.notifications.showDescription')}
             checked={toastEnabled}
             onChange={setToastEnabled}
           />
@@ -156,34 +157,33 @@ export default function SettingsPage() {
               onClick={() =>
                 pushToast({
                   kind: 'confirmed',
-                  title: 'Test notification',
-                  body: 'This is how confirmed orders will appear.',
+                  title: t('settings.notifications.testTitle'),
+                  body: t('settings.notifications.testBody'),
                 })
               }
             >
-              Send test notification
+              {t('settings.notifications.sendTest')}
             </CRMButton>
           </div>
         </div>
       </GlassCard>
 
       <GlassCard padding="md">
-        <SectionHeader icon={Volume2} title="Sounds" />
+        <SectionHeader icon={Volume2} title={t('settings.sounds.title')} />
         <p className="mt-1 text-xs text-gray-500">
-          Short tones play when you're assigned an order (agents) or when an
-          order is confirmed (admins).
+          {t('settings.sounds.intro')}
         </p>
         <div className="mt-5 flex flex-col gap-4">
           <ToggleRow
-            label="Play notification sounds"
-            description="Turn off if you prefer silent alerts."
+            label={t('settings.sounds.playLabel')}
+            description={t('settings.sounds.playDescription')}
             checked={soundEnabled}
             onChange={setSoundEnabled}
           />
 
           <div className={soundEnabled ? '' : 'pointer-events-none opacity-50'}>
             <label className="flex items-center justify-between text-sm font-medium text-gray-700">
-              <span>Volume</span>
+              <span>{t('settings.sounds.volume')}</span>
               <span className="text-xs text-gray-400">{Math.round(volume * 100)}%</span>
             </label>
             <input
@@ -205,7 +205,7 @@ export default function SettingsPage() {
               disabled={!soundEnabled}
               onClick={() => playNotificationSound('confirmed')}
             >
-              Preview confirmed
+              {t('settings.sounds.previewConfirmed')}
             </CRMButton>
             <CRMButton
               size="sm"
@@ -213,7 +213,7 @@ export default function SettingsPage() {
               disabled={!soundEnabled}
               onClick={() => playNotificationSound('assignment')}
             >
-              Preview assignment
+              {t('settings.sounds.previewAssignment')}
             </CRMButton>
           </div>
         </div>
@@ -221,25 +221,20 @@ export default function SettingsPage() {
 
       {canResetCRM && (
         <GlassCard padding="md" className="border border-red-200">
-          <SectionHeader icon={AlertTriangle} title="Danger zone" tone="danger" />
+          <SectionHeader icon={AlertTriangle} title={t('settings.danger.title')} tone="danger" />
           <p className="mt-1 text-xs text-gray-500">
-            Wipe all business data and start fresh. Useful after a test phase
-            or when migrating to a new workflow.
+            {t('settings.danger.intro')}
           </p>
 
           <div className="mt-4 rounded-card border border-red-200 bg-red-50/50 p-4">
             <p className="text-sm font-semibold text-red-800">
-              Reset full CRM
+              {t('settings.danger.resetTitle')}
             </p>
             <p className="mt-1 text-xs text-red-700/90">
-              Deletes every order, customer, product, variant, integration
-              (Youcan stores), message log, notification, commission record,
-              expense, automation template, WhatsApp session, and atelie row
-              (employees, tasks, production runs, fabrics, materials). Your
-              user account, roles, and app settings are preserved.
+              {t('settings.danger.resetDescription')}
             </p>
             <p className="mt-2 text-xs font-semibold text-red-800">
-              This cannot be undone.
+              {t('settings.danger.cannotUndo')}
             </p>
             <div className="mt-3">
               <CRMButton
@@ -248,7 +243,7 @@ export default function SettingsPage() {
                 leftIcon={<AlertTriangle size={14} />}
                 onClick={() => setResetOpen(true)}
               >
-                Reset full CRM…
+                {t('settings.danger.resetButton')}
               </CRMButton>
             </div>
           </div>
@@ -258,7 +253,7 @@ export default function SettingsPage() {
       <GlassModal
         open={resetOpen}
         onClose={closeResetModal}
-        title="Reset full CRM"
+        title={t('settings.danger.modalTitle')}
         size="md"
         footer={
           <div className="flex justify-end gap-2">
@@ -268,7 +263,7 @@ export default function SettingsPage() {
               disabled={resetSubmitting}
               onClick={closeResetModal}
             >
-              Cancel
+              {t('settings.danger.cancel')}
             </CRMButton>
             <CRMButton
               size="sm"
@@ -276,7 +271,7 @@ export default function SettingsPage() {
               disabled={!codeMatches || resetSubmitting}
               onClick={handleResetCRM}
             >
-              {resetSubmitting ? 'Resetting…' : 'Reset everything'}
+              {resetSubmitting ? t('settings.danger.resetting') : t('settings.danger.resetEverything')}
             </CRMButton>
           </div>
         }
@@ -285,32 +280,29 @@ export default function SettingsPage() {
           <div className="flex items-start gap-2 rounded-card border border-red-200 bg-red-50 p-3">
             <AlertTriangle size={16} className="mt-0.5 shrink-0 text-red-600" />
             <p className="leading-snug text-red-800">
-              <span className="font-semibold">All business data will be
-              deleted permanently</span> — orders, customers, products,
-              integrations, atelie records, messages, notifications,
-              commissions, expenses. Users and roles stay intact.
+              <span className="font-semibold">{t('settings.danger.modalWarning')}</span>{t('settings.danger.modalWarningTail')}
             </p>
           </div>
           <p className="text-xs text-gray-500">
-            To confirm, type the code below exactly:
+            {t('settings.danger.confirmInstruction')}
             {' '}
             {expectedCode ? (
               <code className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[11px] text-gray-800">
                 {expectedCode}
               </code>
             ) : (
-              <span className="text-gray-400">loading…</span>
+              <span className="text-gray-400">{t('settings.danger.loadingCode')}</span>
             )}
           </p>
           <CRMInput
             autoFocus
-            placeholder="Type the confirmation code"
+            placeholder={t('settings.danger.confirmPlaceholder')}
             value={resetCode}
             onChange={(e) => setResetCode(e.target.value)}
             disabled={resetSubmitting || expectedCode === null}
             error={
               expectedCode !== null && resetCode.length > 0 && !codeMatches
-                ? 'Code does not match'
+                ? t('settings.danger.codeMismatch')
                 : undefined
             }
           />

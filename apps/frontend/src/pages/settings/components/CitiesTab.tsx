@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Trash2, Upload, MapPin, Search, AlertCircle, CheckCircle2, Loader2, Download } from 'lucide-react';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { CRMInput } from '@/components/ui/CRMInput';
 import { useAuthStore } from '@/store/authStore';
 import { PERMISSIONS } from '@/constants/permissions';
 import { citiesApi, type City, type ImportResponse } from '@/services/citiesApi';
+import type { TFunction } from 'i18next';
 
 // ─── CSV helpers ─────────────────────────────────────────────────────────────
 // Minimal CSV parser — handles quoted fields + commas inside quotes. We roll
@@ -60,9 +62,9 @@ interface ParsedRow {
   zone: string | null;
 }
 
-function parseCityCsv(text: string): { rows: ParsedRow[]; errors: string[] } {
+function parseCityCsv(text: string, t: TFunction): { rows: ParsedRow[]; errors: string[] } {
   const rows = parseCsv(text).filter((r) => r.some((c) => c.trim()));
-  if (rows.length === 0) return { rows: [], errors: ['CSV is empty'] };
+  if (rows.length === 0) return { rows: [], errors: [t('settings.cities.errors.csvEmpty')] };
 
   // Detect header — if the first cell of row 0 is not a number-looking string
   // we treat row 0 as a header.
@@ -78,12 +80,12 @@ function parseCityCsv(text: string): { rows: ParsedRow[]; errors: string[] } {
     const priceStr = (cols[1] ?? '').trim().replace(',', '.');
     const zone = (cols[2] ?? '').trim() || null;
     if (!name) {
-      errors.push(`Line ${lineNo}: missing city name`);
+      errors.push(t('settings.cities.errors.lineMissingName', { line: lineNo }));
       return;
     }
     const price = Number(priceStr);
     if (!Number.isFinite(price) || price < 0) {
-      errors.push(`Line ${lineNo}: invalid price "${priceStr}"`);
+      errors.push(t('settings.cities.errors.lineInvalidPrice', { line: lineNo, price: priceStr }));
       return;
     }
     parsed.push({ name, price, zone });
@@ -94,6 +96,7 @@ function parseCityCsv(text: string): { rows: ParsedRow[]; errors: string[] } {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function CitiesTab() {
+  const { t } = useTranslation();
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canEdit = hasPermission(PERMISSIONS.SETTINGS_EDIT);
 
@@ -125,11 +128,11 @@ export function CitiesTab() {
       setCities(data);
       setError(null);
     } catch (e: any) {
-      setError(e?.response?.data?.error?.message ?? 'Failed to load cities');
+      setError(e?.response?.data?.error?.message ?? t('settings.cities.errors.loadFailed'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     load();
@@ -151,7 +154,7 @@ export function CitiesTab() {
     const name = newName.trim();
     const price = Number(newPrice);
     if (!name || !Number.isFinite(price) || price < 0) {
-      setError('Enter a name and a non-negative price');
+      setError(t('settings.cities.errors.addInvalid'));
       return;
     }
     setAdding(true);
@@ -167,7 +170,7 @@ export function CitiesTab() {
       setNewZone('');
       setError(null);
     } catch (e: any) {
-      setError(e?.response?.data?.error?.message ?? 'Failed to add city');
+      setError(e?.response?.data?.error?.message ?? t('settings.cities.errors.addFailed'));
     } finally {
       setAdding(false);
     }
@@ -189,7 +192,7 @@ export function CitiesTab() {
     if (!draft) return;
     const price = Number(draft.price);
     if (!Number.isFinite(price) || price < 0) {
-      setError(`Invalid price for ${c.name}`);
+      setError(t('settings.cities.errors.editInvalid', { name: c.name }));
       return;
     }
     try {
@@ -198,7 +201,7 @@ export function CitiesTab() {
       cancelEdit(c.id);
       setError(null);
     } catch (e: any) {
-      setError(e?.response?.data?.error?.message ?? 'Failed to save city');
+      setError(e?.response?.data?.error?.message ?? t('settings.cities.errors.saveFailed'));
     }
   };
 
@@ -207,17 +210,17 @@ export function CitiesTab() {
       const updated = await citiesApi.update(c.id, { isActive: !c.isActive });
       setCities((prev) => prev.map((x) => (x.id === c.id ? updated : x)));
     } catch (e: any) {
-      setError(e?.response?.data?.error?.message ?? 'Failed to toggle city');
+      setError(e?.response?.data?.error?.message ?? t('settings.cities.errors.toggleFailed'));
     }
   };
 
   const remove = async (c: City) => {
-    if (!confirm(`Delete ${c.name}? Orders that reference this city will keep their stored city name.`)) return;
+    if (!confirm(t('settings.cities.deleteConfirm', { name: c.name }))) return;
     try {
       await citiesApi.remove(c.id);
       setCities((prev) => prev.filter((x) => x.id !== c.id));
     } catch (e: any) {
-      setError(e?.response?.data?.error?.message ?? 'Failed to delete city');
+      setError(e?.response?.data?.error?.message ?? t('settings.cities.errors.deleteFailed'));
     }
   };
 
@@ -232,12 +235,12 @@ export function CitiesTab() {
     setImportResult(null);
     try {
       const text = await file.text();
-      const { rows, errors } = parseCityCsv(text);
+      const { rows, errors } = parseCityCsv(text, t);
       if (errors.length > 0) {
         setCsvErrors(errors);
       }
       if (rows.length === 0) {
-        setError('No valid rows found in CSV');
+        setError(t('settings.cities.errors.noValidRows'));
         return;
       }
       setImporting(true);
@@ -245,7 +248,7 @@ export function CitiesTab() {
       setImportResult(result);
       await load();
     } catch (err: any) {
-      setError(err?.response?.data?.error?.message ?? err?.message ?? 'Import failed');
+      setError(err?.response?.data?.error?.message ?? err?.message ?? t('settings.cities.errors.importFailed'));
     } finally {
       setImporting(false);
     }
@@ -268,23 +271,22 @@ export function CitiesTab() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs text-gray-400">
-            {cities.length} cities total · {activeCount} active. These are used to validate the city on every
-            order and to compute the shipping fee.
+            {t('settings.cities.summary', { count: cities.length, active: activeCount })}
           </p>
         </div>
         {canEdit && (
           <div className="flex items-center gap-2">
             <CRMButton variant="ghost" size="sm" leftIcon={<Download size={13} />} onClick={downloadTemplate}>
-              Template
+              {t('settings.cities.template')}
             </CRMButton>
             <select
               value={importMode}
               onChange={(e) => setImportMode(e.target.value as 'upsert' | 'replace')}
               className="h-8 rounded-input border border-gray-200 bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/30"
-              title="Upsert adds + updates. Replace also deactivates cities not in the CSV."
+              title={t('settings.cities.importTitle')}
             >
-              <option value="upsert">Upsert</option>
-              <option value="replace">Replace</option>
+              <option value="upsert">{t('settings.cities.modeUpsert')}</option>
+              <option value="replace">{t('settings.cities.modeReplace')}</option>
             </select>
             <CRMButton
               variant="secondary"
@@ -293,7 +295,7 @@ export function CitiesTab() {
               onClick={handleFilePick}
               disabled={importing}
             >
-              {importing ? 'Importing…' : 'Import CSV'}
+              {importing ? t('settings.cities.importing') : t('settings.cities.importCsv')}
             </CRMButton>
             <input
               ref={fileInputRef}
@@ -321,33 +323,44 @@ export function CitiesTab() {
         <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs text-emerald-800">
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-2 font-semibold">
-              <CheckCircle2 size={14} /> Import done
+              <CheckCircle2 size={14} /> {t('settings.cities.importDone')}
             </span>
             <button
               type="button"
               onClick={() => setImportResult(null)}
               className="text-emerald-700/70 hover:text-emerald-900"
             >
-              Dismiss
+              {t('settings.cities.dismiss')}
             </button>
           </div>
           <p className="mt-1 text-emerald-700">
-            Created {importResult.summary.created} · Updated {importResult.summary.updated} · Unchanged{' '}
-            {importResult.summary.unchanged}
-            {importResult.summary.deactivated > 0 ? ` · Deactivated ${importResult.summary.deactivated}` : ''}
-            {importResult.summary.skipped > 0 ? ` · Skipped ${importResult.summary.skipped}` : ''}
+            {t('settings.cities.importSummary', {
+              created: importResult.summary.created,
+              updated: importResult.summary.updated,
+              unchanged: importResult.summary.unchanged,
+              deactivatedTail:
+                importResult.summary.deactivated > 0
+                  ? t('settings.cities.deactivatedTail', { count: importResult.summary.deactivated })
+                  : '',
+              skippedTail:
+                importResult.summary.skipped > 0
+                  ? t('settings.cities.skippedTail', { count: importResult.summary.skipped })
+                  : '',
+            })}
           </p>
         </div>
       )}
 
       {csvErrors.length > 0 && (
         <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs text-amber-800">
-          <p className="mb-1 font-semibold">CSV issues ({csvErrors.length})</p>
+          <p className="mb-1 font-semibold">{t('settings.cities.csvIssuesTitle', { count: csvErrors.length })}</p>
           <ul className="ml-4 list-disc space-y-0.5">
             {csvErrors.slice(0, 8).map((e) => (
               <li key={e}>{e}</li>
             ))}
-            {csvErrors.length > 8 && <li>…and {csvErrors.length - 8} more</li>}
+            {csvErrors.length > 8 && (
+              <li>{t('settings.cities.csvIssuesMore', { count: csvErrors.length - 8 })}</li>
+            )}
           </ul>
         </div>
       )}
@@ -356,17 +369,17 @@ export function CitiesTab() {
       {canEdit && (
         <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
           <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gray-900">
-            <Plus size={14} className="text-primary" /> Add a city
+            <Plus size={14} className="text-primary" /> {t('settings.cities.addTitle')}
           </h3>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-[1.5fr_1fr_1fr_auto]">
             <CRMInput
-              placeholder="City name"
+              placeholder={t('settings.cities.addNamePlaceholder')}
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               disabled={adding}
             />
             <CRMInput
-              placeholder="Price (MAD)"
+              placeholder={t('settings.cities.addPricePlaceholder')}
               type="number"
               min={0}
               value={newPrice}
@@ -374,13 +387,13 @@ export function CitiesTab() {
               disabled={adding}
             />
             <CRMInput
-              placeholder="Zone (optional)"
+              placeholder={t('settings.cities.addZonePlaceholder')}
               value={newZone}
               onChange={(e) => setNewZone(e.target.value)}
               disabled={adding}
             />
             <CRMButton variant="primary" onClick={handleAdd} disabled={adding}>
-              {adding ? 'Adding…' : 'Add'}
+              {adding ? t('settings.cities.adding') : t('settings.cities.add')}
             </CRMButton>
           </div>
         </div>
@@ -391,7 +404,7 @@ export function CitiesTab() {
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
           type="text"
-          placeholder="Search by name or zone"
+          placeholder={t('settings.cities.searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full rounded-input border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -403,18 +416,18 @@ export function CitiesTab() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-[11px] uppercase tracking-wide text-gray-500">
             <tr>
-              <th className="px-4 py-2.5 text-left font-semibold">City</th>
-              <th className="px-4 py-2.5 text-right font-semibold">Price (MAD)</th>
-              <th className="px-4 py-2.5 text-left font-semibold">Zone</th>
-              <th className="px-4 py-2.5 text-center font-semibold">Active</th>
-              <th className="px-4 py-2.5 text-right font-semibold">{canEdit ? 'Actions' : ''}</th>
+              <th className="px-4 py-2.5 text-left font-semibold">{t('settings.cities.columns.city')}</th>
+              <th className="px-4 py-2.5 text-right font-semibold">{t('settings.cities.columns.price')}</th>
+              <th className="px-4 py-2.5 text-left font-semibold">{t('settings.cities.columns.zone')}</th>
+              <th className="px-4 py-2.5 text-center font-semibold">{t('settings.cities.columns.active')}</th>
+              <th className="px-4 py-2.5 text-right font-semibold">{canEdit ? t('settings.cities.columns.actions') : ''}</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
                 <td colSpan={5} className="px-4 py-10 text-center text-xs text-gray-400">
-                  Loading…
+                  {t('settings.cities.loading')}
                 </td>
               </tr>
             ) : filtered.length === 0 ? (
@@ -425,7 +438,9 @@ export function CitiesTab() {
                       <MapPin size={18} />
                     </div>
                     <p className="text-xs text-gray-400">
-                      {cities.length === 0 ? 'No cities yet. Add one above or import a CSV.' : 'No matches.'}
+                      {cities.length === 0
+                        ? t('settings.cities.emptyNoCities')
+                        : t('settings.cities.emptyNoMatches')}
                     </p>
                   </div>
                 </td>
@@ -455,7 +470,7 @@ export function CitiesTab() {
                         <span
                           onClick={() => canEdit && startEdit(c)}
                           className={canEdit ? 'cursor-pointer hover:text-primary' : undefined}
-                          title={canEdit ? 'Click to edit' : undefined}
+                          title={canEdit ? t('settings.cities.clickToEdit') : undefined}
                         >
                           {c.price.toLocaleString('fr-MA')}
                         </span>
@@ -502,17 +517,17 @@ export function CitiesTab() {
                           {isEditing ? (
                             <>
                               <CRMButton variant="primary" size="sm" onClick={() => saveEdit(c)}>
-                                Save
+                                {t('settings.cities.save')}
                               </CRMButton>
                               <CRMButton variant="ghost" size="sm" onClick={() => cancelEdit(c.id)}>
-                                Cancel
+                                {t('settings.cities.cancel')}
                               </CRMButton>
                             </>
                           ) : (
                             <button
                               type="button"
                               onClick={() => remove(c)}
-                              title="Delete"
+                              title={t('settings.cities.deleteTitle')}
                               className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-300 transition-colors hover:bg-red-50 hover:text-red-500"
                             >
                               <Trash2 size={13} />

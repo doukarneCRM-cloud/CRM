@@ -2554,5 +2554,110 @@
       "reconcileEnd": ".",
       "reconcileFailed": "Échec de la re-liaison"
     }
+  },
+  "settings": {
+    "page": {
+      "title": "Paramètres",
+      "subtitle": "Gérez l'apparence, les sons et les notifications d'Anaqatoki."
+    },
+    "account": {
+      "title": "Compte"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "intro": "Pop-ups qui apparaissent en bas à droite lorsque des commandes vous sont attribuées ou confirmées par votre équipe.",
+      "showLabel": "Afficher les pop-ups de notification",
+      "showDescription": "Désactivé, vous ne verrez aucun toast — les événements socket continuent en arrière-plan.",
+      "sendTest": "Envoyer une notification de test",
+      "testTitle": "Notification de test",
+      "testBody": "Voici comment apparaîtront les commandes confirmées."
+    },
+    "sounds": {
+      "title": "Sons",
+      "intro": "Des tonalités courtes sont jouées lorsqu'une commande vous est attribuée (agents) ou lorsqu'une commande est confirmée (admins).",
+      "playLabel": "Jouer les sons de notification",
+      "playDescription": "Désactivez si vous préférez les alertes silencieuses.",
+      "volume": "Volume",
+      "previewConfirmed": "Aperçu confirmation",
+      "previewAssignment": "Aperçu attribution"
+    },
+    "danger": {
+      "title": "Zone dangereuse",
+      "intro": "Effacez toutes les données métier et repartez de zéro. Utile après une phase de test ou lors de la migration vers un nouveau flux de travail.",
+      "resetTitle": "Réinitialiser tout le CRM",
+      "resetDescription": "Supprime toutes les commandes, clients, produits, variantes, intégrations (boutiques YouCan), journaux de messages, notifications, enregistrements de commissions, dépenses, modèles d'automatisation, sessions WhatsApp et lignes d'atelier (employés, tâches, lots de production, tissus, matériaux). Votre compte utilisateur, vos rôles et les paramètres de l'application sont préservés.",
+      "cannotUndo": "Cette action est irréversible.",
+      "resetButton": "Réinitialiser tout le CRM…",
+      "modalTitle": "Réinitialiser tout le CRM",
+      "modalWarning": "Toutes les données métier seront définitivement supprimées",
+      "modalWarningTail": " — commandes, clients, produits, intégrations, enregistrements atelier, messages, notifications, commissions, dépenses. Les utilisateurs et les rôles restent intacts.",
+      "confirmInstruction": "Pour confirmer, tapez le code ci-dessous exactement :",
+      "loadingCode": "chargement…",
+      "confirmPlaceholder": "Tapez le code de confirmation",
+      "codeMismatch": "Le code ne correspond pas",
+      "cancel": "Annuler",
+      "resetEverything": "Tout réinitialiser",
+      "resetting": "Réinitialisation…",
+      "resetCompleteTitle": "Réinitialisation du CRM terminée",
+      "resetCompleteBody": "Toutes les données métier ont été effacées. Rechargement…",
+      "resetFailedTitle": "Échec de la réinitialisation",
+      "resetFailedDefault": "Échec de la réinitialisation",
+      "codeLoadFailedTitle": "Impossible de charger le code de confirmation",
+      "codeLoadFailedBody": "Vérifiez que vous disposez de la permission settings:reset_crm et réessayez."
+    },
+    "cities": {
+      "summary_zero": "Aucune ville · {{active}} actives. Elles servent à valider la ville de chaque commande et à calculer les frais de livraison.",
+      "summary_one": "{{count}} ville au total · {{active}} active. Elles servent à valider la ville de chaque commande et à calculer les frais de livraison.",
+      "summary_other": "{{count}} villes au total · {{active}} actives. Elles servent à valider la ville de chaque commande et à calculer les frais de livraison.",
+      "template": "Modèle",
+      "importCsv": "Importer CSV",
+      "importing": "Importation…",
+      "importTitle": "Upsert ajoute et met à jour. Remplacer désactive aussi les villes absentes du CSV.",
+      "modeUpsert": "Upsert",
+      "modeReplace": "Remplacer",
+      "importDone": "Importation terminée",
+      "importSummary": "Créées {{created}} · Mises à jour {{updated}} · Inchangées {{unchanged}}{{deactivatedTail}}{{skippedTail}}",
+      "deactivatedTail": " · Désactivées {{count}}",
+      "skippedTail": " · Ignorées {{count}}",
+      "csvIssuesTitle": "Problèmes CSV ({{count}})",
+      "csvIssuesMore": "…et {{count}} de plus",
+      "addTitle": "Ajouter une ville",
+      "addNamePlaceholder": "Nom de la ville",
+      "addPricePlaceholder": "Prix (MAD)",
+      "addZonePlaceholder": "Zone (optionnel)",
+      "add": "Ajouter",
+      "adding": "Ajout…",
+      "searchPlaceholder": "Rechercher par nom ou zone",
+      "columns": {
+        "city": "Ville",
+        "price": "Prix (MAD)",
+        "zone": "Zone",
+        "active": "Active",
+        "actions": "Actions"
+      },
+      "loading": "Chargement…",
+      "emptyNoCities": "Aucune ville. Ajoutez-en une ci-dessus ou importez un CSV.",
+      "emptyNoMatches": "Aucun résultat.",
+      "clickToEdit": "Cliquer pour modifier",
+      "save": "Enregistrer",
+      "cancel": "Annuler",
+      "deleteTitle": "Supprimer",
+      "deleteConfirm": "Supprimer {{name}} ? Les commandes faisant référence à cette ville conserveront leur nom de ville enregistré.",
+      "dismiss": "Ignorer",
+      "errors": {
+        "loadFailed": "Échec du chargement des villes",
+        "addInvalid": "Saisissez un nom et un prix non négatif",
+        "addFailed": "Échec de l'ajout de la ville",
+        "editInvalid": "Prix invalide pour {{name}}",
+        "saveFailed": "Échec de l'enregistrement de la ville",
+        "toggleFailed": "Échec du basculement de la ville",
+        "deleteFailed": "Échec de la suppression de la ville",
+        "csvEmpty": "Le CSV est vide",
+        "noValidRows": "Aucune ligne valide trouvée dans le CSV",
+        "lineMissingName": "Ligne {{line}} : nom de ville manquant",
+        "lineInvalidPrice": "Ligne {{line}} : prix invalide \"{{price}}\"",
+        "importFailed": "Échec de l'importation"
+      }
+    }
   }
 }
