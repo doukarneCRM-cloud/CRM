@@ -6,7 +6,7 @@ import { CRMButton } from '@/components/ui/CRMButton';
 import { CRMInput } from '@/components/ui/CRMInput';
 import { authService } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
-import { ROUTES } from '@/constants/routes';
+import { getLandingRoute } from '@/lib/landingRoute';
 import { cn } from '@/lib/cn';
 import type { LoginResponse } from '@/types/auth';
 
@@ -81,7 +81,7 @@ function Logo() {
 export default function LoginPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { setAuth, isAuthenticated } = useAuthStore();
+  const { setAuth, isAuthenticated, hasPermission } = useAuthStore();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -101,7 +101,7 @@ export default function LoginPage() {
   }, [shake]);
 
   if (isAuthenticated) {
-    return <Navigate to={ROUTES.DASHBOARD} replace />;
+    return <Navigate to={getLandingRoute(hasPermission)} replace />;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -115,7 +115,7 @@ export default function LoginPage() {
       const { data } = await authService.login(email.trim(), password, rememberMe);
       const res = data as LoginResponse;
       setAuth(res.user, res.accessToken, res.refreshToken);
-      navigate(ROUTES.DASHBOARD, { replace: true });
+      navigate(getLandingRoute(hasPermission), { replace: true });
     } catch (err: unknown) {
       const axiosErr = err as { response?: { status?: number; data?: ApiErrorBody } };
       const status = axiosErr.response?.status;

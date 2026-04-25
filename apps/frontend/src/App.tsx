@@ -1,6 +1,8 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ROUTES } from '@/constants/routes';
 import { PERMISSIONS } from '@/constants/permissions';
+import { useAuthStore } from '@/store/authStore';
+import { getLandingRoute } from '@/lib/landingRoute';
 
 // Guards & Layout
 import { AuthGuard } from '@/app/guards/AuthGuard';
@@ -264,14 +266,21 @@ export default function App() {
             }
           />
 
-          {/* Default inside app → dashboard */}
-          <Route index element={<Navigate to={ROUTES.DASHBOARD} replace />} />
+          {/* Default inside app → user's landing route */}
+          <Route index element={<LandingRedirect />} />
         </Route>
       </Route>
 
       {/* ── Fallback ────────────────────────────────────────────────────── */}
-      <Route path="/" element={<Navigate to={ROUTES.DASHBOARD} replace />} />
+      <Route path="/" element={<LandingRedirect />} />
       <Route path="*" element={<Navigate to={ROUTES.LOGIN} replace />} />
     </Routes>
   );
+}
+
+// Inline component so the redirect target reacts to the current user's
+// permissions — agents land on Call Center, admins on Dashboard, etc.
+function LandingRedirect() {
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  return <Navigate to={getLandingRoute(hasPermission)} replace />;
 }

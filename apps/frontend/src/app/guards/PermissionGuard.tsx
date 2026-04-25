@@ -1,6 +1,6 @@
 import { Navigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
-import { ROUTES } from '@/constants/routes';
+import { getLandingRoute } from '@/lib/landingRoute';
 
 interface PermissionGuardProps {
   requires: string | string[];
@@ -25,7 +25,9 @@ export function PermissionGuard({
 
   if (!allowed) {
     if (fallback) return <>{fallback}</>;
-    return <Navigate to={ROUTES.DASHBOARD} replace />;
+    // Send the user to whatever page they CAN open — sending agents back to
+    // the Dashboard creates a redirect loop because they lack `dashboard:view`.
+    return <Navigate to={getLandingRoute(hasPermission)} replace />;
   }
 
   return <>{children}</>;
