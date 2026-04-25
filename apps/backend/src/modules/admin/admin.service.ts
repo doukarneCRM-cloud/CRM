@@ -163,3 +163,63 @@ export async function resetCRM(
 
   return summary;
 }
+
+// Targeted wipe — clears only the orders + customers subgraph and the
+// rows that reference them (conversations, message logs, notifications,
+// commission payments, import logs, the ref counter). Everything else
+// stays: products, stores, agents/roles, automation rules, atelie data,
+// commission rules, expenses, settings.
+//
+// Use case: admin linked YouCan, customers + orders auto-imported, admin
+// wants to start fresh on the order side without re-doing every other
+// piece of setup.
+export async function resetOrdersAndCustomers(code: string): Promise<ResetCRMSummary> {
+  if (code !== RESET_CODE) {
+    const err = new Error('Invalid confirmation code') as Error & {
+      statusCode: number;
+      code: string;
+    };
+    err.statusCode = 400;
+    err.code = 'INVALID_CONFIRMATION_CODE';
+    throw err;
+  }
+
+  const summary: ResetCRMSummary = {};
+
+  await prisma.$transaction(
+    async (tx) => {
+      // WhatsApp threads reference customers; messages cascade from the
+      // thread, but we count them explicitly for an honest summary.
+      summary.whatsAppMessage = (await tx.whatsAppMessage.deleteMany({})).count;
+      summary.whatsAppThread = (await tx.whatsAppThread.deleteMany({})).count;
+      summary.messageLog = (await tx.messageLog.deleteMany({})).count;
+
+      // Notifications often link to an orderId — wipe before orders so we
+      // don't dangle, and so the bell starts clean.
+      summary.notification = (await tx.notification.deleteMany({})).count;
+
+      // Commission payments reference orders. Commission *rules* (the
+      // per-agent rates) are deliberately preserved.
+      summary.commissionPayment = (await tx.commissionPayment.deleteMany({})).count;
+
+      // Order subgraph (children before parent so explicit counts work)
+      summary.orderLog = (await tx.orderLog.deleteMany({})).count;
+      summary.orderItem = (await tx.orderItem.deleteMany({})).count;
+      summary.order = (await tx.order.deleteMany({})).count;
+
+      // Now safe to drop customers — order + thread refs are gone.
+      summary.customer = (await tx.customer.deleteMany({})).count;
+
+      // YouCan import history points at deleted orders/products by id —
+      // clearing keeps the integration log honest. Stores stay, so the
+      // OAuth token + webhook subscription remain in place.
+      summary.importLog = (await tx.importLog.deleteMany({})).count;
+
+      // Reset the order-ref sequence so the next order starts fresh.
+      summary.counter = (await tx.counter.deleteMany({})).count;
+    },
+    { maxWait: 10_000, timeout: 300_000 },
+  );
+
+  return summary;
+}

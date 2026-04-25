@@ -35,8 +35,15 @@ export default function SettingsPage() {
   const [resetCode, setResetCode] = useState('');
   const [resetSubmitting, setResetSubmitting] = useState(false);
   const [wipeOtherUsers, setWipeOtherUsers] = useState(false);
+  // Second action — scoped wipe of just orders + customers (and rows that
+  // reference them). Reuses the same expectedCode (one fetch covers both
+  // modals); independent submitting state so the two CTAs don't fight.
+  const [scopedOpen, setScopedOpen] = useState(false);
+  const [scopedCode, setScopedCode] = useState('');
+  const [scopedSubmitting, setScopedSubmitting] = useState(false);
   const [expectedCode, setExpectedCode] = useState<string | null>(null);
   const codeMatches = expectedCode !== null && resetCode === expectedCode;
+  const scopedCodeMatches = expectedCode !== null && scopedCode === expectedCode;
   const canResetCRM = hasPermission('settings:reset_crm');
 
   async function handleResetCRM() {
@@ -78,11 +85,46 @@ export default function SettingsPage() {
     setWipeOtherUsers(false);
   }
 
-  // Fetch the expected code from the backend once the modal opens. Failing
-  // means the server-side permission or endpoint isn't available — the
-  // button stays disabled (codeMatches requires expectedCode !== null).
+  async function handleResetOrdersAndCustomers() {
+    if (!scopedCodeMatches || scopedSubmitting) return;
+    setScopedSubmitting(true);
+    try {
+      await api.post('/admin/reset-orders-customers', {
+        confirmationCode: scopedCode,
+      });
+      pushToast({
+        kind: 'confirmed',
+        title: t('settings.danger.scopedCompleteTitle'),
+        body: t('settings.danger.scopedCompleteBody'),
+      });
+      setTimeout(() => {
+        window.location.reload();
+      }, 800);
+    } catch (err) {
+      const msg =
+        (err as { response?: { data?: { error?: { message?: string } } } })
+          ?.response?.data?.error?.message ?? t('settings.danger.resetFailedDefault');
+      pushToast({
+        kind: 'error',
+        title: t('settings.danger.resetFailedTitle'),
+        body: msg,
+      });
+      setScopedSubmitting(false);
+    }
+  }
+
+  function closeScopedModal() {
+    if (scopedSubmitting) return;
+    setScopedOpen(false);
+    setScopedCode('');
+  }
+
+  // Fetch the expected code from the backend whenever either danger-zone
+  // modal opens. Failing means the server-side permission or endpoint
+  // isn't available — the button stays disabled (codeMatches requires
+  // expectedCode !== null).
   useEffect(() => {
-    if (!resetOpen) {
+    if (!resetOpen && !scopedOpen) {
       setExpectedCode(null);
       return;
     }
@@ -105,7 +147,7 @@ export default function SettingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [resetOpen, pushToast, t]);
+  }, [resetOpen, scopedOpen, pushToast, t]);
 
   // Persist sound prefs whenever they change — they are read live on every play
   useEffect(() => {
@@ -229,6 +271,28 @@ export default function SettingsPage() {
             {t('settings.danger.intro')}
           </p>
 
+          <div className="mt-4 rounded-card border border-amber-200 bg-amber-50/50 p-4">
+            <p className="text-sm font-semibold text-amber-900">
+              {t('settings.danger.scopedTitle')}
+            </p>
+            <p className="mt-1 text-xs text-amber-800/90">
+              {t('settings.danger.scopedDescription')}
+            </p>
+            <p className="mt-2 text-xs font-semibold text-amber-900">
+              {t('settings.danger.cannotUndo')}
+            </p>
+            <div className="mt-3">
+              <CRMButton
+                size="sm"
+                variant="secondary"
+                leftIcon={<AlertTriangle size={14} />}
+                onClick={() => setScopedOpen(true)}
+              >
+                {t('settings.danger.scopedButton')}
+              </CRMButton>
+            </div>
+          </div>
+
           <div className="mt-4 rounded-card border border-red-200 bg-red-50/50 p-4">
             <p className="text-sm font-semibold text-red-800">
               {t('settings.danger.resetTitle')}
@@ -323,6 +387,66 @@ export default function SettingsPage() {
               {t('settings.danger.wipeUsersHint')}
             </span>
           </label>
+        </div>
+      </GlassModal>
+
+      <GlassModal
+        open={scopedOpen}
+        onClose={closeScopedModal}
+        title={t('settings.danger.scopedModalTitle')}
+        size="md"
+        footer={
+          <div className="flex justify-end gap-2">
+            <CRMButton
+              size="sm"
+              variant="ghost"
+              disabled={scopedSubmitting}
+              onClick={closeScopedModal}
+            >
+              {t('settings.danger.cancel')}
+            </CRMButton>
+            <CRMButton
+              size="sm"
+              variant="danger"
+              disabled={!scopedCodeMatches || scopedSubmitting}
+              onClick={handleResetOrdersAndCustomers}
+            >
+              {scopedSubmitting
+                ? t('settings.danger.resetting')
+                : t('settings.danger.scopedConfirmCta')}
+            </CRMButton>
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-3 text-sm text-gray-700">
+          <div className="flex items-start gap-2 rounded-card border border-amber-200 bg-amber-50 p-3">
+            <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-700" />
+            <p className="leading-snug text-amber-900">
+              <span className="font-semibold">{t('settings.danger.scopedModalWarning')}</span>{t('settings.danger.scopedModalWarningTail')}
+            </p>
+          </div>
+          <p className="text-xs text-gray-500">
+            {t('settings.danger.confirmInstruction')}{' '}
+            {expectedCode ? (
+              <code className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[11px] text-gray-800">
+                {expectedCode}
+              </code>
+            ) : (
+              <span className="text-gray-400">{t('settings.danger.loadingCode')}</span>
+            )}
+          </p>
+          <CRMInput
+            autoFocus
+            placeholder={t('settings.danger.confirmPlaceholder')}
+            value={scopedCode}
+            onChange={(e) => setScopedCode(e.target.value)}
+            disabled={scopedSubmitting || expectedCode === null}
+            error={
+              expectedCode !== null && scopedCode.length > 0 && !scopedCodeMatches
+                ? t('settings.danger.codeMismatch')
+                : undefined
+            }
+          />
         </div>
       </GlassModal>
     </div>

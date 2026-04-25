@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { verifyJWT } from '../../shared/middleware/verifyJWT';
 import { requirePermission } from '../../shared/middleware/rbac.middleware';
-import { resetCRM, getResetCode } from './admin.service';
+import { resetCRM, resetOrdersAndCustomers, getResetCode } from './admin.service';
 
 export async function adminRoutes(app: FastifyInstance) {
   // Returns the current confirmation code to authorized users so the UI can
@@ -43,6 +43,30 @@ export async function adminRoutes(app: FastifyInstance) {
       const summary = await resetCRM(confirmationCode, {
         keepUserId: wipeOtherUsers ? request.user.sub : undefined,
       });
+      return reply.send({ ok: true, summary });
+    },
+  );
+
+  // Targeted wipe — clears only orders, customers, and the rows that
+  // reference them. Same `settings:reset_crm` permission and same typed
+  // confirmation code as the full reset. Used when an integration
+  // auto-imported data the admin didn't expect.
+  app.post<{ Body: { confirmationCode?: string } }>(
+    '/reset-orders-customers',
+    { preHandler: [verifyJWT, requirePermission('settings:reset_crm')] },
+    async (request, reply) => {
+      const { confirmationCode } = request.body ?? {};
+      if (typeof confirmationCode !== 'string' || confirmationCode.length === 0) {
+        return reply.status(400).send({
+          error: {
+            code: 'INVALID_BODY',
+            message: 'confirmationCode is required',
+            statusCode: 400,
+          },
+        });
+      }
+
+      const summary = await resetOrdersAndCustomers(confirmationCode);
       return reply.send({ ok: true, summary });
     },
   );
