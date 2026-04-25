@@ -130,6 +130,7 @@ model User {
   createdRules        AutomationRule[]    @relation("RuleAuthor")
   assignedThreads     WhatsAppThread[]    @relation("ThreadAssignee")
   whatsappMessages    WhatsAppMessage[]   @relation("MessageAuthor")
+  createdStatusGroups ShippingStatusGroup[] @relation("StatusGroupAuthor")
 }
 
 model RefreshToken {
@@ -1063,4 +1064,25 @@ model WhatsAppMessage {
 
   @@index([threadId, createdAt])
   @@index([providerId])
+}
+
+// ─── Shipping status groups (Call Center pill grouping) ─────────────────────
+
+// Admin-managed buckets that roll up the long ShippingStatus enum into a
+// handful of named tabs ("Active", "Issues", "Delivered", …) on the Call
+// Center page. `statusKeys` holds the raw enum strings so adding a new
+// ShippingStatus value never requires a schema change. Statuses not claimed
+// by any group automatically surface in the frontend's "Other" tab.
+model ShippingStatusGroup {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  color       String?
+  statusKeys  String[]
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  createdBy   User?    @relation("StatusGroupAuthor", fields: [createdById], references: [id])
+
+  @@index([position])
 }

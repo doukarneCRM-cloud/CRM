@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useCallback, useRef, type MouseEvent } fr
 import { useTranslation } from 'react-i18next';
 import {
   History, MessageCircle, Send, Package, Phone, StickyNote, PhoneOff, Truck, Search, X,
-  AlertTriangle, Copy, Check, Plus,
+  AlertTriangle, Copy, Check, Plus, Settings,
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { CRMButton } from '@/components/ui/CRMButton';
@@ -14,6 +14,7 @@ import { useAuthStore } from '@/store/authStore';
 import {
   CONFIRMATION_STATUS_COLORS,
   SHIPPING_STATUS_COLORS,
+  getStatusConfig,
   type ConfirmationStatus,
   type ShippingStatus,
 } from '@/constants/statusColors';
@@ -24,6 +25,9 @@ import { useClickOutside } from '@/hooks/useClickOutside';
 import { useCallCenterStore } from '../callCenterStore';
 import { OrderLogsModal } from '@/pages/orders/components/OrderLogsModal';
 import { CustomerHistoryModal } from '@/pages/orders/components/CustomerHistoryModal';
+import { useShippingStatusGroups } from '../hooks/useShippingStatusGroups';
+import { ManageStatusGroupsModal } from './ManageStatusGroupsModal';
+import { PERMISSIONS } from '@/constants/permissions';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -723,9 +727,22 @@ interface FilterPillsProps {
   onChange: (status: string | null) => void;
 }
 
+// Sentinel for the auto-generated "Other" tab — anything not claimed by a
+// user-defined group lands here. Picked to never collide with a real group id.
+const OTHER_GROUP_ID = '__other__';
+
 function FilterPills({ section, orders, selected, onChange }: FilterPillsProps) {
   const { t } = useTranslation();
   const colors = section === 'confirmation' ? CONFIRMATION_STATUS_COLORS : SHIPPING_STATUS_COLORS;
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const canManageGroups = hasPermission(PERMISSIONS.SHIPPING_GROUPS_MANAGE);
+
+  // Groups only apply on the shipping tab. The hook still runs on confirmation
+  // (cheap idempotent fetch) but we ignore the result to keep code branches
+  // tight.
+  const { groups } = useShippingStatusGroups();
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const [manageOpen, setManageOpen] = useState(false);
 
   const counts = useMemo(() => {
     const map = new Map<string, number>();
@@ -747,55 +764,207 @@ function FilterPills({ section, orders, selected, onChange }: FilterPillsProps) 
     );
   }, [orders, section]);
 
+  // Statuses NOT claimed by any group, projected against the live `counts`
+  // map. Drives the "Other" tab + restricts pill visibility when it's active.
+  const orphanStatuses = useMemo(() => {
+    if (section !== 'shipping') return new Set<string>();
+    const claimed = new Set<string>();
+    for (const g of groups) for (const k of g.statusKeys) claimed.add(k);
+    const orphans = new Set<string>();
+    for (const k of Object.keys(SHIPPING_STATUS_COLORS)) {
+      if (!claimed.has(k) && (counts.get(k) ?? 0) > 0) orphans.add(k);
+    }
+    return orphans;
+  }, [groups, counts, section]);
+
+  // Decide which status keys the pill row should show given the active tab.
+  const visibleStatusKeys = useMemo(() => {
+    if (section !== 'shipping' || groups.length === 0 || activeGroupId === null) {
+      // "All" tab OR no groups defined OR confirmation tab → flat behaviour:
+      // every status with count > 0, in the natural enum order.
+      return Object.keys(colors).filter((k) => (counts.get(k) ?? 0) > 0);
+    }
+    if (activeGroupId === OTHER_GROUP_ID) {
+      return [...orphanStatuses];
+    }
+    const grp = groups.find((g) => g.id === activeGroupId);
+    if (!grp) return Object.keys(colors).filter((k) => (counts.get(k) ?? 0) > 0);
+    return grp.statusKeys.filter((k) => (counts.get(k) ?? 0) > 0);
+  }, [section, groups, activeGroupId, colors, counts, orphanStatuses]);
+
+  // Group-tab strip is shipping-only and only when at least one group exists.
+  const showGroupTabs = section === 'shipping' && groups.length > 0;
+
+  // Per-tab order count, used as a secondary number badge on each tab.
+  const groupCounts = useMemo(() => {
+    if (!showGroupTabs) return new Map<string, number>();
+    const map = new Map<string, number>();
+    for (const g of groups) {
+      let total = 0;
+      for (const k of g.statusKeys) total += counts.get(k) ?? 0;
+      map.set(g.id, total);
+    }
+    let otherTotal = 0;
+    for (const k of orphanStatuses) otherTotal += counts.get(k) ?? 0;
+    map.set(OTHER_GROUP_ID, otherTotal);
+    return map;
+  }, [groups, counts, showGroupTabs, orphanStatuses]);
+
+  // Switching group resets the status-pill selection so the visible list
+  // stays in sync with what's on screen.
+  const switchGroup = (id: string | null) => {
+    setActiveGroupId(id);
+    onChange(null);
+  };
+
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <button
-        type="button"
-        onClick={() => onChange(null)}
+    <div className="space-y-2">
+      {showGroupTabs && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <GroupTabButton
+            label={t('callCenter.groups.all')}
+            count={orders.length}
+            active={activeGroupId === null}
+            onClick={() => switchGroup(null)}
+          />
+          {groups.map((g) => (
+            <GroupTabButton
+              key={g.id}
+              label={g.name}
+              count={groupCounts.get(g.id) ?? 0}
+              active={activeGroupId === g.id}
+              color={g.color}
+              onClick={() => switchGroup(g.id)}
+            />
+          ))}
+          {orphanStatuses.size > 0 && (
+            <GroupTabButton
+              label={t('callCenter.groups.other')}
+              count={groupCounts.get(OTHER_GROUP_ID) ?? 0}
+              active={activeGroupId === OTHER_GROUP_ID}
+              onClick={() => switchGroup(OTHER_GROUP_ID)}
+            />
+          )}
+          {canManageGroups && (
+            <button
+              type="button"
+              onClick={() => setManageOpen(true)}
+              className="ml-auto inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white/70 px-2 py-1 text-[11px] font-semibold text-gray-500 hover:border-primary/40 hover:text-primary"
+              title={t('callCenter.groups.manage') as string}
+            >
+              <Settings size={12} />
+              {t('callCenter.groups.manage')}
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => onChange(null)}
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-badge px-2.5 py-1 text-[11px] font-semibold transition',
+            selected === null
+              ? 'bg-primary text-white shadow-sm'
+              : 'bg-white/70 text-gray-600 hover:bg-white',
+          )}
+        >
+          {t('callCenter.all')}
+          <span className="rounded-full bg-black/10 px-1.5 text-[10px] font-bold">
+            {orders.length}
+          </span>
+        </button>
+        {visibleStatusKeys.map((status) => {
+          const cfg = getStatusConfig(status);
+          const count = counts.get(status) ?? 0;
+          if (count === 0) return null;
+          const active = selected === status;
+          const showTodayBadge = status === 'callback' && callbackTodayCount > 0;
+          return (
+            <button
+              key={status}
+              type="button"
+              onClick={() => onChange(active ? null : status)}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-badge px-2.5 py-1 text-[11px] font-semibold transition',
+                active
+                  ? cn(cfg.bg, cfg.text, 'ring-2 ring-primary/40 shadow-sm')
+                  : cn(cfg.bg, cfg.text, 'opacity-70 hover:opacity-100'),
+              )}
+              title={showTodayBadge ? t('callCenter.toCallToday', { count: callbackTodayCount }) : undefined}
+            >
+              <span className={cn('h-1.5 w-1.5 rounded-full', cfg.dot)} />
+              {cfg.label}
+              <span className="rounded-full bg-white/60 px-1.5 text-[10px] font-bold">
+                {count}
+              </span>
+              {showTodayBadge && (
+                <span className="callback-today-blink inline-flex items-center gap-0.5 rounded-full bg-sky-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                  <Phone size={8} /> {t('callCenter.todayBadge', { count: callbackTodayCount })}
+                </span>
+              )}
+            </button>
+          );
+        })}
+        {section === 'shipping' && !showGroupTabs && canManageGroups && (
+          // No groups yet → tuck the gear at the end of the pill row so admins
+          // still have a discoverable entry point.
+          <button
+            type="button"
+            onClick={() => setManageOpen(true)}
+            className="ml-auto inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white/70 px-2 py-1 text-[11px] font-semibold text-gray-500 hover:border-primary/40 hover:text-primary"
+            title={t('callCenter.groups.manage') as string}
+          >
+            <Settings size={12} />
+            {t('callCenter.groups.manage')}
+          </button>
+        )}
+      </div>
+
+      {manageOpen && (
+        <ManageStatusGroupsModal open={manageOpen} onClose={() => setManageOpen(false)} />
+      )}
+    </div>
+  );
+}
+
+interface GroupTabButtonProps {
+  label: string;
+  count: number;
+  active: boolean;
+  color?: string | null;
+  onClick: () => void;
+}
+
+function GroupTabButton({ label, count, active, color, onClick }: GroupTabButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'inline-flex shrink-0 items-center gap-1.5 rounded-badge px-3 py-1.5 text-xs font-semibold transition',
+        active
+          ? 'bg-primary text-white shadow-sm'
+          : 'bg-white/70 text-gray-600 hover:bg-white',
+      )}
+    >
+      {color && (
+        <span
+          className="h-2 w-2 rounded-full ring-1 ring-white/40"
+          style={{ backgroundColor: color }}
+        />
+      )}
+      {label}
+      <span
         className={cn(
-          'inline-flex items-center gap-1.5 rounded-badge px-2.5 py-1 text-[11px] font-semibold transition',
-          selected === null
-            ? 'bg-primary text-white shadow-sm'
-            : 'bg-white/70 text-gray-600 hover:bg-white',
+          'rounded-full px-1.5 text-[10px] font-bold',
+          active ? 'bg-white/20 text-white' : 'bg-black/10 text-gray-600',
         )}
       >
-        {t('callCenter.all')}
-        <span className="rounded-full bg-black/10 px-1.5 text-[10px] font-bold">
-          {orders.length}
-        </span>
-      </button>
-      {Object.entries(colors).map(([status, cfg]) => {
-        const count = counts.get(status) ?? 0;
-        if (count === 0) return null;
-        const active = selected === status;
-        const showTodayBadge = status === 'callback' && callbackTodayCount > 0;
-        return (
-          <button
-            key={status}
-            type="button"
-            onClick={() => onChange(active ? null : status)}
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-badge px-2.5 py-1 text-[11px] font-semibold transition',
-              active
-                ? cn(cfg.bg, cfg.text, 'ring-2 ring-primary/40 shadow-sm')
-                : cn(cfg.bg, cfg.text, 'opacity-70 hover:opacity-100'),
-            )}
-            title={showTodayBadge ? t('callCenter.toCallToday', { count: callbackTodayCount }) : undefined}
-          >
-            <span className={cn('h-1.5 w-1.5 rounded-full', cfg.dot)} />
-            {cfg.label}
-            <span className="rounded-full bg-white/60 px-1.5 text-[10px] font-bold">
-              {count}
-            </span>
-            {showTodayBadge && (
-              <span className="callback-today-blink inline-flex items-center gap-0.5 rounded-full bg-sky-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
-                <Phone size={8} /> {t('callCenter.todayBadge', { count: callbackTodayCount })}
-              </span>
-            )}
-          </button>
-        );
-      })}
-    </div>
+        {count}
+      </span>
+    </button>
   );
 }
 
