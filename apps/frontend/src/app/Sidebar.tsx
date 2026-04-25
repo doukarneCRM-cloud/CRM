@@ -23,6 +23,7 @@ import { cn } from '@/lib/cn';
 import { ROUTES } from '@/constants/routes';
 import { PERMISSIONS } from '@/constants/permissions';
 import { useAuthStore } from '@/store/authStore';
+import { BrandLogo } from '@/components/ui/BrandLogo';
 import { authService } from '@/services/api';
 import { resolveImageUrl } from '@/lib/imageUrl';
 
@@ -165,15 +166,23 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
             collapsed ? 'px-4 md:justify-center md:px-2' : 'gap-3 px-4',
           )}
         >
+          {/* Full wordmark + tagline — visible whenever the side text block
+              would have been (i.e. always on mobile, and on md+ only when
+              the rail is expanded). */}
+          <div className={cn('min-w-0 flex-1', collapsed && 'md:hidden')}>
+            <BrandLogo className="text-[13px]" />
+            <p className="mt-0.5 truncate text-[10px] text-gray-400">{t('brand.tagline')}</p>
+          </div>
+          {/* Compact "A" mark — only on md+ when the rail is collapsed
+              (the wide wordmark won't fit a 64px rail). */}
           <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-btn text-base font-bold text-white shadow-card"
+            className={cn(
+              'hidden h-9 w-9 shrink-0 items-center justify-center rounded-btn text-base font-bold text-white shadow-card',
+              collapsed && 'md:flex',
+            )}
             style={{ background: 'linear-gradient(135deg, #18181B 0%, #27272A 100%)' }}
           >
             A
-          </div>
-          <div className={cn('min-w-0 flex-1', collapsed && 'md:hidden')}>
-            <p className="truncate text-sm font-bold text-primary">Anaqatoki</p>
-            <p className="text-[10px] text-gray-400">{t('brand.tagline')}</p>
           </div>
           {/* Mobile close button */}
           <button
