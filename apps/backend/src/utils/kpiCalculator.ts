@@ -1,3 +1,4 @@
+import { ShippingStatus } from '@prisma/client';
 import { prisma } from '../shared/prisma';
 import { buildOrderWhereClause, type OrderFilterParams } from './filterBuilder';
 
@@ -17,11 +18,15 @@ export interface KPIResult {
   profit: number;             // MAD — revenue minus shipping costs
   // Numerator / denominator pairs behind each rate, so the UI can render the
   // raw count alongside the percentage without recomputing anything.
+  // `shipped` is the count of orders whose Coliix label was created (the
+  // natural "sent to courier" denominator); shown alongside the return
+  // rate so the user can see e.g. "5 of 30 shipped" rather than guessing.
   counts: {
     confirmed: number;
     confirmationDenom: number;
     delivered: number;
     deliveryDenom: number;
+    shipped: number;
     returned: number;
     returnDenom: number;
     merged: number;
@@ -51,7 +56,24 @@ function safeRate(numerator: number, denominator: number): number {
 // Canonical (team-card) formulas, used everywhere for cross-page consistency:
 //   confirmationRate = confirmed / totalOrders
 //   deliveryRate     = delivered / confirmed
-//   returnRate       = returned  / delivered
+//   returnRate       = verifiedReturns / shipped (labelSent=true)
+//
+// "Shipped" = orders where the Coliix label was successfully created
+// (labelSent flag flips on a successful push to Coliix). Natural
+// denominator for "of the orders we sent out, how many came back?".
+//
+// Returned numerator counts ONLY admin-verified outcomes —
+// `return_validated` (good return, restocked) and `return_refused`
+// (we rejected the return). Pending statuses (`returned` carrier-flag,
+// `attempted`, `lost`) are excluded: until a human verifies the package
+// at the back desk, the outcome isn't final, so we don't pollute the
+// dashboard rate with them. The Returns page still surfaces those
+// pending rows in its dedicated tab so nothing gets lost operationally.
+const RETURNED_STATUSES: ShippingStatus[] = [
+  ShippingStatus.return_validated,
+  ShippingStatus.return_refused,
+];
+
 export async function computeKPIs(filters: OrderFilterParams): Promise<KPIResult> {
   const where = buildOrderWhereClause(filters);
 
@@ -61,24 +83,29 @@ export async function computeKPIs(filters: OrderFilterParams): Promise<KPIResult
   // re-run the filter with isArchived:'all' to count them across the same scope.
   const mergedWhere = buildOrderWhereClause({ ...filters, isArchived: 'all' });
 
-  const [confirmedCount, deliveredCount, returnedCount, mergedCount] = await Promise.all([
+  const [confirmedCount, deliveredCount, shippedCount, returnedCount, mergedCount] = await Promise.all([
     prisma.order.count({ where: { ...where, confirmationStatus: 'confirmed' } }),
     prisma.order.count({ where: { ...where, shippingStatus: 'delivered' } }),
+    prisma.order.count({ where: { ...where, labelSent: true } }),
     prisma.order.count({
-      where: { ...where, shippingStatus: { in: ['returned', 'return_validated'] } },
+      where: { ...where, shippingStatus: { in: RETURNED_STATUSES } },
     }),
     prisma.order.count({ where: { ...mergedWhere, mergedIntoId: { not: null } } }),
   ]);
 
   const confirmationRate = safeRate(confirmedCount, totalOrders);
   const deliveryRate = safeRate(deliveredCount, confirmedCount);
-  const returnRate = safeRate(returnedCount, deliveredCount);
+  // Use the true shipped pool (labelSent=true) as the return-rate
+  // denominator. Falls back to delivered+returned if nothing has been
+  // pushed to Coliix yet (e.g. brand-new install) so the rate doesn't
+  // silently 0/0.
+  const returnDenomCount = shippedCount > 0 ? shippedCount : deliveredCount + returnedCount;
+  const returnRate = safeRate(returnedCount, returnDenomCount);
   const mergedDenom = totalOrders + mergedCount;
   const mergedRate = safeRate(mergedCount, mergedDenom);
 
   const denominatorCount = totalOrders;
   const deliveryDenomCount = confirmedCount;
-  const returnDenomCount = deliveredCount;
 
   // ── 5. Revenue: SUM(total) WHERE delivered ───────────────────────────────
   const revenueAgg = await prisma.order.aggregate({
@@ -108,6 +135,7 @@ export async function computeKPIs(filters: OrderFilterParams): Promise<KPIResult
       confirmationDenom: denominatorCount,
       delivered: deliveredCount,
       deliveryDenom: deliveryDenomCount,
+      shipped: shippedCount,
       returned: returnedCount,
       returnDenom: returnDenomCount,
       merged: mergedCount,
