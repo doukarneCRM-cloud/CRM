@@ -200,8 +200,14 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
           ))}
         </nav>
 
-        {/* Bottom: user info + logout */}
-        <div className={cn('border-t border-gray-100 py-3', collapsed ? 'px-3 md:px-2' : 'px-3')}>
+        {/* Bottom: user info + logout — dark slab so it visually anchors the
+            sidebar and pairs with the dark TopBar across the layout. */}
+        <div
+          className={cn(
+            'border-t border-black/40 bg-primary py-3 text-white',
+            collapsed ? 'px-3 md:px-2' : 'px-3',
+          )}
+        >
           {user && (
             <div className={cn('mb-2 flex items-center gap-2.5 rounded-btn px-2 py-2', collapsed && 'md:hidden')}>
               {(() => {
@@ -210,19 +216,19 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
                   <img
                     src={avatarSrc}
                     alt={user.name}
-                    className="h-8 w-8 shrink-0 rounded-full object-cover"
+                    className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-white/20"
                   />
                 ) : (
                   <div
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
-                    style={{ background: 'linear-gradient(135deg, #18181B, #27272A)' }}
+                    style={{ background: 'linear-gradient(135deg, #3F3F46, #52525B)' }}
                   >
                     {user.name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()}
                   </div>
                 );
               })()}
               <div className="min-w-0">
-                <p className="truncate text-xs font-semibold text-gray-900">{user.name}</p>
+                <p className="truncate text-xs font-semibold text-white">{user.name}</p>
                 <p className="truncate text-[10px] text-gray-400">{user.role.label}</p>
               </div>
             </div>
@@ -232,7 +238,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
             <button
               onClick={handleLogout}
               className={cn(
-                'flex w-full items-center gap-2.5 rounded-btn px-3 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600',
+                'flex w-full items-center gap-2.5 rounded-btn px-3 py-2 text-sm font-medium text-gray-300 transition-colors hover:bg-red-500/15 hover:text-red-300',
                 collapsed && 'md:justify-center md:px-2',
               )}
             >

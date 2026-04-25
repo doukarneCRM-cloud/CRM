@@ -200,7 +200,7 @@ function UserDropdown() {
       <div ref={ref} className="relative">
         <button
           onClick={() => setOpen((v) => !v)}
-          className="flex items-center gap-2.5 rounded-btn px-3 py-1.5 transition-colors hover:bg-accent"
+          className="flex items-center gap-2.5 rounded-btn px-3 py-1.5 transition-colors hover:bg-white/10"
         >
           {avatarSrc ? (
             <img
@@ -211,13 +211,13 @@ function UserDropdown() {
           ) : (
             <div
               className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white"
-              style={{ background: 'linear-gradient(135deg, #18181B, #27272A)' }}
+              style={{ background: 'linear-gradient(135deg, #3F3F46, #52525B)' }}
             >
               {initials}
             </div>
           )}
           <div className="hidden text-left md:block">
-            <p className="text-xs font-semibold text-gray-900">{user.name}</p>
+            <p className="text-xs font-semibold text-white">{user.name}</p>
             <p className="text-[10px] text-gray-400">{user.role.label}</p>
           </div>
           <ChevronDown
@@ -297,7 +297,7 @@ export function TopBar({ onMobileMenuOpen }: TopBarProps) {
 
   return (
     <header
-      className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-gray-100 bg-white/90 px-3 backdrop-blur-sm sm:px-5"
+      className="flex h-14 shrink-0 items-center gap-2 border-b border-black/40 bg-primary px-3 text-white shadow-sm sm:gap-3 sm:px-5"
       style={{
         position: 'sticky',
         top: 0,
@@ -306,29 +306,31 @@ export function TopBar({ onMobileMenuOpen }: TopBarProps) {
       }}
     >
       {/* Left: hamburger (mobile) + page title + online agents list */}
-      <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+      <div className="flex min-w-0 flex-1 basis-0 items-center gap-2 sm:gap-3">
         <button
           onClick={onMobileMenuOpen}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-btn text-gray-500 hover:bg-accent hover:text-primary md:hidden"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-btn text-gray-300 hover:bg-white/10 hover:text-white md:hidden"
           aria-label={t('common.openMenu')}
         >
           <Menu size={20} />
         </button>
-        <h1 className="shrink-0 text-base font-semibold text-gray-900">{pageTitle}</h1>
+        <h1 className="shrink-0 text-base font-semibold text-white">{pageTitle}</h1>
         {isAdmin && user && (
-          <div className="min-w-0 flex-1">
+          <div className="hidden min-w-0 flex-1 lg:block">
             <OnlineAgents />
           </div>
         )}
       </div>
 
-      {/* Right: search + lang + bell + user */}
-      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-        {/* Global search — hidden on very narrow screens */}
-        <div className="hidden sm:block">
+      {/* Center: global search */}
+      <div className="hidden flex-1 basis-0 justify-center sm:flex">
+        <div className="w-full max-w-xl">
           <GlobalSearch />
         </div>
+      </div>
 
+      {/* Right: lang + bell + user */}
+      <div className="flex flex-1 basis-0 shrink-0 items-center justify-end gap-2 sm:gap-3">
         {/* Language switcher */}
         <LanguageSwitcher />
 

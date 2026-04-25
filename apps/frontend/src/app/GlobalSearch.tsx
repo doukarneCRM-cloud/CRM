@@ -87,8 +87,8 @@ export function GlobalSearch() {
     <div ref={ref} className="relative">
       <div
         className={cn(
-          'hidden items-center gap-2 rounded-input border border-gray-200 bg-gray-50 px-3 py-1.5 md:flex',
-          'focus-within:border-primary focus-within:bg-white',
+          'hidden w-full items-center gap-2 rounded-input border border-white/10 bg-white/95 px-3 py-1.5 md:flex',
+          'focus-within:border-white focus-within:bg-white focus-within:shadow-sm',
         )}
       >
         <Search size={14} className="text-gray-400" />
@@ -101,7 +101,7 @@ export function GlobalSearch() {
           }}
           onFocus={() => setOpen(true)}
           placeholder={t('shared.search.placeholder')}
-          className="w-56 bg-transparent text-sm text-gray-900 outline-none placeholder-gray-400"
+          className="w-full min-w-0 flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder-gray-400"
         />
         {loading ? (
           <Loader2 size={14} className="animate-spin text-gray-400" />

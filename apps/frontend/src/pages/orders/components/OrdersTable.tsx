@@ -114,7 +114,14 @@ function SkeletonRow({ cols }: { cols: number }) {
   return (
     <tr>
       {Array.from({ length: cols }).map((_, i) => (
-        <td key={i} className="px-4 py-3">
+        <td
+          key={i}
+          className={cn(
+            'border-y border-gray-100 bg-white px-4 py-3',
+            i === 0 && 'rounded-l-lg border-l',
+            i === cols - 1 && 'rounded-r-lg border-r',
+          )}
+        >
           <div className={cn('skeleton h-4 rounded', i < 2 ? 'w-28' : 'w-20')} />
         </td>
       ))}
@@ -566,21 +573,21 @@ export function OrdersTable({
             <button
               onClick={() => onEdit(row.original)}
               title={t('orders.editOrder')}
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-300 transition-colors hover:bg-gray-100 hover:text-gray-600"
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-900 transition-colors hover:bg-gray-100"
             >
               <Edit2 size={13} />
             </button>
             <button
               onClick={() => onAssign(row.original)}
               title={t('orders.assignAgent')}
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-300 transition-colors hover:bg-accent hover:text-primary"
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-900 transition-colors hover:bg-accent"
             >
               <UserPlus size={13} />
             </button>
             <button
               onClick={() => onArchive(row.original)}
               title={t('orders.archiveOrder')}
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-300 transition-colors hover:bg-red-50 hover:text-red-500"
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-900 transition-colors hover:bg-red-50 hover:text-red-500"
             >
               <Archive size={13} />
             </button>
@@ -725,18 +732,22 @@ export function OrdersTable({
         )}
       </div>
 
-      {/* ─── Desktop: table (md and up) ─────────────────────────────── */}
+      {/* ─── Desktop: table (md and up) ──────────────────────────────
+          Each row is rendered as a self-contained card (rounded ends,
+          rule borders, hover lift) to match the Call Center layout —
+          we use `border-separate` so the spacing between rows reads as
+          a real gap rather than a hairline. */}
       <div className="hidden overflow-x-auto md:block">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full border-separate border-spacing-y-1.5 text-sm">
           {/* Sticky header */}
           <thead className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm">
             {table.getHeaderGroups().map((hg) => (
-              <tr key={hg.id} className="border-b border-gray-100">
+              <tr key={hg.id}>
                 {hg.headers.map((header) => (
                   <th
                     key={header.id}
                     style={{ width: header.getSize(), minWidth: header.getSize() }}
-                    className="whitespace-nowrap px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400"
+                    className="whitespace-nowrap border-b border-gray-100 px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400"
                   >
                     {flexRender(header.column.columnDef.header, header.getContext())}
                   </th>
@@ -763,24 +774,27 @@ export function OrdersTable({
                 </td>
               </tr>
             ) : (
-              table.getRowModel().rows.map((row) => (
-                <tr
-                  key={row.id}
-                  className={cn(
-                    'border-b border-gray-50 transition-colors hover:bg-accent/70',
-                    selectedSet.has(row.original.id) && 'bg-accent/60',
-                  )}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <td
-                      key={cell.id}
-                      className="px-3 py-2 align-top text-gray-700"
-                    >
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
-                </tr>
-              ))
+              table.getRowModel().rows.map((row) => {
+                const isSelected = selectedSet.has(row.original.id);
+                return (
+                  <tr key={row.id} className="group transition-colors">
+                    {row.getVisibleCells().map((cell, idx, arr) => (
+                      <td
+                        key={cell.id}
+                        className={cn(
+                          'border-y border-gray-100 px-3 py-2 align-top text-gray-700 transition-colors',
+                          'group-hover:border-primary/30 group-hover:bg-primary/5',
+                          isSelected ? 'bg-accent/60' : 'bg-white',
+                          idx === 0 && 'rounded-l-lg border-l',
+                          idx === arr.length - 1 && 'rounded-r-lg border-r',
+                        )}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

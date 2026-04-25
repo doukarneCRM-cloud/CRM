@@ -14,6 +14,20 @@ const config: Config = {
           dark: '#09090B',
         },
         accent: '#F4F4F5',
+        // Warm earthy accent — used by the Orders KPI cards. Lifts the
+        // dashboard out of the cool-blue/indigo palette without fighting the
+        // monochrome primary. 500 is the readable mid-tone, 50 the chip bg.
+        caramel: {
+          50:  '#FDF7EC',
+          100: '#FAEAC9',
+          200: '#F3D292',
+          300: '#E5B158',
+          400: '#D29630',
+          500: '#B8801F',
+          600: '#9A6917',
+          700: '#7A5311',
+          DEFAULT: '#B8801F',
+        },
         surface: 'rgba(255,255,255,0.85)',
         bg: '#F8F9FA',
         status: {

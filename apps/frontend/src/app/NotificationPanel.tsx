@@ -121,7 +121,7 @@ export function NotificationPanel() {
     <div ref={ref} className="relative">
       <button
         onClick={handleToggle}
-        className="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-accent hover:text-primary"
+        className="flex h-8 w-8 items-center justify-center rounded-full text-gray-300 transition-colors hover:bg-white/10 hover:text-white"
         aria-label={t('shared.notifications.ariaLabel')}
       >
         <Bell size={16} />
