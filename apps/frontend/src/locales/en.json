@@ -2592,7 +2592,16 @@
       "reconcileErrors_one": ", {{count}} error",
       "reconcileErrors_other": ", {{count}} errors",
       "reconcileEnd": ".",
-      "reconcileFailed": "Re-link failed"
+      "reconcileFailed": "Re-link failed",
+      "backfillCta": "Fix order dates",
+      "backfillTooltip": "Re-fetch every imported YouCan order and patch its CRM date to the original placement time.",
+      "backfillConfirm": "This will re-fetch every imported YouCan order from YouCan and update their CRM dates. It can take a minute. Continue?",
+      "backfillDoneTitle": "Order dates repaired",
+      "backfillDoneBody": "Updated {{updated}} · already correct {{unchanged}} · scanned {{scanned}}",
+      "backfillFailedNote_one": "{{count}} failed",
+      "backfillFailedNote_other": "{{count}} failed",
+      "backfillFailedTitle": "Repair failed",
+      "backfillFailed": "Could not repair order dates"
     }
   },
   "settings": {

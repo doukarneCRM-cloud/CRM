@@ -2592,7 +2592,16 @@
       "reconcileErrors_one": ", {{count}} erreur",
       "reconcileErrors_other": ", {{count}} erreurs",
       "reconcileEnd": ".",
-      "reconcileFailed": "Échec de la re-liaison"
+      "reconcileFailed": "Échec de la re-liaison",
+      "backfillCta": "Corriger les dates",
+      "backfillTooltip": "Récupère chaque commande YouCan importée et corrige sa date dans le CRM avec la date de passation d'origine.",
+      "backfillConfirm": "Cela va récupérer chaque commande YouCan importée depuis YouCan et mettre à jour leurs dates dans le CRM. Cela peut prendre une minute. Continuer ?",
+      "backfillDoneTitle": "Dates des commandes corrigées",
+      "backfillDoneBody": "Mises à jour {{updated}} · déjà correctes {{unchanged}} · analysées {{scanned}}",
+      "backfillFailedNote_one": "{{count}} échec",
+      "backfillFailedNote_other": "{{count}} échecs",
+      "backfillFailedTitle": "Échec de la réparation",
+      "backfillFailed": "Impossible de réparer les dates des commandes"
     }
   },
   "settings": {

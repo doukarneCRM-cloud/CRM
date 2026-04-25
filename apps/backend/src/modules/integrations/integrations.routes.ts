@@ -119,6 +119,20 @@ export async function integrationsRoutes(app: FastifyInstance) {
     return reply.send(result);
   });
 
+  // One-shot repair: re-fetch every imported YouCan order and patch its
+  // Order.createdAt to the original placement timestamp from YouCan. Needed
+  // because older imports defaulted to `now()` and the CRM list ended up
+  // sorted by Prisma insert order. Safe to re-run — already-correct rows
+  // (within 1 second) are skipped.
+  app.post(
+    '/youcan/backfill-created-at',
+    { preHandler: [verifyJWT, requirePermission('integrations:manage')] },
+    async (_req, reply) => {
+      const result = await svc.backfillYoucanOrderCreatedAt();
+      return reply.send(result);
+    },
+  );
+
   // ── Logs ──────────────────────────────────────────────────────────────────
 
   app.get('/stores/:id/logs', { preHandler: [verifyJWT, requirePermission('integrations:view')] }, async (req, reply) => {

@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Link2 } from 'lucide-react';
+import { Plus, Link2, Clock } from 'lucide-react';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { useAuthStore } from '@/store/authStore';
+import { useToastStore } from '@/store/toastStore';
 import { PERMISSIONS } from '@/constants/permissions';
 import { integrationsApi, type Store } from '@/services/integrationsApi';
 import { StoreCard } from './StoreCard';
@@ -23,6 +24,7 @@ export function YoucanTab() {
   const { t } = useTranslation();
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canManage = hasPermission(PERMISSIONS.INTEGRATIONS_MANAGE);
+  const pushToast = useToastStore((s) => s.push);
 
   const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +34,7 @@ export function YoucanTab() {
   const [importProductsStoreId, setImportProductsStoreId] = useState<string | null>(null);
   const [importOrdersStoreId, setImportOrdersStoreId] = useState<string | null>(null);
   const [wizardStore, setWizardStore] = useState<Store | null>(null);
+  const [backfilling, setBackfilling] = useState(false);
 
   const popupRef = useRef<Window | null>(null);
   const [oauthError, setOauthError] = useState<string | null>(null);
@@ -130,6 +133,41 @@ export function YoucanTab() {
     }
   };
 
+  // Repair `Order.createdAt` for every imported YouCan order. Re-fetches the
+  // original placement timestamp from YouCan and patches the row. Safe to
+  // re-run; rows already correct (within 1s) are skipped.
+  const handleBackfill = async () => {
+    const confirmed = window.confirm(t('integrations.youcan.backfillConfirm') as string);
+    if (!confirmed) return;
+    setBackfilling(true);
+    try {
+      const r = await integrationsApi.backfillCreatedAt();
+      const failedNote =
+        r.failed > 0 ? ` · ${t('integrations.youcan.backfillFailedNote', { count: r.failed })}` : '';
+      pushToast({
+        kind: r.failed > 0 ? 'error' : 'confirmed',
+        title: t('integrations.youcan.backfillDoneTitle'),
+        body:
+          t('integrations.youcan.backfillDoneBody', {
+            updated: r.updated,
+            unchanged: r.unchanged,
+            scanned: r.scanned,
+          }) + failedNote,
+      });
+    } catch (e) {
+      const msg =
+        (e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
+          ?.message ?? t('integrations.youcan.backfillFailed');
+      pushToast({
+        kind: 'error',
+        title: t('integrations.youcan.backfillFailedTitle'),
+        body: msg as string,
+      });
+    } finally {
+      setBackfilling(false);
+    }
+  };
+
   const handleReconcile = async (storeId: string) => {
     setReconcilingStoreId(storeId);
     setReconcileMessage(null);
@@ -155,19 +193,33 @@ export function YoucanTab() {
 
   return (
     <>
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-gray-400">
           {t('integrations.youcan.subtitle')}
         </p>
         {canManage && (
-          <CRMButton
-            variant="primary"
-            size="sm"
-            leftIcon={<Plus size={14} />}
-            onClick={() => setAddOpen(true)}
-          >
-            {t('integrations.youcan.addStore')}
-          </CRMButton>
+          <div className="flex items-center gap-2">
+            {stores.length > 0 && (
+              <CRMButton
+                variant="secondary"
+                size="sm"
+                leftIcon={<Clock size={14} />}
+                loading={backfilling}
+                onClick={handleBackfill}
+                title={t('integrations.youcan.backfillTooltip') as string}
+              >
+                {t('integrations.youcan.backfillCta')}
+              </CRMButton>
+            )}
+            <CRMButton
+              variant="primary"
+              size="sm"
+              leftIcon={<Plus size={14} />}
+              onClick={() => setAddOpen(true)}
+            >
+              {t('integrations.youcan.addStore')}
+            </CRMButton>
+          </div>
         )}
       </div>
 

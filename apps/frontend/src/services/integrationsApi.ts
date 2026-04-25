@@ -112,6 +112,14 @@ export const integrationsApi = {
   importOrders: (id: string, count?: number) =>
     api.post<ImportResult>(`/integrations/stores/${id}/import/orders`, { count }).then((r) => r.data),
 
+  // One-shot repair: re-fetch every imported YouCan order across every store
+  // and patch its CRM `createdAt` to the original placement timestamp from
+  // YouCan. Fixes historical rows whose dates were collapsed to import time.
+  backfillCreatedAt: () =>
+    api
+      .post<BackfillResult>('/integrations/youcan/backfill-created-at')
+      .then((r) => r.data),
+
   // Logs
   getLogs: (id: string, page = 1, pageSize = 50) =>
     api.get<{ data: ImportLog[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }>(
@@ -119,3 +127,18 @@ export const integrationsApi = {
       { params: { page, pageSize } },
     ).then((r) => r.data),
 };
+
+export interface BackfillResult {
+  scanned: number;
+  updated: number;
+  unchanged: number;
+  failed: number;
+  perStore: Array<{
+    storeId: string;
+    storeName: string;
+    scanned: number;
+    updated: number;
+    unchanged: number;
+    failed: number;
+  }>;
+}

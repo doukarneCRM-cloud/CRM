@@ -1333,3 +1333,125 @@ export async function previewYoucanProducts(
     },
   };
 }
+
+// ─── One-shot backfill: re-fetch every imported YouCan order and patch ──────
+// `Order.createdAt` to the original placement timestamp from YouCan.
+//
+// Why this exists: a previous version of `importSingleOrder()` didn't pass a
+// `createdAt` so every imported order got Prisma's default (`now()`). That
+// collapsed batches to one moment and reversed YouCan's chronology in the
+// CRM list. The current code preserves `yo.created_at`, but historical rows
+// still have wrong dates. This function repairs them.
+//
+// Strategy:
+// - Group orders by storeId so we can use the right OAuth token.
+// - For each order, hit YouCan's single-order endpoint and read `created_at`.
+// - Skip rows whose stored `createdAt` already matches (within 1s) — it's
+//   either already correct or someone manually adjusted it.
+// - Fail-soft per row: a single 404 / network blip doesn't kill the run.
+//
+// Returns per-store counters so the UI can show what happened.
+export interface BackfillResult {
+  scanned: number;
+  updated: number;
+  unchanged: number;
+  failed: number;
+  perStore: Array<{
+    storeId: string;
+    storeName: string;
+    scanned: number;
+    updated: number;
+    unchanged: number;
+    failed: number;
+  }>;
+}
+
+export async function backfillYoucanOrderCreatedAt(): Promise<BackfillResult> {
+  const orders = await prisma.order.findMany({
+    where: { source: 'youcan', youcanOrderId: { not: null } },
+    select: {
+      id: true,
+      youcanOrderId: true,
+      storeId: true,
+      createdAt: true,
+    },
+  });
+
+  // Bucket by store so we can label results and reuse one OAuth context.
+  const byStore = new Map<string, typeof orders>();
+  for (const o of orders) {
+    if (!o.storeId) continue;
+    const list = byStore.get(o.storeId) ?? [];
+    list.push(o);
+    byStore.set(o.storeId, list);
+  }
+
+  const stores = await prisma.store.findMany({
+    where: { id: { in: [...byStore.keys()] } },
+    select: { id: true, name: true },
+  });
+  const storeNameById = new Map(stores.map((s) => [s.id, s.name]));
+
+  const result: BackfillResult = {
+    scanned: 0,
+    updated: 0,
+    unchanged: 0,
+    failed: 0,
+    perStore: [],
+  };
+
+  for (const [storeId, group] of byStore) {
+    const perStore = {
+      storeId,
+      storeName: storeNameById.get(storeId) ?? storeId,
+      scanned: 0,
+      updated: 0,
+      unchanged: 0,
+      failed: 0,
+    };
+
+    for (const o of group) {
+      if (!o.youcanOrderId) continue;
+      perStore.scanned += 1;
+      try {
+        const fresh = await fetchOrder(storeId, o.youcanOrderId);
+        const raw = (fresh as { created_at?: string | number | null })?.created_at;
+        if (!raw) {
+          perStore.failed += 1;
+          continue;
+        }
+        const youcanCreatedAt = new Date(raw);
+        if (Number.isNaN(youcanCreatedAt.getTime())) {
+          perStore.failed += 1;
+          continue;
+        }
+        // Skip if the existing value is already within 1 second of YouCan's
+        // — saves a write and surfaces "already correct" in the report.
+        const diff = Math.abs(o.createdAt.getTime() - youcanCreatedAt.getTime());
+        if (diff < 1000) {
+          perStore.unchanged += 1;
+          continue;
+        }
+        await prisma.order.update({
+          where: { id: o.id },
+          data: { createdAt: youcanCreatedAt },
+        });
+        perStore.updated += 1;
+      } catch (err) {
+        perStore.failed += 1;
+        console.error(
+          `[backfill] order ${o.id} (yc:${o.youcanOrderId}) failed:`,
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
+
+    result.scanned += perStore.scanned;
+    result.updated += perStore.updated;
+    result.unchanged += perStore.unchanged;
+    result.failed += perStore.failed;
+    result.perStore.push(perStore);
+  }
+
+  return result;
+}
