@@ -1063,19 +1063,11 @@ export async function processWebhookOrder(storeId: string, payload: YoucanOrder)
     await logImport(storeId, 'webhook_order', 'warning', 'Webhook received but store is inactive');
     return;
   }
-  // Hard gate: until the admin opts into auto-sync, the webhook is just
-  // a no-op — the YouCan subscription stays alive (so we don't have to
-  // re-register it later) but we don't import anything. The admin can
-  // still pull historical orders manually via the Import Orders modal.
-  if (!store.autoSyncEnabled) {
-    await logImport(
-      storeId,
-      'webhook_order',
-      'info',
-      `Webhook received for order ${payload.ref} but auto-sync is OFF — skipped (use the Import button to pull manually)`,
-    );
-    return;
-  }
+  // Webhook is the real-time channel for *new* orders placed after the
+  // OAuth link — it's exactly what the admin wants when they say "auto
+  // import in instant". So the autoSyncEnabled flag does NOT gate this
+  // path. That flag only controls the periodic background poller, which
+  // is what would otherwise mass-pull historical orders on link.
 
   try {
     const result = await importSingleOrder(storeId, payload, store.fieldMapping as Record<string, string> | null);
