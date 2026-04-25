@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useCallback, useRef, type MouseEvent } fr
 import { useTranslation } from 'react-i18next';
 import {
   History, MessageCircle, Send, Package, Phone, StickyNote, PhoneOff, Truck, Search, X,
-  AlertTriangle, Copy, Check, Plus, Settings,
+  Copy, Check, Plus, Settings,
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { CRMButton } from '@/components/ui/CRMButton';
@@ -241,7 +241,7 @@ function ShippingPill({ order }: { order: Order }) {
 
 interface RowProps {
   order: Order;
-  onOpenLogs: (order: Order, type: 'confirmation' | 'shipping') => void;
+  onOpenLogs: (order: Order, type: 'all' | 'confirmation' | 'shipping') => void;
   onOpenCustomer: (customerId: string) => void;
   onRefresh: () => void;
 }
@@ -398,6 +398,14 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
                   >
                     {g.name}
                   </p>
+                  {gi === 0 && order.hasStockWarning && order.confirmationStatus === 'pending' && (
+                    <p
+                      className="text-[10px] font-medium leading-tight text-amber-600"
+                      title={t('callCenter.row.stockShortTooltip')}
+                    >
+                      {t('callCenter.row.stockShort')}
+                    </p>
+                  )}
                   <div className="mt-0.5 flex flex-wrap gap-1">
                     {g.variants.map((v, vi) => (
                       <span
@@ -452,35 +460,19 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
                 onOpenModal={() => openOrder(order)}
                 onRefresh={onRefresh}
               />
-              <button
-                type="button"
-                onClick={() => onOpenLogs(order, 'confirmation')}
-                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-gray-900 active:bg-gray-100 active:text-primary"
-                title={t('callCenter.row.confirmationHistory')}
-              >
-                <History size={12} />
-              </button>
             </div>
             <div className="flex min-w-0 items-center gap-1">
               <ShippingPill order={order} />
               <button
                 type="button"
-                onClick={() => onOpenLogs(order, 'shipping')}
+                onClick={() => onOpenLogs(order, 'all')}
                 className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-gray-900 active:bg-gray-100 active:text-primary"
-                title={t('callCenter.row.shippingHistory')}
+                title={t('callCenter.row.history')}
               >
                 <History size={12} />
               </button>
             </div>
           </div>
-          {order.hasStockWarning && order.confirmationStatus === 'pending' && (
-            <div className="flex items-start gap-1.5 rounded-btn border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
-              <AlertTriangle size={11} className="mt-0.5 shrink-0 text-amber-600" />
-              <p className="line-clamp-2">
-                <span className="font-semibold">{t('callCenter.row.stockShort')}</span> {t('callCenter.row.stockShortHint')}
-              </p>
-            </div>
-          )}
           {order.confirmationNote && (
             <div className="flex items-start gap-1.5 rounded-btn bg-amber-50/70 px-2 py-1 text-[11px] text-amber-800">
               <StickyNote size={11} className="mt-0.5 shrink-0" />
@@ -603,6 +595,14 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
                   >
                     {g.name}
                   </p>
+                  {gi === 0 && order.hasStockWarning && order.confirmationStatus === 'pending' && (
+                    <p
+                      className="text-[10px] font-medium leading-tight text-amber-600"
+                      title={t('callCenter.row.stockShortTooltip')}
+                    >
+                      {t('callCenter.row.stockShort')}
+                    </p>
+                  )}
                   <div className="mt-0.5 flex flex-wrap gap-1">
                     {g.variants.map((v, vi) => (
                       <span
@@ -655,29 +655,12 @@ function Row({ order, onOpenLogs, onOpenCustomer, onRefresh }: RowProps) {
               onOpenModal={() => openOrder(order)}
               onRefresh={onRefresh}
             />
-            <button
-              type="button"
-              onClick={() => onOpenLogs(order, 'confirmation')}
-              className="inline-flex h-5 w-5 items-center justify-center rounded-full text-gray-900 hover:bg-gray-100 hover:text-primary"
-              title={t('callCenter.row.confirmationHistory')}
-            >
-              <History size={11} />
-            </button>
-            {order.hasStockWarning && order.confirmationStatus === 'pending' && (
-              <span
-                className="inline-flex items-center gap-1 rounded-badge border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
-                title={t('callCenter.row.stockShortTooltip')}
-              >
-                <AlertTriangle size={9} className="shrink-0" />
-                {t('callCenter.row.stockShort').replace(/\.$/, '')}
-              </span>
-            )}
             <ShippingPill order={order} />
             <button
               type="button"
-              onClick={() => onOpenLogs(order, 'shipping')}
+              onClick={() => onOpenLogs(order, 'all')}
               className="inline-flex h-5 w-5 items-center justify-center rounded-full text-gray-900 hover:bg-gray-100 hover:text-primary"
-              title={t('callCenter.row.shippingHistory')}
+              title={t('callCenter.row.history')}
             >
               <History size={11} />
             </button>
@@ -978,7 +961,7 @@ export function CallCenterTable({ onCreate }: { onCreate?: () => void } = {}) {
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [logsOrder, setLogsOrder] = useState<{ order: Order; type: 'confirmation' | 'shipping' } | null>(null);
+  const [logsOrder, setLogsOrder] = useState<{ order: Order; type: 'all' | 'confirmation' | 'shipping' } | null>(null);
   const [historyCustomerId, setHistoryCustomerId] = useState<string | null>(null);
   // Tab + status filter live in the zustand store so the KPI pipeline chips
   // can drive them from outside this component.

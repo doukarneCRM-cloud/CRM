@@ -257,7 +257,7 @@ export default function OrdersPage() {
   }, []);
 
   const handleViewLogs = useCallback(
-    (order: Order, type: 'confirmation' | 'shipping') => {
+    (order: Order, type: 'all' | 'confirmation' | 'shipping') => {
       setLogsOrder({
         orderId: order.id,
         reference: order.reference,

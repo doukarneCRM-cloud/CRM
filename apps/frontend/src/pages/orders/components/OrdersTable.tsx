@@ -10,7 +10,7 @@ import {
 import {
   ChevronLeft, ChevronRight, ChevronDown, Edit2, Archive,
   UserPlus, MessageCircle, History, Send, MapPin, User,
-  DownloadCloud, Check, Loader2, AlertTriangle,
+  DownloadCloud, Check, Loader2,
 } from 'lucide-react';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { OrderSourceIcon } from '@/components/ui/OrderSourceIcon';
@@ -128,7 +128,7 @@ interface TableCallbacks {
   onEdit: (order: Order) => void;
   onArchive: (order: Order) => void;
   onAssign: (order: Order) => void;
-  onViewLogs: (order: Order, type: 'confirmation' | 'shipping') => void;
+  onViewLogs: (order: Order, type: 'all' | 'confirmation' | 'shipping') => void;
   onViewCustomer: (order: Order) => void;
   onRefresh: () => void;
   onSendColiix?: (order: Order) => void;
@@ -337,6 +337,9 @@ export function OrdersTable({
             : isPlaceholder
               ? t('orders.unlinkedProductBadge')
               : undefined;
+          const showStockShort =
+            Boolean(row.original.hasStockWarning) &&
+            row.original.confirmationStatus === 'pending';
           return (
             <div>
               <p
@@ -356,6 +359,14 @@ export function OrdersTable({
                   />
                 )}
               </p>
+              {showStockShort && (
+                <p
+                  className="text-[10px] font-medium leading-tight text-amber-600"
+                  title={t('orders.stockShortTooltip')}
+                >
+                  {t('orders.stockShort')}
+                </p>
+              )}
               <div className="mt-0.5 flex flex-wrap gap-1">
                 {first.variant.color && (
                   <span
@@ -430,28 +441,12 @@ export function OrdersTable({
         size: 170,
         cell: ({ row }) => {
           const hasDeletedProduct = row.original.items.some((i) => i.variant.product.deletedAt);
-          // Only surface the short-stock badge while the order is still in
-          // the pending lane — for confirmed/shipped orders the stock is
-          // either already reserved or already consumed, so the signal is
-          // moot and would only add noise.
-          const showStockWarning =
-            Boolean(row.original.hasStockWarning) &&
-            row.original.confirmationStatus === 'pending';
           return (
           <div className="flex flex-col gap-1.5">
             {/* Confirmation (top) */}
             <div className="flex items-center gap-1">
               <span className="w-[14px] shrink-0 text-[9px] font-bold uppercase text-gray-300">C</span>
               <StatusBadge status={row.original.confirmationStatus} size="sm" showDot />
-              {showStockWarning && (
-                <span
-                  className="inline-flex items-center gap-1 rounded-badge border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-700"
-                  title={t('orders.stockShortTooltip')}
-                >
-                  <AlertTriangle size={9} className="shrink-0" />
-                  {t('orders.stockShort')}
-                </span>
-              )}
               {hasDeletedProduct && (
                 <span
                   className="inline-flex items-center rounded-badge border border-red-200 bg-red-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-red-600"
@@ -460,21 +455,14 @@ export function OrdersTable({
                   {t('orders.notTracked')}
                 </span>
               )}
-              <button
-                onClick={() => onViewLogs(row.original, 'confirmation')}
-                title={t('orders.viewConfirmationHistory')}
-                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-gray-900 transition-colors hover:bg-gray-100 hover:text-gray-700"
-              >
-                <History size={11} />
-              </button>
             </div>
             {/* Shipping (bottom) */}
             <div className="flex items-center gap-1">
               <span className="w-[14px] shrink-0 text-[9px] font-bold uppercase text-gray-300">S</span>
               <StatusBadge status={row.original.shippingStatus} size="sm" showDot />
               <button
-                onClick={() => onViewLogs(row.original, 'shipping')}
-                title={t('orders.viewShippingHistory')}
+                onClick={() => onViewLogs(row.original, 'all')}
+                title={t('orders.viewHistory')}
                 className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-gray-900 transition-colors hover:bg-gray-100 hover:text-gray-700"
               >
                 <History size={11} />
