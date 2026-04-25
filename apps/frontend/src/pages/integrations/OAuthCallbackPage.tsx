@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { integrationsApi } from '@/services/integrationsApi';
+import { apiErrorMessage } from '@/lib/apiError';
 
 /**
  * Runs inside the OAuth popup window. Exchanges the code for tokens,
  * then postMessages the result back to the parent and closes itself.
  */
 export default function OAuthCallbackPage() {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<'pending' | 'success' | 'error'>('pending');
   const [message, setMessage] = useState<string>('');
 
@@ -35,18 +38,20 @@ export default function OAuthCallbackPage() {
     }
 
     if (!code || !state) {
+      const msg = t('integrations.oauth.missingCode');
       setStatus('error');
-      setMessage('Missing authorization code');
-      postResult({ ok: false, error: 'Missing authorization code' });
+      setMessage(msg);
+      postResult({ ok: false, error: msg });
       setTimeout(() => window.close(), 1200);
       return;
     }
 
     const storeId = state.split(':')[0];
     if (!storeId) {
+      const msg = t('integrations.oauth.invalidState');
       setStatus('error');
-      setMessage('Invalid state');
-      postResult({ ok: false, error: 'Invalid state' });
+      setMessage(msg);
+      postResult({ ok: false, error: msg });
       setTimeout(() => window.close(), 1200);
       return;
     }
@@ -54,18 +59,18 @@ export default function OAuthCallbackPage() {
     integrationsApi.completeOAuth(storeId, code, state)
       .then(() => {
         setStatus('success');
-        setMessage('Store connected successfully');
+        setMessage(t('integrations.oauth.storeConnected'));
         postResult({ ok: true, storeId });
         setTimeout(() => window.close(), 800);
       })
-      .catch((e: any) => {
-        const msg = e?.response?.data?.error?.message ?? e?.message ?? 'OAuth callback failed';
+      .catch((e: unknown) => {
+        const msg = apiErrorMessage(e, t('integrations.oauth.callbackFailed'));
         setStatus('error');
         setMessage(msg);
         postResult({ ok: false, storeId, error: msg });
         setTimeout(() => window.close(), 1500);
       });
-  }, []);
+  }, [t]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/5 to-primary/10 px-4">
@@ -74,8 +79,8 @@ export default function OAuthCallbackPage() {
           <>
             <Loader2 size={36} className="animate-spin text-primary" />
             <div className="text-center">
-              <p className="text-sm font-semibold text-gray-900">Connecting to YouCan...</p>
-              <p className="mt-1 text-xs text-gray-400">Finalizing the connection.</p>
+              <p className="text-sm font-semibold text-gray-900">{t('integrations.oauth.connecting')}</p>
+              <p className="mt-1 text-xs text-gray-400">{t('integrations.oauth.finalizing')}</p>
             </div>
           </>
         )}
@@ -83,7 +88,7 @@ export default function OAuthCallbackPage() {
           <>
             <CheckCircle2 size={36} className="text-emerald-500" />
             <div className="text-center">
-              <p className="text-sm font-semibold text-gray-900">Connected!</p>
+              <p className="text-sm font-semibold text-gray-900">{t('integrations.oauth.connectedTitle')}</p>
               <p className="mt-1 text-xs text-gray-400">{message}</p>
             </div>
           </>
@@ -92,7 +97,7 @@ export default function OAuthCallbackPage() {
           <>
             <AlertCircle size={36} className="text-red-500" />
             <div className="text-center">
-              <p className="text-sm font-semibold text-gray-900">Connection failed</p>
+              <p className="text-sm font-semibold text-gray-900">{t('integrations.oauth.connectionFailed')}</p>
               <p className="mt-1 text-xs text-red-600">{message}</p>
             </div>
           </>

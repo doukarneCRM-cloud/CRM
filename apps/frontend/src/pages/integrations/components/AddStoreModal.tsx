@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link2 } from 'lucide-react';
 import { GlassModal } from '@/components/ui/GlassModal';
 import { CRMInput } from '@/components/ui/CRMInput';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { integrationsApi, type Store } from '@/services/integrationsApi';
+import { apiErrorMessage } from '@/lib/apiError';
 
 interface Props {
   open: boolean;
@@ -12,6 +14,7 @@ interface Props {
 }
 
 export function AddStoreModal({ open, onClose, onCreated }: Props) {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +26,7 @@ export function AddStoreModal({ open, onClose, onCreated }: Props) {
 
   const handleSubmit = async () => {
     if (!name.trim()) {
-      setError('Store name is required');
+      setError(t('integrations.addStore.nameRequired'));
       return;
     }
     setSaving(true);
@@ -33,25 +36,21 @@ export function AddStoreModal({ open, onClose, onCreated }: Props) {
       reset();
       onCreated(store);
       onClose();
-    } catch (e: any) {
-      setError(e?.response?.data?.error?.message ?? 'Failed to create store');
+    } catch (e: unknown) {
+      setError(apiErrorMessage(e, t('integrations.addStore.createFailed')));
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <GlassModal open={open} onClose={onClose} title="Add YouCan Store" size="md">
+    <GlassModal open={open} onClose={onClose} title={t('integrations.addStore.title')} size="md">
       <div className="flex flex-col gap-4">
-        <p className="text-xs text-gray-500">
-          Give this connection a name, then you'll be taken to YouCan in a popup window to
-          authorize access. Have multiple brands? Create one entry per YouCan store — you can
-          link as many as you need.
-        </p>
+        <p className="text-xs text-gray-500">{t('integrations.addStore.intro')}</p>
 
         <CRMInput
-          label="Store Name"
-          placeholder="My YouCan Store"
+          label={t('integrations.addStore.storeName')}
+          placeholder={t('integrations.addStore.placeholder')}
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
@@ -63,7 +62,7 @@ export function AddStoreModal({ open, onClose, onCreated }: Props) {
 
         <div className="flex items-center justify-end gap-2 pt-2">
           <CRMButton variant="ghost" size="sm" onClick={onClose} disabled={saving}>
-            Cancel
+            {t('common.cancel')}
           </CRMButton>
           <CRMButton
             variant="primary"
@@ -72,7 +71,7 @@ export function AddStoreModal({ open, onClose, onCreated }: Props) {
             onClick={handleSubmit}
             loading={saving}
           >
-            Create & Connect
+            {t('integrations.addStore.createConnect')}
           </CRMButton>
         </div>
       </div>

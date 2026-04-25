@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { GlassModal } from '@/components/ui/GlassModal';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { CRMSelect } from '@/components/ui/CRMSelect';
@@ -8,6 +9,7 @@ import {
 } from 'lucide-react';
 import { integrationsApi, type Store, type ImportLog } from '@/services/integrationsApi';
 import { cn } from '@/lib/cn';
+import { apiErrorMessage } from '@/lib/apiError';
 
 interface Props {
   store: Store | null;
@@ -15,15 +17,6 @@ interface Props {
   onClose: () => void;
   onUpdated: () => void;
 }
-
-const AUTO_DETECT_OPTION = { value: '', label: '— Auto-detect —' };
-
-const CRM_FIELDS = [
-  { key: 'name', label: 'Customer Name' },
-  { key: 'phone', label: 'Customer Phone' },
-  { key: 'city', label: 'Customer City' },
-  { key: 'address', label: 'Customer Address' },
-];
 
 interface CheckoutField {
   path: string;
@@ -38,6 +31,7 @@ const LOG_LEVEL_ICON: Record<string, { icon: React.ElementType; color: string }>
 };
 
 export function ConfigureStoreModal({ store, open, onClose, onUpdated }: Props) {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<'mapping' | 'logs'>('mapping');
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -50,33 +44,34 @@ export function ConfigureStoreModal({ store, open, onClose, onUpdated }: Props) 
   const [fieldsLoading, setFieldsLoading] = useState(false);
   const [fieldsError, setFieldsError] = useState<string | null>(null);
 
+  const crmFields = useMemo(
+    () => [
+      { key: 'name', label: t('integrations.configureStore.crmFields.name') },
+      { key: 'phone', label: t('integrations.configureStore.crmFields.phone') },
+      { key: 'city', label: t('integrations.configureStore.crmFields.city') },
+      { key: 'address', label: t('integrations.configureStore.crmFields.address') },
+    ],
+    [t],
+  );
+
+  const autoDetectOption = useMemo(
+    () => ({ value: '', label: t('integrations.configureStore.autoDetect') }),
+    [t],
+  );
+
   const loadCheckoutFields = useCallback(async (storeId: string) => {
     setFieldsLoading(true);
     setFieldsError(null);
     try {
       const fields = await integrationsApi.detectCheckoutFields(storeId);
       setCheckoutFields(fields);
-    } catch (e: any) {
+    } catch (e: unknown) {
       setCheckoutFields([]);
-      setFieldsError(
-        e?.response?.data?.error?.message
-          ?? 'Could not detect checkout fields. Make sure the store is connected and has at least one order.',
-      );
+      setFieldsError(apiErrorMessage(e, t('integrations.configureStore.fieldsError')));
     } finally {
       setFieldsLoading(false);
     }
-  }, []);
-
-  useEffect(() => {
-    if (store && open) {
-      setMapping(store.fieldMapping ?? {});
-      setTab('mapping');
-      setCheckoutFields(null);
-      setFieldsError(null);
-      loadLogs(store.id, 1);
-      if (store.isConnected) loadCheckoutFields(store.id);
-    }
-  }, [store, open, loadCheckoutFields]);
+  }, [t]);
 
   const loadLogs = useCallback(async (storeId: string, page: number) => {
     setLogsLoading(true);
@@ -92,6 +87,17 @@ export function ConfigureStoreModal({ store, open, onClose, onUpdated }: Props) 
     }
   }, []);
 
+  useEffect(() => {
+    if (store && open) {
+      setMapping(store.fieldMapping ?? {});
+      setTab('mapping');
+      setCheckoutFields(null);
+      setFieldsError(null);
+      loadLogs(store.id, 1);
+      if (store.isConnected) loadCheckoutFields(store.id);
+    }
+  }, [store, open, loadCheckoutFields, loadLogs]);
+
   const handleSaveMapping = async () => {
     if (!store) return;
     setSaving(true);
@@ -99,8 +105,8 @@ export function ConfigureStoreModal({ store, open, onClose, onUpdated }: Props) 
     try {
       await integrationsApi.updateFieldMapping(store.id, mapping);
       onUpdated();
-    } catch (e: any) {
-      setError(e?.response?.data?.error?.message ?? 'Failed to save mapping');
+    } catch (e: unknown) {
+      setError(apiErrorMessage(e, t('integrations.configureStore.saveFailed')));
     } finally {
       setSaving(false);
     }
@@ -109,7 +115,7 @@ export function ConfigureStoreModal({ store, open, onClose, onUpdated }: Props) 
   if (!store) return null;
 
   return (
-    <GlassModal open={open} onClose={onClose} title={`Configure: ${store.name}`} size="xl">
+    <GlassModal open={open} onClose={onClose} title={t('integrations.configureStore.title', { name: store.name })} size="xl">
       <div className="flex flex-col gap-4">
         {/* Tabs */}
         <div className="flex gap-1 rounded-xl bg-gray-100 p-1">
@@ -120,7 +126,7 @@ export function ConfigureStoreModal({ store, open, onClose, onUpdated }: Props) 
               tab === 'mapping' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700',
             )}
           >
-            Field Mapping
+            {t('integrations.configureStore.tabMapping')}
           </button>
           <button
             onClick={() => { setTab('logs'); loadLogs(store.id, 1); }}
@@ -129,7 +135,7 @@ export function ConfigureStoreModal({ store, open, onClose, onUpdated }: Props) 
               tab === 'logs' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700',
             )}
           >
-            Sync Logs
+            {t('integrations.configureStore.tabLogs')}
           </button>
         </div>
 
@@ -137,10 +143,7 @@ export function ConfigureStoreModal({ store, open, onClose, onUpdated }: Props) 
         {tab === 'mapping' && (
           <div className="flex flex-col gap-4">
             <div className="flex items-start justify-between gap-3">
-              <p className="text-xs text-gray-500">
-                Only YouCan checkout fields detected in your recent orders are shown below.
-                Leave on "Auto-detect" to let the system guess from customer/shipping defaults.
-              </p>
+              <p className="text-xs text-gray-500">{t('integrations.configureStore.mappingIntro')}</p>
               {store.isConnected && (
                 <button
                   type="button"
@@ -148,7 +151,7 @@ export function ConfigureStoreModal({ store, open, onClose, onUpdated }: Props) 
                   disabled={fieldsLoading}
                   className="shrink-0 rounded-btn bg-gray-100 px-2 py-1 text-[10px] font-semibold text-gray-600 hover:bg-gray-200 disabled:opacity-60"
                 >
-                  {fieldsLoading ? 'Scanning…' : 'Rescan fields'}
+                  {fieldsLoading ? t('integrations.configureStore.scanning') : t('integrations.configureStore.rescanFields')}
                 </button>
               )}
             </div>
@@ -161,25 +164,22 @@ export function ConfigureStoreModal({ store, open, onClose, onUpdated }: Props) 
 
             {fieldsLoading ? (
               <p className="rounded-btn bg-gray-50 px-3 py-2 text-[11px] text-gray-500">
-                Scanning recent YouCan orders for active checkout fields…
+                {t('integrations.configureStore.scanningOrders')}
               </p>
             ) : (
-              CRM_FIELDS.map((field) => {
+              crmFields.map((field) => {
                 const detected = checkoutFields ?? [];
-                // Always surface whatever the store currently maps, even if
-                // it's not in the detected list, so a legacy mapping isn't
-                // silently dropped when nothing was detected yet.
                 const currentValue = mapping[field.key] ?? '';
                 const options = [
-                  AUTO_DETECT_OPTION,
+                  autoDetectOption,
                   ...detected.map((f) => ({
                     value: f.path,
                     label: f.sample
-                      ? `${f.label}  ·  "${f.sample}"`
+                      ? t('integrations.configureStore.optionWithSample', { label: f.label, sample: f.sample })
                       : f.label,
                   })),
                   ...(currentValue && !detected.some((f) => f.path === currentValue)
-                    ? [{ value: currentValue, label: `${currentValue}  ·  (not detected)` }]
+                    ? [{ value: currentValue, label: t('integrations.configureStore.notDetected', { path: currentValue }) }]
                     : []),
                 ];
                 return (
@@ -208,7 +208,7 @@ export function ConfigureStoreModal({ store, open, onClose, onUpdated }: Props) 
 
             <div className="flex justify-end pt-2">
               <CRMButton variant="primary" size="sm" leftIcon={<Save size={12} />} onClick={handleSaveMapping} loading={saving}>
-                Save Mapping
+                {t('integrations.configureStore.saveMapping')}
               </CRMButton>
             </div>
           </div>
@@ -218,9 +218,9 @@ export function ConfigureStoreModal({ store, open, onClose, onUpdated }: Props) 
         {tab === 'logs' && (
           <div className="flex flex-col gap-2">
             {logsLoading ? (
-              <div className="flex items-center justify-center py-8 text-xs text-gray-400">Loading logs...</div>
+              <div className="flex items-center justify-center py-8 text-xs text-gray-400">{t('integrations.configureStore.logsLoading')}</div>
             ) : logs.length === 0 ? (
-              <div className="flex items-center justify-center py-8 text-xs text-gray-400">No logs yet</div>
+              <div className="flex items-center justify-center py-8 text-xs text-gray-400">{t('integrations.configureStore.logsEmpty')}</div>
             ) : (
               <>
                 <div className="max-h-[400px] overflow-y-auto">
@@ -249,13 +249,13 @@ export function ConfigureStoreModal({ store, open, onClose, onUpdated }: Props) 
                           <p className="mt-0.5 text-xs text-gray-700">{log.message}</p>
                           {(log.imported > 0 || log.skipped > 0 || log.errors > 0) && (
                             <div className="mt-1 flex gap-3 text-[10px]">
-                              {log.imported > 0 && <span className="text-emerald-600">{log.imported} imported</span>}
-                              {log.skipped > 0 && <span className="text-gray-500">{log.skipped} skipped</span>}
-                              {log.errors > 0 && <span className="text-red-600">{log.errors} errors</span>}
+                              {log.imported > 0 && <span className="text-emerald-600">{t('integrations.configureStore.importedCount', { count: log.imported })}</span>}
+                              {log.skipped > 0 && <span className="text-gray-500">{t('integrations.configureStore.skippedCount', { count: log.skipped })}</span>}
+                              {log.errors > 0 && <span className="text-red-600">{t('integrations.configureStore.errorsCount', { count: log.errors })}</span>}
                             </div>
                           )}
-                          {log.meta && (log.meta as any).details && (
-                            <LogDetails details={(log.meta as any).details} />
+                          {log.meta && (log.meta as { details?: string[] }).details && (
+                            <LogDetails details={(log.meta as { details: string[] }).details} />
                           )}
                         </div>
                       </div>
@@ -270,7 +270,7 @@ export function ConfigureStoreModal({ store, open, onClose, onUpdated }: Props) 
                       disabled={logsPage <= 1}
                       onClick={() => loadLogs(store.id, logsPage - 1)}
                     >
-                      Prev
+                      {t('integrations.configureStore.prev')}
                     </CRMButton>
                     <span className="text-[11px] text-gray-400">{logsPage} / {logsTotalPages}</span>
                     <CRMButton
@@ -279,7 +279,7 @@ export function ConfigureStoreModal({ store, open, onClose, onUpdated }: Props) 
                       disabled={logsPage >= logsTotalPages}
                       onClick={() => loadLogs(store.id, logsPage + 1)}
                     >
-                      Next
+                      {t('integrations.configureStore.next')}
                     </CRMButton>
                   </div>
                 )}
@@ -293,6 +293,7 @@ export function ConfigureStoreModal({ store, open, onClose, onUpdated }: Props) 
 }
 
 function LogDetails({ details }: { details: string[] }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   if (!details.length) return null;
   return (
@@ -302,7 +303,7 @@ function LogDetails({ details }: { details: string[] }) {
         className="flex items-center gap-1 text-[10px] font-medium text-primary"
       >
         {expanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-        {details.length} detail{details.length > 1 ? 's' : ''}
+        {t('integrations.configureStore.detailsToggle', { count: details.length })}
       </button>
       {expanded && (
         <div className="mt-1 max-h-32 overflow-y-auto rounded-btn bg-gray-50 p-2 text-[10px] text-gray-600">

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Copy,
   Check,
@@ -18,6 +19,7 @@ import { useAuthStore } from '@/store/authStore';
 import { PERMISSIONS } from '@/constants/permissions';
 import { providersApi, type ShippingProvider } from '@/services/providersApi';
 import { CitiesTab } from '@/pages/settings/components/CitiesTab';
+import { apiErrorMessage } from '@/lib/apiError';
 
 const BACKEND_ORIGIN = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 
@@ -26,6 +28,7 @@ function buildWebhookUrl(secret: string) {
 }
 
 export function ColiixTab() {
+  const { t } = useTranslation();
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canManage = hasPermission(PERMISSIONS.INTEGRATIONS_MANAGE);
 
@@ -51,12 +54,12 @@ export function ColiixTab() {
       setProvider(p);
       setApiBaseUrl(p.apiBaseUrl);
       setError(null);
-    } catch (e: any) {
-      setError(e?.response?.data?.error?.message ?? 'Failed to load Coliix integration');
+    } catch (e: unknown) {
+      setError(apiErrorMessage(e, t('integrations.coliix.loadFailed')));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     load();
@@ -74,8 +77,8 @@ export function ColiixTab() {
       setProvider(updated);
       setApiKeyInput('');
       setShowKey(false);
-    } catch (e: any) {
-      setError(e?.response?.data?.error?.message ?? 'Failed to save settings');
+    } catch (e: unknown) {
+      setError(apiErrorMessage(e, t('integrations.coliix.saveFailed')));
     } finally {
       setSaving(false);
     }
@@ -88,8 +91,8 @@ export function ColiixTab() {
       setProvider(updated);
       setApiKeyInput('');
       setTestResult(null);
-    } catch (e: any) {
-      setError(e?.response?.data?.error?.message ?? 'Failed to clear API key');
+    } catch (e: unknown) {
+      setError(apiErrorMessage(e, t('integrations.coliix.clearFailed')));
     } finally {
       setSaving(false);
     }
@@ -103,8 +106,8 @@ export function ColiixTab() {
       setTestResult(result);
       // Refresh lastCheckedAt / lastError
       load();
-    } catch (e: any) {
-      setTestResult({ ok: false, message: e?.response?.data?.error?.message ?? 'Test failed' });
+    } catch (e: unknown) {
+      setTestResult({ ok: false, message: apiErrorMessage(e, t('integrations.coliix.testFailed')) });
     } finally {
       setTesting(false);
     }
@@ -116,21 +119,21 @@ export function ColiixTab() {
     try {
       const updated = await providersApi.update('coliix', { isActive: !provider.isActive });
       setProvider(updated);
-    } catch (e: any) {
-      setError(e?.response?.data?.error?.message ?? 'Failed to toggle');
+    } catch (e: unknown) {
+      setError(apiErrorMessage(e, t('integrations.coliix.toggleFailed')));
     } finally {
       setToggling(false);
     }
   };
 
   const handleRotate = async () => {
-    if (!confirm('Rotate the webhook secret? The old URL will stop working — update Coliix with the new one.')) return;
+    if (!confirm(t('integrations.coliix.rotateConfirm'))) return;
     setRotating(true);
     try {
       const updated = await providersApi.rotateSecret('coliix');
       setProvider(updated);
-    } catch (e: any) {
-      setError(e?.response?.data?.error?.message ?? 'Failed to rotate secret');
+    } catch (e: unknown) {
+      setError(apiErrorMessage(e, t('integrations.coliix.rotateFailed')));
     } finally {
       setRotating(false);
     }
@@ -160,7 +163,7 @@ export function ColiixTab() {
   if (!provider) {
     return (
       <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-        {error ?? 'Coliix integration not available.'}
+        {error ?? t('integrations.coliix.notAvailable')}
       </div>
     );
   }
@@ -171,9 +174,7 @@ export function ColiixTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-gray-400">
-          Export confirmed orders to Coliix and receive instant status updates via webhook.
-        </p>
+        <p className="text-xs text-gray-400">{t('integrations.coliix.subtitle')}</p>
         <div className="flex items-center gap-2">
           <span
             className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
@@ -187,7 +188,7 @@ export function ColiixTab() {
                 provider.isActive ? 'bg-emerald-500' : 'bg-gray-400'
               }`}
             />
-            {provider.isActive ? 'Active' : 'Inactive'}
+            {provider.isActive ? t('integrations.coliix.statusActive') : t('integrations.coliix.statusInactive')}
           </span>
           <CRMButton
             variant="secondary"
@@ -195,7 +196,7 @@ export function ColiixTab() {
             onClick={() => setCitiesOpen(true)}
             leftIcon={<MapPin size={14} />}
           >
-            Cities
+            {t('integrations.coliix.citiesButton')}
           </CRMButton>
           {canManage && (
             <CRMButton
@@ -204,7 +205,7 @@ export function ColiixTab() {
               onClick={handleToggle}
               disabled={toggling || (!provider.hasApiKey && !provider.isActive)}
             >
-              {toggling ? '…' : provider.isActive ? 'Disable' : 'Enable'}
+              {toggling ? '…' : provider.isActive ? t('integrations.coliix.disable') : t('integrations.coliix.enable')}
             </CRMButton>
           )}
         </div>
@@ -213,7 +214,7 @@ export function ColiixTab() {
       <GlassModal
         open={citiesOpen}
         onClose={() => setCitiesOpen(false)}
-        title="Shipping cities"
+        title={t('integrations.coliix.citiesTitle')}
         size="3xl"
       >
         <CitiesTab />
@@ -236,22 +237,22 @@ export function ColiixTab() {
               <Truck size={16} />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-gray-900">Coliix API</h3>
-              <p className="text-[11px] text-gray-400">Credentials used to export orders and fetch tracking.</p>
+              <h3 className="text-sm font-bold text-gray-900">{t('integrations.coliix.apiCardTitle')}</h3>
+              <p className="text-[11px] text-gray-400">{t('integrations.coliix.apiCardSubtitle')}</p>
             </div>
           </div>
 
           <div className="space-y-3">
             <CRMInput
-              label="API base URL"
+              label={t('integrations.coliix.apiBaseUrl')}
               value={apiBaseUrl}
               onChange={(e) => setApiBaseUrl(e.target.value)}
               disabled={!canManage || saving}
-              placeholder="https://api.coliix.com"
+              placeholder={t('integrations.coliix.apiBaseUrlPlaceholder')}
             />
 
             <div>
-              <label className="text-sm font-medium text-gray-700">API key</label>
+              <label className="text-sm font-medium text-gray-700">{t('integrations.coliix.apiKey')}</label>
               <div className="mt-1.5 flex items-center gap-2">
                 <div className="relative flex-1">
                   <input
@@ -260,8 +261,8 @@ export function ColiixTab() {
                     onChange={(e) => setApiKeyInput(e.target.value)}
                     placeholder={
                       provider.hasApiKey
-                        ? `Saved: ${provider.apiKeyMask ?? '••••'}  —  enter a new key to replace`
-                        : 'Paste your Coliix API key'
+                        ? t('integrations.coliix.apiKeySaved', { mask: provider.apiKeyMask ?? '••••' })
+                        : t('integrations.coliix.apiKeyPlaceholder')
                     }
                     disabled={!canManage || saving}
                     className="w-full rounded-input border border-gray-200 bg-white py-2.5 pl-3 pr-10 text-sm text-gray-900 placeholder-gray-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -275,9 +276,7 @@ export function ColiixTab() {
                   </button>
                 </div>
               </div>
-              <p className="mt-1 text-[11px] text-gray-400">
-                Stored encrypted at rest (AES-256-GCM). We never display the key back.
-              </p>
+              <p className="mt-1 text-[11px] text-gray-400">{t('integrations.coliix.apiKeyHelper')}</p>
             </div>
 
             {testResult && (
@@ -295,15 +294,19 @@ export function ColiixTab() {
 
             {provider.lastCheckedAt && !testResult && (
               <p className="text-[11px] text-gray-400">
-                Last checked {new Date(provider.lastCheckedAt).toLocaleString()}
-                {provider.lastError ? ` — ${provider.lastError}` : ' — OK'}
+                {t('integrations.coliix.lastChecked', {
+                  when: new Date(provider.lastCheckedAt).toLocaleString(),
+                  tail: provider.lastError
+                    ? t('integrations.coliix.lastCheckedError', { message: provider.lastError })
+                    : t('integrations.coliix.lastCheckedOk'),
+                })}
               </p>
             )}
 
             {canManage && (
               <div className="flex flex-wrap gap-2 pt-1">
                 <CRMButton variant="primary" size="sm" onClick={handleSave} disabled={!canSave}>
-                  {saving ? 'Saving…' : 'Save'}
+                  {saving ? t('integrations.coliix.saving') : t('integrations.coliix.save')}
                 </CRMButton>
                 <CRMButton
                   variant="secondary"
@@ -312,11 +315,11 @@ export function ColiixTab() {
                   disabled={testing || !provider.hasApiKey}
                   leftIcon={testing ? <Loader2 size={14} className="animate-spin" /> : undefined}
                 >
-                  {testing ? 'Testing…' : 'Test connection'}
+                  {testing ? t('integrations.coliix.testing') : t('integrations.coliix.testConnection')}
                 </CRMButton>
                 {provider.hasApiKey && (
                   <CRMButton variant="ghost" size="sm" onClick={handleClearKey} disabled={saving}>
-                    Clear key
+                    {t('integrations.coliix.clearKey')}
                   </CRMButton>
                 )}
               </div>
@@ -331,10 +334,8 @@ export function ColiixTab() {
               <RefreshCw size={16} />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-gray-900">Webhook URL</h3>
-              <p className="text-[11px] text-gray-400">
-                Paste this into Coliix's webhook settings to receive real-time status updates.
-              </p>
+              <h3 className="text-sm font-bold text-gray-900">{t('integrations.coliix.webhookTitle')}</h3>
+              <p className="text-[11px] text-gray-400">{t('integrations.coliix.webhookSubtitle')}</p>
             </div>
           </div>
 
@@ -353,13 +354,12 @@ export function ColiixTab() {
                 onClick={handleCopy}
                 leftIcon={copied ? <Check size={14} /> : <Copy size={14} />}
               >
-                {copied ? 'Copied' : 'Copy'}
+                {copied ? t('integrations.coliix.copied') : t('integrations.coliix.copy')}
               </CRMButton>
             </div>
 
             <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
-              The secret in the URL authenticates Coliix to this CRM. Keep it private — if it leaks,
-              rotate it below and update Coliix.
+              {t('integrations.coliix.webhookWarning')}
             </div>
 
             {canManage && (
@@ -370,7 +370,7 @@ export function ColiixTab() {
                 disabled={rotating}
                 leftIcon={rotating ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
               >
-                {rotating ? 'Rotating…' : 'Rotate secret'}
+                {rotating ? t('integrations.coliix.rotating') : t('integrations.coliix.rotateSecret')}
               </CRMButton>
             )}
           </div>

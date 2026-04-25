@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Check, ChevronRight, ChevronLeft, Download, Package,
   Search, X, Save, AlertCircle, Sparkles, CheckCircle2,
@@ -31,32 +32,41 @@ interface CheckoutField {
 
 type StepKey = 'mapping' | 'orders' | 'products' | 'done';
 
-const STEPS: Array<{ key: StepKey; label: string }> = [
-  { key: 'mapping', label: 'Map Fields' },
-  { key: 'orders', label: 'Import Orders' },
-  { key: 'products', label: 'Import Products' },
-  { key: 'done', label: 'Done' },
-];
+const STEP_KEYS: StepKey[] = ['mapping', 'orders', 'products', 'done'];
 
-const CRM_FIELDS: Array<{ key: string; label: string; hint: string }> = [
-  { key: 'name', label: 'Customer Name', hint: 'Full name used on call sheets' },
-  { key: 'phone', label: 'Customer Phone', hint: 'Primary callback number' },
-  { key: 'city', label: 'Customer City', hint: 'Drives shipping cost lookup' },
-  { key: 'address', label: 'Customer Address', hint: 'Street / delivery point' },
-];
-
-const ORDER_PRESETS: Array<{ label: string; value: number | 'all' | 'skip' }> = [
-  { label: 'Skip', value: 'skip' },
-  { label: 'Last 10', value: 10 },
-  { label: 'Last 50', value: 50 },
-  { label: 'Last 100', value: 100 },
-  { label: 'All', value: 'all' },
-];
+const CRM_FIELD_KEYS = ['name', 'phone', 'city', 'address'] as const;
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
+  const { t } = useTranslation();
   const [step, setStep] = useState<StepKey>('mapping');
+
+  const STEPS = useMemo(
+    () => STEP_KEYS.map((key) => ({ key, label: t(`integrations.onboarding.steps.${key}`) })),
+    [t],
+  );
+
+  const CRM_FIELDS = useMemo(
+    () =>
+      CRM_FIELD_KEYS.map((key) => ({
+        key,
+        label: t(`integrations.onboarding.mapping.crmFields.${key}Label`),
+        hint: t(`integrations.onboarding.mapping.crmFields.${key}Hint`),
+      })),
+    [t],
+  );
+
+  const ORDER_PRESETS = useMemo<Array<{ label: string; value: number | 'all' | 'skip' }>>(
+    () => [
+      { label: t('integrations.onboarding.orders.presetSkip'), value: 'skip' },
+      { label: t('integrations.onboarding.orders.presetLast', { count: 10 }), value: 10 },
+      { label: t('integrations.onboarding.orders.presetLast', { count: 50 }), value: 50 },
+      { label: t('integrations.onboarding.orders.presetLast', { count: 100 }), value: 100 },
+      { label: t('integrations.onboarding.orders.presetAll'), value: 'all' },
+    ],
+    [t],
+  );
 
   // Step 1 — mapping
   const [mapping, setMapping] = useState<Record<string, string>>({});
@@ -118,12 +128,12 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
       setFields([]);
       setFieldsError(
         e?.response?.data?.error?.message
-          ?? 'Could not detect checkout fields from YouCan. You can still map manually below.',
+          ?? t('integrations.onboarding.mapping.fieldsError'),
       );
     } finally {
       setFieldsLoading(false);
     }
-  }, [store]);
+  }, [store, t]);
 
   useEffect(() => {
     if (open && store && step === 'mapping' && fields === null) {
@@ -139,7 +149,7 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
       await integrationsApi.updateFieldMapping(store.id, mapping);
       setStep('orders');
     } catch (e: any) {
-      setMappingError(e?.response?.data?.error?.message ?? 'Failed to save mapping');
+      setMappingError(e?.response?.data?.error?.message ?? t('integrations.onboarding.mapping.saveFailed'));
     } finally {
       setMappingSaving(false);
     }
@@ -159,7 +169,7 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
       const r = await integrationsApi.importOrders(store.id, count);
       setOrderResult(r);
     } catch (e: any) {
-      setOrderError(e?.response?.data?.error?.message ?? 'Import failed');
+      setOrderError(e?.response?.data?.error?.message ?? t('integrations.onboarding.orders.importFailed'));
     } finally {
       setOrderImporting(false);
     }
@@ -177,12 +187,12 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
         setProductsPage(data.pagination.current_page);
         setProductsTotalPages(data.pagination.total_pages);
       } catch (e: any) {
-        setProductError(e?.response?.data?.error?.message ?? 'Failed to load products');
+        setProductError(e?.response?.data?.error?.message ?? t('integrations.onboarding.products.loadFailed'));
       } finally {
         setProductsLoading(false);
       }
     },
-    [store],
+    [store, t],
   );
 
   // When user picks "pick from list", fetch the first page.
@@ -230,7 +240,7 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
       setProductResult(r);
       onFinished();
     } catch (e: any) {
-      setProductError(e?.response?.data?.error?.message ?? 'Import failed');
+      setProductError(e?.response?.data?.error?.message ?? t('integrations.onboarding.products.importFailed'));
     } finally {
       setProductImporting(false);
     }
@@ -241,13 +251,15 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
   const mappingOptions = useMemo(() => {
     const detected = fields ?? [];
     return [
-      { value: '', label: '— Auto-detect —' },
+      { value: '', label: t('integrations.onboarding.mapping.autoDetect') },
       ...detected.map((f) => ({
         value: f.path,
-        label: f.sample ? `${f.label}  ·  "${f.sample}"` : f.label,
+        label: f.sample
+          ? t('integrations.onboarding.mapping.optionWithSample', { label: f.label, sample: f.sample })
+          : f.label,
       })),
     ];
-  }, [fields]);
+  }, [fields, t]);
 
   // ── Render ──────────────────────────────────────────────────────────────
   if (!store) return null;
@@ -256,7 +268,7 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
     <GlassModal
       open={open}
       onClose={onClose}
-      title={`Set up: ${store.name}`}
+      title={t('integrations.onboarding.title', { name: store.name })}
       size="2xl"
     >
       <div className="flex flex-col gap-5">
@@ -268,12 +280,12 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
           <div className="flex flex-col gap-4">
             <div>
               <p className="text-xs font-semibold text-gray-700">
-                Match YouCan checkout fields to your CRM fields
+                {t('integrations.onboarding.mapping.heading')}
               </p>
               <p className="mt-0.5 text-[11px] text-gray-400">
-                We scanned your store's recent orders and found {fields?.length ?? '…'} active
-                checkout field{fields?.length === 1 ? '' : 's'}. Pick the best match for each CRM
-                field, or leave on "Auto-detect" to use sensible defaults.
+                {fields == null
+                  ? t('integrations.onboarding.mapping.detectedPending')
+                  : t('integrations.onboarding.mapping.detected', { count: fields.length })}
               </p>
             </div>
 
@@ -285,7 +297,7 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
 
             {fieldsLoading ? (
               <div className="rounded-btn bg-gray-50 px-3 py-4 text-center text-[11px] text-gray-500">
-                Scanning YouCan orders to find active checkout fields…
+                {t('integrations.onboarding.mapping.scanning')}
               </div>
             ) : (
               <div className="flex flex-col gap-3">
@@ -321,7 +333,7 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
 
             <FooterRow>
               <CRMButton variant="ghost" size="sm" onClick={onClose}>
-                Cancel
+                {t('common.cancel')}
               </CRMButton>
               <CRMButton
                 variant="primary"
@@ -330,7 +342,7 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
                 loading={mappingSaving}
                 onClick={handleSaveMapping}
               >
-                Save & Continue
+                {t('integrations.onboarding.mapping.saveContinue')}
               </CRMButton>
             </FooterRow>
           </div>
@@ -343,11 +355,10 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
               <>
                 <div>
                   <p className="text-xs font-semibold text-gray-700">
-                    Import past orders from YouCan?
+                    {t('integrations.onboarding.orders.heading')}
                   </p>
                   <p className="mt-0.5 text-[11px] text-gray-400">
-                    New orders arrive automatically via webhook. You can also pull existing orders
-                    to get started. Duplicates are skipped.
+                    {t('integrations.onboarding.orders.intro')}
                   </p>
                 </div>
 
@@ -380,7 +391,7 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
 
                 <FooterRow>
                   <CRMButton variant="ghost" size="sm" onClick={() => setStep('mapping')} leftIcon={<ChevronLeft size={12} />}>
-                    Back
+                    {t('integrations.onboarding.orders.back')}
                   </CRMButton>
                   <CRMButton
                     variant="primary"
@@ -390,13 +401,15 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
                     loading={orderImporting}
                     onClick={handleImportOrders}
                   >
-                    {orderChoice === 'skip' ? 'Skip & Continue' : 'Import & Continue'}
+                    {orderChoice === 'skip'
+                      ? t('integrations.onboarding.orders.skipContinue')
+                      : t('integrations.onboarding.orders.importContinue')}
                   </CRMButton>
                 </FooterRow>
               </>
             ) : (
               <>
-                <ResultPanel result={orderResult} label="Order import complete" />
+                <ResultPanel result={orderResult} label={t('integrations.onboarding.orders.importComplete')} />
                 <FooterRow>
                   <CRMButton
                     variant="primary"
@@ -404,7 +417,7 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
                     rightIcon={<ChevronRight size={12} />}
                     onClick={() => setStep('products')}
                   >
-                    Continue
+                    {t('integrations.onboarding.orders.continue')}
                   </CRMButton>
                 </FooterRow>
               </>
@@ -419,19 +432,18 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
               <>
                 <div>
                   <p className="text-xs font-semibold text-gray-700">
-                    Import products from YouCan?
+                    {t('integrations.onboarding.products.heading')}
                   </p>
                   <p className="mt-0.5 text-[11px] text-gray-400">
-                    Importing links products to orders so stock is tracked. Orders referencing
-                    unknown products stay in red until you import them.
+                    {t('integrations.onboarding.products.intro')}
                   </p>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2">
                   {([
-                    { key: 'skip', label: 'Skip for now', desc: 'Do it later' },
-                    { key: 'all', label: 'Import All', desc: 'Everything at once' },
-                    { key: 'pick', label: 'Pick from list', desc: 'Choose specific products' },
+                    { key: 'skip', label: t('integrations.onboarding.products.optSkipLabel'), desc: t('integrations.onboarding.products.optSkipDesc') },
+                    { key: 'all', label: t('integrations.onboarding.products.optAllLabel'), desc: t('integrations.onboarding.products.optAllDesc') },
+                    { key: 'pick', label: t('integrations.onboarding.products.optPickLabel'), desc: t('integrations.onboarding.products.optPickDesc') },
                   ] as const).map((opt) => {
                     const active = productChoice === opt.key;
                     return (
@@ -465,7 +477,7 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
                         type="text"
                         value={productSearchInput}
                         onChange={(e) => setProductSearchInput(e.target.value)}
-                        placeholder="Search products by name…"
+                        placeholder={t('integrations.onboarding.products.searchPlaceholder')}
                         className="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-9 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                       />
                       {productSearchInput && (
@@ -473,7 +485,7 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
                           type="button"
                           onClick={() => setProductSearchInput('')}
                           className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                          title="Clear search"
+                          title={t('integrations.onboarding.products.clearSearch')}
                         >
                           <X size={12} />
                         </button>
@@ -482,11 +494,15 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
 
                     {productsLoading ? (
                       <div className="py-6 text-center text-[11px] text-gray-400">
-                        {productSearch ? `Searching for "${productSearch}"…` : 'Loading products…'}
+                        {productSearch
+                          ? t('integrations.onboarding.products.searching', { query: productSearch })
+                          : t('integrations.onboarding.products.loading')}
                       </div>
                     ) : products.length === 0 ? (
                       <div className="py-6 text-center text-[11px] text-gray-400">
-                        {productSearch ? `No products match "${productSearch}"` : 'No products in this store yet'}
+                        {productSearch
+                          ? t('integrations.onboarding.products.noMatch', { query: productSearch })
+                          : t('integrations.onboarding.products.noProducts')}
                       </div>
                     ) : (
                       <>
@@ -521,7 +537,11 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
                                 <div className="min-w-0 flex-1">
                                   <p className="truncate text-[11px] font-semibold text-gray-900">{p.name}</p>
                                   <p className="text-[9px] text-gray-400">
-                                    {p.price} MAD · {p.variants_count} var · stock {p.inventory}
+                                    {t('integrations.onboarding.products.productMeta', {
+                                      price: p.price,
+                                      variants: p.variants_count,
+                                      stock: p.inventory,
+                                    })}
                                   </p>
                                 </div>
                               </button>
@@ -538,7 +558,7 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
                               onClick={() => loadProducts(productsPage - 1, productSearch)}
                               leftIcon={<ChevronLeft size={12} />}
                             >
-                              Prev
+                              {t('integrations.onboarding.prev')}
                             </CRMButton>
                             <span className="text-[10px] text-gray-400">{productsPage} / {productsTotalPages}</span>
                             <CRMButton
@@ -548,13 +568,13 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
                               onClick={() => loadProducts(productsPage + 1, productSearch)}
                               rightIcon={<ChevronRight size={12} />}
                             >
-                              Next
+                              {t('integrations.onboarding.next')}
                             </CRMButton>
                           </div>
                         )}
 
                         <p className="text-center text-[10px] text-gray-400">
-                          {selectedProducts.size} selected
+                          {t('integrations.onboarding.products.selectedCount', { count: selectedProducts.size })}
                         </p>
                       </>
                     )}
@@ -569,7 +589,7 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
 
                 <FooterRow>
                   <CRMButton variant="ghost" size="sm" onClick={() => setStep('orders')} leftIcon={<ChevronLeft size={12} />}>
-                    Back
+                    {t('integrations.onboarding.products.back')}
                   </CRMButton>
                   <CRMButton
                     variant="primary"
@@ -583,10 +603,10 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
                     onClick={handleImportProducts}
                   >
                     {productChoice === 'skip'
-                      ? 'Skip & Finish'
+                      ? t('integrations.onboarding.products.skipFinish')
                       : productChoice === 'pick'
-                        ? `Import ${selectedProducts.size || ''} & Finish`
-                        : 'Import All & Finish'}
+                        ? t('integrations.onboarding.products.importPickFinish', { count: selectedProducts.size || '' })
+                        : t('integrations.onboarding.products.importAllFinish')}
                   </CRMButton>
                 </FooterRow>
               </>
@@ -594,7 +614,7 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
 
             {productResult && (
               <>
-                <ResultPanel result={productResult} label="Product import complete" />
+                <ResultPanel result={productResult} label={t('integrations.onboarding.products.importComplete')} />
                 <FooterRow>
                   <CRMButton
                     variant="primary"
@@ -604,7 +624,7 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
                       setStep('done');
                     }}
                   >
-                    Finish
+                    {t('integrations.onboarding.products.finish')}
                   </CRMButton>
                 </FooterRow>
               </>
@@ -618,14 +638,12 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
               <Sparkles size={22} />
             </div>
-            <p className="text-sm font-bold text-gray-900">You're all set!</p>
+            <p className="text-sm font-bold text-gray-900">{t('integrations.onboarding.done.heading')}</p>
             <p className="max-w-md text-xs text-gray-500">
-              {store.name} is connected. New orders will arrive automatically. Any order
-              referencing a product that isn't in your catalog will appear in red — you can
-              import it from the Integrations page at any time.
+              {t('integrations.onboarding.done.body', { name: store.name })}
             </p>
             <CRMButton variant="primary" size="sm" onClick={onClose}>
-              Close
+              {t('integrations.onboarding.done.close')}
             </CRMButton>
           </div>
         )}
@@ -636,7 +654,7 @@ export function OnboardingWizard({ store, open, onClose, onFinished }: Props) {
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function StepBar({ steps, currentIndex }: { steps: typeof STEPS; currentIndex: number }) {
+function StepBar({ steps, currentIndex }: { steps: Array<{ key: StepKey; label: string }>; currentIndex: number }) {
   return (
     <div className="flex items-center gap-2">
       {steps.map((s, i) => {
@@ -683,6 +701,7 @@ function FooterRow({ children }: { children: React.ReactNode }) {
 }
 
 function ResultPanel({ result, label }: { result: ImportResult; label: string }) {
+  const { t } = useTranslation();
   return (
     <div
       className={cn(
@@ -699,15 +718,15 @@ function ResultPanel({ result, label }: { result: ImportResult; label: string })
         <p className="text-xs font-bold text-gray-900">{label}</p>
       </div>
       <div className="mt-2 flex gap-4 text-[11px]">
-        <span className="text-emerald-700">{result.imported} imported</span>
-        <span className="text-gray-500">{result.skipped} skipped</span>
-        <span className="text-red-600">{result.errors} errors</span>
+        <span className="text-emerald-700">{t('integrations.onboarding.result.imported', { count: result.imported })}</span>
+        <span className="text-gray-500">{t('integrations.onboarding.result.skipped', { count: result.skipped })}</span>
+        <span className="text-red-600">{t('integrations.onboarding.result.errors', { count: result.errors })}</span>
       </div>
       {result.details.length > 0 && (
         <div className="mt-2 max-h-32 overflow-y-auto rounded-btn bg-white/80 p-2 text-[10px] text-gray-600">
           {result.details.slice(0, 40).map((d, i) => <p key={i}>{d}</p>)}
           {result.details.length > 40 && (
-            <p className="text-gray-400">…and {result.details.length - 40} more</p>
+            <p className="text-gray-400">{t('integrations.onboarding.result.moreDetails', { count: result.details.length - 40 })}</p>
           )}
         </div>
       )}

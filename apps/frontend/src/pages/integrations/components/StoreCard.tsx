@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Link2, Unlink, Power, Trash2, Package, ShoppingCart,
   AlertCircle, CheckCircle2, Clock, Settings2, Wand2, Loader2,
@@ -30,10 +31,11 @@ export function StoreCard({
   onReconcile,
   reconciling,
 }: Props) {
+  const { t } = useTranslation();
   const [deleting, setDeleting] = useState(false);
 
   const handleDelete = () => {
-    if (!window.confirm(`Delete store "${store.name}"? This cannot be undone.`)) return;
+    if (!window.confirm(t('integrations.storeCard.deleteConfirm', { name: store.name }))) return;
     setDeleting(true);
     onDelete();
   };
@@ -73,14 +75,14 @@ export function StoreCard({
               : 'bg-gray-100 text-gray-500',
           )}>
             {store.isConnected ? (
-              <><CheckCircle2 size={9} /> Connected</>
+              <><CheckCircle2 size={9} /> {t('integrations.storeCard.connected')}</>
             ) : (
-              <><AlertCircle size={9} /> Disconnected</>
+              <><AlertCircle size={9} /> {t('integrations.storeCard.disconnected')}</>
             )}
           </span>
           {!store.isActive && (
             <span className="inline-flex items-center gap-1 rounded-badge bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-600">
-              Disabled
+              {t('integrations.storeCard.storeDisabled')}
             </span>
           )}
         </div>
@@ -99,21 +101,21 @@ export function StoreCard({
         <div className="flex flex-col items-center rounded-xl bg-gray-50 py-2">
           <Package size={14} className="text-gray-400" />
           <span className="mt-1 text-sm font-bold text-gray-900">{store._count.products}</span>
-          <span className="text-[9px] uppercase tracking-wide text-gray-400">Products</span>
+          <span className="text-[9px] uppercase tracking-wide text-gray-400">{t('integrations.storeCard.products')}</span>
         </div>
         <div className="flex flex-col items-center rounded-xl bg-gray-50 py-2">
           <ShoppingCart size={14} className="text-gray-400" />
           <span className="mt-1 text-sm font-bold text-gray-900">{store._count.orders}</span>
-          <span className="text-[9px] uppercase tracking-wide text-gray-400">Orders</span>
+          <span className="text-[9px] uppercase tracking-wide text-gray-400">{t('integrations.storeCard.orders')}</span>
         </div>
         <div className="flex flex-col items-center rounded-xl bg-gray-50 py-2">
           <Clock size={14} className="text-gray-400" />
           <span className="mt-1 text-[10px] font-semibold text-gray-600">
             {store.lastSyncAt
               ? new Date(store.lastSyncAt).toLocaleDateString('fr-MA', { day: '2-digit', month: 'short' })
-              : 'Never'}
+              : t('integrations.storeCard.never')}
           </span>
-          <span className="text-[9px] uppercase tracking-wide text-gray-400">Last sync</span>
+          <span className="text-[9px] uppercase tracking-wide text-gray-400">{t('integrations.storeCard.lastSync')}</span>
         </div>
       </div>
 
@@ -121,20 +123,20 @@ export function StoreCard({
       <div className="flex flex-col gap-2 border-t border-gray-100 pt-3">
         {!store.isConnected ? (
           <CRMButton variant="primary" size="sm" leftIcon={<Link2 size={12} />} onClick={onConnect} className="w-full">
-            Connect to YouCan
+            {t('integrations.storeCard.connect')}
           </CRMButton>
         ) : (
           <>
             <div className="grid grid-cols-2 gap-2">
               <CRMButton variant="secondary" size="sm" leftIcon={<Package size={12} />} onClick={onImportProducts}>
-                Import Products
+                {t('integrations.storeCard.importProducts')}
               </CRMButton>
               <CRMButton variant="secondary" size="sm" leftIcon={<ShoppingCart size={12} />} onClick={onImportOrders}>
-                Import Orders
+                {t('integrations.storeCard.importOrders')}
               </CRMButton>
             </div>
             <CRMButton variant="ghost" size="sm" leftIcon={<Settings2 size={12} />} onClick={onConfigure} className="w-full">
-              Configure & Field Mapping
+              {t('integrations.storeCard.configure')}
             </CRMButton>
             <CRMButton
               variant="ghost"
@@ -143,9 +145,9 @@ export function StoreCard({
               onClick={onReconcile}
               disabled={reconciling}
               className="w-full text-primary hover:bg-primary/5"
-              title="Promote any placeholder products created from orders into real products by re-fetching them from YouCan."
+              title={t('integrations.storeCard.relinkTitle')}
             >
-              {reconciling ? 'Re-linking…' : 'Re-link unlinked products'}
+              {reconciling ? t('integrations.storeCard.relinking') : t('integrations.storeCard.relink')}
             </CRMButton>
           </>
         )}
@@ -157,7 +159,7 @@ export function StoreCard({
             onClick={onToggle}
             className={cn(store.isActive ? 'text-gray-500 hover:text-red-600' : 'text-emerald-600')}
           >
-            {store.isActive ? 'Disable' : 'Enable'}
+            {store.isActive ? t('integrations.storeCard.disable') : t('integrations.storeCard.enable')}
           </CRMButton>
           <CRMButton
             variant="ghost"
@@ -167,7 +169,7 @@ export function StoreCard({
             disabled={deleting}
             className="text-red-500 hover:text-red-700"
           >
-            Delete
+            {t('integrations.storeCard.delete')}
           </CRMButton>
         </div>
       </div>

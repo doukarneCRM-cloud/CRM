@@ -1,9 +1,11 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { GlassModal } from '@/components/ui/GlassModal';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { Package, Check, Download, ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
 import { integrationsApi, type YoucanProductPreview, type ImportResult } from '@/services/integrationsApi';
 import { cn } from '@/lib/cn';
+import { apiErrorMessage } from '@/lib/apiError';
 
 interface Props {
   storeId: string | null;
@@ -13,6 +15,7 @@ interface Props {
 }
 
 export function ImportProductsModal({ storeId, open, onClose, onDone }: Props) {
+  const { t } = useTranslation();
   const [products, setProducts] = useState<YoucanProductPreview[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
@@ -34,12 +37,12 @@ export function ImportProductsModal({ storeId, open, onClose, onDone }: Props) {
       setProducts(data.products);
       setPage(data.pagination.current_page);
       setTotalPages(data.pagination.total_pages);
-    } catch (e: any) {
-      setError(e?.response?.data?.error?.message ?? 'Failed to load products from YouCan');
+    } catch (e: unknown) {
+      setError(apiErrorMessage(e, t('integrations.importProducts.loadFailed')));
     } finally {
       setLoading(false);
     }
-  }, [storeId]);
+  }, [storeId, t]);
 
   useEffect(() => {
     if (open && storeId) {
@@ -91,15 +94,15 @@ export function ImportProductsModal({ storeId, open, onClose, onDone }: Props) {
       );
       setResult(r);
       onDone();
-    } catch (e: any) {
-      setError(e?.response?.data?.error?.message ?? 'Import failed');
+    } catch (e: unknown) {
+      setError(apiErrorMessage(e, t('integrations.importProducts.importFailed')));
     } finally {
       setImporting(false);
     }
   };
 
   return (
-    <GlassModal open={open} onClose={onClose} title="Import Products from YouCan" size="xl">
+    <GlassModal open={open} onClose={onClose} title={t('integrations.importProducts.title')} size="xl">
       <div className="flex flex-col gap-4">
         {/* Result summary */}
         {result && (
@@ -107,11 +110,11 @@ export function ImportProductsModal({ storeId, open, onClose, onDone }: Props) {
             'rounded-xl border p-4',
             result.errors > 0 ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-emerald-50',
           )}>
-            <p className="text-sm font-bold text-gray-900">Import complete</p>
+            <p className="text-sm font-bold text-gray-900">{t('integrations.importProducts.importComplete')}</p>
             <div className="mt-2 flex gap-4 text-xs">
-              <span className="text-emerald-700">{result.imported} imported</span>
-              <span className="text-gray-500">{result.skipped} updated</span>
-              <span className="text-red-600">{result.errors} errors</span>
+              <span className="text-emerald-700">{t('integrations.importProducts.importedLabel', { count: result.imported })}</span>
+              <span className="text-gray-500">{t('integrations.importProducts.updatedLabel', { count: result.skipped })}</span>
+              <span className="text-red-600">{t('integrations.importProducts.errorsLabel', { count: result.errors })}</span>
             </div>
             {result.details.length > 0 && (
               <div className="mt-2 max-h-40 overflow-y-auto rounded-btn bg-white/80 p-2 text-[11px] text-gray-600">
@@ -119,7 +122,7 @@ export function ImportProductsModal({ storeId, open, onClose, onDone }: Props) {
               </div>
             )}
             <CRMButton variant="ghost" size="sm" onClick={onClose} className="mt-3">
-              Close
+              {t('integrations.importProducts.close')}
             </CRMButton>
           </div>
         )}
@@ -128,9 +131,7 @@ export function ImportProductsModal({ storeId, open, onClose, onDone }: Props) {
         {!result && (
           <>
             <div className="flex items-center justify-between gap-2">
-              <p className="text-xs text-gray-500">
-                Select products to import or import all at once. Photos, variants, and prices are included.
-              </p>
+              <p className="text-xs text-gray-500">{t('integrations.importProducts.intro')}</p>
               <div className="flex items-center gap-2">
                 <CRMButton
                   variant="secondary"
@@ -140,7 +141,7 @@ export function ImportProductsModal({ storeId, open, onClose, onDone }: Props) {
                   loading={importing}
                   disabled={loading}
                 >
-                  Import All
+                  {t('integrations.importProducts.importAll')}
                 </CRMButton>
                 {selected.size > 0 && (
                   <CRMButton
@@ -150,7 +151,7 @@ export function ImportProductsModal({ storeId, open, onClose, onDone }: Props) {
                     onClick={() => handleImport('selected')}
                     loading={importing}
                   >
-                    Import {selected.size} Selected
+                    {t('integrations.importProducts.importSelected', { count: selected.size })}
                   </CRMButton>
                 )}
               </div>
@@ -170,7 +171,7 @@ export function ImportProductsModal({ storeId, open, onClose, onDone }: Props) {
                 type="text"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Search products by name..."
+                placeholder={t('integrations.importProducts.searchPlaceholder')}
                 className="w-full rounded-xl border border-gray-200 bg-white py-2 pl-9 pr-9 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
               {searchInput && (
@@ -178,7 +179,7 @@ export function ImportProductsModal({ storeId, open, onClose, onDone }: Props) {
                   type="button"
                   onClick={() => setSearchInput('')}
                   className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                  title="Clear search"
+                  title={t('integrations.importProducts.clearSearch')}
                 >
                   <X size={12} />
                 </button>
@@ -188,13 +189,15 @@ export function ImportProductsModal({ storeId, open, onClose, onDone }: Props) {
             {/* Product list */}
             {loading ? (
               <div className="flex items-center justify-center py-12 text-xs text-gray-400">
-                {search ? `Searching for "${search}"…` : 'Loading products from YouCan...'}
+                {search
+                  ? t('integrations.importProducts.searching', { query: search })
+                  : t('integrations.importProducts.loadingProducts')}
               </div>
             ) : products.length === 0 ? (
               <div className="flex items-center justify-center py-12 text-xs text-gray-400">
                 {search
-                  ? `No products match "${search}"`
-                  : 'No products found in this YouCan store'}
+                  ? t('integrations.importProducts.noMatch', { query: search })
+                  : t('integrations.importProducts.noProducts')}
               </div>
             ) : (
               <>
@@ -211,7 +214,7 @@ export function ImportProductsModal({ storeId, open, onClose, onDone }: Props) {
                   )}>
                     {selected.size === products.length && <Check size={10} />}
                   </div>
-                  Select all on this page
+                  {t('integrations.importProducts.selectAll')}
                 </button>
 
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -242,9 +245,9 @@ export function ImportProductsModal({ storeId, open, onClose, onDone }: Props) {
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-xs font-semibold text-gray-900">{p.name}</p>
                         <div className="flex gap-2 text-[10px] text-gray-400">
-                          <span>{p.price} MAD</span>
-                          <span>{p.variants_count} variant{p.variants_count !== 1 ? 's' : ''}</span>
-                          <span>Stock: {p.inventory}</span>
+                          <span>{t('integrations.importProducts.priceMad', { price: p.price })}</span>
+                          <span>{t('integrations.importProducts.variantsCount', { count: p.variants_count })}</span>
+                          <span>{t('integrations.importProducts.stock', { count: p.inventory })}</span>
                         </div>
                       </div>
                     </button>
@@ -255,11 +258,11 @@ export function ImportProductsModal({ storeId, open, onClose, onDone }: Props) {
                 {totalPages > 1 && (
                   <div className="flex items-center justify-center gap-3 pt-2">
                     <CRMButton variant="ghost" size="sm" disabled={page <= 1} onClick={() => loadProducts(page - 1, search)} leftIcon={<ChevronLeft size={12} />}>
-                      Prev
+                      {t('integrations.importProducts.prev')}
                     </CRMButton>
                     <span className="text-[11px] text-gray-400">{page} / {totalPages}</span>
                     <CRMButton variant="ghost" size="sm" disabled={page >= totalPages} onClick={() => loadProducts(page + 1, search)} leftIcon={<ChevronRight size={12} />}>
-                      Next
+                      {t('integrations.importProducts.next')}
                     </CRMButton>
                   </div>
                 )}

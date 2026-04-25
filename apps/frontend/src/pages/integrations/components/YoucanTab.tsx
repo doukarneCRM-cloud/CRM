@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Link2 } from 'lucide-react';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { useAuthStore } from '@/store/authStore';
@@ -19,6 +20,7 @@ interface OAuthMessage {
 }
 
 export function YoucanTab() {
+  const { t } = useTranslation();
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canManage = hasPermission(PERMISSIONS.INTEGRATIONS_MANAGE);
 
@@ -64,12 +66,12 @@ export function YoucanTab() {
         justConnectedStoreIdRef.current = data.storeId ?? null;
         loadStores();
       } else {
-        setOauthError(data.error ?? 'OAuth connection failed');
+        setOauthError(data.error ?? t('integrations.youcan.oauthFailed'));
       }
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [loadStores]);
+  }, [loadStores, t]);
 
   useEffect(() => {
     const pendingId = justConnectedStoreIdRef.current;
@@ -95,12 +97,12 @@ export function YoucanTab() {
         `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`,
       );
       if (!popupRef.current) {
-        setOauthError('Popup was blocked. Please allow popups for this site and try again.');
+        setOauthError(t('integrations.youcan.popupBlocked'));
       }
     } catch (e: any) {
-      setOauthError(e?.response?.data?.error?.message ?? 'Failed to start OAuth flow');
+      setOauthError(e?.response?.data?.error?.message ?? t('integrations.youcan.oauthStartFailed'));
     }
-  }, []);
+  }, [t]);
 
   const handleStoreCreated = useCallback(
     (store: Store) => {
@@ -134,18 +136,18 @@ export function YoucanTab() {
     try {
       const r = await integrationsApi.reconcilePlaceholders(storeId);
       if (r.reconciled === 0 && r.skipped === 0) {
-        setReconcileMessage('No unlinked products found — everything is already linked.');
+        setReconcileMessage(t('integrations.youcan.reconcileEmpty'));
       } else {
         setReconcileMessage(
-          `Linked ${r.reconciled} product${r.reconciled === 1 ? '' : 's'}` +
-            (r.skipped > 0 ? `, ${r.skipped} still unlinked` : '') +
-            (r.errors > 0 ? `, ${r.errors} error${r.errors === 1 ? '' : 's'}` : '') +
-            '.',
+          t('integrations.youcan.reconcileLinked', { count: r.reconciled }) +
+            (r.skipped > 0 ? t('integrations.youcan.reconcileStill', { count: r.skipped }) : '') +
+            (r.errors > 0 ? t('integrations.youcan.reconcileErrors', { count: r.errors }) : '') +
+            t('integrations.youcan.reconcileEnd'),
         );
       }
       loadStores();
     } catch (e: any) {
-      setReconcileMessage(e?.response?.data?.error?.message ?? 'Re-link failed');
+      setReconcileMessage(e?.response?.data?.error?.message ?? t('integrations.youcan.reconcileFailed'));
     } finally {
       setReconcilingStoreId(null);
     }
@@ -155,7 +157,7 @@ export function YoucanTab() {
     <>
       <div className="mb-4 flex items-center justify-between">
         <p className="text-xs text-gray-400">
-          Connect your YouCan stores to import products and receive orders in real-time.
+          {t('integrations.youcan.subtitle')}
         </p>
         {canManage && (
           <CRMButton
@@ -164,7 +166,7 @@ export function YoucanTab() {
             leftIcon={<Plus size={14} />}
             onClick={() => setAddOpen(true)}
           >
-            Add Store
+            {t('integrations.youcan.addStore')}
           </CRMButton>
         )}
       </div>
@@ -183,7 +185,7 @@ export function YoucanTab() {
             onClick={() => setReconcileMessage(null)}
             className="text-primary/60 hover:text-primary"
           >
-            Dismiss
+            {t('integrations.youcan.dismiss')}
           </button>
         </div>
       )}
@@ -200,9 +202,9 @@ export function YoucanTab() {
             <Link2 size={24} className="text-primary" />
           </div>
           <div className="text-center">
-            <p className="text-sm font-semibold text-gray-700">No stores connected</p>
+            <p className="text-sm font-semibold text-gray-700">{t('integrations.youcan.emptyTitle')}</p>
             <p className="mt-1 text-xs text-gray-400">
-              Add your YouCan store to start importing products and receiving orders.
+              {t('integrations.youcan.emptyBody')}
             </p>
           </div>
           {canManage && (
@@ -212,7 +214,7 @@ export function YoucanTab() {
               leftIcon={<Plus size={14} />}
               onClick={() => setAddOpen(true)}
             >
-              Add Your First Store
+              {t('integrations.youcan.addFirstStore')}
             </CRMButton>
           )}
         </div>

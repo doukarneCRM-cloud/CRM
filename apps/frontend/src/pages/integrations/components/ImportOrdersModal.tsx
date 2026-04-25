@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { GlassModal } from '@/components/ui/GlassModal';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { Download } from 'lucide-react';
 import { integrationsApi, type ImportResult } from '@/services/integrationsApi';
 import { cn } from '@/lib/cn';
+import { apiErrorMessage } from '@/lib/apiError';
 
 interface Props {
   storeId: string | null;
@@ -12,20 +14,24 @@ interface Props {
   onDone: () => void;
 }
 
-const PRESETS = [
-  { label: 'Last 10', value: 10 },
-  { label: 'Last 50', value: 50 },
-  { label: 'Last 100', value: 100 },
-  { label: 'Last 200', value: 200 },
-];
-
 export function ImportOrdersModal({ storeId, open, onClose, onDone }: Props) {
+  const { t } = useTranslation();
   const [mode, setMode] = useState<'preset' | 'custom' | 'all'>('preset');
   const [presetCount, setPresetCount] = useState(50);
   const [customCount, setCustomCount] = useState('');
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const presets = useMemo(
+    () => [
+      { label: t('integrations.importOrders.presetLast', { count: 10 }), value: 10 },
+      { label: t('integrations.importOrders.presetLast', { count: 50 }), value: 50 },
+      { label: t('integrations.importOrders.presetLast', { count: 100 }), value: 100 },
+      { label: t('integrations.importOrders.presetLast', { count: 200 }), value: 200 },
+    ],
+    [t],
+  );
 
   const handleImport = async () => {
     if (!storeId) return;
@@ -40,8 +46,8 @@ export function ImportOrdersModal({ storeId, open, onClose, onDone }: Props) {
       const r = await integrationsApi.importOrders(storeId, count);
       setResult(r);
       onDone();
-    } catch (e: any) {
-      setError(e?.response?.data?.error?.message ?? 'Import failed');
+    } catch (e: unknown) {
+      setError(apiErrorMessage(e, t('integrations.importOrders.importFailed')));
     } finally {
       setImporting(false);
     }
@@ -54,7 +60,7 @@ export function ImportOrdersModal({ storeId, open, onClose, onDone }: Props) {
   };
 
   return (
-    <GlassModal open={open} onClose={handleClose} title="Import Orders from YouCan" size="md">
+    <GlassModal open={open} onClose={handleClose} title={t('integrations.importOrders.title')} size="md">
       <div className="flex flex-col gap-4">
         {/* Result */}
         {result ? (
@@ -62,11 +68,11 @@ export function ImportOrdersModal({ storeId, open, onClose, onDone }: Props) {
             'rounded-xl border p-4',
             result.errors > 0 ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-emerald-50',
           )}>
-            <p className="text-sm font-bold text-gray-900">Import complete</p>
+            <p className="text-sm font-bold text-gray-900">{t('integrations.importOrders.importComplete')}</p>
             <div className="mt-2 flex gap-4 text-xs">
-              <span className="text-emerald-700">{result.imported} imported</span>
-              <span className="text-gray-500">{result.skipped} already exist</span>
-              <span className="text-red-600">{result.errors} errors</span>
+              <span className="text-emerald-700">{t('integrations.importOrders.importedLabel', { count: result.imported })}</span>
+              <span className="text-gray-500">{t('integrations.importOrders.alreadyExist', { count: result.skipped })}</span>
+              <span className="text-red-600">{t('integrations.importOrders.errorsLabel', { count: result.errors })}</span>
             </div>
             {result.details.length > 0 && (
               <div className="mt-2 max-h-40 overflow-y-auto rounded-btn bg-white/80 p-2 text-[11px] text-gray-600">
@@ -74,15 +80,12 @@ export function ImportOrdersModal({ storeId, open, onClose, onDone }: Props) {
               </div>
             )}
             <CRMButton variant="ghost" size="sm" onClick={handleClose} className="mt-3">
-              Close
+              {t('integrations.importOrders.close')}
             </CRMButton>
           </div>
         ) : (
           <>
-            <p className="text-xs text-gray-500">
-              Choose how many orders to import. Already-imported orders are automatically skipped.
-              New orders will appear instantly in the CRM.
-            </p>
+            <p className="text-xs text-gray-500">{t('integrations.importOrders.intro')}</p>
 
             {/* Mode selector */}
             <div className="flex gap-1 rounded-xl bg-gray-100 p-1">
@@ -95,7 +98,11 @@ export function ImportOrdersModal({ storeId, open, onClose, onDone }: Props) {
                     mode === m ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700',
                   )}
                 >
-                  {m === 'preset' ? 'Quick' : m === 'custom' ? 'Custom' : 'All'}
+                  {m === 'preset'
+                    ? t('integrations.importOrders.modeQuick')
+                    : m === 'custom'
+                      ? t('integrations.importOrders.modeCustom')
+                      : t('integrations.importOrders.modeAll')}
                 </button>
               ))}
             </div>
@@ -103,7 +110,7 @@ export function ImportOrdersModal({ storeId, open, onClose, onDone }: Props) {
             {/* Preset */}
             {mode === 'preset' && (
               <div className="grid grid-cols-4 gap-2">
-                {PRESETS.map((p) => (
+                {presets.map((p) => (
                   <button
                     key={p.value}
                     onClick={() => setPresetCount(p.value)}
@@ -124,7 +131,7 @@ export function ImportOrdersModal({ storeId, open, onClose, onDone }: Props) {
             {mode === 'custom' && (
               <div>
                 <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                  Number of orders to import
+                  {t('integrations.importOrders.customLabel')}
                 </label>
                 <input
                   type="number"
@@ -132,7 +139,7 @@ export function ImportOrdersModal({ storeId, open, onClose, onDone }: Props) {
                   max={500}
                   value={customCount}
                   onChange={(e) => setCustomCount(e.target.value)}
-                  placeholder="e.g. 75"
+                  placeholder={t('integrations.importOrders.customPlaceholder')}
                   className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
               </div>
@@ -141,7 +148,9 @@ export function ImportOrdersModal({ storeId, open, onClose, onDone }: Props) {
             {/* All */}
             {mode === 'all' && (
               <div className="rounded-xl bg-amber-50 px-4 py-3 text-xs text-amber-700">
-                This will import <b>all orders</b> from your YouCan store. This may take a while for stores with many orders.
+                {t('integrations.importOrders.allWarningPrefix')}
+                <b>{t('integrations.importOrders.allWarningBold')}</b>
+                {t('integrations.importOrders.allWarningSuffix')}
               </div>
             )}
 
@@ -151,7 +160,7 @@ export function ImportOrdersModal({ storeId, open, onClose, onDone }: Props) {
 
             <div className="flex items-center justify-end gap-2 pt-2">
               <CRMButton variant="ghost" size="sm" onClick={handleClose} disabled={importing}>
-                Cancel
+                {t('common.cancel')}
               </CRMButton>
               <CRMButton
                 variant="primary"
@@ -161,7 +170,7 @@ export function ImportOrdersModal({ storeId, open, onClose, onDone }: Props) {
                 loading={importing}
                 disabled={mode === 'custom' && !customCount}
               >
-                Start Import
+                {t('integrations.importOrders.startImport')}
               </CRMButton>
             </div>
           </>
