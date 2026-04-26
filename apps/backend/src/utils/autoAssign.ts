@@ -49,23 +49,43 @@ interface Candidate {
 }
 
 /**
- * Agents eligible for auto-assignment: active + online + hold the
- * confirmation:view permission, AND (when the admin has narrowed the pool)
- * present in the rule's `eligibleAgentIds` allowlist. Falls back to all
- * active permission-holders if nobody is online — better to assign than to
- * drop orders on the floor. The allowlist filter is applied to both
- * branches so a stock manager who holds confirmation:view but is excluded
- * from the rotation never receives an order, even when they're the only
- * one online.
+ * Agents eligible for auto-assignment.
+ *
+ * Two modes, picked by whether the admin set an allowlist:
+ *
+ *   1. Allowlist set (admin explicitly picked specific agents in the
+ *      Eligible-agents picker). Honor that set in full — every active
+ *      agent on the list participates in the rotation regardless of
+ *      online status. The admin already said "these are the agents",
+ *      so secretly skipping the offline ones makes the rotation
+ *      unpredictable (e.g. a 2-agent allowlist where only one is
+ *      currently online would funnel every order to that one agent
+ *      until the other came back).
+ *
+ *   2. Allowlist empty (back-compat broad pool — everyone with
+ *      confirmation:view). Prefer agents currently online so handoffs
+ *      track shifts; fall back to the full active pool if nobody is
+ *      online — better to assign than to drop orders on the floor.
+ *
+ * Both modes still require `isActive: true` and the confirmation:view
+ * permission, so a deactivated user or one whose role lost the
+ * permission silently drops out of the rotation either way.
  */
 async function eligibleAgents(allowlist: string[] = []): Promise<Candidate[]> {
-  const allowFilter = allowlist.length > 0
-    ? { id: { in: allowlist } }
-    : {};
+  if (allowlist.length > 0) {
+    return prisma.user.findMany({
+      where: {
+        id: { in: allowlist },
+        isActive: true,
+        role: { permissions: { some: { permission: { key: 'confirmation:view' } } } },
+      },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    });
+  }
 
   const online = await prisma.user.findMany({
     where: {
-      ...allowFilter,
       isActive: true,
       isOnline: true,
       role: { permissions: { some: { permission: { key: 'confirmation:view' } } } },
@@ -77,7 +97,6 @@ async function eligibleAgents(allowlist: string[] = []): Promise<Candidate[]> {
 
   return prisma.user.findMany({
     where: {
-      ...allowFilter,
       isActive: true,
       role: { permissions: { some: { permission: { key: 'confirmation:view' } } } },
     },
