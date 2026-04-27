@@ -2670,7 +2670,26 @@
       "saveFailed": "Échec de l'enregistrement des paramètres",
       "clearFailed": "Échec de la suppression de la clé API",
       "toggleFailed": "Échec du changement d'état",
-      "rotateFailed": "Échec du renouvellement du secret"
+      "rotateFailed": "Échec du renouvellement du secret",
+      "forceSyncTitle": "Forcer la synchro maintenant",
+      "forceSyncSubtitle": "Récupère le statut Coliix de chaque commande en transit. À utiliser quand les webhooks n'arrivent pas.",
+      "syncNow": "Synchroniser",
+      "syncing": "Synchronisation…",
+      "syncFailed": "Échec de la synchronisation",
+      "syncTotal": "Vérifiées",
+      "syncChanged": "Mises à jour",
+      "syncUnchanged": "Inchangées",
+      "syncFailed_short": "Échecs",
+      "syncAllUpToDate": "Toutes les commandes en transit sont à jour avec Coliix.",
+      "syncCol": {
+        "ref": "Réf",
+        "coliixState": "État Coliix",
+        "mapped": "Mappé vers",
+        "outcome": "Résultat",
+        "unknown": "Inconnu",
+        "notMapped": "État absent du mapping",
+        "unchanged": "Aucun changement"
+      }
     },
     "configureStore": {
       "title": "Configurer : {{name}}",

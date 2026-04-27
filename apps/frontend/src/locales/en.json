@@ -2670,7 +2670,26 @@
       "saveFailed": "Failed to save settings",
       "clearFailed": "Failed to clear API key",
       "toggleFailed": "Failed to toggle",
-      "rotateFailed": "Failed to rotate secret"
+      "rotateFailed": "Failed to rotate secret",
+      "forceSyncTitle": "Force sync now",
+      "forceSyncSubtitle": "Pull the latest status from Coliix for every in-flight order. Use when webhooks haven't fired.",
+      "syncNow": "Sync now",
+      "syncing": "Syncing…",
+      "syncFailed": "Sync failed",
+      "syncTotal": "Polled",
+      "syncChanged": "Changed",
+      "syncUnchanged": "Same",
+      "syncFailed_short": "Failed",
+      "syncAllUpToDate": "All in-flight orders already match Coliix.",
+      "syncCol": {
+        "ref": "Ref",
+        "coliixState": "Coliix state",
+        "mapped": "Mapped to",
+        "outcome": "Outcome",
+        "unknown": "Unknown",
+        "notMapped": "State not in mapping rules",
+        "unchanged": "No change"
+      }
     },
     "configureStore": {
       "title": "Configure: {{name}}",

@@ -17,7 +17,7 @@ import { CRMInput } from '@/components/ui/CRMInput';
 import { GlassModal } from '@/components/ui/GlassModal';
 import { useAuthStore } from '@/store/authStore';
 import { PERMISSIONS } from '@/constants/permissions';
-import { providersApi, type ShippingProvider } from '@/services/providersApi';
+import { providersApi, coliixApi, type ShippingProvider, type RefreshAllResult } from '@/services/providersApi';
 import { CitiesTab } from '@/pages/settings/components/CitiesTab';
 import { apiErrorMessage } from '@/lib/apiError';
 
@@ -47,6 +47,9 @@ export function ColiixTab() {
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [citiesOpen, setCitiesOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<RefreshAllResult | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -147,6 +150,20 @@ export function ColiixTab() {
       setTimeout(() => setCopied(false), 1800);
     } catch {
       /* ignore */
+    }
+  };
+
+  const handleForceSync = async () => {
+    setSyncing(true);
+    setSyncError(null);
+    setSyncResult(null);
+    try {
+      const result = await coliixApi.refreshAll();
+      setSyncResult(result);
+    } catch (e: unknown) {
+      setSyncError(apiErrorMessage(e, t('integrations.coliix.syncFailed')));
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -373,9 +390,131 @@ export function ColiixTab() {
                 {rotating ? t('integrations.coliix.rotating') : t('integrations.coliix.rotateSecret')}
               </CRMButton>
             )}
+
+            {canManage && provider.isActive && provider.hasApiKey && (
+              <div className="mt-3 border-t border-gray-100 pt-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-700">
+                      {t('integrations.coliix.forceSyncTitle')}
+                    </p>
+                    <p className="text-[11px] text-gray-400">
+                      {t('integrations.coliix.forceSyncSubtitle')}
+                    </p>
+                  </div>
+                  <CRMButton
+                    variant="primary"
+                    size="sm"
+                    onClick={handleForceSync}
+                    disabled={syncing}
+                    leftIcon={
+                      syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />
+                    }
+                  >
+                    {syncing ? t('integrations.coliix.syncing') : t('integrations.coliix.syncNow')}
+                  </CRMButton>
+                </div>
+
+                {syncError && (
+                  <div className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700">
+                    {syncError}
+                  </div>
+                )}
+
+                {syncResult && <SyncResultsPanel result={syncResult} />}
+              </div>
+            )}
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Sync results panel (per-order Coliix response, mapping outcome) ─────────
+// Drawn inline so admins can scan exactly what Coliix returned for each
+// in-flight order: the raw state string, what the rules mapped it to, whether
+// the order was actually updated, and any per-order error. This is the single
+// most useful surface when "the webhook is configured but orders don't move".
+
+function SyncResultsPanel({ result }: { result: RefreshAllResult }) {
+  const { t } = useTranslation();
+  const noteworthy = result.results.filter((r) => r.changed || !r.ok || r.mapped == null);
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-4 gap-2 rounded-xl border border-gray-100 bg-gray-50/60 px-3 py-2 text-center text-[11px]">
+        <div>
+          <p className="font-semibold text-gray-900">{result.total}</p>
+          <p className="text-gray-400">{t('integrations.coliix.syncTotal')}</p>
+        </div>
+        <div>
+          <p className="font-semibold text-emerald-700">{result.changed}</p>
+          <p className="text-gray-400">{t('integrations.coliix.syncChanged')}</p>
+        </div>
+        <div>
+          <p className="font-semibold text-gray-700">{result.unchanged}</p>
+          <p className="text-gray-400">{t('integrations.coliix.syncUnchanged')}</p>
+        </div>
+        <div>
+          <p className={`font-semibold ${result.failed > 0 ? 'text-red-600' : 'text-gray-700'}`}>
+            {result.failed}
+          </p>
+          <p className="text-gray-400">{t('integrations.coliix.syncFailed_short')}</p>
+        </div>
+      </div>
+
+      {noteworthy.length === 0 ? (
+        <p className="rounded-xl border border-gray-100 bg-white px-3 py-2 text-[11px] text-gray-500">
+          {t('integrations.coliix.syncAllUpToDate')}
+        </p>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-gray-100">
+          <table className="w-full text-[11px]">
+            <thead className="bg-gray-50 text-left text-gray-500">
+              <tr>
+                <th className="px-3 py-1.5 font-semibold">{t('integrations.coliix.syncCol.ref')}</th>
+                <th className="px-3 py-1.5 font-semibold">{t('integrations.coliix.syncCol.coliixState')}</th>
+                <th className="px-3 py-1.5 font-semibold">{t('integrations.coliix.syncCol.mapped')}</th>
+                <th className="px-3 py-1.5 font-semibold">{t('integrations.coliix.syncCol.outcome')}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 bg-white">
+              {noteworthy.map((r) => (
+                <tr key={r.orderId}>
+                  <td className="px-3 py-1.5 font-mono text-gray-700">{r.reference}</td>
+                  <td className="px-3 py-1.5 text-gray-700">
+                    {r.coliix?.currentState ?? <span className="text-gray-300">—</span>}
+                  </td>
+                  <td className="px-3 py-1.5">
+                    {r.mapped ? (
+                      <span className="rounded-badge bg-gray-100 px-1.5 py-0.5 font-medium text-gray-700">
+                        {r.mapped}
+                      </span>
+                    ) : (
+                      <span className="rounded-badge bg-amber-50 px-1.5 py-0.5 font-medium text-amber-700 ring-1 ring-amber-200">
+                        {t('integrations.coliix.syncCol.unknown')}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-1.5">
+                    {r.error ? (
+                      <span className="text-red-600">{r.error}</span>
+                    ) : r.changed ? (
+                      <span className="text-emerald-700">
+                        {r.prevStatus} → {r.newStatus}
+                      </span>
+                    ) : r.mapped == null ? (
+                      <span className="text-amber-700">{t('integrations.coliix.syncCol.notMapped')}</span>
+                    ) : (
+                      <span className="text-gray-500">{t('integrations.coliix.syncCol.unchanged')}</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
