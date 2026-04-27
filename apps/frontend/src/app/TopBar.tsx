@@ -402,8 +402,11 @@ export function TopBar({ onMobileMenuOpen }: TopBarProps) {
         marginLeft: 0,
       }}
     >
-      {/* Left: hamburger (mobile) + page title + online agents list */}
-      <div className="flex min-w-0 flex-1 basis-0 items-center gap-2 sm:gap-3">
+      {/* Left: hamburger (mobile) + page title + agents presence bar.
+          Takes 2/4 of the row (left + right + center share width 2:1:1)
+          so the agent pills get visible space — the previous 1:1:1 split
+          truncated everyone past the third pill on common laptop widths. */}
+      <div className="flex min-w-0 flex-[2] basis-0 items-center gap-2 sm:gap-3">
         <button
           onClick={onMobileMenuOpen}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-btn text-gray-500 hover:bg-gray-100 hover:text-gray-900 md:hidden"
@@ -419,9 +422,12 @@ export function TopBar({ onMobileMenuOpen }: TopBarProps) {
         )}
       </div>
 
-      {/* Center: global search */}
+      {/* Center: global search. Capped at max-w-xs (320px) — the previous
+          max-w-xl (576px) was eating the row width that the agent pills
+          need. 320px still comfortably fits "Search orders, clients,
+          products…" placeholder. */}
       <div className="hidden flex-1 basis-0 justify-center sm:flex">
-        <div className="w-full max-w-xl">
+        <div className="w-full max-w-xs">
           <GlobalSearch />
         </div>
       </div>
