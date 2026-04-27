@@ -2689,6 +2689,18 @@
         "unknown": "Inconnu",
         "notMapped": "État absent du mapping",
         "unchanged": "Aucun changement"
+      },
+      "health": {
+        "title": "Santé du webhook",
+        "live": "Actif",
+        "idle": "Inactif",
+        "silent": "Silencieux",
+        "lastWebhook": "Dernier appel",
+        "last1h": "1 dernière h",
+        "last24h": "24 dernières h",
+        "never": "Jamais",
+        "justNow": "À l'instant",
+        "silentHint": "Coliix n'a pas appelé cette URL depuis 24 h. Ouvrez le tableau de bord Coliix, collez l'URL ci-dessus dans leurs paramètres webhook et assurez-vous que les événements de changement de statut sont activés. Le polling de secours (5 min) continue."
       }
     },
     "configureStore": {

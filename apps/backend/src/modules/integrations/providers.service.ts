@@ -131,6 +131,59 @@ export async function rotateWebhookSecret(name: string): Promise<ProviderPublic>
   return toPublic(updated);
 }
 
+/**
+ * Coliix webhook health — derived from OrderLog rows that ingestStatus tags
+ * with `meta.source = 'webhook'`. Surfaces in the Coliix admin tab so an
+ * operator can tell at a glance whether Coliix is actually calling our URL,
+ * which is the precondition for "instant" status updates.
+ */
+export interface ColiixWebhookHealth {
+  lastWebhookAt: Date | null;
+  count1h: number;
+  count24h: number;
+  lastPollerAt: Date | null;
+}
+
+export async function getColiixWebhookHealth(): Promise<ColiixWebhookHealth> {
+  const now = Date.now();
+  const since1h = new Date(now - 60 * 60_000);
+  const since24h = new Date(now - 24 * 60 * 60_000);
+
+  // We tag every shipping OrderLog written by ingestStatus() with
+  // meta.source so we can split webhook hits from poller hits without a
+  // dedicated audit table. Postgres JSON path filters do this in-place.
+  const webhookFilter = {
+    type: 'shipping' as const,
+    meta: { path: ['source'], equals: 'webhook' as const },
+  };
+  const pollerFilter = {
+    type: 'shipping' as const,
+    meta: { path: ['source'], equals: 'poller' as const },
+  };
+
+  const [lastWebhook, count1h, count24h, lastPoller] = await Promise.all([
+    prisma.orderLog.findFirst({
+      where: webhookFilter,
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    }),
+    prisma.orderLog.count({ where: { ...webhookFilter, createdAt: { gte: since1h } } }),
+    prisma.orderLog.count({ where: { ...webhookFilter, createdAt: { gte: since24h } } }),
+    prisma.orderLog.findFirst({
+      where: pollerFilter,
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    }),
+  ]);
+
+  return {
+    lastWebhookAt: lastWebhook?.createdAt ?? null,
+    count1h,
+    count24h,
+    lastPollerAt: lastPoller?.createdAt ?? null,
+  };
+}
+
 /** Returns the decrypted API key, or throws if the provider has no key set. */
 export async function getDecryptedApiKey(name: string): Promise<string> {
   const row = await getOrCreateProvider(name);

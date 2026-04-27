@@ -2689,6 +2689,18 @@
         "unknown": "Unknown",
         "notMapped": "State not in mapping rules",
         "unchanged": "No change"
+      },
+      "health": {
+        "title": "Webhook health",
+        "live": "Live",
+        "idle": "Idle",
+        "silent": "Silent",
+        "lastWebhook": "Last hit",
+        "last1h": "Last 1h",
+        "last24h": "Last 24h",
+        "never": "Never",
+        "justNow": "Just now",
+        "silentHint": "Coliix has not called this URL in the last 24 hours. Open Coliix's dashboard, paste the Webhook URL above into their webhook settings, and make sure status-change events are enabled. The 5-minute fallback poller still runs."
       }
     },
     "configureStore": {

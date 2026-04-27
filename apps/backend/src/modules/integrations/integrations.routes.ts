@@ -211,6 +211,18 @@ export async function integrationsRoutes(app: FastifyInstance) {
     return reply.send(result);
   });
 
+  // Webhook health — last inbound webhook, last poller hit, count in the
+  // last hour and 24 hours. Lets the admin tell at a glance whether Coliix
+  // is actually calling our URL (the precondition for "instant" updates).
+  app.get(
+    '/coliix/webhook-health',
+    { preHandler: [verifyJWT, requirePermission('shipping:push')] },
+    async (_req, reply) => {
+      const health = await providers.getColiixWebhookHealth();
+      return reply.send(health);
+    },
+  );
+
   // ── Coliix webhook — instant status updates ───────────────────────────────
   // Coliix calls this URL (GET or POST) whenever a parcel state changes. The
   // path-segment secret is how we authenticate — no header, no HMAC, so don't

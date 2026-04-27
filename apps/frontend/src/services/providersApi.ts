@@ -79,6 +79,13 @@ export interface RefreshAllResult {
   results: TrackNowResult[];
 }
 
+export interface ColiixWebhookHealth {
+  lastWebhookAt: string | null;
+  count1h: number;
+  count24h: number;
+  lastPollerAt: string | null;
+}
+
 export const coliixApi = {
   exportOne: (orderId: string) =>
     api.post<ExportResult>(`/integrations/coliix/export/${orderId}`).then((r) => r.data),
@@ -99,4 +106,8 @@ export const coliixApi = {
         { timeout: 180_000 },
       )
       .then((r) => r.data),
+
+  // "Is Coliix actually calling us?" health snapshot.
+  webhookHealth: () =>
+    api.get<ColiixWebhookHealth>('/integrations/coliix/webhook-health').then((r) => r.data),
 };

@@ -17,7 +17,13 @@ import { CRMInput } from '@/components/ui/CRMInput';
 import { GlassModal } from '@/components/ui/GlassModal';
 import { useAuthStore } from '@/store/authStore';
 import { PERMISSIONS } from '@/constants/permissions';
-import { providersApi, coliixApi, type ShippingProvider, type RefreshAllResult } from '@/services/providersApi';
+import {
+  providersApi,
+  coliixApi,
+  type ShippingProvider,
+  type RefreshAllResult,
+  type ColiixWebhookHealth,
+} from '@/services/providersApi';
 import { CitiesTab } from '@/pages/settings/components/CitiesTab';
 import { apiErrorMessage } from '@/lib/apiError';
 
@@ -50,6 +56,7 @@ export function ColiixTab() {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<RefreshAllResult | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [health, setHealth] = useState<ColiixWebhookHealth | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -67,6 +74,28 @@ export function ColiixTab() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Webhook health auto-refreshes every 30s while the tab is open so the
+  // operator sees Coliix hits arrive in near-real-time without reloading.
+  useEffect(() => {
+    let cancelled = false;
+    const fetchHealth = () => {
+      coliixApi
+        .webhookHealth()
+        .then((h) => {
+          if (!cancelled) setHealth(h);
+        })
+        .catch(() => {
+          // Silent — non-critical metric. Keep last successful snapshot.
+        });
+    };
+    fetchHealth();
+    const handle = setInterval(fetchHealth, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(handle);
+    };
+  }, []);
 
   const handleSave = async () => {
     if (!provider) return;
@@ -391,6 +420,10 @@ export function ColiixTab() {
               </CRMButton>
             )}
 
+            {provider.isActive && provider.hasApiKey && health && (
+              <WebhookHealthPanel health={health} />
+            )}
+
             {canManage && provider.isActive && provider.hasApiKey && (
               <div className="mt-3 border-t border-gray-100 pt-3">
                 <div className="mb-2 flex items-center justify-between">
@@ -427,6 +460,82 @@ export function ColiixTab() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Webhook health panel ────────────────────────────────────────────────────
+// "Is Coliix actually calling us?" — the only way the user gets truly instant
+// status updates is if Coliix invokes our webhook URL. This panel shows the
+// last inbound timestamp + recent counts so the answer is visible without
+// having to dig through server logs.
+
+function formatRelative(iso: string | null, t: (k: string) => string): string {
+  if (!iso) return t('integrations.coliix.health.never');
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return t('integrations.coliix.health.justNow');
+  if (ms < 60_000) return t('integrations.coliix.health.justNow');
+  const min = Math.floor(ms / 60_000);
+  if (min < 60) return `${min}m`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h`;
+  const d = Math.floor(hr / 24);
+  return `${d}d`;
+}
+
+function WebhookHealthPanel({ health }: { health: ColiixWebhookHealth }) {
+  const { t } = useTranslation();
+  const isReceiving = health.count1h > 0;
+  const isStale =
+    !isReceiving && health.count24h === 0 && health.lastWebhookAt === null;
+  return (
+    <div className="mt-3 border-t border-gray-100 pt-3">
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-xs font-semibold text-gray-700">
+          {t('integrations.coliix.health.title')}
+        </p>
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+            isReceiving
+              ? 'bg-emerald-50 text-emerald-700'
+              : isStale
+              ? 'bg-red-50 text-red-700'
+              : 'bg-amber-50 text-amber-700'
+          }`}
+        >
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${
+              isReceiving ? 'bg-emerald-500' : isStale ? 'bg-red-500' : 'bg-amber-500'
+            }`}
+          />
+          {isReceiving
+            ? t('integrations.coliix.health.live')
+            : isStale
+            ? t('integrations.coliix.health.silent')
+            : t('integrations.coliix.health.idle')}
+        </span>
+      </div>
+      <div className="grid grid-cols-3 gap-2 rounded-xl border border-gray-100 bg-white px-3 py-2 text-center text-[11px]">
+        <div>
+          <p className="font-mono font-semibold text-gray-900">
+            {formatRelative(health.lastWebhookAt, t)}
+          </p>
+          <p className="text-gray-400">{t('integrations.coliix.health.lastWebhook')}</p>
+        </div>
+        <div>
+          <p className="font-mono font-semibold text-gray-900">{health.count1h}</p>
+          <p className="text-gray-400">{t('integrations.coliix.health.last1h')}</p>
+        </div>
+        <div>
+          <p className="font-mono font-semibold text-gray-900">{health.count24h}</p>
+          <p className="text-gray-400">{t('integrations.coliix.health.last24h')}</p>
+        </div>
+      </div>
+      {isStale && (
+        <p className="mt-2 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-[11px] text-red-700">
+          {t('integrations.coliix.health.silentHint')}
+        </p>
+      )}
     </div>
   );
 }
