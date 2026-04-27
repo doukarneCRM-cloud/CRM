@@ -133,6 +133,7 @@ model User {
   createdStatusGroups ShippingStatusGroup[] @relation("StatusGroupAuthor")
   broadcastsAuthored  Broadcast[]           @relation("BroadcastAuthor")
   broadcastsReceived  BroadcastRecipient[]  @relation("BroadcastTarget")
+  approvedSamples     ProductTest[]         @relation("SampleApprover")
 }
 
 model RefreshToken {
@@ -597,21 +598,66 @@ model FabricRoll {
   @@index([isDepleted])
 }
 
+enum SampleStatus {
+  draft
+  tested
+  approved
+  archived
+}
+
 model ProductTest {
-  id                    String   @id @default(cuid())
+  id                    String       @id @default(cuid())
   name                  String
   productId             String?
   videoUrl              String?
-  estimatedCostPerPiece Decimal? @db.Decimal(12, 2)
+  // Long-form description shown to admins/buyers — separate from internal
+  // `notes` (which can stay private). HTML stripped on save in the service.
+  description           String?
+  // Sample lifecycle. `approved` is the gate that unlocks creating a
+  // ProductionRun from this sample.
+  status                SampleStatus @default(draft)
+  approvedAt            DateTime?
+  approvedById          String?
+
+  // Cost-calc inputs. Fees are per-piece overrides on the sample (a
+  // YouCan / fulfillment fee can vary per garment). Markup feeds
+  // `suggestedPrice`. The service recomputes `estimatedCostPerPiece` and
+  // `suggestedPrice` on every save so they're always current.
+  laborMadPerPiece      Decimal?     @db.Decimal(12, 2)
+  confirmationFee       Decimal?     @db.Decimal(12, 2)
+  deliveryFee           Decimal?     @db.Decimal(12, 2)
+  markupPercent         Decimal?     @db.Decimal(5, 2)
+  suggestedPrice        Decimal?     @db.Decimal(12, 2)
+
+  estimatedCostPerPiece Decimal?     @db.Decimal(12, 2)
   notes                 String?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
 
   product     Product?               @relation(fields: [productId], references: [id])
+  approvedBy  User?                  @relation("SampleApprover", fields: [approvedById], references: [id])
   fabrics     ProductTestFabric[]
   sizes       ProductTestSize[]
   accessories ProductTestAccessory[]
+  photos      ProductTestPhoto[]
   runs        ProductionRun[]
+
+  @@index([status, createdAt])
+}
+
+model ProductTestPhoto {
+  id        String   @id @default(cuid())
+  testId    String
+  url       String
+  caption   String?
+  // Fractional position so reorders never need a backfill update of the
+  // entire list — same trick used by AtelieTask.position.
+  position  Float    @default(0)
+  createdAt DateTime @default(now())
+
+  test ProductTest @relation(fields: [testId], references: [id], onDelete: Cascade)
+
+  @@index([testId, position])
 }
 
 model ProductTestFabric {
@@ -638,10 +684,15 @@ model ProductTestSize {
 }
 
 model ProductTestAccessory {
-  id               String @id @default(cuid())
+  id               String   @id @default(cuid())
   testId           String
   materialId       String
   quantityPerPiece Float
+  // Snapshot the material's unit cost at the moment the accessory was
+  // added to the sample, so later AtelieMaterial price changes don't
+  // retroactively rewrite the sample's estimated cost. Falls back to
+  // material.unitCost in the calculator when null (legacy rows).
+  unitCostSnapshot Decimal? @db.Decimal(12, 2)
 
   test     ProductTest    @relation(fields: [testId], references: [id], onDelete: Cascade)
   material AtelieMaterial @relation(fields: [materialId], references: [id])

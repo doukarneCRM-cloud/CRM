@@ -19,7 +19,19 @@ export interface TestAccessory {
   id: string;
   materialId: string;
   quantityPerPiece: number;
+  unitCostSnapshot?: number | null;
   material?: { id: string; name: string; unit: string };
+}
+
+export type SampleStatus = 'draft' | 'tested' | 'approved' | 'archived';
+
+export interface SamplePhoto {
+  id: string;
+  testId: string;
+  url: string;
+  caption?: string | null;
+  position: number;
+  createdAt: string;
 }
 
 export interface ProductTest {
@@ -27,6 +39,16 @@ export interface ProductTest {
   name: string;
   productId: string | null;
   videoUrl?: string | null;
+  description: string | null;
+  status: SampleStatus;
+  approvedAt: string | null;
+  approvedById: string | null;
+  approvedBy?: { id: string; name: string } | null;
+  laborMadPerPiece: number | null;
+  confirmationFee: number | null;
+  deliveryFee: number | null;
+  markupPercent: number | null;
+  suggestedPrice: number | null;
   estimatedCostPerPiece: number | null;
   notes: string | null;
   createdAt: string;
@@ -35,17 +57,51 @@ export interface ProductTest {
   fabrics: TestFabric[];
   sizes: TestSize[];
   accessories: TestAccessory[];
+  photos: SamplePhoto[];
 }
 
 export interface CreateProductTestPayload {
   name: string;
   productId?: string | null;
   videoUrl?: string | null;
-  estimatedCostPerPiece?: number | null;
+  description?: string | null;
   notes?: string | null;
+  laborMadPerPiece?: number | null;
+  confirmationFee?: number | null;
+  deliveryFee?: number | null;
+  markupPercent?: number | null;
+  estimatedCostPerPiece?: number | null;
+  suggestedPrice?: number | null;
   fabrics?: Array<{ fabricTypeId: string; role: string }>;
   sizes?: Array<{ size: string; tracingMeters: number }>;
-  accessories?: Array<{ materialId: string; quantityPerPiece: number }>;
+  accessories?: Array<{
+    materialId: string;
+    quantityPerPiece: number;
+    unitCostSnapshot?: number | null;
+  }>;
+}
+
+export interface SampleCostBreakdown {
+  fabric: number;
+  accessories: number;
+  labor: number;
+  fees: number;
+  total: number;
+  suggestedPrice: number | null;
+  fabricDetail: Array<{
+    fabricTypeId: string;
+    fabricTypeName: string;
+    avgMetersPerPiece: number;
+    avgMadPerMeter: number;
+    contribution: number;
+  }>;
+  accessoryDetail: Array<{
+    materialId: string;
+    materialName: string;
+    quantityPerPiece: number;
+    unitCost: number;
+    contribution: number;
+  }>;
 }
 
 // ─── Production runs ───────────────────────────────────────────────────────
@@ -177,10 +233,31 @@ export interface CostBreakdown {
 
 export const productionApi = {
   // Tests
-  listTests: () =>
-    api.get<{ data: ProductTest[] }>('/atelie/tests/').then((r) => r.data.data),
+  listTests: (status?: SampleStatus | SampleStatus[]) => {
+    const params = status
+      ? { status: Array.isArray(status) ? status.join(',') : status }
+      : undefined;
+    return api
+      .get<{ data: ProductTest[] }>('/atelie/tests', { params })
+      .then((r) => r.data.data);
+  },
 
-  getTest: (id: string) => api.get<ProductTest>(`/atelie/tests/${id}`).then((r) => r.data),
+  getTest: (id: string) =>
+    api.get<ProductTest>(`/atelie/tests/${id}`).then((r) => r.data),
+
+  getCost: (id: string) =>
+    api.get<SampleCostBreakdown>(`/atelie/tests/${id}/cost`).then((r) => r.data),
+
+  transitionSample: (id: string, to: SampleStatus) =>
+    api.post<ProductTest>(`/atelie/tests/${id}/transition`, { to }).then((r) => r.data),
+
+  replacePhotos: (
+    id: string,
+    photos: Array<{ url: string; caption?: string | null; position?: number }>,
+  ) =>
+    api
+      .put<{ data: SamplePhoto[] }>(`/atelie/tests/${id}/photos`, { photos })
+      .then((r) => r.data.data),
 
   getTestVideo: (id: string) =>
     api

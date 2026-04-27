@@ -2363,6 +2363,77 @@
         "created": "Créé"
       }
     },
+    "samples": {
+      "title": "Échantillons",
+      "subtitle": "Nomenclature par modèle — tissus, tailles, accessoires, frais, marge → coût en direct & prix de vente conseillé.",
+      "newSample": "Nouvel échantillon",
+      "loading": "Chargement…",
+      "empty": "Aucun échantillon. Créez-en un pour estimer le coût avant la production.",
+      "emptyTab": "Aucun échantillon dans {{tab}}.",
+      "photos": "Photos",
+      "description": "Description",
+      "approvedMeta": "Approuvé par {{name}} le {{date}}",
+      "tabs": {
+        "all": "Tous",
+        "draft": "Brouillon",
+        "tested": "Testé",
+        "approved": "Approuvé",
+        "archived": "Archivé"
+      },
+      "status": {
+        "draft": "Brouillon",
+        "tested": "Testé",
+        "approved": "Approuvé",
+        "archived": "Archivé"
+      },
+      "col": {
+        "name": "Nom",
+        "status": "Statut",
+        "product": "Produit",
+        "estPerPiece": "Coût / pièce (MAD)",
+        "suggestedPrice": "Prix conseillé (MAD)",
+        "unitCost": "Unité (MAD)",
+        "sizes": "Tailles",
+        "created": "Créé"
+      },
+      "form": {
+        "pricingHeading": "Données de tarification",
+        "pricingHint": "Le coût par pièce et le prix conseillé sont calculés à partir de ces valeurs et de vos tissus/accessoires après l'enregistrement.",
+        "laborPerPiece": "Main-d'œuvre MAD / pièce",
+        "confirmationFee": "Frais de confirmation",
+        "deliveryFee": "Frais de livraison",
+        "markupPercent": "Marge %",
+        "description": "Description",
+        "descriptionPlaceholder": "Léger, manches courtes, deux poches devant…"
+      },
+      "transition": {
+        "successTitle": "Échantillon mis à jour",
+        "successBody": "Statut changé en {{to}}.",
+        "errorTitle": "Changement de statut refusé",
+        "errorBody": "La transition n'est pas autorisée.",
+        "to": {
+          "draft": "Repasser en brouillon",
+          "tested": "Marquer testé",
+          "approved": "Approuver",
+          "archived": "Archiver"
+        }
+      },
+      "cost": {
+        "title": "Détail du coût",
+        "subtitle": "Par pièce — recalculé à chaque enregistrement.",
+        "computing": "Calcul en cours…",
+        "totalPerPiece": "Total / pièce",
+        "suggested": "Vendre à",
+        "fabric": "Tissu",
+        "accessories": "Accessoires",
+        "labor": "Main-d'œuvre",
+        "fees": "Frais (conf. + livraison)",
+        "fabricBreakdown": "Détail tissus",
+        "accessoryBreakdown": "Détail accessoires",
+        "fabricHint": "{{meters}}m × {{mad}} MAD/m (moy. rouleaux)",
+        "accessoryHint": "{{qty}} × {{mad}} MAD"
+      }
+    },
     "testDetail": {
       "backToTests": "Retour aux tests",
       "loading": "Chargement…",

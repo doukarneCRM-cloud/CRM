@@ -2363,6 +2363,77 @@
         "created": "Created"
       }
     },
+    "samples": {
+      "title": "Samples (Échantillons)",
+      "subtitle": "Per-design BOMs — fabrics, sizes, accessories, fees, markup → live cost & suggested selling price.",
+      "newSample": "New sample",
+      "loading": "Loading…",
+      "empty": "No samples yet. Create one to estimate cost before mass production.",
+      "emptyTab": "No samples in {{tab}}.",
+      "photos": "Photos",
+      "description": "Description",
+      "approvedMeta": "Approved by {{name}} on {{date}}",
+      "tabs": {
+        "all": "All",
+        "draft": "Draft",
+        "tested": "Tested",
+        "approved": "Approved",
+        "archived": "Archived"
+      },
+      "status": {
+        "draft": "Draft",
+        "tested": "Tested",
+        "approved": "Approved",
+        "archived": "Archived"
+      },
+      "col": {
+        "name": "Name",
+        "status": "Status",
+        "product": "Product",
+        "estPerPiece": "Cost / piece (MAD)",
+        "suggestedPrice": "Sell at (MAD)",
+        "unitCost": "Unit (MAD)",
+        "sizes": "Sizes",
+        "created": "Created"
+      },
+      "form": {
+        "pricingHeading": "Pricing inputs",
+        "pricingHint": "Cost per piece + suggested price are computed from these + your fabric/accessory data after save.",
+        "laborPerPiece": "Labor MAD / piece",
+        "confirmationFee": "Confirmation fee",
+        "deliveryFee": "Delivery fee",
+        "markupPercent": "Markup %",
+        "description": "Description",
+        "descriptionPlaceholder": "Light, short sleeves, two front pockets…"
+      },
+      "transition": {
+        "successTitle": "Sample updated",
+        "successBody": "Status moved to {{to}}.",
+        "errorTitle": "Could not change status",
+        "errorBody": "The transition was rejected.",
+        "to": {
+          "draft": "Move to draft",
+          "tested": "Mark as tested",
+          "approved": "Approve",
+          "archived": "Archive"
+        }
+      },
+      "cost": {
+        "title": "Cost breakdown",
+        "subtitle": "Per piece — recomputed on every save.",
+        "computing": "Computing…",
+        "totalPerPiece": "Total / piece",
+        "suggested": "Sell at",
+        "fabric": "Fabric",
+        "accessories": "Accessories",
+        "labor": "Labor",
+        "fees": "Fees (confirm + delivery)",
+        "fabricBreakdown": "Fabric detail",
+        "accessoryBreakdown": "Accessory detail",
+        "fabricHint": "{{meters}}m × {{mad}} MAD/m (avg roll)",
+        "accessoryHint": "{{qty}} × {{mad}} MAD"
+      }
+    },
     "testDetail": {
       "backToTests": "Back to tests",
       "loading": "Loading…",

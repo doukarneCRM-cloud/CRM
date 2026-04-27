@@ -20,15 +20,20 @@ export function ProductTestFormModal({ open, onClose, onSaved }: Props) {
   const [accessories, setAccessories] = useState<Material[]>([]);
   const [saving, setSaving] = useState(false);
 
-  const [form, setForm] = useState<CreateProductTestPayload>({
+  const blankForm: CreateProductTestPayload = {
     name: '',
     videoUrl: '',
-    estimatedCostPerPiece: null,
+    description: '',
+    laborMadPerPiece: null,
+    confirmationFee: null,
+    deliveryFee: null,
+    markupPercent: 40,
     notes: '',
     fabrics: [],
     sizes: [],
     accessories: [],
-  });
+  };
+  const [form, setForm] = useState<CreateProductTestPayload>(blankForm);
 
   useEffect(() => {
     if (!open) return;
@@ -38,15 +43,8 @@ export function ProductTestFormModal({ open, onClose, onSaved }: Props) {
         setAccessories(mats.filter((m) => m.category !== 'fabric'));
       },
     );
-    setForm({
-      name: '',
-      videoUrl: '',
-      estimatedCostPerPiece: null,
-      notes: '',
-      fabrics: [],
-      sizes: [],
-      accessories: [],
-    });
+    setForm(blankForm);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   async function save() {
@@ -57,6 +55,7 @@ export function ProductTestFormModal({ open, onClose, onSaved }: Props) {
         ...form,
         name: form.name.trim(),
         videoUrl: form.videoUrl?.trim() || null,
+        description: form.description?.trim() || null,
         notes: form.notes?.trim() || null,
       });
       pushToast({ kind: 'success', title: t('production.testForm.toast.savedTitle') });
@@ -118,26 +117,12 @@ export function ProductTestFormModal({ open, onClose, onSaved }: Props) {
       }
     >
       <div className="flex flex-col gap-4">
-        <div className="grid grid-cols-2 gap-3">
-          <CRMInput
-            label={t('production.testForm.name')}
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            placeholder={t('production.testForm.namePlaceholder')}
-          />
-          <CRMInput
-            label={t('production.testForm.estPerPiece')}
-            type="number"
-            value={form.estimatedCostPerPiece ?? ''}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                estimatedCostPerPiece:
-                  e.target.value === '' ? null : Number(e.target.value),
-              })
-            }
-          />
-        </div>
+        <CRMInput
+          label={t('production.testForm.name')}
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          placeholder={t('production.testForm.namePlaceholder')}
+        />
 
         <CRMInput
           label={t('production.testForm.videoUrl')}
@@ -145,6 +130,65 @@ export function ProductTestFormModal({ open, onClose, onSaved }: Props) {
           onChange={(e) => setForm({ ...form, videoUrl: e.target.value })}
           placeholder={t('production.testForm.videoUrlPlaceholder')}
         />
+
+        {/* Cost-calc inputs. estimatedCostPerPiece + suggestedPrice are
+            COMPUTED by the backend on save — admins enter labor / fees /
+            markup here and the right-rail panel on the detail page shows
+            the resulting numbers. */}
+        <div className="rounded-card border border-gray-100 bg-gray-50/50 p-3">
+          <h3 className="mb-2 text-xs font-semibold text-gray-700">
+            {t('production.samples.form.pricingHeading')}
+          </h3>
+          <p className="mb-3 text-[10px] text-gray-500">
+            {t('production.samples.form.pricingHint')}
+          </p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <CRMInput
+              label={t('production.samples.form.laborPerPiece')}
+              type="number"
+              value={form.laborMadPerPiece ?? ''}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  laborMadPerPiece: e.target.value === '' ? null : Number(e.target.value),
+                })
+              }
+            />
+            <CRMInput
+              label={t('production.samples.form.confirmationFee')}
+              type="number"
+              value={form.confirmationFee ?? ''}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  confirmationFee: e.target.value === '' ? null : Number(e.target.value),
+                })
+              }
+            />
+            <CRMInput
+              label={t('production.samples.form.deliveryFee')}
+              type="number"
+              value={form.deliveryFee ?? ''}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  deliveryFee: e.target.value === '' ? null : Number(e.target.value),
+                })
+              }
+            />
+            <CRMInput
+              label={t('production.samples.form.markupPercent')}
+              type="number"
+              value={form.markupPercent ?? ''}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  markupPercent: e.target.value === '' ? null : Number(e.target.value),
+                })
+              }
+            />
+          </div>
+        </div>
 
         {/* Fabrics */}
         <div>
@@ -312,6 +356,19 @@ export function ProductTestFormModal({ open, onClose, onSaved }: Props) {
               </div>
             ))}
           </div>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-gray-700">
+            {t('production.samples.form.description')}
+          </label>
+          <textarea
+            rows={3}
+            value={form.description ?? ''}
+            placeholder={t('production.samples.form.descriptionPlaceholder')}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            className="w-full rounded-input border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+          />
         </div>
 
         <CRMInput
