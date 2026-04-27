@@ -86,9 +86,17 @@ const RULES: Array<{ keys: string[]; status: ShippingStatus }> = [
     status: 'label_created',
   },
 
-  // Picked up from warehouse — courier physically collected the parcel
+  // Picked up from warehouse — courier physically collected the parcel.
+  // `ramasse` is the past participle Coliix actually emits ("Ramassé") and
+  // MUST be an exact key here: the substring `ramasse` also appears inside
+  // label_created's `attente_de_ramassage` key, so without an explicit
+  // exact match the loose fallback would pull "Ramassé" into the
+  // waiting-for-pickup bucket instead of the actually-picked-up bucket.
   {
-    keys: ['pris_en_charge', 'ramassage', 'pickup', 'picked_up', 'collecte', 'recupere'],
+    keys: [
+      'pris_en_charge', 'ramasse', 'ramassee', 'ramasses',
+      'ramassage', 'pickup', 'picked_up', 'collecte', 'recupere',
+    ],
     status: 'picked_up',
   },
 ];
