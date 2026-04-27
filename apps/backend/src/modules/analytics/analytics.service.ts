@@ -204,13 +204,16 @@ export async function computeDeliveryTab(filters: OrderFilterParams): Promise<De
     await Promise.all([
       computeDeliveryCore(filters),
       computeDeliveryCore(mirrorRange(filters)),
-      // Pipeline is now driven by Coliix's literal wording instead of our
-      // internal enum — admins have asked to see exactly what Coliix
-      // reports. Orders not yet handed off to Coliix fall into synthetic
-      // "Not Shipped" / "Label Created" buckets so nothing disappears.
+      // Pipeline shows the LIVE shipping state — only orders that have
+      // been pushed to Coliix (labelSent: true). Orders still pending in
+      // the CRM aren't in any shipping stage and were producing a phantom
+      // "Not Shipped" bucket that inflated the totals (97 displayed vs 67
+      // actually shipped). Buckets are Coliix's literal wording when
+      // available, "Label Created" for orders pushed but with no Coliix
+      // update yet.
       prisma.order.findMany({
-        where,
-        select: { coliixRawState: true, labelSent: true },
+        where: { ...where, labelSent: true },
+        select: { coliixRawState: true },
       }),
       prisma.order.findMany({
         where: { ...where, labelSent: true },
@@ -254,17 +257,14 @@ export async function computeDeliveryTab(filters: OrderFilterParams): Promise<De
     ]);
 
   // ── Pipeline buckets — keyed by Coliix's literal wording ───────────────
-  // Orders without a coliixRawState fall back to the labelSent flag so
-  // unpushed and just-pushed orders still show up. Sort by count desc so
-  // the most-populated buckets appear first; ties resolved alphabetically
-  // for stability.
+  // Only includes orders actually pushed to Coliix (the query filters on
+  // labelSent: true). An order that's been pushed but for which no Coliix
+  // update has arrived yet falls into a synthetic 'Label Created' bucket
+  // so it isn't lost between push and first webhook. Sorted by count desc;
+  // ties broken alphabetically for stable rendering.
   const countsByStatus = new Map<string, number>();
   for (const o of pipelineRows) {
-    const key = o.coliixRawState
-      ? o.coliixRawState
-      : o.labelSent
-        ? 'Label Created'
-        : 'Not Shipped';
+    const key = o.coliixRawState ?? 'Label Created';
     countsByStatus.set(key, (countsByStatus.get(key) ?? 0) + 1);
   }
   const pipeline = Array.from(countsByStatus.entries())
