@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Plus, Trash2, Package, Loader2, Lock, PackageSearch } from 'lucide-react';
+import { Plus, Trash2, Package, Loader2, Lock, PackageSearch, RotateCcw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { GlassModal } from '@/components/ui/GlassModal';
@@ -112,12 +112,22 @@ function ItemRow({
 }) {
   const { t } = useTranslation();
   const product = products.find((p) => p.id === item.productId);
+  const variant = product?.variants.find((v) => v.id === item.variantId);
+  const basePrice = variant?.price ?? product?.basePrice ?? null;
+  // Compare with a small epsilon so we don't flag a "custom" badge for
+  // floating-point noise in 99.99-style legacy data.
+  const isCustomPrice = basePrice != null && Math.abs(item.unitPrice - basePrice) > 0.005;
   const colorOptions = getColorOptions(product);
   const sizeOptions = getSizeOptions(product, item.color);
 
   const productOpts = products.map((p) => ({ value: p.id, label: p.name }));
   const colorOpts = colorOptions.map((c) => ({ value: c, label: c }));
   const sizeOpts = sizeOptions.map((s) => ({ value: s, label: s }));
+
+  const resetPrice = () => {
+    if (basePrice == null) return;
+    onChange({ ...item, unitPrice: basePrice });
+  };
 
   const handleProductChange = (productId: string) => {
     const p = products.find((x) => x.id === productId);
@@ -220,16 +230,53 @@ function ItemRow({
       </div>
 
       {/* Stock + price meta */}
-      <div className="mt-2 flex items-center justify-between text-xs text-gray-400">
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-400">
         <span className={cn('font-medium', stockColor)}>
           {item.stock === 0 ? t('orders.edit.outOfStock') : t('orders.edit.inStock', { count: item.stock })}
         </span>
-        <span>
-          {t('orders.edit.unit')}{' '}
-          <span className="font-semibold text-gray-700">
-            {item.unitPrice.toLocaleString('fr-MA')} MAD
-          </span>
-          <span className="mx-2 text-gray-300">·</span>
+        <span className="flex flex-wrap items-center gap-1.5">
+          <label className="flex items-center gap-1.5">
+            {t('orders.edit.unit')}
+            <input
+              type="number"
+              min={0.01}
+              step="0.01"
+              value={Number.isFinite(item.unitPrice) ? item.unitPrice : ''}
+              onChange={(e) => {
+                const next = parseFloat(e.target.value);
+                if (Number.isFinite(next) && next > 0) {
+                  onChange({ ...item, unitPrice: next });
+                }
+              }}
+              className={cn(
+                'w-20 rounded border bg-white px-1.5 py-0.5 text-right text-xs font-semibold text-gray-700 outline-none transition-colors',
+                isCustomPrice
+                  ? 'border-amber-300 focus:border-amber-500'
+                  : 'border-gray-200 focus:border-primary',
+              )}
+              title={t('orders.edit.unitPriceTooltip')}
+            />
+            <span className="text-gray-400">MAD</span>
+          </label>
+          {isCustomPrice && (
+            <span className="inline-flex items-center gap-1">
+              <span
+                className="rounded-badge bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-700 ring-1 ring-amber-200"
+                title={t('orders.edit.customPriceTooltip', { base: basePrice?.toLocaleString('fr-MA') })}
+              >
+                {t('orders.edit.customPriceBadge')}
+              </span>
+              <button
+                type="button"
+                onClick={resetPrice}
+                title={t('orders.edit.resetPrice', { base: basePrice?.toLocaleString('fr-MA') })}
+                className="flex h-5 w-5 items-center justify-center rounded text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
+              >
+                <RotateCcw size={11} />
+              </button>
+            </span>
+          )}
+          <span className="mx-1 text-gray-300">·</span>
           {t('orders.edit.subtotal')}{' '}
           <span className="font-semibold text-gray-900">
             {(item.quantity * item.unitPrice).toLocaleString('fr-MA')} MAD
