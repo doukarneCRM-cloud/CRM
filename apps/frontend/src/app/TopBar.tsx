@@ -224,7 +224,7 @@ function AgentsPresenceBar() {
   // (alphabetical). Hides deactivated users — admin can still manage them
   // from the Team page; the topbar is for live operational presence.
   const sorted = useMemo(() => {
-    return agents
+    const fromRoster = agents
       .filter((u) => u.isActive)
       .map((u) => ({
         userId: u.id,
@@ -236,11 +236,28 @@ function AgentsPresenceBar() {
         // the next periodic refetch.
         isOnline: onlineUsers.has(u.id) || u.isOnline,
         lastSeenAt: u.lastSeenAt,
-      }))
-      .sort((a, b) => {
-        if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1;
-        return a.name.localeCompare(b.name);
-      });
+      }));
+
+    // Render anyone the socket told us is online but the /users snapshot
+    // hasn't caught up to yet (newly-created agent, or first paint racing
+    // the roster fetch). The next 60s poll will replace these with the
+    // canonical roster row.
+    const known = new Set(fromRoster.map((u) => u.userId));
+    const ghosts = Array.from(onlineUsers.values())
+      .filter((u) => !known.has(u.userId) && u.name)
+      .map((u) => ({
+        userId: u.userId,
+        name: u.name as string,
+        avatarUrl: u.avatarUrl ?? null,
+        roleName: u.roleName,
+        isOnline: true,
+        lastSeenAt: null as string | null,
+      }));
+
+    return [...fromRoster, ...ghosts].sort((a, b) => {
+      if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
   }, [agents, onlineUsers]);
 
   if (sorted.length === 0) return null;

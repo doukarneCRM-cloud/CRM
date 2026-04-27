@@ -102,7 +102,7 @@ export function initSocket(app: FastifyInstance) {
     }
     lastPersistedAt.set(user.sub, Date.now());
 
-    socket.to('admin').emit('user:online', {
+    io.emit('user:online', {
       userId: user.sub,
       name: dbUser.name,
       avatarUrl: dbUser.avatarUrl,
@@ -125,6 +125,13 @@ export function initSocket(app: FastifyInstance) {
 
     socket.on('disconnect', async () => {
       app.log.info(`[Socket] disconnected: ${user.sub}`);
+      // Only flip offline if this disconnect is from the currently-tracked
+      // socket. A newer socket may have replaced this one (refresh, second
+      // tab, reconnect after blip) — in that case the user is still online
+      // via the new socket, and we must not clobber the map.
+      const entry = onlineUsers.get(user.sub);
+      if (!entry || entry.socketId !== socket.id) return;
+
       onlineUsers.delete(user.sub);
       lastPersistedAt.delete(user.sub);
 
@@ -133,7 +140,7 @@ export function initSocket(app: FastifyInstance) {
         data: { isOnline: false, lastSeenAt: new Date() },
       });
 
-      io.to('admin').emit('user:offline', { userId: user.sub });
+      io.emit('user:offline', { userId: user.sub });
     });
   });
 
@@ -146,7 +153,7 @@ export function initSocket(app: FastifyInstance) {
         await prisma.user
           .update({ where: { id: userId }, data: { isOnline: false } })
           .catch((err) => app.log.warn({ err, userId }, '[Socket] stale cleanup failed'));
-        io.to('admin').emit('user:offline', { userId });
+        io.emit('user:offline', { userId });
       }
     }
   }, 60_000);
