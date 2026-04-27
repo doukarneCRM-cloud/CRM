@@ -12,6 +12,7 @@ import {
 import * as svc from './integrations.service';
 import * as providers from './providers.service';
 import * as coliix from './coliix.service';
+import { maskSecret } from '../../shared/encryption';
 import { z } from 'zod';
 
 const BulkExportSchema = z.object({
@@ -220,6 +221,24 @@ export async function integrationsRoutes(app: FastifyInstance) {
   //   state:     state | status | new_state
   //   driver:    driver_note | note | comment
   const coliixWebhookHandler = async (req: any, reply: any) => {
+    // Always-on diagnostic log of the raw inbound hit. Critical when Coliix
+    // is "supposed to be calling us" but orders aren't moving — without
+    // this line we have no proof the request even reached the server, and
+    // a typo'd URL / IP block / wrong content-type silently produces zero
+    // trace. Body and query are flattened so we capture both shapes.
+    app.log.info(
+      {
+        secretMasked: maskSecret(((req.params as any)?.secret) ?? ''),
+        method: req.method,
+        ip: req.ip,
+        contentType: req.headers?.['content-type'] ?? null,
+        userAgent: req.headers?.['user-agent'] ?? null,
+        query: req.query ?? null,
+        body: req.body ?? null,
+      },
+      '[coliix-webhook] inbound',
+    );
+
     const { secret } = req.params as { secret: string };
     const { prisma } = await import('../../shared/prisma');
     const row = await prisma.shippingProvider.findFirst({
@@ -227,11 +246,14 @@ export async function integrationsRoutes(app: FastifyInstance) {
       select: { id: true, isActive: true },
     });
     if (!row) {
+      app.log.warn(
+        { secretMasked: maskSecret(secret) },
+        '[coliix-webhook] rejected — secret does not match any Coliix provider row',
+      );
       return reply.status(404).send({ error: 'Invalid webhook secret' });
     }
     if (!row.isActive) {
-      // Still 200 — we don't want Coliix to retry forever while we're disabled,
-      // but we record nothing either.
+      app.log.info('[coliix-webhook] integration disabled — accepted but ignored');
       return reply.status(200).send({ ignored: true, reason: 'Coliix integration disabled' });
     }
 
@@ -256,7 +278,19 @@ export async function integrationsRoutes(app: FastifyInstance) {
     const eventDate = eventDateStr ? new Date(eventDateStr) : null;
 
     if (!tracking || !rawState) {
-      return reply.status(400).send({ error: 'Missing tracking or state' });
+      app.log.warn(
+        {
+          parsedTracking: tracking || null,
+          parsedRawState: rawState || null,
+          payloadKeys: Object.keys(source),
+        },
+        '[coliix-webhook] payload missing tracking or state — Coliix sent fields we do not recognize',
+      );
+      return reply.status(400).send({
+        error: 'Missing tracking or state',
+        hint: 'Send tracking + state in JSON body, query string, or form-urlencoded. Accepted aliases: tracking|tracking_code|trackingCode|ref AND state|status|new_state.',
+        payloadKeys: Object.keys(source),
+      });
     }
 
     const result = await coliix.ingestStatus({
@@ -266,6 +300,8 @@ export async function integrationsRoutes(app: FastifyInstance) {
       eventDate: eventDate && !Number.isNaN(eventDate.getTime()) ? eventDate : null,
       source: 'webhook',
     });
+
+    app.log.info({ tracking, rawState, result }, '[coliix-webhook] ingest result');
 
     // Always 200 on matched events — even when the status didn't actually
     // change — so Coliix doesn't hammer us with retries. Only unmatched
