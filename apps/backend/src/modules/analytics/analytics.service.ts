@@ -574,66 +574,35 @@ async function computeConfirmationCore(filters: OrderFilterParams) {
   // won't include them — count them with the archive filter disabled.
   const mergedWhere = buildOrderWhereClause({ ...filters, isArchived: 'all' });
 
-  // ── Activity window ─────────────────────────────────────────────────────
-  // Total/Pending/Merged stay creation-based ("how many orders did we get,
-  // and where did the ones we got land"). Confirmed/Cancelled/Unreachable
-  // switch to *activity* counts — how many distinct orders had a decision
-  // recorded in the date range, regardless of when the order was placed.
+  // ── KPI counts ──────────────────────────────────────────────────────────
+  // Aligned with the Confirmation Funnel donut — Confirmed / Cancelled /
+  // Unreachable count orders BY THEIR CURRENT confirmation status (not by
+  // historical transitions). Previously these were activity counts, which
+  // produced visible drift on the page: an order that hit 9 unreachable
+  // attempts and auto-cancelled was being counted both in Unreachable
+  // (it had unreachable transitions) and in Cancelled (its current state),
+  // while the funnel only counted it once under Cancelled. The 26-vs-8
+  // gap users hit on Unreachable was exactly that pattern.
   //
-  // Crucially we count DISTINCT ORDERS, not log rows. An order that was
-  // confirmed, cancelled, then re-confirmed within the range contributes
-  // 1 to confirmed and 1 to cancelled — never 2 — because admins counting
-  // "how many orders did we confirm today" don't expect re-flips to
-  // double the tally. That's the 71-vs-68 gap users were hitting.
+  // Avg confirmation time still uses OrderLog so re-confirmations don't
+  // skew the mean — that one is genuinely a "first time it happened"
+  // measurement, not a snapshot.
   const { from: activityFrom, to: activityTo } = activityRange(filters);
   const orderFilterForActivity = stripOrderCreatedAt(where);
-  const distinctOrdersWithStatusLog = (statusKeyword: string) =>
-    prisma.order.count({
-      where: {
-        ...orderFilterForActivity,
-        logs: {
-          some: {
-            type: 'confirmation',
-            createdAt: { gte: activityFrom, lte: activityTo },
-            action: { contains: `Confirmation → ${statusKeyword}` },
-          },
-        },
-      },
-    });
 
-  const [total, confirmed, cancelled, unreachable, decisionPool, pending, merged, confirmedSample] =
+  const [total, confirmed, cancelled, unreachable, pending, merged, confirmedSample] =
     await Promise.all([
       prisma.order.count({ where }),
-      distinctOrdersWithStatusLog('confirmed'),
-      distinctOrdersWithStatusLog('cancelled'),
-      distinctOrdersWithStatusLog('unreachable'),
-      // Distinct orders that had ANY decision in the range. Used as the
-      // denominator for the rates — avoids the double-counting that
-      // (confirmed + cancelled + unreachable) would produce if a single
-      // order flipped multiple ways within the range.
-      prisma.order.count({
-        where: {
-          ...orderFilterForActivity,
-          logs: {
-            some: {
-              type: 'confirmation',
-              createdAt: { gte: activityFrom, lte: activityTo },
-              OR: [
-                { action: { contains: 'Confirmation → confirmed' } },
-                { action: { contains: 'Confirmation → cancelled' } },
-                { action: { contains: 'Confirmation → unreachable' } },
-              ],
-            },
-          },
-        },
-      }),
+      prisma.order.count({ where: { ...where, confirmationStatus: 'confirmed' } }),
+      prisma.order.count({ where: { ...where, confirmationStatus: 'cancelled' } }),
+      prisma.order.count({ where: { ...where, confirmationStatus: 'unreachable' } }),
       prisma.order.count({
         where: { ...where, confirmationStatus: { in: ['pending', 'awaiting', 'callback'] } },
       }),
       prisma.order.count({ where: { ...mergedWhere, mergedIntoId: { not: null } } }),
-      // Sample for avg-confirmation-time. Pull confirmation logs in the
-      // range, deduped to the EARLIEST per order so re-confirmations don't
-      // skew the mean. Avg = log.createdAt − order.createdAt, in hours.
+      // First confirmation log per order in the activity window, used to
+      // compute mean (logTime − orderCreatedAt). Deduped via earliest-per-
+      // order so a re-confirmation doesn't bias the average.
       prisma.orderLog.findMany({
         where: {
           type: 'confirmation',
@@ -647,9 +616,12 @@ async function computeConfirmationCore(filters: OrderFilterParams) {
       }),
     ]);
 
-  // Rates over distinct decided orders.
-  const confirmationRate = safeRate(confirmed, decisionPool);
-  const cancellationRate = safeRate(cancelled, decisionPool);
+  // Rates over the decided pool (confirmed + cancelled + unreachable). Now
+  // that we count current state these are mutually exclusive — no risk of
+  // double-counting an order that flipped between buckets.
+  const decidedPool = confirmed + cancelled + unreachable;
+  const confirmationRate = safeRate(confirmed, decidedPool);
+  const cancellationRate = safeRate(cancelled, decidedPool);
   const mergedRate = safeRate(merged, total + merged);
 
   let avgConfirmationHours = 0;
