@@ -446,6 +446,11 @@ export interface TrackNowResult {
   changed: boolean;
   newStatus?: ShippingStatus;
   error?: string;
+  // Raw HTTP response body Coliix returned on failure. Surfaced so the
+  // diagnostic table can show it verbatim when our own error extractor
+  // misses an unexpected shape — leaves no information unrecoverable.
+  errorStatus?: number;
+  errorPayload?: unknown;
   reason?: string;
 }
 
@@ -517,6 +522,7 @@ export async function trackOrderNow(orderId: string): Promise<TrackNowResult> {
   } catch (err) {
     const message =
       err instanceof ColiixError ? err.message : err instanceof Error ? err.message : String(err);
+    const isColiix = err instanceof ColiixError;
     return {
       ok: false,
       orderId: order.id,
@@ -527,6 +533,8 @@ export async function trackOrderNow(orderId: string): Promise<TrackNowResult> {
       mapped: null,
       changed: false,
       error: message,
+      errorStatus: isColiix ? err.status : undefined,
+      errorPayload: isColiix ? err.payload : undefined,
     };
   }
 }

@@ -69,6 +69,8 @@ export interface TrackNowResult {
   newStatus?: string;
   reason?: string;
   error?: string;
+  errorStatus?: number;
+  errorPayload?: unknown;
 }
 
 export interface RefreshAllResult {

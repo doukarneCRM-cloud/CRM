@@ -607,7 +607,31 @@ function SyncResultsPanel({ result }: { result: RefreshAllResult }) {
                   </td>
                   <td className="px-3 py-1.5">
                     {r.error ? (
-                      <span className="text-red-600">{r.error}</span>
+                      <span className="text-red-600">
+                        {/* Defensive: never let an object slip through and
+                            render as "[object Object]". The backend tries
+                            very hard to send a string, but if a future
+                            shape leaks through we JSON-stringify rather
+                            than swallow info. */}
+                        {typeof r.error === 'string'
+                          ? r.error
+                          : JSON.stringify(r.error)}
+                        {r.errorStatus !== undefined && r.errorStatus !== 0 && (
+                          <span className="ml-1 text-[10px] text-red-400">
+                            ({r.errorStatus})
+                          </span>
+                        )}
+                        {r.errorPayload !== undefined && r.errorPayload !== null && (
+                          <details className="mt-1 text-[10px]">
+                            <summary className="cursor-pointer text-red-500 hover:text-red-700">
+                              {t('integrations.coliix.syncCol.rawResponse')}
+                            </summary>
+                            <pre className="mt-1 max-h-40 overflow-auto rounded bg-red-50 p-2 font-mono text-[10px] text-red-700">
+                              {JSON.stringify(r.errorPayload, null, 2)}
+                            </pre>
+                          </details>
+                        )}
+                      </span>
                     ) : r.changed ? (
                       <span className="text-emerald-700">
                         {r.prevStatus} → {r.newStatus}

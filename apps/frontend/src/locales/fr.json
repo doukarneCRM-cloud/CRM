@@ -2688,7 +2688,8 @@
         "outcome": "Résultat",
         "unknown": "Inconnu",
         "notMapped": "État absent du mapping",
-        "unchanged": "Aucun changement"
+        "unchanged": "Aucun changement",
+        "rawResponse": "Réponse Coliix brute"
       },
       "health": {
         "title": "Santé du webhook",

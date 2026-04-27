@@ -111,16 +111,44 @@ async function postForm(params: Record<string, string | number>): Promise<unknow
     payload && typeof payload === 'object' && 'status' in payload
       ? Number((payload as { status: unknown }).status)
       : null;
-  const bodyMsg =
-    payload && typeof payload === 'object' && 'msg' in payload
-      ? String((payload as { msg: unknown }).msg ?? '')
-      : '';
+  const bodyMsg = extractMsg(payload);
 
   if (bodyStatus !== null && bodyStatus !== 200) {
     throw new ColiixError(bodyMsg || `Coliix error (status ${bodyStatus})`, bodyStatus, payload);
   }
 
   return payload;
+}
+
+// Coliix's error responses sometimes return `msg` as an array of validation
+// objects (e.g. `[{ field: "tracking", message: "..." }, ...]`) rather than a
+// string. The naive `String(msg)` collapses that to "[object Object],..." and
+// destroys the actual error text — which is exactly what made every Sync row
+// show "[object Object]" with no indication of why the call failed.
+function extractMsg(payload: unknown): string {
+  if (!payload || typeof payload !== 'object' || !('msg' in payload)) return '';
+  const msg = (payload as { msg: unknown }).msg;
+  if (msg == null) return '';
+  if (typeof msg === 'string') return msg;
+  if (Array.isArray(msg)) {
+    return msg
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object') {
+          const o = item as Record<string, unknown>;
+          // Pick the most common message-bearing fields, fall back to JSON so
+          // nothing is silently lost.
+          return String(o.message ?? o.msg ?? o.error ?? o.detail ?? JSON.stringify(item));
+        }
+        return String(item);
+      })
+      .join('; ');
+  }
+  if (typeof msg === 'object') {
+    const o = msg as Record<string, unknown>;
+    return String(o.message ?? o.msg ?? o.error ?? o.detail ?? JSON.stringify(msg));
+  }
+  return String(msg);
 }
 
 /** Create a new parcel. Returns the tracking code assigned by Coliix. */
