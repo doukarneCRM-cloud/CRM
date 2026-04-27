@@ -497,7 +497,9 @@
       "statusCount_other": "{{count}} statuses",
       "errorNameRequired": "Name is required",
       "errorNameTaken": "A group with this name already exists",
-      "errorGeneric": "Something went wrong, please try again"
+      "errorGeneric": "Something went wrong, please try again",
+      "customStatusPlaceholder": "Add a Coliix status (e.g. Ramassé, Livré)…",
+      "addCustomStatus": "Add"
     },
     "kpi": {
       "todaysOrders": "Today's Orders",

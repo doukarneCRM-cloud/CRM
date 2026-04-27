@@ -497,7 +497,9 @@
       "statusCount_other": "{{count}} statuts",
       "errorNameRequired": "Le nom est requis",
       "errorNameTaken": "Un groupe avec ce nom existe déjà",
-      "errorGeneric": "Une erreur est survenue, veuillez réessayer"
+      "errorGeneric": "Une erreur est survenue, veuillez réessayer",
+      "customStatusPlaceholder": "Ajouter un statut Coliix (ex. Ramassé, Livré)…",
+      "addCustomStatus": "Ajouter"
     },
     "kpi": {
       "todaysOrders": "Commandes du jour",

@@ -1,7 +1,4 @@
 import { z } from 'zod';
-import { ShippingStatus } from '@prisma/client';
-
-const VALID_STATUS_KEYS = Object.values(ShippingStatus) as readonly string[];
 
 // Hex like "#10b981" or "#fff" — keep optional, the UI falls back to a neutral
 // chip when no color is set.
@@ -10,13 +7,16 @@ const HexColor = z
   .regex(/^#([0-9a-fA-F]{3}){1,2}$/, 'Invalid hex color')
   .max(9);
 
+// Status keys are now Coliix's literal wordings (Ramassé, Livré, Attente De
+// Ramassage, …) — free-form strings, not constrained to our internal
+// ShippingStatus enum. This lets a group keep its statuses persisted
+// even when no orders currently have them, and accepts new Coliix
+// wordings the moment Coliix introduces them without a code change.
+// Legacy enum values (created before this migration) still validate
+// since they're plain strings too.
 const StatusKeyArray = z
-  .array(z.string().min(1).max(64))
+  .array(z.string().min(1).max(120))
   .max(60)
-  .refine(
-    (keys) => keys.every((k) => VALID_STATUS_KEYS.includes(k)),
-    { message: 'One or more statusKeys are not valid ShippingStatus values' },
-  )
   .refine(
     (keys) => new Set(keys).size === keys.length,
     { message: 'Duplicate statusKeys are not allowed' },

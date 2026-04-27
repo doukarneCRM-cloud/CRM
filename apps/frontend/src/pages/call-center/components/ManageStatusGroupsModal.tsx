@@ -1,15 +1,29 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowDown, ArrowUp, Plus, Trash2, X } from 'lucide-react';
 import { GlassModal } from '@/components/ui/GlassModal';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { cn } from '@/lib/cn';
-import {
-  SHIPPING_STATUS_COLORS,
-  SHIPPING_STATUS_OPTIONS,
-} from '@/constants/statusColors';
+import { coliixApi } from '@/services/providersApi';
 import { useShippingStatusGroups } from '../hooks/useShippingStatusGroups';
 import type { ShippingStatusGroup } from '@/services/shippingStatusGroupsApi';
+
+// Stable colour for an arbitrary Coliix wording. Same FNV-ish hash used on
+// the Dashboard / Analytics pipeline cards so a status reads as the same
+// colour everywhere it appears.
+const PILL_PALETTE = [
+  '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
+  '#06B6D4', '#EC4899', '#84CC16', '#F97316', '#6366F1',
+  '#14B8A6', '#A855F7',
+];
+function colourFor(s: string): string {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = (h * 16777619) >>> 0;
+  }
+  return PILL_PALETTE[h % PILL_PALETTE.length];
+}
 
 const PRESET_COLORS = [
   '#10b981', // emerald
@@ -43,6 +57,39 @@ export function ManageStatusGroupsModal({ open, onClose }: ManageStatusGroupsMod
   const [editName, setEditName] = useState('');
   const [editColor, setEditColor] = useState<string | null>(null);
   const [editKeys, setEditKeys] = useState<string[]>([]);
+
+  // Distinct Coliix wordings currently present on orders. Refreshed on
+  // open so newly-arrived states show up without needing a page reload.
+  const [coliixStates, setColiixStates] = useState<string[]>([]);
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    coliixApi
+      .states()
+      .then((rows) => {
+        if (!cancelled) setColiixStates(rows.map((r) => r.value));
+      })
+      .catch(() => {
+        if (!cancelled) setColiixStates([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  // Available status options = the union of (Coliix wordings present on
+  // orders) ∪ (every key already saved on a group) ∪ (the keys being
+  // edited right now). The second set guarantees that a group keeps
+  // showing its own statuses even if no order currently sits in them —
+  // exactly the user's "wakha makayn ta order, mybanch, walakin
+  // mynsach" requirement.
+  const availableKeys = useMemo(() => {
+    const set = new Set<string>(coliixStates);
+    for (const g of groups) for (const k of g.statusKeys) set.add(k);
+    for (const k of newKeys) set.add(k);
+    for (const k of editKeys) set.add(k);
+    return Array.from(set);
+  }, [coliixStates, groups, newKeys, editKeys]);
 
   const claimedByOther = useMemo(() => {
     // Map each statusKey -> list of group names already claiming it. Used to
@@ -244,8 +291,12 @@ export function ManageStatusGroupsModal({ open, onClose }: ManageStatusGroupsMod
                 {t('callCenter.groups.statuses')}
               </label>
               <StatusChipPicker
+                available={availableKeys}
                 selected={newKeys}
                 onToggle={(k) => toggleKey(newKeys, setNewKeys, k)}
+                onAddCustom={(k) => {
+                  if (!newKeys.includes(k)) setNewKeys([...newKeys, k]);
+                }}
                 claimedByOther={claimedByOther}
                 ownGroupName={null}
               />
@@ -319,8 +370,12 @@ export function ManageStatusGroupsModal({ open, onClose }: ManageStatusGroupsMod
                         {t('callCenter.groups.statuses')}
                       </label>
                       <StatusChipPicker
+                        available={availableKeys}
                         selected={editKeys}
                         onToggle={(k) => toggleKey(editKeys, setEditKeys, k)}
+                        onAddCustom={(k) => {
+                          if (!editKeys.includes(k)) setEditKeys([...editKeys, k]);
+                        }}
                         claimedByOther={claimedByOther}
                         ownGroupName={g.name}
                       />
@@ -391,30 +446,20 @@ export function ManageStatusGroupsModal({ open, onClose }: ManageStatusGroupsMod
                         {g.statusKeys.length > 0 ? (
                           <div className="mt-2 flex flex-wrap gap-1">
                             {g.statusKeys.map((k) => {
-                              const cfg = SHIPPING_STATUS_COLORS[
-                                k as keyof typeof SHIPPING_STATUS_COLORS
-                              ];
-                              if (!cfg) {
-                                return (
-                                  <span
-                                    key={k}
-                                    className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-500"
-                                  >
-                                    {k}
-                                  </span>
-                                );
-                              }
+                              // Status keys are now arbitrary Coliix wordings.
+                              // Render with a stable hash colour and the
+                              // literal text — no enum lookup needed.
+                              const colour = colourFor(k);
                               return (
                                 <span
                                   key={k}
-                                  className={cn(
-                                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                                    cfg.bg,
-                                    cfg.text,
-                                  )}
+                                  className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-700"
                                 >
-                                  <span className={cn('h-1.5 w-1.5 rounded-full', cfg.dot)} />
-                                  {cfg.label}
+                                  <span
+                                    className="h-1.5 w-1.5 rounded-full"
+                                    style={{ backgroundColor: colour }}
+                                  />
+                                  {k}
                                 </span>
                               );
                             })}
@@ -489,59 +534,110 @@ function ColorPicker({
 }
 
 function StatusChipPicker({
+  available,
   selected,
   onToggle,
+  onAddCustom,
   claimedByOther,
   ownGroupName,
 }: {
+  available: string[];
   selected: string[];
   onToggle: (key: string) => void;
+  onAddCustom: (key: string) => void;
   claimedByOther: Map<string, string[]>;
   ownGroupName: string | null;
 }) {
   const { t } = useTranslation();
+  const [customDraft, setCustomDraft] = useState('');
+
+  const sorted = useMemo(
+    () => [...available].sort((a, b) => a.localeCompare(b, 'fr')),
+    [available],
+  );
+
+  const handleAddCustom = () => {
+    const k = customDraft.trim();
+    if (!k) return;
+    onAddCustom(k);
+    setCustomDraft('');
+  };
+
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {SHIPPING_STATUS_OPTIONS.map((opt) => {
-        const cfg = SHIPPING_STATUS_COLORS[opt.value];
-        const active = selected.includes(opt.value);
-        // "Claimed elsewhere" = some OTHER group already lists this status. We
-        // show a soft warning (not a block) since transitional states are a
-        // legit reason to overlap.
-        const claimers = (claimedByOther.get(opt.value) ?? []).filter(
-          (n) => n !== ownGroupName,
-        );
-        const warning = !active && claimers.length > 0;
-        return (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => onToggle(opt.value)}
-            title={
-              warning
-                ? (t('callCenter.groups.groupAlreadyClaims', {
-                    groups: claimers.join(', '),
-                  }) as string)
-                : undefined
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-1.5">
+        {sorted.map((key) => {
+          const active = selected.includes(key);
+          // "Claimed elsewhere" = some OTHER group already lists this status.
+          // Soft warning (not a block) — transitional states are a legit
+          // reason to overlap.
+          const claimers = (claimedByOther.get(key) ?? []).filter(
+            (n) => n !== ownGroupName,
+          );
+          const warning = !active && claimers.length > 0;
+          const colour = colourFor(key);
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => onToggle(key)}
+              title={
+                warning
+                  ? (t('callCenter.groups.groupAlreadyClaims', {
+                      groups: claimers.join(', '),
+                    }) as string)
+                  : undefined
+              }
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition',
+                active
+                  ? 'border-current bg-gray-100 text-gray-900 shadow-sm'
+                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300',
+                warning && 'ring-1 ring-amber-300',
+              )}
+            >
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: colour }}
+              />
+              {key}
+              {warning && (
+                <span className="rounded-full bg-amber-100 px-1.5 py-[1px] text-[9px] font-bold text-amber-700">
+                  {t('callCenter.groups.claimedShort')}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Free-text adder — lets the user type a Coliix wording that hasn't
+          appeared on an order yet so the group is future-proof. */}
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={customDraft}
+          onChange={(e) => setCustomDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              handleAddCustom();
             }
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition',
-              active
-                ? cn(cfg.bg, cfg.text, 'border-current shadow-sm')
-                : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300',
-              warning && 'ring-1 ring-amber-300',
-            )}
-          >
-            <span className={cn('h-1.5 w-1.5 rounded-full', cfg.dot)} />
-            {cfg.label}
-            {warning && (
-              <span className="rounded-full bg-amber-100 px-1.5 py-[1px] text-[9px] font-bold text-amber-700">
-                {t('callCenter.groups.claimedShort')}
-              </span>
-            )}
-          </button>
-        );
-      })}
+          }}
+          placeholder={t('callCenter.groups.customStatusPlaceholder') as string}
+          className="flex-1 rounded-md border border-gray-200 bg-white px-2 py-1 text-xs focus:border-primary focus:outline-none"
+          maxLength={120}
+        />
+        <CRMButton
+          variant="ghost"
+          size="sm"
+          onClick={handleAddCustom}
+          disabled={!customDraft.trim()}
+          leftIcon={<Plus size={12} />}
+        >
+          {t('callCenter.groups.addCustomStatus')}
+        </CRMButton>
+      </div>
     </div>
   );
 }

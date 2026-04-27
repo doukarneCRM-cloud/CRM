@@ -730,7 +730,15 @@ function FilterPills({ section, orders, selected, onChange }: FilterPillsProps) 
   const counts = useMemo(() => {
     const map = new Map<string, number>();
     for (const o of orders) {
-      const key = section === 'confirmation' ? o.confirmationStatus : o.shippingStatus;
+      // Shipping pillar keys are now Coliix's literal wordings — that's
+      // what status groups store and what the user sees on the row.
+      // Confirmation pillar still uses the internal enum (not Coliix-driven).
+      // Orders not yet pushed to Coliix have null coliixRawState; bucket
+      // them under a synthetic key so they still appear under "Other".
+      const key =
+        section === 'confirmation'
+          ? o.confirmationStatus
+          : (o.coliixRawState ?? (o.labelSent ? 'Label Created' : 'Not Shipped'));
       map.set(key, (map.get(key) ?? 0) + 1);
     }
     return map;
@@ -748,30 +756,39 @@ function FilterPills({ section, orders, selected, onChange }: FilterPillsProps) 
   }, [orders, section]);
 
   // Statuses NOT claimed by any group, projected against the live `counts`
-  // map. Drives the "Other" tab + restricts pill visibility when it's active.
+  // map. Drives the "Other" tab + restricts pill visibility when it's
+  // active. Source of "all known shipping keys" is now the live counts
+  // map (Coliix wordings present on orders) since there's no fixed enum
+  // catalogue any more.
   const orphanStatuses = useMemo(() => {
     if (section !== 'shipping') return new Set<string>();
     const claimed = new Set<string>();
     for (const g of groups) for (const k of g.statusKeys) claimed.add(k);
     const orphans = new Set<string>();
-    for (const k of Object.keys(SHIPPING_STATUS_COLORS)) {
-      if (!claimed.has(k) && (counts.get(k) ?? 0) > 0) orphans.add(k);
+    for (const [k, n] of counts.entries()) {
+      if (!claimed.has(k) && n > 0) orphans.add(k);
     }
     return orphans;
   }, [groups, counts, section]);
 
   // Decide which status keys the pill row should show given the active tab.
+  // For shipping the source of truth is `counts` (= Coliix wordings present
+  // on orders). Confirmation still walks the enum via `colors` for stable
+  // ordering.
   const visibleStatusKeys = useMemo(() => {
-    if (section !== 'shipping' || groups.length === 0 || activeGroupId === null) {
-      // "All" tab OR no groups defined OR confirmation tab → flat behaviour:
-      // every status with count > 0, in the natural enum order.
+    if (section === 'confirmation') {
       return Object.keys(colors).filter((k) => (counts.get(k) ?? 0) > 0);
+    }
+    // Shipping section
+    if (groups.length === 0 || activeGroupId === null) {
+      // "All" tab OR no groups defined → every shipping wording with count > 0.
+      return Array.from(counts.keys()).filter((k) => (counts.get(k) ?? 0) > 0);
     }
     if (activeGroupId === OTHER_GROUP_ID) {
       return [...orphanStatuses];
     }
     const grp = groups.find((g) => g.id === activeGroupId);
-    if (!grp) return Object.keys(colors).filter((k) => (counts.get(k) ?? 0) > 0);
+    if (!grp) return Array.from(counts.keys()).filter((k) => (counts.get(k) ?? 0) > 0);
     return grp.statusKeys.filter((k) => (counts.get(k) ?? 0) > 0);
   }, [section, groups, activeGroupId, colors, counts, orphanStatuses]);
 
@@ -1067,13 +1084,17 @@ export function CallCenterTable({ onCreate }: { onCreate?: () => void } = {}) {
     [confirmationOrders, confirmationFilter],
   );
 
-  const filteredShipping = useMemo(
-    () =>
-      shippingFilter
-        ? shippingOrders.filter((o) => o.shippingStatus === shippingFilter)
-        : shippingOrders,
-    [shippingOrders, shippingFilter],
-  );
+  const filteredShipping = useMemo(() => {
+    if (!shippingFilter) return shippingOrders;
+    // Pills are now keyed on Coliix's literal wording, with synthetic
+    // 'Label Created' / 'Not Shipped' buckets for orders with no Coliix
+    // update yet — match the same way `counts` was computed above so
+    // clicking a pill narrows to exactly the orders it counted.
+    return shippingOrders.filter((o) => {
+      const k = o.coliixRawState ?? (o.labelSent ? 'Label Created' : 'Not Shipped');
+      return k === shippingFilter;
+    });
+  }, [shippingOrders, shippingFilter]);
 
   if (loading) {
     return (
