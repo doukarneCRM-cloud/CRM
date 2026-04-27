@@ -774,6 +774,172 @@ export async function importOrders(
   return { imported, skipped, errors, details };
 }
 
+// ─── Reconciliation ────────────────────────────────────────────────────────
+// Answers the question "which orders does YouCan have that we don't?" for
+// a single store, restricted to the recent window the admin cares about.
+// Walks YouCan's pages newest-first, stops as soon as it sees orders older
+// than `since`, then for every YouCan order in that window:
+//   - already in CRM (by youcanOrderId)         → outcome 'in_crm'
+//   - missing, import succeeds                  → outcome 'imported'
+//   - missing, import throws                    → outcome 'failed' + error
+//
+// Does NOT advance lastSyncAt — this is an on-demand audit, not a sync.
+
+export interface ReconcileOrderRow {
+  youcanOrderId: string;
+  youcanRef: string | null;
+  createdAt: string | null;
+  outcome: 'in_crm' | 'imported' | 'failed';
+  error?: string;
+  customer?: { name: string | null; phone: string | null } | null;
+}
+
+export interface ReconcileResult {
+  storeId: string;
+  storeName: string;
+  windowFrom: string;
+  windowTo: string;
+  scanned: number;
+  inCrm: number;
+  imported: number;
+  failed: number;
+  rows: ReconcileOrderRow[];
+}
+
+const RECONCILE_PAGE_SIZE = 50;
+const RECONCILE_MAX_PAGES = 20;
+
+export async function reconcileMissingOrders(
+  storeId: string,
+  windowHours: number = 24,
+): Promise<ReconcileResult> {
+  const store = await prisma.store.findUnique({
+    where: { id: storeId },
+    select: { id: true, name: true, fieldMapping: true },
+  });
+  if (!store) {
+    throw { statusCode: 404, code: 'NOT_FOUND', message: 'Store not found' };
+  }
+  const fieldMapping = store.fieldMapping as Record<string, string> | null;
+
+  const windowTo = new Date();
+  const windowFrom = new Date(windowTo.getTime() - windowHours * 60 * 60_000);
+
+  const rows: ReconcileOrderRow[] = [];
+  let scanned = 0;
+  let inCrm = 0;
+  let imported = 0;
+  let failed = 0;
+
+  outer: for (let page = 1; page <= RECONCILE_MAX_PAGES; page++) {
+    const { data, pagination } = await fetchOrders(storeId, page, RECONCILE_PAGE_SIZE);
+    if (!data.length) break;
+
+    for (const yo of data) {
+      const placedAt = yo.created_at ? new Date(yo.created_at) : null;
+      // Newest-first ordering in YouCan responses lets us bail out early
+      // as soon as we cross the windowFrom boundary.
+      if (placedAt && !Number.isNaN(placedAt.getTime()) && placedAt < windowFrom) {
+        break outer;
+      }
+      scanned++;
+
+      const cust = yo.customer ?? null;
+      const customer = cust
+        ? {
+            name:
+              cust.full_name ??
+              (`${cust.first_name ?? ''} ${cust.last_name ?? ''}`.trim() || null),
+            phone: cust.phone ?? null,
+          }
+        : null;
+
+      const existing = await prisma.order.findUnique({
+        where: { youcanOrderId: yo.id },
+        select: { id: true },
+      });
+      if (existing) {
+        inCrm++;
+        rows.push({
+          youcanOrderId: yo.id,
+          youcanRef: yo.ref ?? null,
+          createdAt: yo.created_at ?? null,
+          outcome: 'in_crm',
+          customer,
+        });
+        continue;
+      }
+
+      try {
+        await importSingleOrder(storeId, yo, fieldMapping);
+        imported++;
+        rows.push({
+          youcanOrderId: yo.id,
+          youcanRef: yo.ref ?? null,
+          createdAt: yo.created_at ?? null,
+          outcome: 'imported',
+          customer,
+        });
+      } catch (e) {
+        failed++;
+        const error = e instanceof Error ? e.message : 'Unknown error';
+        rows.push({
+          youcanOrderId: yo.id,
+          youcanRef: yo.ref ?? null,
+          createdAt: yo.created_at ?? null,
+          outcome: 'failed',
+          error,
+          customer,
+        });
+        // Persist the failure so it stays in the regular Logs panel for
+        // later debugging.
+        await prisma.importLog
+          .create({
+            data: {
+              storeId,
+              type: 'orders_import',
+              level: 'error',
+              message: `Reconcile failed to import YouCan order ${yo.ref ?? yo.id}: ${error}`,
+              imported: 0,
+              skipped: 0,
+              errors: 1,
+              meta: {
+                youcanOrderId: yo.id,
+                youcanRef: yo.ref ?? null,
+                error,
+                createdAt: yo.created_at ?? null,
+                source: 'reconcile',
+              },
+            },
+          })
+          .catch(() => {});
+      }
+    }
+
+    if (page >= pagination.total_pages) break;
+  }
+
+  await logImport(
+    storeId,
+    'reconcile',
+    failed > 0 ? 'warning' : 'info',
+    `Reconcile (last ${windowHours}h): scanned ${scanned}, in CRM ${inCrm}, imported ${imported}, failed ${failed}`,
+    { scanned, inCrm, imported, failed, windowHours },
+  );
+
+  return {
+    storeId,
+    storeName: store.name,
+    windowFrom: windowFrom.toISOString(),
+    windowTo: windowTo.toISOString(),
+    scanned,
+    inCrm,
+    imported,
+    failed,
+    rows,
+  };
+}
+
 /**
  * Import a single YouCan order into the CRM. Used by both bulk import and webhooks.
  * Returns 'imported' | 'skipped'.

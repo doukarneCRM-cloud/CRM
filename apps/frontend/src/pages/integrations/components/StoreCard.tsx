@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Link2, Unlink, Power, Trash2, Package, ShoppingCart,
   AlertCircle, CheckCircle2, Clock, Settings2, Wand2, Loader2,
-  Zap, Timer,
+  Zap, Timer, Search,
 } from 'lucide-react';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { cn } from '@/lib/cn';
@@ -18,7 +18,9 @@ interface Props {
   onImportProducts: () => void;
   onImportOrders: () => void;
   onReconcile: () => void;
+  onFindMissing: () => void;
   reconciling?: boolean;
+  findingMissing?: boolean;
 }
 
 export function StoreCard({
@@ -30,7 +32,9 @@ export function StoreCard({
   onImportProducts,
   onImportOrders,
   onReconcile,
+  onFindMissing,
   reconciling,
+  findingMissing,
 }: Props) {
   const { t } = useTranslation();
   const [deleting, setDeleting] = useState(false);
@@ -170,6 +174,21 @@ export function StoreCard({
             </div>
             <CRMButton variant="ghost" size="sm" leftIcon={<Settings2 size={12} />} onClick={onConfigure} className="w-full">
               {t('integrations.storeCard.configure')}
+            </CRMButton>
+            <CRMButton
+              variant="ghost"
+              size="sm"
+              leftIcon={
+                findingMissing ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />
+              }
+              onClick={onFindMissing}
+              disabled={findingMissing}
+              className="w-full text-amber-700 hover:bg-amber-50"
+              title={t('integrations.storeCard.findMissingTitle') as string}
+            >
+              {findingMissing
+                ? t('integrations.storeCard.findingMissing')
+                : t('integrations.storeCard.findMissing')}
             </CRMButton>
             <CRMButton
               variant="ghost"

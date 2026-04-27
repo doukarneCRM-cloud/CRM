@@ -59,6 +59,28 @@ export interface Pagination {
   total_pages: number;
 }
 
+// ─── Reconciliation result (mirrors backend ReconcileResult) ────────────────
+export interface ReconcileOrderRow {
+  youcanOrderId: string;
+  youcanRef: string | null;
+  createdAt: string | null;
+  outcome: 'in_crm' | 'imported' | 'failed';
+  error?: string;
+  customer?: { name: string | null; phone: string | null } | null;
+}
+
+export interface ReconcileResult {
+  storeId: string;
+  storeName: string;
+  windowFrom: string;
+  windowTo: string;
+  scanned: number;
+  inCrm: number;
+  imported: number;
+  failed: number;
+  rows: ReconcileOrderRow[];
+}
+
 // ─── API ────────────────────────────────────────────────────────────────────
 
 export const integrationsApi = {
@@ -115,6 +137,17 @@ export const integrationsApi = {
   // Orders
   importOrders: (id: string, count?: number) =>
     api.post<ImportResult>(`/integrations/stores/${id}/import/orders`, { count }).then((r) => r.data),
+
+  // Reconciliation: walk YouCan orders in a recent window, attempt to
+  // import any missing, return a per-order outcome list.
+  reconcileOrders: (id: string, hours = 24) =>
+    api
+      .post<ReconcileResult>(
+        `/integrations/stores/${id}/reconcile`,
+        undefined,
+        { params: { hours }, timeout: 180_000 },
+      )
+      .then((r) => r.data),
 
   // One-shot repair: re-fetch every imported YouCan order across every store
   // and patch its CRM `createdAt` to the original placement timestamp from

@@ -2907,9 +2907,24 @@
       "relinking": "Re-liaison…",
       "relink": "Re-lier les produits non liés",
       "relinkTitle": "Promouvoir les produits provisoires créés depuis les commandes en vrais produits en les récupérant à nouveau depuis YouCan.",
+      "findMissing": "Trouver les commandes manquantes",
+      "findingMissing": "Recherche…",
+      "findMissingTitle": "Récupère les 24 dernières heures de commandes depuis YouCan et importe celles absentes du CRM.",
       "enable": "Activer",
       "disable": "Désactiver",
       "delete": "Supprimer"
+    },
+    "reconcile": {
+      "title": "Commandes manquantes — {{name}}",
+      "scanned": "Analysées",
+      "inCrm": "Déjà dans le CRM",
+      "imported": "Importées",
+      "failed": "Échecs",
+      "windowHint": "Commandes YouCan analysées du {{from}} au {{to}}.",
+      "emptyWindow": "Aucune commande YouCan dans les 24 dernières heures.",
+      "failedHeader": "Échec d'import — à investiguer",
+      "importedHeader": "Importées à l'instant",
+      "inCrmHeader": "Déjà dans le CRM ({{count}})"
     },
     "youcan": {
       "subtitle": "Connectez vos boutiques YouCan pour importer les produits et recevoir les commandes en temps réel.",
@@ -2929,6 +2944,7 @@
       "reconcileErrors_other": ", {{count}} erreurs",
       "reconcileEnd": ".",
       "reconcileFailed": "Échec de la re-liaison",
+      "findMissingFailed": "Impossible de vérifier les commandes manquantes sur YouCan",
       "backfillCta": "Corriger les dates",
       "backfillTooltip": "Récupère chaque commande YouCan importée et corrige sa date dans le CRM avec la date de passation d'origine.",
       "backfillConfirm": "Cela va récupérer chaque commande YouCan importée depuis YouCan et mettre à jour leurs dates dans le CRM. Cela peut prendre une minute. Continuer ?",

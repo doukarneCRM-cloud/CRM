@@ -5,12 +5,17 @@ import { CRMButton } from '@/components/ui/CRMButton';
 import { useAuthStore } from '@/store/authStore';
 import { useToastStore } from '@/store/toastStore';
 import { PERMISSIONS } from '@/constants/permissions';
-import { integrationsApi, type Store } from '@/services/integrationsApi';
+import {
+  integrationsApi,
+  type Store,
+  type ReconcileResult,
+} from '@/services/integrationsApi';
 import { StoreCard } from './StoreCard';
 import { AddStoreModal } from './AddStoreModal';
 import { ConfigureStoreModal } from './ConfigureStoreModal';
 import { ImportProductsModal } from './ImportProductsModal';
 import { ImportOrdersModal } from './ImportOrdersModal';
+import { ReconcileOrdersModal } from './ReconcileOrdersModal';
 import { OnboardingWizard } from './OnboardingWizard';
 
 interface OAuthMessage {
@@ -43,6 +48,13 @@ export function YoucanTab() {
   const [reconcilingStoreId, setReconcilingStoreId] = useState<string | null>(null);
   const [reconcileMessage, setReconcileMessage] = useState<string | null>(null);
 
+  // Find-missing-orders state — separate from the existing
+  // placeholder-reconciliation flow above (which works at the
+  // product/variant level). The handler is declared further down,
+  // after loadStores is defined.
+  const [findingMissingStoreId, setFindingMissingStoreId] = useState<string | null>(null);
+  const [reconcileResult, setReconcileResult] = useState<ReconcileResult | null>(null);
+
   const loadStores = useCallback(async () => {
     try {
       const data = await integrationsApi.listStores();
@@ -57,6 +69,31 @@ export function YoucanTab() {
   useEffect(() => {
     loadStores();
   }, [loadStores]);
+
+  const handleFindMissing = useCallback(
+    async (storeId: string) => {
+      setFindingMissingStoreId(storeId);
+      try {
+        const result = await integrationsApi.reconcileOrders(storeId, 24);
+        setReconcileResult(result);
+        if (result.imported > 0) {
+          // Refresh store list so the orders count chip updates.
+          loadStores();
+        }
+      } catch (e: unknown) {
+        const msg =
+          (e as { response?: { data?: { error?: { message?: string } } } })?.response?.data
+            ?.error?.message ?? (e as { message?: string })?.message ?? null;
+        pushToast({
+          kind: 'error',
+          title: msg ?? t('integrations.youcan.findMissingFailed'),
+        });
+      } finally {
+        setFindingMissingStoreId(null);
+      }
+    },
+    [loadStores, pushToast, t],
+  );
 
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
@@ -284,6 +321,8 @@ export function YoucanTab() {
               onImportOrders={() => setImportOrdersStoreId(store.id)}
               onReconcile={() => handleReconcile(store.id)}
               reconciling={reconcilingStoreId === store.id}
+              onFindMissing={() => handleFindMissing(store.id)}
+              findingMissing={findingMissingStoreId === store.id}
             />
           ))}
         </div>
@@ -313,6 +352,11 @@ export function YoucanTab() {
         open={!!wizardStore}
         onClose={() => setWizardStore(null)}
         onFinished={loadStores}
+      />
+      <ReconcileOrdersModal
+        result={reconcileResult}
+        open={!!reconcileResult}
+        onClose={() => setReconcileResult(null)}
       />
     </>
   );

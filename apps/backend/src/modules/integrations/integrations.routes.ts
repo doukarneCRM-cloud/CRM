@@ -120,6 +120,24 @@ export async function integrationsRoutes(app: FastifyInstance) {
     return reply.send(result);
   });
 
+  // On-demand reconciliation — pulls the last N hours of orders from
+  // YouCan, compares against the CRM by youcanOrderId, attempts import
+  // for anything missing, and returns a per-order outcome list. Use
+  // this when an admin notices a gap (orders visible on YouCan but not
+  // in the CRM) — answers "what's missing today" and "why" in one
+  // round-trip without touching the periodic poller's lastSyncAt.
+  app.post(
+    '/stores/:id/reconcile',
+    { preHandler: [verifyJWT, requirePermission('integrations:manage')] },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      const q = req.query as Record<string, string | undefined>;
+      const windowHours = q.hours ? Math.max(1, Math.min(168, Number(q.hours))) : 24;
+      const result = await svc.reconcileMissingOrders(id, windowHours);
+      return reply.send(result);
+    },
+  );
+
   // One-shot repair: re-fetch every imported YouCan order and patch its
   // Order.createdAt to the original placement timestamp from YouCan. Needed
   // because older imports defaulted to `now()` and the CRM list ended up
