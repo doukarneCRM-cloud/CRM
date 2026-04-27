@@ -149,39 +149,57 @@ export interface DeliveryTabPayload {
   trend: DeliveryTrendPoint[];
 }
 
+// Verified-return statuses — matches kpiCalculator.RETURNED_STATUSES so the
+// Dashboard's "returned" count and the Analytics Delivery card report the
+// same number. Pending returns ('returned' carrier flag, 'attempted',
+// 'lost') are excluded by design until a human verifies the parcel; they
+// surface on the Returns page's dedicated "Pending" tab.
+const VERIFIED_RETURN_STATUSES = ['return_validated', 'return_refused'] as const;
+
 async function computeDeliveryCore(filters: OrderFilterParams) {
   const where = buildOrderWhereClause(filters);
 
-  const [shipped, delivered, returned, inTransit, revenueAgg, deliveredSample] = await Promise.all([
-    prisma.order.count({ where: { ...where, labelSent: true } }),
-    prisma.order.count({ where: { ...where, shippingStatus: 'delivered' } }),
-    prisma.order.count({
-      where: { ...where, shippingStatus: { in: ['returned', 'return_validated'] } },
-    }),
-    prisma.order.count({
-      where: {
-        ...where,
-        shippingStatus: { in: ['picked_up', 'in_transit', 'out_for_delivery'] },
-      },
-    }),
-    prisma.order.aggregate({
-      where: { ...where, shippingStatus: 'delivered' },
-      _sum: { total: true },
-    }),
-    prisma.order.findMany({
-      where: {
-        ...where,
-        shippingStatus: 'delivered',
-        labelSentAt: { not: null },
-        deliveredAt: { not: null },
-      },
-      select: { labelSentAt: true, deliveredAt: true },
-      take: 5000,
-    }),
-  ]);
+  const [shipped, confirmed, delivered, returned, inTransit, revenueAgg, deliveredSample] =
+    await Promise.all([
+      prisma.order.count({ where: { ...where, labelSent: true } }),
+      // Confirmed = denominator for deliveryRate, matching kpiCalculator's
+      // canonical formula (delivered / confirmed).
+      prisma.order.count({ where: { ...where, confirmationStatus: 'confirmed' } }),
+      prisma.order.count({ where: { ...where, shippingStatus: 'delivered' } }),
+      prisma.order.count({
+        where: { ...where, shippingStatus: { in: [...VERIFIED_RETURN_STATUSES] } },
+      }),
+      prisma.order.count({
+        where: {
+          ...where,
+          shippingStatus: { in: ['picked_up', 'in_transit', 'out_for_delivery'] },
+        },
+      }),
+      prisma.order.aggregate({
+        where: { ...where, shippingStatus: 'delivered' },
+        _sum: { total: true },
+      }),
+      prisma.order.findMany({
+        where: {
+          ...where,
+          shippingStatus: 'delivered',
+          labelSentAt: { not: null },
+          deliveredAt: { not: null },
+        },
+        select: { labelSentAt: true, deliveredAt: true },
+        take: 5000,
+      }),
+    ]);
 
-  const deliveryRate = safeRate(delivered, delivered + returned);
-  const returnRate = safeRate(returned, delivered + returned);
+  // Rates aligned with kpiCalculator.computeKPIs:
+  //   deliveryRate = delivered / confirmed         ("of orders we said yes to,
+  //                                                  how many got delivered")
+  //   returnRate   = returned  / shipped           ("of orders we sent out,
+  //                                                  how many came back")
+  // The Returns page's tab can still expose its own pending-aware rate.
+  const deliveryRate = safeRate(delivered, confirmed);
+  const returnDenom = shipped > 0 ? shipped : delivered + returned;
+  const returnRate = safeRate(returned, returnDenom);
   const revenue = revenueAgg._sum.total ?? 0;
 
   let avgDeliveryDays = 0;
