@@ -147,9 +147,24 @@ export async function getCustomerHistory(id: string, query: HistoryQueryInput) {
         agent: { select: { id: true, name: true } },
         items: {
           select: {
+            id: true,
             quantity: true,
+            unitPrice: true,
             total: true,
-            variant: { select: { product: { select: { name: true } } } },
+            // Customer-history modal renders a [COLOR] [SIZE] pill row
+            // next to the product name. Without these fields the frontend
+            // received `undefined` for color/size and the pills silently
+            // disappeared. id+sku are picked up here too so the response
+            // shape matches what the OrderItem type promises elsewhere.
+            variant: {
+              select: {
+                id: true,
+                color: true,
+                size: true,
+                sku: true,
+                product: { select: { id: true, name: true, imageUrl: true } },
+              },
+            },
           },
         },
       },
