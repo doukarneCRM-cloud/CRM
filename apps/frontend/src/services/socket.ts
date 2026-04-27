@@ -154,3 +154,18 @@ export function disconnectSocket() {
   socket?.disconnect();
   socket = null;
 }
+
+// Force the socket to drop its current connection and reopen with the latest
+// access token from the auth store. Call this immediately after the token is
+// refreshed by the axios interceptor — io() captures `auth.token` at
+// construct time, so reconnect attempts otherwise replay the OLD token, get
+// rejected by the JWT handshake, and the user silently goes presence-offline
+// even though their REST traffic is happily using the new token.
+export function reauthSocket() {
+  if (!useAuthStore.getState().isAuthenticated) return;
+  if (socket) {
+    socket.disconnect();
+    socket = null;
+  }
+  connectSocket();
+}

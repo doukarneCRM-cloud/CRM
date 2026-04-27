@@ -1,5 +1,6 @@
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '@/store/authStore';
+import { reauthSocket } from '@/services/socket';
 import type { RefreshResponse } from '@/types/auth';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
@@ -74,6 +75,10 @@ api.interceptors.response.use(
       setAccessToken(data.accessToken);
       setRefreshToken(data.refreshToken);
       onTokenRefreshed(data.accessToken);
+      // Socket.IO captures auth.token at construct time, so without this the
+      // old (now-rejected) token would keep being replayed on every reconnect
+      // attempt — silently knocking the user presence-offline.
+      reauthSocket();
 
       originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
       return api(originalRequest);
