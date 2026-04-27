@@ -5,10 +5,10 @@ import { GlobalFilterBar, type FilterChipConfig } from '@/components/ui/GlobalFi
 import { FbDateRangePicker } from '@/components/ui/FbDateRangePicker';
 import {
   CONFIRMATION_STATUS_OPTIONS,
-  SHIPPING_STATUS_OPTIONS,
   SOURCE_OPTIONS,
 } from '@/constants/statusColors';
 import { supportApi } from '@/services/ordersApi';
+import { coliixApi } from '@/services/providersApi';
 import type { AgentOption } from '@/types/orders';
 import { useFilterStore } from '@/store/filterStore';
 import { useDashboard } from './hooks/useDashboard';
@@ -59,9 +59,11 @@ export default function DashboardPage() {
   const prevPreset = useMemo(() => previousPeriod(dateRange), [dateRange]);
 
   const [agents, setAgents] = useState<AgentOption[]>([]);
+  const [coliixStates, setColiixStates] = useState<Array<{ value: string; count: number }>>([]);
   useEffect(() => {
     let cancelled = false;
     supportApi.agents().then((r) => { if (!cancelled) setAgents(r); }).catch(() => {});
+    coliixApi.states().then((r) => { if (!cancelled) setColiixStates(r); }).catch(() => {});
     return () => { cancelled = true; };
   }, []);
 
@@ -72,10 +74,17 @@ export default function DashboardPage() {
         label: t('dashboard.filterConfirmation'),
         options: CONFIRMATION_STATUS_OPTIONS,
       },
+      // Shipping chip — driven by Coliix's literal status wordings
+      // (Ramassé, Livré, Attente De Ramassage, …) so the dropdown matches
+      // what Coliix actually reports. Stays in sync with the same chip on
+      // the Orders page; one filter, one logic, everywhere.
       {
-        key: 'shippingStatuses',
+        key: 'coliixRawStates',
         label: t('dashboard.filterShipping'),
-        options: SHIPPING_STATUS_OPTIONS,
+        options: coliixStates.map((s) => ({
+          value: s.value,
+          label: `${s.value} (${s.count})`,
+        })),
       },
       {
         key: 'sources',
@@ -92,7 +101,7 @@ export default function DashboardPage() {
         options: agents.map((a) => ({ value: a.id, label: a.name })),
       },
     ];
-  }, [agents, t]);
+  }, [agents, coliixStates, t]);
 
   return (
     <div className="flex flex-col gap-3">

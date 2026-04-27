@@ -80,6 +80,7 @@ export interface DashboardFilters {
   cities?: string;
   confirmationStatuses?: string;
   shippingStatuses?: string;
+  coliixRawStates?: string;
   sources?: string;
   dateFrom?: string;
   dateTo?: string;

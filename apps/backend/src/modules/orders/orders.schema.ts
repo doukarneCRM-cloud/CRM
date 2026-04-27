@@ -101,6 +101,10 @@ export const OrderQuerySchema = z.object({
   cities: z.string().optional(),
   confirmationStatuses: z.string().optional(),
   shippingStatuses: z.string().optional(),
+  // Comma-separated Coliix literal status wordings (e.g. "Ramassé,Livré").
+  // Drives the shipping chip on the Orders page now that the dropdown
+  // reflects Coliix's actual reports instead of our internal enum.
+  coliixRawStates: z.string().optional(),
   sources: z.string().optional(),
   dateFrom: z.string().optional(),
   dateTo: z.string().optional(),

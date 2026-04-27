@@ -7,6 +7,7 @@ export interface AnalyticsFilters {
   cities?: string;
   confirmationStatuses?: string;
   shippingStatuses?: string;
+  coliixRawStates?: string;
   sources?: string;
   dateFrom?: string;
   dateTo?: string;

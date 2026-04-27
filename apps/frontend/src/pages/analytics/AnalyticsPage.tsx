@@ -4,10 +4,10 @@ import { useTranslation } from 'react-i18next';
 import { GlobalFilterBar, type FilterChipConfig } from '@/components/ui/GlobalFilterBar';
 import {
   CONFIRMATION_STATUS_OPTIONS,
-  SHIPPING_STATUS_OPTIONS,
   SOURCE_OPTIONS,
 } from '@/constants/statusColors';
 import { supportApi } from '@/services/ordersApi';
+import { coliixApi } from '@/services/providersApi';
 import type { AgentOption } from '@/types/orders';
 import { cn } from '@/lib/cn';
 import { DeliveryTab } from './tabs/DeliveryTab';
@@ -47,16 +47,28 @@ export default function AnalyticsPage() {
   const activeMeta = TABS.find((tab) => tab.id === active)!;
 
   const [agents, setAgents] = useState<AgentOption[]>([]);
+  const [coliixStates, setColiixStates] = useState<Array<{ value: string; count: number }>>([]);
   useEffect(() => {
     let cancelled = false;
     supportApi.agents().then((r) => { if (!cancelled) setAgents(r); }).catch(() => {});
+    coliixApi.states().then((r) => { if (!cancelled) setColiixStates(r); }).catch(() => {});
     return () => { cancelled = true; };
   }, []);
 
   const filterConfigs = useMemo<FilterChipConfig[]>(() => {
     const staticConfigs: FilterChipConfig[] = [
       { key: 'confirmationStatuses', label: t('analytics.filters.confirmation'), options: CONFIRMATION_STATUS_OPTIONS },
-      { key: 'shippingStatuses', label: t('analytics.filters.shipping'), options: SHIPPING_STATUS_OPTIONS },
+      // Shipping chip — same Coliix-driven dropdown as Orders + Dashboard
+      // so a single selection on the global filter bar narrows every page
+      // by the same Coliix wording.
+      {
+        key: 'coliixRawStates',
+        label: t('analytics.filters.shipping'),
+        options: coliixStates.map((s) => ({
+          value: s.value,
+          label: `${s.value} (${s.count})`,
+        })),
+      },
       { key: 'sources', label: t('analytics.filters.source'), options: SOURCE_OPTIONS },
     ];
     if (agents.length === 0) return staticConfigs;
@@ -68,7 +80,7 @@ export default function AnalyticsPage() {
         options: agents.map((a) => ({ value: a.id, label: a.name })),
       },
     ];
-  }, [agents, t]);
+  }, [agents, coliixStates, t]);
 
   return (
     <div className="flex flex-col gap-4 p-4">

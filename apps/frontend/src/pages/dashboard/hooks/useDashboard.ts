@@ -34,6 +34,9 @@ export function useDashboard(options: UseDashboardOptions = {}): UseDashboardRet
         shippingStatuses: filters.shippingStatuses.length
           ? filters.shippingStatuses.join(',')
           : undefined,
+        coliixRawStates: filters.coliixRawStates.length
+          ? filters.coliixRawStates.join(',')
+          : undefined,
         sources: filters.sources.length ? filters.sources.join(',') : undefined,
         dateFrom: filters.dateRange.from ?? undefined,
         dateTo: filters.dateRange.to ?? undefined,
@@ -52,6 +55,7 @@ export function useDashboard(options: UseDashboardOptions = {}): UseDashboardRet
     filters.productIds,
     filters.confirmationStatuses,
     filters.shippingStatuses,
+    filters.coliixRawStates,
     filters.sources,
     filters.dateRange.from,
     filters.dateRange.to,

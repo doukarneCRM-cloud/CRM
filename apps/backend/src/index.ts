@@ -349,6 +349,7 @@ app.get('/api/v1/kpi/dashboard', { preHandler: [verifyJWT] }, async (request, re
     cities: q.cities,
     confirmationStatuses: q.confirmationStatuses,
     shippingStatuses: q.shippingStatuses,
+    coliixRawStates: q.coliixRawStates,
     sources: q.sources,
     dateFrom: q.dateFrom,
     dateTo: q.dateTo,
