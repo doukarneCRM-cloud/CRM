@@ -620,7 +620,14 @@ export async function computeConfirmationTab(
 ): Promise<ConfirmationTabPayload> {
   const where = buildOrderWhereClause(filters);
 
-  const [current, previous, pipelineGroups, agentGroups, productRows, cityRows, trendRows] =
+  // Compute trend window early so the OrderLog query can be filtered at the
+  // DB level instead of pulling every confirmation log ever written.
+  const trendFrom = filters.dateFrom
+    ? new Date(filters.dateFrom)
+    : new Date(Date.now() - 30 * 86_400_000);
+  const trendTo = filters.dateTo ? new Date(filters.dateTo) : new Date();
+
+  const [current, previous, pipelineGroups, agentGroups, productRows, cityRows, trendLogs] =
     await Promise.all([
       computeConfirmationCore(filters),
       computeConfirmationCore(mirrorRange(filters)),
@@ -652,9 +659,23 @@ export async function computeConfirmationTab(
         where,
         select: { confirmationStatus: true, customer: { select: { city: true } } },
       }),
-      prisma.order.findMany({
-        where: { ...where, confirmationStatus: { in: ['confirmed', 'cancelled'] } },
-        select: { confirmationStatus: true, updatedAt: true, createdAt: true },
+      // Pull every confirmation transition (the OrderLog rows that
+      // updateOrderStatus writes) within the trend window. Bucketing these by
+      // log.createdAt — the real time of the status change — replaces the
+      // old Order.updatedAt bucketing which was wrong: any later edit
+      // (Coliix label sent, address fixed, unreachable counter bumped) would
+      // shove the order into "today" and leave previous days flat.
+      prisma.orderLog.findMany({
+        where: {
+          type: 'confirmation',
+          createdAt: { gte: trendFrom, lte: trendTo },
+          OR: [
+            { action: { contains: 'Confirmation → confirmed' } },
+            { action: { contains: 'Confirmation → cancelled' } },
+          ],
+          order: where,
+        },
+        select: { action: true, createdAt: true },
       }),
     ]);
 
@@ -794,18 +815,20 @@ export async function computeConfirmationTab(
     .slice(0, 12);
 
   // ── Trend ──────────────────────────────────────────────────────────────
-  const from = filters.dateFrom ? new Date(filters.dateFrom) : new Date(Date.now() - 30 * 86_400_000);
-  const to = filters.dateTo ? new Date(filters.dateTo) : new Date();
+  // Bucket every confirmation transition by when it was actually logged.
+  // Counts each transition independently — if the same order is confirmed
+  // and later cancelled, both days are credited, which is what an admin
+  // wants to see when inspecting daily call-center activity.
   const trendBucket = new Map<string, { confirmed: number; cancelled: number }>();
-  for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+  for (let d = new Date(trendFrom); d <= trendTo; d.setDate(d.getDate() + 1)) {
     trendBucket.set(dayKey(d), { confirmed: 0, cancelled: 0 });
   }
-  for (const row of trendRows) {
-    const key = dayKey(row.updatedAt);
+  for (const log of trendLogs) {
+    const key = dayKey(log.createdAt);
     const b = trendBucket.get(key);
     if (!b) continue;
-    if (row.confirmationStatus === 'confirmed') b.confirmed += 1;
-    else b.cancelled += 1;
+    if (log.action.includes('Confirmation → confirmed')) b.confirmed += 1;
+    else if (log.action.includes('Confirmation → cancelled')) b.cancelled += 1;
   }
   const trend = Array.from(trendBucket.entries())
     .map(([date, v]) => ({ date, confirmed: v.confirmed, cancelled: v.cancelled }))
