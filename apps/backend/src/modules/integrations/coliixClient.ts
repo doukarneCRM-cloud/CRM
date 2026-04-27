@@ -56,6 +56,12 @@ export interface ColiixTrackResult {
   raw: unknown;
 }
 
+// Per-call cap. Without this a single slow Coliix response stalls the whole
+// sequential refresh sweep (refreshAllInFlight loops orders one by one), and
+// the user-facing Sync button times out client-side before any results come
+// back. 8 seconds is generous for Coliix's typical ~300–800ms responses.
+const PER_CALL_TIMEOUT_MS = 8_000;
+
 async function postForm(params: Record<string, string | number>): Promise<unknown> {
   const provider = await getOrCreateProvider('coliix');
   const apiKey = await getDecryptedApiKey('coliix');
@@ -66,14 +72,28 @@ async function postForm(params: Record<string, string | number>): Promise<unknow
     body.set(k, String(v));
   }
 
-  const res = await fetch(`${provider.apiBaseUrl}${API_PATH}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Accept: 'application/json',
-    },
-    body,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), PER_CALL_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(`${provider.apiBaseUrl}${API_PATH}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
+      },
+      body,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new ColiixError(`Coliix request timed out after ${PER_CALL_TIMEOUT_MS}ms`, 0, null);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   let payload: unknown = null;
   try {

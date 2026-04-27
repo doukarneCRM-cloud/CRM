@@ -88,6 +88,15 @@ export const coliixApi = {
 
   // Force a fresh tracking pull for every in-flight order. Useful when
   // webhooks have been silent or to verify the state-mapping rules.
+  // Override the default 15s axios timeout — the backend polls Coliix
+  // sequentially, so a few dozen in-flight orders × ~1s round-trip easily
+  // outruns the global timeout. 3 minutes lets a ~150-order sweep finish.
   refreshAll: () =>
-    api.post<RefreshAllResult>('/integrations/coliix/refresh-all').then((r) => r.data),
+    api
+      .post<RefreshAllResult>(
+        '/integrations/coliix/refresh-all',
+        undefined,
+        { timeout: 180_000 },
+      )
+      .then((r) => r.data),
 };
