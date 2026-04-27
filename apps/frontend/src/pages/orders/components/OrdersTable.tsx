@@ -473,10 +473,23 @@ export function OrdersTable({
                 </span>
               )}
             </div>
-            {/* Shipping (bottom) */}
+            {/* Shipping (bottom) — prefer Coliix's literal wording when it
+                has reported one, fall back to the mapped enum label for
+                orders that haven't gone through Coliix yet (e.g. brand new
+                pending orders that have never been pushed). */}
             <div className="flex items-center gap-1">
               <span className="w-[14px] shrink-0 text-[9px] font-bold uppercase text-gray-300">S</span>
-              <StatusBadge status={row.original.shippingStatus} size="sm" showDot />
+              {row.original.coliixRawState ? (
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-badge bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-700"
+                  title={row.original.coliixRawState}
+                >
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" />
+                  {row.original.coliixRawState}
+                </span>
+              ) : (
+                <StatusBadge status={row.original.shippingStatus} size="sm" showDot />
+              )}
               <button
                 onClick={() => onViewLogs(row.original, 'all')}
                 title={t('orders.viewHistory')}

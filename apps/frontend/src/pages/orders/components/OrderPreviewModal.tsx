@@ -165,7 +165,17 @@ export function OrderPreviewModal({ order, onClose, onEdit }: OrderPreviewModalP
           </div>
           <div className="flex items-center gap-1">
             <span className="text-[9px] font-bold uppercase text-gray-300">S</span>
-            <StatusBadge status={order.shippingStatus} size="sm" showDot />
+            {order.coliixRawState ? (
+              <span
+                className="inline-flex items-center gap-1.5 rounded-badge bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-700"
+                title={order.coliixRawState}
+              >
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" />
+                {order.coliixRawState}
+              </span>
+            ) : (
+              <StatusBadge status={order.shippingStatus} size="sm" showDot />
+            )}
           </div>
         </div>
       </div>

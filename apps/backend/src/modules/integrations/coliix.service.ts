@@ -266,6 +266,7 @@ export async function ingestStatus(input: {
       reference: true,
       confirmationStatus: true,
       shippingStatus: true,
+      coliixRawState: true,
       deliveredAt: true,
     },
   });
@@ -273,14 +274,25 @@ export async function ingestStatus(input: {
     return { matched: false, changed: false, reason: `No order with tracking ${tracking}` };
   }
 
+  const trimmedRaw = input.rawState.trim();
   const mapped = mapColiixState(input.rawState);
+
   if (!mapped) {
-    // Log the unknown state so ops can extend the mapping table.
+    // Persist the raw state on the order even though we couldn't map it to
+    // an enum — the UI prefers the raw text for display, so the new wording
+    // shows up even when our internal classification doesn't keep up.
+    if (trimmedRaw && order.coliixRawState !== trimmedRaw) {
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { coliixRawState: trimmedRaw, lastTrackedAt: new Date() },
+      });
+      emitToRoom('orders:all', 'order:updated', { orderId: order.id });
+    }
     await prisma.orderLog.create({
       data: {
         orderId: order.id,
         type: 'shipping',
-        action: `Coliix unknown state "${input.rawState}" (${input.source}) — ignored`,
+        action: `Coliix raw state → "${input.rawState}" (${input.source}) — no enum mapping, raw text saved`,
         performedBy: 'System',
         meta: {
           provider: 'coliix',
@@ -291,15 +303,18 @@ export async function ingestStatus(input: {
     });
     return {
       matched: true,
-      changed: false,
+      changed: trimmedRaw !== '' && order.coliixRawState !== trimmedRaw,
       orderId: order.id,
       reference: order.reference,
-      reason: `Unknown Coliix state: ${input.rawState}`,
+      reason: `Raw state saved: ${input.rawState}`,
     };
   }
 
-  // Idempotent — webhook may fire twice for the same event.
-  if (order.shippingStatus === mapped) {
+  // Idempotent on the enum AND the raw text — webhook may fire twice for
+  // the same event, but we still refresh coliixRawState if Coliix changes
+  // the wording while keeping the same enum bucket (e.g. "Livré au client"
+  // vs "Livré"). Otherwise old wording would freeze on the order.
+  if (order.shippingStatus === mapped && order.coliixRawState === trimmedRaw) {
     return {
       matched: true,
       changed: false,
@@ -312,6 +327,7 @@ export async function ingestStatus(input: {
 
   const data: Prisma.OrderUpdateInput = {
     shippingStatus: mapped,
+    coliixRawState: input.rawState.trim() || null,
     lastTrackedAt: new Date(),
   };
   if (mapped === 'delivered' && !order.deliveredAt) {

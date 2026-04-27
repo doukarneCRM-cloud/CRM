@@ -77,6 +77,11 @@ export interface Order {
   cancellationReason: string | null;
   callbackAt: string | null;
   coliixTrackingId: string | null;
+  // Literal status string Coliix returned on its most recent webhook /
+  // poller hit. UI prefers this over the enum-based label so admins see
+  // exactly what Coliix is reporting ("Ramassé", "Attente De Ramassage",
+  // …). Null until the first Coliix update lands.
+  coliixRawState: string | null;
   labelSent: boolean;
   isArchived: boolean;
   unreachableCount: number;
