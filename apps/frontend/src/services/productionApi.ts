@@ -151,6 +151,72 @@ export interface RunConsumption {
   material?: { id: string; name: string; unit: string } | null;
 }
 
+export type ProductionStageKey = 'cut' | 'sew' | 'finish' | 'qc' | 'packed';
+export type LaborAllocationMode = 'by_pieces' | 'by_complexity' | 'manual';
+export type ProductionLogTypeKey =
+  | 'system'
+  | 'stage'
+  | 'consumption'
+  | 'labor'
+  | 'note'
+  | 'status';
+
+export interface RunStage {
+  id: string;
+  runId: string;
+  stage: ProductionStageKey;
+  startedAt: string | null;
+  completedAt: string | null;
+  inputPieces: number;
+  outputPieces: number;
+  rejectedPieces: number;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RunLog {
+  id: string;
+  runId: string;
+  type: ProductionLogTypeKey;
+  action: string;
+  performedBy: string | null;
+  performedById: string | null;
+  meta: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface ProductionWeekSummary {
+  id: string;
+  weekStart: string;
+  closed: boolean;
+  closedAt: string | null;
+  laborTotal: number;
+  runCount: number;
+  totalPieces: number;
+}
+
+export interface ProductionWeekProjection {
+  weekId: string;
+  weekStart: string;
+  closed: boolean;
+  closedAt: string | null;
+  laborTotal: number;
+  manualValid: boolean;
+  manualSum: number;
+  runs: Array<{
+    runId: string;
+    reference: string;
+    status: RunStatus;
+    sampleName: string | null;
+    actualPieces: number;
+    expectedPieces: number;
+    mode: LaborAllocationMode;
+    share: number;
+    currentLaborCost: number;
+  }>;
+}
+
 export interface ProductionRun {
   id: string;
   reference: string;
@@ -165,6 +231,9 @@ export interface ProductionRun {
   laborCost: number;
   totalCost: number;
   costPerPiece: number;
+  weekId: string | null;
+  laborAllocation: LaborAllocationMode;
+  laborManualShare: number | null;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -307,4 +376,59 @@ export const productionApi = {
 
   costBreakdown: (id: string) =>
     api.get<CostBreakdown>(`/atelie/runs/${id}/cost-breakdown`).then((r) => r.data),
+
+  // ── Stages ────────────────────────────────────────────────────────────
+  listStages: (id: string) =>
+    api
+      .get<{ data: RunStage[]; order: ProductionStageKey[] }>(`/atelie/runs/${id}/stages`)
+      .then((r) => r.data),
+
+  advanceStage: (
+    id: string,
+    stage: ProductionStageKey,
+    payload: {
+      inputPieces?: number;
+      outputPieces?: number;
+      rejectedPieces?: number;
+      notes?: string | null;
+      complete?: boolean;
+    },
+  ) =>
+    api
+      .patch<{ data: RunStage[] }>(`/atelie/runs/${id}/stages/${stage}`, payload)
+      .then((r) => r.data.data),
+
+  // ── Logs ──────────────────────────────────────────────────────────────
+  listLogs: (id: string, opts: { page?: number; pageSize?: number } = {}) =>
+    api
+      .get<{
+        data: RunLog[];
+        pagination: { page: number; pageSize: number; total: number; totalPages: number };
+      }>(`/atelie/runs/${id}/logs`, { params: opts })
+      .then((r) => r.data),
+
+  // ── Labor allocation mode ─────────────────────────────────────────────
+  setLaborAllocation: (
+    id: string,
+    payload: { laborAllocation: LaborAllocationMode; laborManualShare?: number | null },
+  ) =>
+    api
+      .patch<ProductionRun>(`/atelie/runs/${id}/labor-allocation`, payload)
+      .then((r) => r.data),
+
+  // ── Weeks ─────────────────────────────────────────────────────────────
+  listWeeks: () =>
+    api
+      .get<{ data: ProductionWeekSummary[] }>('/atelie/weeks/')
+      .then((r) => r.data.data),
+
+  getWeek: (weekStart: string) =>
+    api
+      .get<ProductionWeekProjection>(`/atelie/weeks/${weekStart}`)
+      .then((r) => r.data),
+
+  closeWeek: (weekStart: string) =>
+    api
+      .post<ProductionWeekProjection>(`/atelie/weeks/${weekStart}/close`)
+      .then((r) => r.data),
 };

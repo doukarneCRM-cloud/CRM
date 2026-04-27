@@ -562,6 +562,29 @@ enum ConsumptionSourceType {
   accessory
 }
 
+enum ProductionStage {
+  cut
+  sew
+  finish
+  qc
+  packed
+}
+
+enum ProductionLogType {
+  system
+  stage
+  consumption
+  labor
+  note
+  status
+}
+
+enum LaborAllocationMode {
+  by_pieces
+  by_complexity
+  manual
+}
+
 model FabricType {
   id        String   @id @default(cuid())
   name      String   @unique
@@ -715,11 +738,21 @@ model ProductionRun {
   totalCost      Decimal             @default(0) @db.Decimal(12, 2)
   costPerPiece   Decimal             @default(0) @db.Decimal(12, 2)
   notes          String?
+  // Cost-split context. When the run touches a week with peer runs, the
+  // workshop's labor cost is divided between them per `laborAllocation`.
+  // `manual` requires `laborManualShare` (0..100). Computed snapshot
+  // stored on the run when the week closes.
+  weekId           String?
+  laborAllocation  LaborAllocationMode @default(by_pieces)
+  laborManualShare Decimal?            @db.Decimal(5, 2)
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 
   test         ProductTest?            @relation(fields: [testId], references: [id])
   product      Product?                @relation(fields: [productId], references: [id])
+  week         ProductionWeek?         @relation(fields: [weekId], references: [id])
+  stages       ProductionRunStage[]
+  logs         ProductionLog[]
   fabrics      ProductionRunFabric[]
   sizes        ProductionRunSize[]
   consumptions ProductionConsumption[]
@@ -785,6 +818,66 @@ model ProductionRunWorker {
   employee AtelieEmployee @relation(fields: [employeeId], references: [id])
 
   @@unique([runId, employeeId])
+}
+
+// Per-stage progress on a run. Stages are fixed: cut → sew → finish → qc
+// → packed (matches the typical workshop flow). One row per (run, stage)
+// is created lazily as the run advances. `output - rejected` carried into
+// the next stage's `input` lets the timeline show wastage at each step.
+model ProductionRunStage {
+  id             String          @id @default(cuid())
+  runId          String
+  stage          ProductionStage
+  startedAt      DateTime?
+  completedAt    DateTime?
+  inputPieces    Int             @default(0)
+  outputPieces   Int             @default(0)
+  rejectedPieces Int             @default(0)
+  notes          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  run ProductionRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, stage])
+  @@index([runId, stage])
+}
+
+// Audit trail for every meaningful action on a run. Mirrors OrderLog —
+// stage transitions, consumption events, labor splits, and free-form
+// notes all land here so supervisors can reconstruct the run after the
+// fact without diffing snapshots.
+model ProductionLog {
+  id            String            @id @default(cuid())
+  runId         String
+  type          ProductionLogType
+  action        String
+  performedBy   String?
+  performedById String?
+  meta          Json?
+  createdAt     DateTime          @default(now())
+
+  run ProductionRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId, createdAt])
+}
+
+// Calendar week that groups runs sharing workshop attendance. Created
+// lazily when a run's startDate falls in a new week (Monday 00:00 UTC).
+// `laborTotal` is recomputed from WeeklyAttendance × employee daily rate
+// at close-time; `closed` locks the split so payroll doesn't drift.
+model ProductionWeek {
+  id         String    @id @default(cuid())
+  weekStart  DateTime  @unique
+  laborTotal Decimal   @default(0) @db.Decimal(12, 2)
+  closed     Boolean   @default(false)
+  closedAt   DateTime?
+  closedById String?
+  notes      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  runs ProductionRun[]
 }
 
 // ─── Atelie — Team Tasks ──────────────────────────────────────────────────────

@@ -51,6 +51,8 @@ export const ROUTES = {
   PRODUCTION_TEST_DETAIL: '/production/tests/:id',
   PRODUCTION_RUNS: '/production/runs',
   PRODUCTION_RUN_DETAIL: '/production/runs/:id',
+  PRODUCTION_WEEKS: '/production/weeks',
+  PRODUCTION_WEEK_DETAIL: '/production/weeks/:weekStart',
 
   // Automation
   AUTOMATION: '/automation',

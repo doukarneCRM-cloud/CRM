@@ -10,6 +10,8 @@
 
 import { prisma } from '../../shared/prisma';
 import { computeRunCost } from './costCalc';
+import { ensureWeek } from './weeks.service';
+import { logProduction } from './productionLog';
 import type {
   CreateRunInput,
   UpdateRunInput,
@@ -71,24 +73,32 @@ export async function createRun(input: CreateRunInput) {
 
   const expectedPieces = (input.sizes ?? []).reduce((s, x) => s + x.expectedPieces, 0);
 
-  return prisma.$transaction(async (tx) => {
-    const run = await tx.productionRun.create({
+  // Pin the run to a ProductionWeek so the week-close cost split has a
+  // membership query. We do this OUTSIDE the transaction because
+  // ensureWeek's upsert on a separate connection would deadlock against
+  // a long-running tx — and it's idempotent so a retry is harmless.
+  const startDate = new Date(input.startDate);
+  const week = await ensureWeek(startDate);
+
+  const run = await prisma.$transaction(async (tx) => {
+    const created = await tx.productionRun.create({
       data: {
         reference,
         testId: input.testId ?? null,
         productId: input.productId ?? null,
         status: 'draft',
-        startDate: new Date(input.startDate),
+        startDate,
         endDate: input.endDate ? new Date(input.endDate) : null,
         notes: input.notes?.trim() || null,
         expectedPieces,
+        weekId: week.id,
       },
     });
 
     if (input.fabrics?.length) {
       await tx.productionRunFabric.createMany({
         data: input.fabrics.map((f) => ({
-          runId: run.id,
+          runId: created.id,
           fabricTypeId: f.fabricTypeId,
           role: f.role.trim(),
         })),
@@ -97,7 +107,7 @@ export async function createRun(input: CreateRunInput) {
     if (input.sizes?.length) {
       await tx.productionRunSize.createMany({
         data: input.sizes.map((s) => ({
-          runId: run.id,
+          runId: created.id,
           size: s.size.trim(),
           tracingMeters: s.tracingMeters,
           expectedPieces: s.expectedPieces,
@@ -109,14 +119,27 @@ export async function createRun(input: CreateRunInput) {
     if (input.workerIds?.length) {
       await tx.productionRunWorker.createMany({
         data: input.workerIds.map((employeeId) => ({
-          runId: run.id,
+          runId: created.id,
           employeeId,
         })),
       });
     }
 
-    return tx.productionRun.findUnique({ where: { id: run.id }, include: RUN_INCLUDE });
+    return tx.productionRun.findUnique({ where: { id: created.id }, include: RUN_INCLUDE });
   });
+
+  // Audit-log run creation outside the transaction. Failure here is
+  // non-blocking — the run exists, the log is best effort.
+  if (run) {
+    void logProduction({
+      runId: run.id,
+      type: 'system',
+      action: `Run ${run.reference} created (week starting ${week.weekStart.toISOString().slice(0, 10)})`,
+      meta: { weekId: week.id, weekStart: week.weekStart },
+    }).catch(() => undefined);
+  }
+
+  return run;
 }
 
 export async function updateRun(id: string, input: UpdateRunInput) {
@@ -290,6 +313,17 @@ export async function finishRun(runId: string) {
     },
   });
   const breakdown = await computeRunCost(runId);
+
+  void logProduction({
+    runId,
+    type: 'status',
+    action: `Run finished — materials ${breakdown.materialsCost.toFixed(2)} MAD, ${breakdown.actualPieces} pieces (labor pending week close)`,
+    meta: {
+      materialsCost: breakdown.materialsCost,
+      actualPieces: breakdown.actualPieces,
+    },
+  }).catch(() => undefined);
+
   return { ...(await getRun(runId)), breakdown };
 }
 

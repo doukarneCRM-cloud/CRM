@@ -37,6 +37,7 @@ import { fabricRoutes } from './modules/atelieStock/fabric.routes';
 import { atelieTasksRoutes } from './modules/atelieTasks/atelieTasks.routes';
 import { atelieTestsRoutes } from './modules/atelieTests/atelieTests.routes';
 import { atelieProductionRoutes } from './modules/atelieProduction/atelieProduction.routes';
+import { atelieWeeksRoutes } from './modules/atelieProduction/weeks.routes';
 import { analyticsRoutes } from './modules/analytics/analytics.routes';
 import { moneyRoutes } from './modules/money/money.routes';
 import { returnsRoutes } from './modules/returns/returns.routes';
@@ -404,6 +405,7 @@ app.register(atelieTasksRoutes, { prefix: '/api/v1/atelie/tasks' });
 // Atelie — Product tests (prototypes) & Production runs (Phase 14.E).
 app.register(atelieTestsRoutes, { prefix: '/api/v1/atelie/tests' });
 app.register(atelieProductionRoutes, { prefix: '/api/v1/atelie/runs' });
+app.register(atelieWeeksRoutes, { prefix: '/api/v1/atelie/weeks' });
 
 // Analytics — KPIs/charts/reports for delivery, confirmation, profit.
 app.register(analyticsRoutes, { prefix: '/api/v1/analytics' });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, Plus, UserPlus, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -10,7 +10,12 @@ import {
   type ProductionRun,
   type RunStatus,
   type CostBreakdown,
+  type RunStage,
+  type ProductionStageKey,
 } from '@/services/productionApi';
+import { StagesTimeline } from './components/StagesTimeline';
+import { LogsFeed } from './components/LogsFeed';
+import { LaborAllocationCard } from './components/LaborAllocationCard';
 import {
   atelieApi,
   type AtelieEmployee,
@@ -21,7 +26,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useToastStore } from '@/store/toastStore';
 import { apiErrorMessage } from '@/lib/apiError';
 
-type Tab = 'overview' | 'materials' | 'workers' | 'cost' | 'finish';
+type Tab = 'overview' | 'pipeline' | 'materials' | 'workers' | 'cost' | 'finish';
 
 const STATUS_CLASSES: Record<RunStatus, string> = {
   draft: 'bg-gray-100 text-gray-700',
@@ -42,6 +47,28 @@ export default function ProductionRunDetailPage() {
   const [run, setRun] = useState<ProductionRun | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>('overview');
+  const [stages, setStages] = useState<RunStage[]>([]);
+  const [stageOrder, setStageOrder] = useState<ProductionStageKey[]>([
+    'cut', 'sew', 'finish', 'qc', 'packed',
+  ]);
+  // Bumped any time a stage advances or labor allocation changes so the
+  // logs feed refetches and shows the new entry without a manual reload.
+  const [logsRefreshKey, setLogsRefreshKey] = useState(0);
+
+  const loadStages = useCallback(async () => {
+    if (!id) return;
+    try {
+      const r = await productionApi.listStages(id);
+      setStages(r.data);
+      setStageOrder(r.order);
+    } catch {
+      // best effort
+    }
+  }, [id]);
+
+  useEffect(() => {
+    void loadStages();
+  }, [loadStages]);
 
   async function load() {
     if (!id) return;
@@ -62,6 +89,7 @@ export default function ProductionRunDetailPage() {
   const tabs = useMemo<Array<{ id: Tab; label: string }>>(
     () => [
       { id: 'overview', label: t('production.runDetail.tabs.overview') },
+      { id: 'pipeline', label: t('production.runDetail.tabs.pipeline') },
       { id: 'materials', label: t('production.runDetail.tabs.materials') },
       { id: 'workers', label: t('production.runDetail.tabs.workers') },
       ...(canViewCost
@@ -242,13 +270,43 @@ export default function ProductionRunDetailPage() {
       {tab === 'overview' && (
         <OverviewTab run={run} locked={locked} onUpdateActual={updateActual} />
       )}
+      {tab === 'pipeline' && (
+        <div className="flex flex-col gap-4">
+          <StagesTimeline
+            runId={run.id}
+            stages={stages}
+            order={stageOrder}
+            canManage={canManage && !locked}
+            onAdvanced={(next) => {
+              setStages(next);
+              setLogsRefreshKey((k) => k + 1);
+              void load();
+            }}
+          />
+          <LogsFeed runId={run.id} refreshKey={logsRefreshKey} />
+        </div>
+      )}
       {tab === 'materials' && (
         <MaterialsTab run={run} locked={locked} canManage={canManage} onChanged={load} />
       )}
       {tab === 'workers' && (
         <WorkersTab run={run} locked={locked} canManage={canManage} onChanged={load} />
       )}
-      {tab === 'cost' && canViewCost && <CostTab runId={run.id} />}
+      {tab === 'cost' && canViewCost && (
+        <div className="flex flex-col gap-4">
+          <LaborAllocationCard
+            runId={run.id}
+            initialMode={run.laborAllocation}
+            initialManualShare={run.laborManualShare}
+            canManage={canManage}
+            onSaved={(mode, share) => {
+              setRun({ ...run, laborAllocation: mode, laborManualShare: share });
+              setLogsRefreshKey((k) => k + 1);
+            }}
+          />
+          <CostTab runId={run.id} />
+        </div>
+      )}
       {tab === 'finish' && (
         <FinishTab run={run} locked={locked} canFinish={canFinish} onFinish={finish} />
       )}

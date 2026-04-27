@@ -2275,6 +2275,7 @@
       },
       "tabs": {
         "overview": "Aperçu",
+        "pipeline": "Pipeline",
         "materials": "Tissus & accessoires",
         "workers": "Ouvriers",
         "cost": "Détail du coût",
@@ -2365,6 +2366,95 @@
         "estPerPiece": "MAD / pièce (est.)",
         "sizes": "Tailles",
         "created": "Créé"
+      }
+    },
+    "stages": {
+      "title": "Pipeline (coupe → couture → finition → CQ → emballé)",
+      "label": {
+        "cut": "Coupe",
+        "sew": "Couture",
+        "finish": "Finition",
+        "qc": "CQ",
+        "packed": "Emballé"
+      },
+      "complete": "Fait",
+      "inProgress": "En cours",
+      "idle": "Pas démarré",
+      "input": "Entrée",
+      "output": "Sortie",
+      "rejected": "Rejetées",
+      "yield": "Bonnes pièces",
+      "completeBtn": "Marquer terminé",
+      "toast": {
+        "savedTitle": "Étape mise à jour",
+        "errorTitle": "Échec mise à jour",
+        "errorBody": "Le changement a été refusé."
+      }
+    },
+    "logs": {
+      "title": "Journal d'activité",
+      "empty": "Aucune activité.",
+      "system": "Système"
+    },
+    "labor": {
+      "title": "Allocation main-d'œuvre",
+      "subtitle": "Comment la part de main-d'œuvre de la semaine est calculée pour ce run à la clôture.",
+      "sharePercent": "Part %",
+      "mode": {
+        "by_pieces": "Par pièces",
+        "by_complexity": "Par complexité (mètres tissu)",
+        "manual": "Manuel %"
+      },
+      "hint": {
+        "byPieces": "Part = pièces produites cette semaine ÷ total pièces de la semaine.",
+        "byComplexity": "Pondéré par Σ(actualPieces × tracingMeters) — les vêtements lourds reçoivent plus de coût.",
+        "manual": "Vous fixez le pourcentage. Tous les runs manuels doivent totaliser 100% pour clôturer."
+      },
+      "toast": {
+        "savedTitle": "Allocation enregistrée",
+        "errorTitle": "Échec enregistrement",
+        "errorBody": "Réessayez."
+      }
+    },
+    "weeks": {
+      "title": "Semaines de production",
+      "subtitle": "Présence atelier × runs de la semaine → répartition main-d'œuvre par run à la clôture.",
+      "loading": "Chargement…",
+      "empty": "Pas encore de semaines — créez un run et la semaine apparaît.",
+      "notFound": "Semaine introuvable.",
+      "open": "Ouverte",
+      "closed": "Clôturée",
+      "weekOf": "Semaine du {{date}}",
+      "backToList": "Retour aux semaines",
+      "closeBtn": "Clôturer + finaliser la répartition",
+      "closing": "Clôture…",
+      "confirmClose": "Clôturer cette semaine et écrire la part main-d'œuvre de chaque run ? Le coût/pièce sera figé.",
+      "manualInvalid": "Les parts manuelles totalisent {{sum}}%, doit faire 100% pour clôturer.",
+      "runsHeading": "Runs de la semaine",
+      "noRuns": "Aucun run dans cette semaine.",
+      "kpi": {
+        "laborTotal": "Main-d'œuvre totale",
+        "runs": "Runs",
+        "totalShare": "Allouée",
+        "unallocated": "Non allouée"
+      },
+      "col": {
+        "week": "Semaine",
+        "status": "Statut",
+        "runs": "Runs",
+        "pieces": "Pièces",
+        "laborTotal": "M.O. (MAD)",
+        "run": "Run",
+        "sample": "Échantillon",
+        "mode": "Mode",
+        "share": "Part (MAD)",
+        "percent": "%"
+      },
+      "toast": {
+        "closedTitle": "Semaine clôturée",
+        "closedBody": "La part main-d'œuvre de chaque run est figée.",
+        "errorTitle": "Échec clôture",
+        "errorBody": "Voir le message et ajustez avant de réessayer."
       }
     },
     "samples": {

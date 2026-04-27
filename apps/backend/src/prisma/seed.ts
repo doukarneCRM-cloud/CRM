@@ -46,6 +46,7 @@ const ALL_PERMISSIONS = [
   { key: 'production:manage', label: 'Manage Production Runs' },
   { key: 'production:finish', label: 'Finish Production Runs (locks cost)' },
   { key: 'production:cost:view', label: 'View Production Cost Breakdown' },
+  { key: 'production:close_week', label: 'Close Production Week (finalize labor split)' },
   { key: 'call_center:view', label: 'View Call Center' },
   { key: 'money:view', label: 'View Money' },
   { key: 'money:manage', label: 'Manage Money (record payments, mark paid)' },

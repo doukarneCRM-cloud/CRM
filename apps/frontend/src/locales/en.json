@@ -2275,6 +2275,7 @@
       },
       "tabs": {
         "overview": "Overview",
+        "pipeline": "Pipeline",
         "materials": "Fabric & accessories",
         "workers": "Workers",
         "cost": "Cost breakdown",
@@ -2365,6 +2366,95 @@
         "estPerPiece": "Est. MAD / piece",
         "sizes": "Sizes",
         "created": "Created"
+      }
+    },
+    "stages": {
+      "title": "Pipeline (cut → sew → finish → qc → packed)",
+      "label": {
+        "cut": "Cut",
+        "sew": "Sew",
+        "finish": "Finish",
+        "qc": "QC",
+        "packed": "Packed"
+      },
+      "complete": "Done",
+      "inProgress": "In progress",
+      "idle": "Not started",
+      "input": "In",
+      "output": "Out",
+      "rejected": "Rejected",
+      "yield": "Good pieces",
+      "completeBtn": "Mark complete",
+      "toast": {
+        "savedTitle": "Stage updated",
+        "errorTitle": "Could not update stage",
+        "errorBody": "The change was rejected."
+      }
+    },
+    "logs": {
+      "title": "Activity log",
+      "empty": "No activity yet.",
+      "system": "System"
+    },
+    "labor": {
+      "title": "Labor allocation",
+      "subtitle": "How this run's share of the week's workshop labor is computed when the week closes.",
+      "sharePercent": "Share %",
+      "mode": {
+        "by_pieces": "By pieces",
+        "by_complexity": "By complexity (fabric meters)",
+        "manual": "Manual %"
+      },
+      "hint": {
+        "byPieces": "Each run's share = pieces it produced this week ÷ total pieces produced this week.",
+        "byComplexity": "Each run's share is weighted by Σ(actualPieces × tracingMeters), so heavier garments get more labor cost.",
+        "manual": "You set the percent. All manual runs in the week must sum to 100% before the week can close."
+      },
+      "toast": {
+        "savedTitle": "Allocation saved",
+        "errorTitle": "Could not save allocation",
+        "errorBody": "Try again."
+      }
+    },
+    "weeks": {
+      "title": "Production weeks",
+      "subtitle": "Workshop attendance × runs in the week → labor split per run when you close the week.",
+      "loading": "Loading…",
+      "empty": "No production weeks yet — create a run and a week appears here.",
+      "notFound": "Week not found.",
+      "open": "Open",
+      "closed": "Closed",
+      "weekOf": "Week of {{date}}",
+      "backToList": "Back to weeks",
+      "closeBtn": "Close week + finalize labor split",
+      "closing": "Closing…",
+      "confirmClose": "Close this week and write each run's labor share? Run cost-per-piece will be finalized.",
+      "manualInvalid": "Manual shares sum to {{sum}}%, must equal 100% before this week can close.",
+      "runsHeading": "Runs in this week",
+      "noRuns": "No runs in this week.",
+      "kpi": {
+        "laborTotal": "Labor total",
+        "runs": "Runs",
+        "totalShare": "Allocated",
+        "unallocated": "Unallocated"
+      },
+      "col": {
+        "week": "Week",
+        "status": "Status",
+        "runs": "Runs",
+        "pieces": "Pieces",
+        "laborTotal": "Labor (MAD)",
+        "run": "Run",
+        "sample": "Sample",
+        "mode": "Mode",
+        "share": "Share (MAD)",
+        "percent": "%"
+      },
+      "toast": {
+        "closedTitle": "Week closed",
+        "closedBody": "Each run's labor share has been finalized.",
+        "errorTitle": "Could not close week",
+        "errorBody": "See the message and adjust before retrying."
       }
     },
     "samples": {

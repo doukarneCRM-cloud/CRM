@@ -35,6 +35,8 @@ import ProductTestsListPage from '@/pages/production/ProductTestsListPage';
 import ProductTestDetailPage from '@/pages/production/ProductTestDetailPage';
 import ProductionRunsListPage from '@/pages/production/ProductionRunsListPage';
 import ProductionRunDetailPage from '@/pages/production/ProductionRunDetailPage';
+import ProductionWeeksListPage from '@/pages/production/ProductionWeeksListPage';
+import ProductionWeekDetailPage from '@/pages/production/ProductionWeekDetailPage';
 import SettingsPage from '@/pages/settings/SettingsPage';
 import AutomationPage from '@/pages/automation/AutomationPage';
 
@@ -244,6 +246,22 @@ export default function App() {
             element={
               <PermissionGuard requires={PERMISSIONS.PRODUCTION_VIEW}>
                 <ProductionRunDetailPage />
+              </PermissionGuard>
+            }
+          />
+          <Route
+            path={ROUTES.PRODUCTION_WEEKS}
+            element={
+              <PermissionGuard requires={PERMISSIONS.PRODUCTION_VIEW}>
+                <ProductionWeeksListPage />
+              </PermissionGuard>
+            }
+          />
+          <Route
+            path={ROUTES.PRODUCTION_WEEK_DETAIL}
+            element={
+              <PermissionGuard requires={PERMISSIONS.PRODUCTION_VIEW}>
+                <ProductionWeekDetailPage />
               </PermissionGuard>
             }
           />
