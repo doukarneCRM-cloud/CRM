@@ -536,6 +536,62 @@ function WebhookHealthPanel({ health }: { health: ColiixWebhookHealth }) {
           {t('integrations.coliix.health.silentHint')}
         </p>
       )}
+      {health.recentRejections.length > 0 && (
+        <details className="mt-2">
+          <summary className="cursor-pointer rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800 hover:bg-amber-100">
+            {t('integrations.coliix.health.recentRejections', {
+              count: health.recentRejections.length,
+            })}
+          </summary>
+          <div className="mt-2 overflow-hidden rounded-xl border border-amber-100">
+            <table className="w-full text-[10px]">
+              <thead className="bg-amber-50 text-left text-amber-900">
+                <tr>
+                  <th className="px-2 py-1 font-semibold">
+                    {t('integrations.coliix.health.rejCol.when')}
+                  </th>
+                  <th className="px-2 py-1 font-semibold">
+                    {t('integrations.coliix.health.rejCol.code')}
+                  </th>
+                  <th className="px-2 py-1 font-semibold">
+                    {t('integrations.coliix.health.rejCol.tracking')}
+                  </th>
+                  <th className="px-2 py-1 font-semibold">
+                    {t('integrations.coliix.health.rejCol.state')}
+                  </th>
+                  <th className="px-2 py-1 font-semibold">
+                    {t('integrations.coliix.health.rejCol.reason')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-amber-100 bg-white">
+                {health.recentRejections.map((r, i) => (
+                  <tr key={i}>
+                    <td className="px-2 py-1 font-mono text-gray-700">
+                      {formatRelative(r.createdAt, t)}
+                    </td>
+                    <td className="px-2 py-1 font-mono text-gray-700">
+                      {r.statusCode}
+                      {!r.secretMatched && (
+                        <span className="ml-1 text-red-600">
+                          {t('integrations.coliix.health.rejCol.badSecret')}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-2 py-1 font-mono text-gray-700">
+                      {r.tracking ?? <span className="text-red-500">—</span>}
+                    </td>
+                    <td className="px-2 py-1 font-mono text-gray-700">
+                      {r.rawState ?? <span className="text-red-500">—</span>}
+                    </td>
+                    <td className="px-2 py-1 text-gray-700">{r.reason ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      )}
     </div>
   );
 }

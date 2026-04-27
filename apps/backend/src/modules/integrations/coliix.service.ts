@@ -548,15 +548,24 @@ export interface RefreshAllResult {
 }
 
 /**
- * Refresh every in-flight order in one shot — same pipeline as the poller,
- * sequential to stay polite to Coliix. Useful as a manual "kick" after
- * webhooks have been silent for a while.
+ * Refresh every in-flight order in one shot — same pipeline as the poller.
+ * Runs in chunks of REFRESH_CONCURRENCY so a 100+ order sweep completes in
+ * tens of seconds instead of minutes. Sequential was simple but pushed the
+ * total wall-time past hosting-platform edge timeouts (e.g. Railway's ~5
+ * minute HTTP cap), turning the Sync button into a "Network Error".
+ *
+ * Per-call timeout (8s, in coliixClient) keeps any single hung response
+ * from poisoning a chunk.
  */
+const REFRESH_CONCURRENCY = 10;
+
 export async function refreshAllInFlight(): Promise<RefreshAllResult> {
   const inFlight = await listInFlightOrders();
   const results: TrackNowResult[] = [];
-  for (const o of inFlight) {
-    results.push(await trackOrderNow(o.orderId));
+  for (let i = 0; i < inFlight.length; i += REFRESH_CONCURRENCY) {
+    const chunk = inFlight.slice(i, i + REFRESH_CONCURRENCY);
+    const chunkResults = await Promise.all(chunk.map((o) => trackOrderNow(o.orderId)));
+    results.push(...chunkResults);
   }
   return {
     total: results.length,

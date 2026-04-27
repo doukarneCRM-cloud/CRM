@@ -2701,7 +2701,16 @@
         "last24h": "24 dernières h",
         "never": "Jamais",
         "justNow": "À l'instant",
-        "silentHint": "Coliix n'a pas appelé cette URL depuis 24 h. Ouvrez le tableau de bord Coliix, collez l'URL ci-dessus dans leurs paramètres webhook et assurez-vous que les événements de changement de statut sont activés. Le polling de secours (5 min) continue."
+        "silentHint": "Coliix n'a pas appelé cette URL depuis 24 h. Ouvrez le tableau de bord Coliix, collez l'URL ci-dessus dans leurs paramètres webhook et assurez-vous que les événements de changement de statut sont activés. Le polling de secours (5 min) continue.",
+        "recentRejections": "{{count}} rejets récents — cliquer pour développer",
+        "rejCol": {
+          "when": "Quand",
+          "code": "Statut",
+          "tracking": "Tracking",
+          "state": "État",
+          "reason": "Raison",
+          "badSecret": "(secret invalide)"
+        }
       }
     },
     "configureStore": {

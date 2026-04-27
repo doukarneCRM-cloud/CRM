@@ -277,6 +277,35 @@ model ShippingProvider {
   updatedAt     DateTime  @updatedAt
 }
 
+// ─── Webhook inbound audit ───────────────────────────────────────────────────
+// One row per inbound webhook hit, written BEFORE any validation so even
+// rejected calls (wrong secret, missing fields, unknown tracking) are
+// observable. Drives the "Webhook health" panel — without this the panel
+// only saw successful ingests via OrderLog and could not surface
+// configuration mistakes on the Coliix side.
+model WebhookEventLog {
+  id            String   @id @default(cuid())
+  provider      String // "coliix"
+  // ok = the request was accepted (200 / 404 with our standard "received"
+  // body); false when we returned 400 (bad payload) or 404 (bad secret).
+  ok            Boolean
+  secretMatched Boolean  @default(false)
+  statusCode    Int
+  // Parsed extracts so the admin UI can render the inbound at a glance.
+  tracking      String?
+  rawState      String?
+  // Full incoming payload (query + body, merged) and the IP that delivered
+  // it. Kept as JSON so any field the provider later starts sending is
+  // available without a schema change.
+  payload       Json?
+  ip            String?
+  reason        String? // why the row's ok=false, free-text
+  createdAt     DateTime @default(now())
+
+  @@index([provider, createdAt])
+  @@index([createdAt])
+}
+
 enum ImportLogLevel {
   info
   warning

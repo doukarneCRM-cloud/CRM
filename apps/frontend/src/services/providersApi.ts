@@ -81,11 +81,22 @@ export interface RefreshAllResult {
   results: TrackNowResult[];
 }
 
+export interface ColiixWebhookRejection {
+  createdAt: string;
+  statusCode: number;
+  secretMatched: boolean;
+  tracking: string | null;
+  rawState: string | null;
+  reason: string | null;
+  ip: string | null;
+}
+
 export interface ColiixWebhookHealth {
   lastWebhookAt: string | null;
   count1h: number;
   count24h: number;
   lastPollerAt: string | null;
+  recentRejections: ColiixWebhookRejection[];
 }
 
 export const coliixApi = {

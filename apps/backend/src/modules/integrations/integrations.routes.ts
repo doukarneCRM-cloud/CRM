@@ -228,16 +228,78 @@ export async function integrationsRoutes(app: FastifyInstance) {
   // path-segment secret is how we authenticate — no header, no HMAC, so don't
   // move it to a query string and don't ever log the full URL.
   //
-  // We accept flexible field names since Coliix docs vary across environments:
-  //   tracking:  tracking | tracking_code | ref | trackingCode
-  //   state:     state | status | new_state
-  //   driver:    driver_note | note | comment
+  // We accept flexible field names since Coliix docs vary across environments,
+  // and the production dashboard documents the canonical names below:
+  //   tracking:  code (canonical) | tracking | tracking_code | trackingCode | ref
+  //   state:     state (canonical) | status | new_state
+  //   date:      datereported (canonical) | date | event_date
+  //   note:      note (canonical) | driver_note | comment
   const coliixWebhookHandler = async (req: any, reply: any) => {
-    // Always-on diagnostic log of the raw inbound hit. Critical when Coliix
-    // is "supposed to be calling us" but orders aren't moving — without
-    // this line we have no proof the request even reached the server, and
-    // a typo'd URL / IP block / wrong content-type silently produces zero
-    // trace. Body and query are flattened so we capture both shapes.
+    const { prisma } = await import('../../shared/prisma');
+    const source = {
+      ...(req.query ?? {}),
+      ...((req.body as Record<string, unknown>) ?? {}),
+    } as Record<string, unknown>;
+
+    // Parse early so the audit row records what we extracted (or didn't).
+    const tracking = String(
+      source.code ??           // Coliix's documented canonical name
+      source.tracking ??
+      source.tracking_code ??
+      source.trackingCode ??
+      source.ref ?? ''
+    ).trim();
+    const rawState = String(source.state ?? source.status ?? source.new_state ?? '').trim();
+    const driverNote =
+      typeof source.note === 'string'
+        ? source.note         // Coliix's canonical name
+        : typeof source.driver_note === 'string'
+        ? source.driver_note
+        : typeof source.comment === 'string'
+        ? source.comment
+        : null;
+    const eventDateStr =
+      typeof source.datereported === 'string'   // Coliix's canonical name
+        ? source.datereported
+        : typeof source.date === 'string'
+        ? source.date
+        : typeof source.event_date === 'string'
+        ? source.event_date
+        : null;
+    const eventDate = eventDateStr ? new Date(eventDateStr) : null;
+
+    // Audit-log every inbound hit to a dedicated table BEFORE branching, so
+    // the Health panel can show rejected calls (wrong secret, bad payload,
+    // unknown tracking) — not just successful ingests. Fire-and-forget on
+    // the write so a DB hiccup never fails the webhook itself; Coliix would
+    // retry into a perpetual loop.
+    const recordEvent = (
+      ok: boolean,
+      statusCode: number,
+      secretMatched: boolean,
+      reason: string | null,
+    ) => {
+      void prisma.webhookEventLog
+        .create({
+          data: {
+            provider: 'coliix',
+            ok,
+            secretMatched,
+            statusCode,
+            tracking: tracking || null,
+            rawState: rawState || null,
+            payload: source as object,
+            ip: typeof req.ip === 'string' ? req.ip : null,
+            reason,
+          },
+        })
+        .catch((err: unknown) => {
+          app.log.warn({ err }, '[coliix-webhook] audit insert failed');
+        });
+    };
+
+    // Always-on diagnostic log to fastify too — visible in the platform's
+    // log aggregator alongside the DB audit row.
     app.log.info(
       {
         secretMasked: maskSecret(((req.params as any)?.secret) ?? ''),
@@ -252,7 +314,6 @@ export async function integrationsRoutes(app: FastifyInstance) {
     );
 
     const { secret } = req.params as { secret: string };
-    const { prisma } = await import('../../shared/prisma');
     const row = await prisma.shippingProvider.findFirst({
       where: { name: 'coliix', webhookSecret: secret },
       select: { id: true, isActive: true },
@@ -262,32 +323,14 @@ export async function integrationsRoutes(app: FastifyInstance) {
         { secretMasked: maskSecret(secret) },
         '[coliix-webhook] rejected — secret does not match any Coliix provider row',
       );
+      recordEvent(false, 404, false, 'Invalid webhook secret');
       return reply.status(404).send({ error: 'Invalid webhook secret' });
     }
     if (!row.isActive) {
       app.log.info('[coliix-webhook] integration disabled — accepted but ignored');
+      recordEvent(true, 200, true, 'Coliix integration disabled');
       return reply.status(200).send({ ignored: true, reason: 'Coliix integration disabled' });
     }
-
-    const source = { ...(req.query ?? {}), ...((req.body as Record<string, unknown>) ?? {}) } as Record<string, unknown>;
-
-    const tracking = String(source.tracking ?? source.tracking_code ?? source.trackingCode ?? source.ref ?? '').trim();
-    const rawState = String(source.state ?? source.status ?? source.new_state ?? '').trim();
-    const driverNote =
-      typeof source.driver_note === 'string'
-        ? source.driver_note
-        : typeof source.note === 'string'
-        ? source.note
-        : typeof source.comment === 'string'
-        ? source.comment
-        : null;
-    const eventDateStr =
-      typeof source.date === 'string'
-        ? source.date
-        : typeof source.event_date === 'string'
-        ? source.event_date
-        : null;
-    const eventDate = eventDateStr ? new Date(eventDateStr) : null;
 
     if (!tracking || !rawState) {
       app.log.warn(
@@ -298,9 +341,15 @@ export async function integrationsRoutes(app: FastifyInstance) {
         },
         '[coliix-webhook] payload missing tracking or state — Coliix sent fields we do not recognize',
       );
+      recordEvent(
+        false,
+        400,
+        true,
+        `Missing tracking or state — payload keys: ${Object.keys(source).join(', ') || '(empty)'}`,
+      );
       return reply.status(400).send({
         error: 'Missing tracking or state',
-        hint: 'Send tracking + state in JSON body, query string, or form-urlencoded. Accepted aliases: tracking|tracking_code|trackingCode|ref AND state|status|new_state.',
+        hint: 'Send tracking + state in JSON body, query string, or form-urlencoded. Accepted aliases: code|tracking|tracking_code|trackingCode|ref AND state|status|new_state.',
         payloadKeys: Object.keys(source),
       });
     }
@@ -319,8 +368,17 @@ export async function integrationsRoutes(app: FastifyInstance) {
     // change — so Coliix doesn't hammer us with retries. Only unmatched
     // tracking codes produce 404 so ops can notice the drift.
     if (!result.matched) {
+      recordEvent(false, 404, true, result.reason ?? 'Tracking not found in CRM');
       return reply.status(404).send({ received: true, ...result });
     }
+    recordEvent(
+      true,
+      200,
+      true,
+      result.changed
+        ? `Status → ${result.newStatus}`
+        : (result.reason ?? 'Status unchanged'),
+    );
     return reply.status(200).send({ received: true, ...result });
   };
 

@@ -2701,7 +2701,16 @@
         "last24h": "Last 24h",
         "never": "Never",
         "justNow": "Just now",
-        "silentHint": "Coliix has not called this URL in the last 24 hours. Open Coliix's dashboard, paste the Webhook URL above into their webhook settings, and make sure status-change events are enabled. The 5-minute fallback poller still runs."
+        "silentHint": "Coliix has not called this URL in the last 24 hours. Open Coliix's dashboard, paste the Webhook URL above into their webhook settings, and make sure status-change events are enabled. The 5-minute fallback poller still runs.",
+        "recentRejections": "{{count}} recent rejections — click to expand",
+        "rejCol": {
+          "when": "When",
+          "code": "Status",
+          "tracking": "Tracking",
+          "state": "State",
+          "reason": "Reason",
+          "badSecret": "(secret mismatch)"
+        }
       }
     },
     "configureStore": {

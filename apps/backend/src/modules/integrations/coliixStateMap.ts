@@ -22,6 +22,13 @@ function normalize(input: string): string {
 /**
  * Ordered from most-specific to most-general. First matching normalized key wins.
  * Values are Prisma's ShippingStatus enum — keep in sync with schema.prisma.
+ *
+ * The order matters because of the loose substring fallback at the bottom of
+ * mapColiixState. "Attente de ramassage" used to fall through to `picked_up`
+ * via the `ramassage` substring before this rule list was reorganised — the
+ * waiting-for-pickup state is semantically still a pre-pickup state, so we
+ * keep `attente_de_ramassage` as an exact key in `label_created` ABOVE the
+ * `picked_up` rule, ensuring the label-stage rule wins for that input.
  */
 const RULES: Array<{ keys: string[]; status: ShippingStatus }> = [
   // Delivered — most positive terminal state
@@ -67,16 +74,22 @@ const RULES: Array<{ keys: string[]; status: ShippingStatus }> = [
     status: 'in_transit',
   },
 
-  // Picked up from warehouse
+  // Label/parcel registered — keep ABOVE picked_up so "Attente de ramassage"
+  // (waiting-for-pickup) lands here via the exact key match instead of being
+  // pulled into `picked_up` by the `ramassage` substring fallback.
+  {
+    keys: [
+      'cree', 'nouveau', 'new', 'created', 'pending',
+      'label_created', 'prete', 'en_attente',
+      'attente_de_ramassage', 'en_attente_de_ramassage', 'attente_ramassage',
+    ],
+    status: 'label_created',
+  },
+
+  // Picked up from warehouse — courier physically collected the parcel
   {
     keys: ['pris_en_charge', 'ramassage', 'pickup', 'picked_up', 'collecte', 'recupere'],
     status: 'picked_up',
-  },
-
-  // Label/parcel registered
-  {
-    keys: ['cree', 'nouveau', 'new', 'created', 'pending', 'label_created', 'prete', 'en_attente'],
-    status: 'label_created',
   },
 ];
 

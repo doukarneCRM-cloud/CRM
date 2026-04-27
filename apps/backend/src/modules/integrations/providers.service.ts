@@ -132,16 +132,27 @@ export async function rotateWebhookSecret(name: string): Promise<ProviderPublic>
 }
 
 /**
- * Coliix webhook health — derived from OrderLog rows that ingestStatus tags
- * with `meta.source = 'webhook'`. Surfaces in the Coliix admin tab so an
- * operator can tell at a glance whether Coliix is actually calling our URL,
- * which is the precondition for "instant" status updates.
+ * Coliix webhook health — derived from the WebhookEventLog audit table.
+ * EVERY inbound hit is logged there (before validation), so the Health
+ * panel reflects reality: silent means Coliix isn't calling, not just that
+ * "no orders matched". Surfaces a small list of recent rejections so an
+ * operator can spot a misconfigured field name or a typo'd secret without
+ * digging through server logs.
  */
 export interface ColiixWebhookHealth {
   lastWebhookAt: Date | null;
   count1h: number;
   count24h: number;
   lastPollerAt: Date | null;
+  recentRejections: Array<{
+    createdAt: Date;
+    statusCode: number;
+    secretMatched: boolean;
+    tracking: string | null;
+    rawState: string | null;
+    reason: string | null;
+    ip: string | null;
+  }>;
 }
 
 export async function getColiixWebhookHealth(): Promise<ColiixWebhookHealth> {
@@ -149,30 +160,38 @@ export async function getColiixWebhookHealth(): Promise<ColiixWebhookHealth> {
   const since1h = new Date(now - 60 * 60_000);
   const since24h = new Date(now - 24 * 60 * 60_000);
 
-  // We tag every shipping OrderLog written by ingestStatus() with
-  // meta.source so we can split webhook hits from poller hits without a
-  // dedicated audit table. Postgres JSON path filters do this in-place.
-  const webhookFilter = {
-    type: 'shipping' as const,
-    meta: { path: ['source'], equals: 'webhook' as const },
-  };
-  const pollerFilter = {
+  const webhookFilter = { provider: 'coliix' as const };
+  const pollerLogFilter = {
     type: 'shipping' as const,
     meta: { path: ['source'], equals: 'poller' as const },
   };
 
-  const [lastWebhook, count1h, count24h, lastPoller] = await Promise.all([
-    prisma.orderLog.findFirst({
+  const [lastWebhook, count1h, count24h, lastPoller, recentRejections] = await Promise.all([
+    prisma.webhookEventLog.findFirst({
       where: webhookFilter,
       orderBy: { createdAt: 'desc' },
       select: { createdAt: true },
     }),
-    prisma.orderLog.count({ where: { ...webhookFilter, createdAt: { gte: since1h } } }),
-    prisma.orderLog.count({ where: { ...webhookFilter, createdAt: { gte: since24h } } }),
+    prisma.webhookEventLog.count({ where: { ...webhookFilter, createdAt: { gte: since1h } } }),
+    prisma.webhookEventLog.count({ where: { ...webhookFilter, createdAt: { gte: since24h } } }),
     prisma.orderLog.findFirst({
-      where: pollerFilter,
+      where: pollerLogFilter,
       orderBy: { createdAt: 'desc' },
       select: { createdAt: true },
+    }),
+    prisma.webhookEventLog.findMany({
+      where: { ...webhookFilter, ok: false, createdAt: { gte: since24h } },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: {
+        createdAt: true,
+        statusCode: true,
+        secretMatched: true,
+        tracking: true,
+        rawState: true,
+        reason: true,
+        ip: true,
+      },
     }),
   ]);
 
@@ -181,6 +200,7 @@ export async function getColiixWebhookHealth(): Promise<ColiixWebhookHealth> {
     count1h,
     count24h,
     lastPollerAt: lastPoller?.createdAt ?? null,
+    recentRejections,
   };
 }
 
