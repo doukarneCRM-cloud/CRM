@@ -57,6 +57,10 @@ export function useOrders(): UseOrdersReturn {
           filters.shippingStatuses.length > 0
             ? filters.shippingStatuses.join(',')
             : undefined,
+        coliixRawStates:
+          filters.coliixRawStates.length > 0
+            ? filters.coliixRawStates.join(',')
+            : undefined,
         agentIds:
           filters.agentIds.length > 0 ? filters.agentIds.join(',') : undefined,
         cities:
@@ -83,6 +87,7 @@ export function useOrders(): UseOrdersReturn {
     debouncedSearch,
     filters.confirmationStatuses,
     filters.shippingStatuses,
+    filters.coliixRawStates,
     filters.agentIds,
     filters.cities,
     filters.productIds,
@@ -104,6 +109,7 @@ export function useOrders(): UseOrdersReturn {
     debouncedSearch,
     filters.confirmationStatuses,
     filters.shippingStatuses,
+    filters.coliixRawStates,
     filters.agentIds,
     filters.cities,
     filters.productIds,

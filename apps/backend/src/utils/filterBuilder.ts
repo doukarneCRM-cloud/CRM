@@ -6,6 +6,11 @@ export interface OrderFilterParams {
   cities?: string | string[];
   confirmationStatuses?: string | string[];
   shippingStatuses?: string | string[];
+  // New: filter by Coliix's literal status wording (the user-facing label
+  // that drives the shipping pipeline + admin chip dropdown). Distinct
+  // from shippingStatuses, which is our internal enum and stays for
+  // backward-compat with anywhere that still binds to the enum.
+  coliixRawStates?: string | string[];
   sources?: string | string[];
   dateFrom?: string;
   dateTo?: string;
@@ -54,10 +59,17 @@ export function buildOrderWhereClause(
     where.confirmationStatus = { in: confirmationStatuses };
   }
 
-  // Shipping status filter
+  // Shipping status filter (internal enum)
   const shippingStatuses = toArray(params.shippingStatuses) as ShippingStatus[];
   if (shippingStatuses.length > 0) {
     where.shippingStatus = { in: shippingStatuses };
+  }
+
+  // Coliix literal-state filter — drives the user-facing chip dropdown.
+  // Compared as plain strings since coliixRawState is a free-form column.
+  const coliixRawStates = toArray(params.coliixRawStates);
+  if (coliixRawStates.length > 0) {
+    where.coliixRawState = { in: coliixRawStates };
   }
 
   // Source filter

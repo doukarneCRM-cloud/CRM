@@ -8,7 +8,6 @@ import { ordersApi, supportApi } from '@/services/ordersApi';
 import { coliixApi, type ExportResult } from '@/services/providersApi';
 import {
   CONFIRMATION_STATUS_OPTIONS,
-  SHIPPING_STATUS_OPTIONS,
   SOURCE_OPTIONS,
 } from '@/constants/statusColors';
 import { PERMISSIONS } from '@/constants/permissions';
@@ -151,9 +150,14 @@ export default function OrdersPage() {
   const [duplicateCount, setDuplicateCount] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
 
-  // Product + agent filter options — loaded once so the filter chips can populate
+  // Product + agent + Coliix-state filter options — loaded once so the
+  // filter chips can populate. Coliix states are pulled from a dedicated
+  // endpoint that returns the distinct wordings present on orders so the
+  // dropdown reflects what's actually in the data (Ramassé, Livré, …)
+  // instead of our internal enum.
   const [products, setProducts] = useState<Product[]>([]);
   const [agents, setAgents] = useState<AgentOption[]>([]);
+  const [coliixStates, setColiixStates] = useState<Array<{ value: string; count: number }>>([]);
   useEffect(() => {
     let cancelled = false;
     supportApi
@@ -172,6 +176,14 @@ export default function OrdersPage() {
       .catch(() => {
         if (!cancelled) setAgents([]);
       });
+    coliixApi
+      .states()
+      .then((res) => {
+        if (!cancelled) setColiixStates(res);
+      })
+      .catch(() => {
+        if (!cancelled) setColiixStates([]);
+      });
     return () => { cancelled = true; };
   }, []);
 
@@ -182,10 +194,20 @@ export default function OrdersPage() {
         label: t('orders.filterConfirmation'),
         options: CONFIRMATION_STATUS_OPTIONS,
       },
+      // Shipping filter — driven by Coliix's literal status values (Ramassé,
+      // Livré, Attente De Ramassage, …) instead of our internal enum.
+      // Falls back to a single placeholder when no orders have ever been
+      // pushed to Coliix yet so the chip still appears.
       {
-        key: 'shippingStatuses',
+        key: 'coliixRawStates',
         label: t('orders.filterShipping'),
-        options: SHIPPING_STATUS_OPTIONS,
+        options:
+          coliixStates.length > 0
+            ? coliixStates.map((s) => ({
+                value: s.value,
+                label: `${s.value} (${s.count})`,
+              }))
+            : [],
       },
       {
         key: 'sources',
@@ -209,7 +231,7 @@ export default function OrdersPage() {
       });
     }
     return [...base, ...extras];
-  }, [products, agents, t]);
+  }, [products, agents, coliixStates, t]);
 
   // Coliix export state
   const [sendingIds, setSendingIds] = useState<string[]>([]);

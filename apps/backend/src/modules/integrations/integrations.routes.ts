@@ -223,6 +223,29 @@ export async function integrationsRoutes(app: FastifyInstance) {
     },
   );
 
+  // Distinct Coliix raw-state values currently present on orders. Drives
+  // the shipping-status chip dropdown so admins filter by Coliix's actual
+  // wordings (Ramassé, Livré, Attente De Ramassage, …) instead of our
+  // internal enum.
+  app.get(
+    '/coliix/states',
+    { preHandler: [verifyJWT] },
+    async (_req, reply) => {
+      const { prisma } = await import('../../shared/prisma');
+      const rows = await prisma.order.groupBy({
+        by: ['coliixRawState'],
+        where: { coliixRawState: { not: null } },
+        _count: { _all: true },
+        orderBy: { _count: { coliixRawState: 'desc' } },
+      });
+      return reply.send({
+        states: rows
+          .filter((r) => r.coliixRawState !== null)
+          .map((r) => ({ value: r.coliixRawState as string, count: r._count._all })),
+      });
+    },
+  );
+
   // ── Coliix webhook — instant status updates ───────────────────────────────
   // Coliix calls this URL (GET or POST) whenever a parcel state changes. The
   // path-segment secret is how we authenticate — no header, no HMAC, so don't

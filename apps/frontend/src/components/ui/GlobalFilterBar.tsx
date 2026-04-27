@@ -13,7 +13,14 @@ interface FilterOption {
 }
 
 interface FilterChipConfig {
-  key: 'cities' | 'agentIds' | 'productIds' | 'confirmationStatuses' | 'shippingStatuses' | 'sources';
+  key:
+    | 'cities'
+    | 'agentIds'
+    | 'productIds'
+    | 'confirmationStatuses'
+    | 'shippingStatuses'
+    | 'coliixRawStates'
+    | 'sources';
   label: string;
   options: FilterOption[];
 }

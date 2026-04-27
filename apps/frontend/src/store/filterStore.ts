@@ -12,12 +12,16 @@ export interface FilterState {
   dateRange: DateRange;
   confirmationStatuses: string[];
   shippingStatuses: string[];
+  // Coliix's literal status wordings (Ramassé, Livré, …) — drives the
+  // "Shipping" filter chip everywhere now that the dropdown reflects what
+  // Coliix actually reports rather than our internal enum.
+  coliixRawStates: string[];
   sources: string[];
 }
 
 interface FilterActions {
   setFilter: <K extends keyof FilterState>(key: K, value: FilterState[K]) => void;
-  toggleArrayFilter: (key: 'cities' | 'agentIds' | 'productIds' | 'confirmationStatuses' | 'shippingStatuses' | 'sources', value: string) => void;
+  toggleArrayFilter: (key: 'cities' | 'agentIds' | 'productIds' | 'confirmationStatuses' | 'shippingStatuses' | 'coliixRawStates' | 'sources', value: string) => void;
   clearFilter: (key: keyof FilterState) => void;
   clearAll: () => void;
   hasActiveFilters: () => boolean;
@@ -31,6 +35,7 @@ const DEFAULT_STATE: FilterState = {
   dateRange: { from: null, to: null },
   confirmationStatuses: [],
   shippingStatuses: [],
+  coliixRawStates: [],
   sources: [],
 };
 
@@ -62,6 +67,7 @@ export const useFilterStore = create<FilterState & FilterActions>((set, get) => 
       state.productIds.length > 0 ||
       state.confirmationStatuses.length > 0 ||
       state.shippingStatuses.length > 0 ||
+      state.coliixRawStates.length > 0 ||
       state.sources.length > 0 ||
       state.dateRange.from !== null ||
       state.dateRange.to !== null
@@ -76,6 +82,7 @@ export const useFilterStore = create<FilterState & FilterActions>((set, get) => 
     count += state.productIds.length;
     count += state.confirmationStatuses.length;
     count += state.shippingStatuses.length;
+    count += state.coliixRawStates.length;
     count += state.sources.length;
     if (state.dateRange.from || state.dateRange.to) count += 1;
     return count;

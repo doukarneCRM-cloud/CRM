@@ -759,23 +759,34 @@ export async function computeStatusBreakdown(
 ): Promise<StatusBreakdown> {
   const where = buildOrderWhereClause(filters);
 
-  const [confirmationGroups, shippingGroups] = await Promise.all([
+  // Shipping breakdown is now keyed by Coliix's literal status (Ramassé,
+  // Livré, …) on orders that have actually been pushed to Coliix
+  // (labelSent: true). Orders we haven't shipped yet aren't in the
+  // shipping pipeline, and orders pushed but with no Coliix update yet
+  // fall into a synthetic 'Label Created' bucket so they aren't lost.
+  const [confirmationGroups, coliixGroups, pendingPushedCount] = await Promise.all([
     prisma.order.groupBy({
       by: ['confirmationStatus'],
       where,
       _count: { _all: true },
     }),
     prisma.order.groupBy({
-      by: ['shippingStatus'],
-      where,
+      by: ['coliixRawState'],
+      where: { ...where, labelSent: true, coliixRawState: { not: null } },
       _count: { _all: true },
+    }),
+    prisma.order.count({
+      where: { ...where, labelSent: true, coliixRawState: null },
     }),
   ]);
 
   const confirmation: Record<string, number> = {};
   for (const g of confirmationGroups) confirmation[g.confirmationStatus] = g._count._all;
   const shipping: Record<string, number> = {};
-  for (const g of shippingGroups) shipping[g.shippingStatus] = g._count._all;
+  for (const g of coliixGroups) {
+    if (g.coliixRawState) shipping[g.coliixRawState] = g._count._all;
+  }
+  if (pendingPushedCount > 0) shipping['Label Created'] = pendingPushedCount;
 
   return { confirmation, shipping };
 }

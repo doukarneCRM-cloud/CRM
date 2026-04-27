@@ -123,4 +123,14 @@ export const coliixApi = {
   // "Is Coliix actually calling us?" health snapshot.
   webhookHealth: () =>
     api.get<ColiixWebhookHealth>('/integrations/coliix/webhook-health').then((r) => r.data),
+
+  // Distinct coliixRawState values present on orders, with counts. Used
+  // to populate the shipping-status filter chip with Coliix's actual
+  // wordings instead of our internal ShippingStatus enum.
+  states: () =>
+    api
+      .get<{ states: Array<{ value: string; count: number }> }>(
+        '/integrations/coliix/states',
+      )
+      .then((r) => r.data.states),
 };

@@ -125,6 +125,7 @@ export interface OrderFilters {
   search?: string;
   confirmationStatuses?: string;
   shippingStatuses?: string;
+  coliixRawStates?: string;
   agentIds?: string;
   cities?: string;
   productIds?: string;

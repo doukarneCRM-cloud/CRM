@@ -9,6 +9,27 @@ interface Props {
   loading: boolean;
 }
 
+// The breakdown is now keyed by Coliix's literal wording (Ramassé, Livré, …)
+// so the legacy SHIPPING_HEX/STATUS_COLORS lookups miss for everything
+// except a couple of synthetic buckets. Hash each unique wording into a
+// stable colour so bars are visually distinct without a code change every
+// time Coliix introduces a new state name.
+const PALETTE = [
+  '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
+  '#06B6D4', '#EC4899', '#84CC16', '#F97316', '#6366F1',
+  '#14B8A6', '#A855F7',
+];
+function hashColor(s: string): string {
+  if (s === 'Not Shipped') return '#9CA3AF';
+  if (s === 'Label Created') return '#3B82F6';
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = (h * 16777619) >>> 0;
+  }
+  return PALETTE[h % PALETTE.length];
+}
+
 export function DeliveryStatusBars({ breakdown, loading }: Props) {
   const { t } = useTranslation();
   const { rows, max } = useMemo(() => {
@@ -16,11 +37,12 @@ export function DeliveryStatusBars({ breakdown, loading }: Props) {
       .filter(([, n]) => n > 0)
       .map(([status, count]) => {
         const cfg = SHIPPING_STATUS_COLORS[status as ShippingStatus];
+        const legacyColor = SHIPPING_HEX[status as ShippingStatus];
         return {
           status,
           label: cfg?.label ?? status,
           count,
-          color: SHIPPING_HEX[status as ShippingStatus] ?? '#9CA3AF',
+          color: legacyColor ?? hashColor(status),
         };
       })
       .sort((a, b) => b.count - a.count);
