@@ -19,6 +19,7 @@ import { useOrders } from './hooks/useOrders';
 import { OrderSummaryCards } from './components/OrderSummaryCards';
 import { OrdersTable } from './components/OrdersTable';
 import { OrderEditModal } from './components/OrderEditModal';
+import { OrderPreviewModal } from './components/OrderPreviewModal';
 import { OrderLogsModal } from './components/OrderLogsModal';
 import { CustomerHistoryModal } from './components/CustomerHistoryModal';
 import { AgentPickerModal } from './components/AgentPickerModal';
@@ -135,6 +136,7 @@ export default function OrdersPage() {
   } = useOrders();
 
   // ── Modal state ────────────────────────────────────────────────────────────
+  const [previewOrder, setPreviewOrder] = useState<Order | null>(null);
   const [editOrder, setEditOrder] = useState<Order | null>(null);
   const [logsOrder, setLogsOrder] = useState<{
     orderId: string;
@@ -232,6 +234,10 @@ export default function OrdersPage() {
   }, [orders]);
 
   // ── Table callbacks ────────────────────────────────────────────────────────
+
+  const handleView = useCallback((order: Order) => {
+    setPreviewOrder(order);
+  }, []);
 
   const handleEdit = useCallback((order: Order) => {
     setEditOrder(order);
@@ -448,6 +454,7 @@ export default function OrdersPage() {
         totalPages={pagination.totalPages}
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
+        onView={handleView}
         onEdit={handleEdit}
         onArchive={handleArchive}
         onAssign={handleAssignSingle}
@@ -483,6 +490,15 @@ export default function OrdersPage() {
       />
 
       {/* ── Modals ─────────────────────────────────────────────────────────── */}
+
+      <OrderPreviewModal
+        order={previewOrder}
+        onClose={() => setPreviewOrder(null)}
+        onEdit={(order) => {
+          setPreviewOrder(null);
+          setEditOrder(order);
+        }}
+      />
 
       <OrderEditModal
         order={editOrder}

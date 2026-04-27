@@ -8,7 +8,7 @@ import {
   type ColumnDef,
 } from '@tanstack/react-table';
 import {
-  ChevronLeft, ChevronRight, ChevronDown, Edit2, Archive,
+  ChevronLeft, ChevronRight, ChevronDown, Edit2, Archive, Eye,
   UserPlus, MessageCircle, History, Send, MapPin, User,
   DownloadCloud, Check, Loader2,
 } from 'lucide-react';
@@ -132,6 +132,7 @@ function SkeletonRow({ cols }: { cols: number }) {
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface TableCallbacks {
+  onView: (order: Order) => void;
   onEdit: (order: Order) => void;
   onArchive: (order: Order) => void;
   onAssign: (order: Order) => void;
@@ -172,6 +173,7 @@ export function OrdersTable({
   totalPages,
   onPageChange,
   onPageSizeChange,
+  onView,
   onEdit,
   onArchive,
   onAssign,
@@ -567,9 +569,16 @@ export function OrdersTable({
       {
         id: 'actions',
         header: '',
-        size: 90,
+        size: 120,
         cell: ({ row }) => (
           <div className="flex items-center gap-0.5">
+            <button
+              onClick={() => onView(row.original)}
+              title={t('orders.viewOrder')}
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-900 transition-colors hover:bg-gray-100"
+            >
+              <Eye size={13} />
+            </button>
             <button
               onClick={() => onEdit(row.original)}
               title={t('orders.editOrder')}
