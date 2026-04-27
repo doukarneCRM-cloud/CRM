@@ -28,6 +28,29 @@ function dayKey(d: Date): string {
   return d.toISOString().split('T')[0];
 }
 
+// Returns the order filter without its createdAt constraint. Used by
+// "activity" queries (transition counts, trend logs) where the user's date
+// filter applies to the activity timestamp (OrderLog.createdAt), not to
+// when the order was originally placed.
+function stripOrderCreatedAt(where: Prisma.OrderWhereInput): Prisma.OrderWhereInput {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { createdAt: _omit, ...rest } = where;
+  return rest;
+}
+
+// Resolves the [from, to] window for activity-based queries (transitions
+// per day, trend buckets, KPI counts of decisions). Mirrors the date-end
+// inflation that buildOrderWhereClause does for createdAt so the filter
+// includes the full last day instead of cutting off at midnight.
+function activityRange(filters: OrderFilterParams): { from: Date; to: Date } {
+  const from = filters.dateFrom
+    ? new Date(filters.dateFrom)
+    : new Date(Date.now() - 30 * 86_400_000);
+  const to = filters.dateTo ? new Date(filters.dateTo) : new Date();
+  if (filters.dateTo) to.setHours(23, 59, 59, 999);
+  return { from, to };
+}
+
 /** Mirror of the current date range (same duration, shifted back). */
 function mirrorRange(filters: OrderFilterParams): OrderFilterParams {
   if (!filters.dateFrom || !filters.dateTo) {
@@ -565,29 +588,41 @@ async function computeConfirmationCore(filters: OrderFilterParams) {
   // won't include them — count them with the archive filter disabled.
   const mergedWhere = buildOrderWhereClause({ ...filters, isArchived: 'all' });
 
+  // ── Activity window ─────────────────────────────────────────────────────
+  // Total/Pending/Merged stay creation-based ("how many orders did we get,
+  // and where did the ones we got land"). Confirmed/Cancelled/Unreachable
+  // switch to *activity* counts — how many decisions happened during the
+  // date range, regardless of when the order itself was placed. That's what
+  // an admin actually wants to verify from a daily call-center report.
+  const { from: activityFrom, to: activityTo } = activityRange(filters);
+  const orderFilterForActivity = stripOrderCreatedAt(where);
+  const activityLogWhere = (statusKeyword: string): Prisma.OrderLogWhereInput => ({
+    type: 'confirmation',
+    createdAt: { gte: activityFrom, lte: activityTo },
+    action: { contains: `Confirmation → ${statusKeyword}` },
+    order: orderFilterForActivity,
+  });
+
   const [total, confirmed, cancelled, unreachable, pending, merged, confirmedSample] =
     await Promise.all([
       prisma.order.count({ where }),
-      prisma.order.count({ where: { ...where, confirmationStatus: 'confirmed' } }),
-      prisma.order.count({ where: { ...where, confirmationStatus: 'cancelled' } }),
-      prisma.order.count({ where: { ...where, confirmationStatus: 'unreachable' } }),
+      prisma.orderLog.count({ where: activityLogWhere('confirmed') }),
+      prisma.orderLog.count({ where: activityLogWhere('cancelled') }),
+      prisma.orderLog.count({ where: activityLogWhere('unreachable') }),
       prisma.order.count({
         where: { ...where, confirmationStatus: { in: ['pending', 'awaiting', 'callback'] } },
       }),
       prisma.order.count({ where: { ...mergedWhere, mergedIntoId: { not: null } } }),
       prisma.orderLog.findMany({
-        where: {
-          type: 'confirmation',
-          action: { contains: 'confirmed' },
-          order: { ...where, confirmationStatus: 'confirmed' },
-        },
+        where: activityLogWhere('confirmed'),
         select: { createdAt: true, order: { select: { createdAt: true } } },
         take: 5000,
       }),
     ]);
 
-  const decidedPool =
-    confirmed + cancelled + unreachable + pending; // active + decided confirmations
+  // Rates over actual decisions in the period (no pending in the denominator
+  // — pending is "no decision yet", not part of today's call-center output).
+  const decidedPool = confirmed + cancelled + unreachable;
   const confirmationRate = safeRate(confirmed, decidedPool);
   const cancellationRate = safeRate(cancelled, decidedPool);
   const mergedRate = safeRate(merged, total + merged);
@@ -620,12 +655,15 @@ export async function computeConfirmationTab(
 ): Promise<ConfirmationTabPayload> {
   const where = buildOrderWhereClause(filters);
 
-  // Compute trend window early so the OrderLog query can be filtered at the
-  // DB level instead of pulling every confirmation log ever written.
-  const trendFrom = filters.dateFrom
-    ? new Date(filters.dateFrom)
-    : new Date(Date.now() - 30 * 86_400_000);
-  const trendTo = filters.dateTo ? new Date(filters.dateTo) : new Date();
+  // The trend chart's date axis is governed by when the confirmation
+  // actually happened (OrderLog.createdAt), not by when the order was
+  // originally placed (Order.createdAt). Use the shared activityRange /
+  // stripOrderCreatedAt helpers — same semantics as the activity-based KPIs
+  // — so a "today" filter shows every confirmation logged today regardless
+  // of when those orders were placed. Every other filter (agent / source /
+  // city / product / status / archive) still applies via the relation.
+  const { from: trendFrom, to: trendTo } = activityRange(filters);
+  const orderFilterForTrend = stripOrderCreatedAt(where);
 
   const [current, previous, pipelineGroups, agentGroups, productRows, cityRows, trendLogs] =
     await Promise.all([
@@ -673,7 +711,7 @@ export async function computeConfirmationTab(
             { action: { contains: 'Confirmation → confirmed' } },
             { action: { contains: 'Confirmation → cancelled' } },
           ],
-          order: where,
+          order: orderFilterForTrend,
         },
         select: { action: true, createdAt: true },
       }),
