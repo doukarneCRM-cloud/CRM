@@ -2808,7 +2808,16 @@
   "shared": {
     "appName": "Anaqatoki CRM",
     "topbar": {
-      "online": "En ligne"
+      "online": "En ligne",
+      "offline": "Hors ligne",
+      "lastSeenUnknown": "Dernière connexion inconnue",
+      "lastSeenMoments": "À l'instant",
+      "lastSeenMinutes_one": "il y a {{count}} min",
+      "lastSeenMinutes_other": "il y a {{count}} min",
+      "lastSeenHours_one": "il y a {{count}} h",
+      "lastSeenHours_other": "il y a {{count}} h",
+      "lastSeenDays_one": "il y a {{count}} jour",
+      "lastSeenDays_other": "il y a {{count}} jours"
     },
     "notifications": {
       "title": "Notifications",

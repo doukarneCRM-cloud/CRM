@@ -1,7 +1,8 @@
-import { useCallback, useState, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { ChevronDown, LogOut, Menu, User } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { ROUTES } from '@/constants/routes';
@@ -11,6 +12,7 @@ import { useClickOutside } from '@/hooks/useClickOutside';
 import { authService } from '@/services/api';
 import { getInitials } from '@/components/ui/AvatarChip';
 import { resolveImageUrl } from '@/lib/imageUrl';
+import { teamApi, type TeamUser } from '@/services/teamApi';
 import { NotificationPanel } from './NotificationPanel';
 import { GlobalSearch } from './GlobalSearch';
 import { ProfileModal } from './ProfileModal';
@@ -50,6 +52,23 @@ interface AgentPillData {
   avatarSrc: string;
   colorClass: string;
   roleName?: string;
+  isOnline: boolean;
+  lastSeenAt: string | null;
+}
+
+// Render "last seen X ago" for offline agents. Lightweight inline impl —
+// avoids pulling in a date-fns dependency just for this one tooltip line.
+function formatLastSeen(iso: string | null, t: TFunction): string {
+  if (!iso) return t('shared.topbar.lastSeenUnknown');
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return t('shared.topbar.lastSeenUnknown');
+  if (ms < 60_000) return t('shared.topbar.lastSeenMoments');
+  const min = Math.floor(ms / 60_000);
+  if (min < 60) return t('shared.topbar.lastSeenMinutes', { count: min });
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return t('shared.topbar.lastSeenHours', { count: hr });
+  const d = Math.floor(hr / 24);
+  return t('shared.topbar.lastSeenDays', { count: d });
 }
 
 function AgentPill({ agent }: { agent: AgentPillData }) {
@@ -74,32 +93,47 @@ function AgentPill({ agent }: { agent: AgentPillData }) {
         onFocus={showCard}
         onBlur={hideCard}
         tabIndex={0}
-        className="flex shrink-0 items-center gap-1.5 rounded-full border-2 border-emerald-500/70 bg-white py-0.5 pl-0.5 pr-2 text-[11px] font-semibold text-gray-800 shadow-sm outline-none focus:ring-2 focus:ring-emerald-500/30"
+        className={cn(
+          'flex shrink-0 items-center gap-1.5 rounded-full border-2 bg-white py-0.5 pl-0.5 pr-2 text-[11px] font-semibold shadow-sm outline-none focus:ring-2',
+          agent.isOnline
+            ? 'border-emerald-500/70 text-gray-800 focus:ring-emerald-500/30'
+            : 'border-gray-200 text-gray-500 focus:ring-gray-300/30',
+        )}
       >
         {agent.avatarSrc ? (
           <img
             src={agent.avatarSrc}
             alt={agent.name}
-            className="h-5 w-5 shrink-0 rounded-full object-cover"
+            className={cn(
+              'h-5 w-5 shrink-0 rounded-full object-cover',
+              !agent.isOnline && 'opacity-60 grayscale',
+            )}
           />
         ) : (
           <span
             className={cn(
               'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold',
-              agent.colorClass,
+              agent.isOnline ? agent.colorClass : 'bg-gray-100 text-gray-500',
             )}
           >
             {agent.initials}
           </span>
         )}
         <span className="whitespace-nowrap">{agent.name}</span>
-        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 shadow-[0_0_0_2px_rgba(16,185,129,0.2)]" />
+        <span
+          className={cn(
+            'h-1.5 w-1.5 shrink-0 rounded-full',
+            agent.isOnline
+              ? 'bg-emerald-500 shadow-[0_0_0_2px_rgba(16,185,129,0.2)]'
+              : 'bg-gray-400',
+          )}
+        />
       </div>
 
       {card &&
         createPortal(
           <div
-            className="pointer-events-none fixed z-[60] w-56 -translate-x-1/2 rounded-xl border border-gray-100 bg-white p-3 shadow-xl"
+            className="pointer-events-none fixed z-[60] w-60 -translate-x-1/2 rounded-xl border border-gray-100 bg-white p-3 shadow-xl"
             style={{ top: card.top, left: card.left }}
           >
             <div className="flex items-center gap-3">
@@ -108,19 +142,27 @@ function AgentPill({ agent }: { agent: AgentPillData }) {
                   <img
                     src={agent.avatarSrc}
                     alt={agent.name}
-                    className="h-12 w-12 rounded-full object-cover"
+                    className={cn(
+                      'h-12 w-12 rounded-full object-cover',
+                      !agent.isOnline && 'opacity-60 grayscale',
+                    )}
                   />
                 ) : (
                   <span
                     className={cn(
                       'flex h-12 w-12 items-center justify-center rounded-full text-sm font-bold',
-                      agent.colorClass,
+                      agent.isOnline ? agent.colorClass : 'bg-gray-100 text-gray-500',
                     )}
                   >
                     {agent.initials}
                   </span>
                 )}
-                <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-500" />
+                <span
+                  className={cn(
+                    'absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white',
+                    agent.isOnline ? 'bg-emerald-500' : 'bg-gray-400',
+                  )}
+                />
               </div>
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-gray-900">{agent.name}</p>
@@ -129,7 +171,15 @@ function AgentPill({ agent }: { agent: AgentPillData }) {
                     {agent.roleName}
                   </p>
                 )}
-                <p className="mt-0.5 text-[10px] font-semibold text-emerald-600">● {t('shared.topbar.online')}</p>
+                {agent.isOnline ? (
+                  <p className="mt-0.5 text-[10px] font-semibold text-emerald-600">
+                    ● {t('shared.topbar.online')}
+                  </p>
+                ) : (
+                  <p className="mt-0.5 text-[10px] font-semibold text-gray-500">
+                    ● {t('shared.topbar.offline')} · {formatLastSeen(agent.lastSeenAt, t)}
+                  </p>
+                )}
               </div>
             </div>
           </div>,
@@ -139,32 +189,79 @@ function AgentPill({ agent }: { agent: AgentPillData }) {
   );
 }
 
-function OnlineAgents() {
+// Refresh interval for the periodic refetch of the agent roster. The live
+// online/offline transitions arrive instantly via socket events written
+// into useOnlineStore — this poll only catches roster changes (new agent
+// added, role changed, deactivated) and rolls the "last seen X minutes
+// ago" tooltip forward without waiting for the user to refresh.
+const PRESENCE_REFRESH_MS = 60_000;
+
+function AgentsPresenceBar() {
+  const [agents, setAgents] = useState<TeamUser[]>([]);
   const { onlineUsers } = useOnlineStore();
-  const users = Array.from(onlineUsers.values());
-  if (users.length === 0) return null;
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => {
+      teamApi
+        .listUsers()
+        .then((users) => {
+          if (!cancelled) setAgents(users);
+        })
+        .catch(() => {
+          // best effort — we keep the last good roster on transient failures
+        });
+    };
+    load();
+    const t = setInterval(load, PRESENCE_REFRESH_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, []);
+
+  // Sort: online agents first (alphabetical within group), then offline
+  // (alphabetical). Hides deactivated users — admin can still manage them
+  // from the Team page; the topbar is for live operational presence.
+  const sorted = useMemo(() => {
+    return agents
+      .filter((u) => u.isActive)
+      .map((u) => ({
+        userId: u.id,
+        name: u.name,
+        avatarUrl: u.avatarUrl,
+        roleName: u.role?.label,
+        // The live socket store wins over the API snapshot — a user who
+        // just disconnected is reflected immediately, without waiting for
+        // the next periodic refetch.
+        isOnline: onlineUsers.has(u.id) || u.isOnline,
+        lastSeenAt: u.lastSeenAt,
+      }))
+      .sort((a, b) => {
+        if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+  }, [agents, onlineUsers]);
+
+  if (sorted.length === 0) return null;
 
   return (
     <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto py-0.5 pr-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      {users.map((agent, i) => {
-        const name = agent.name ?? agent.userId;
-        const initials = agent.name
-          ? getInitials(agent.name)
-          : agent.userId.slice(0, 2).toUpperCase();
-        return (
-          <AgentPill
-            key={agent.userId}
-            agent={{
-              userId: agent.userId,
-              name,
-              initials,
-              avatarSrc: resolveImageUrl(agent.avatarUrl),
-              colorClass: AVATAR_COLORS[i % AVATAR_COLORS.length],
-              roleName: agent.roleName,
-            }}
-          />
-        );
-      })}
+      {sorted.map((agent, i) => (
+        <AgentPill
+          key={agent.userId}
+          agent={{
+            userId: agent.userId,
+            name: agent.name,
+            initials: getInitials(agent.name),
+            avatarSrc: resolveImageUrl(agent.avatarUrl),
+            colorClass: AVATAR_COLORS[i % AVATAR_COLORS.length],
+            roleName: agent.roleName,
+            isOnline: agent.isOnline,
+            lastSeenAt: agent.lastSeenAt,
+          }}
+        />
+      ))}
     </div>
   );
 }
@@ -317,7 +414,7 @@ export function TopBar({ onMobileMenuOpen }: TopBarProps) {
         <h1 className="shrink-0 text-base font-semibold text-gray-900">{pageTitle}</h1>
         {isAdmin && user && (
           <div className="hidden min-w-0 flex-1 lg:block">
-            <OnlineAgents />
+            <AgentsPresenceBar />
           </div>
         )}
       </div>
