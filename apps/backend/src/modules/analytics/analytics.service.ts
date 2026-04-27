@@ -591,49 +591,95 @@ async function computeConfirmationCore(filters: OrderFilterParams) {
   // ── Activity window ─────────────────────────────────────────────────────
   // Total/Pending/Merged stay creation-based ("how many orders did we get,
   // and where did the ones we got land"). Confirmed/Cancelled/Unreachable
-  // switch to *activity* counts — how many decisions happened during the
-  // date range, regardless of when the order itself was placed. That's what
-  // an admin actually wants to verify from a daily call-center report.
+  // switch to *activity* counts — how many distinct orders had a decision
+  // recorded in the date range, regardless of when the order was placed.
+  //
+  // Crucially we count DISTINCT ORDERS, not log rows. An order that was
+  // confirmed, cancelled, then re-confirmed within the range contributes
+  // 1 to confirmed and 1 to cancelled — never 2 — because admins counting
+  // "how many orders did we confirm today" don't expect re-flips to
+  // double the tally. That's the 71-vs-68 gap users were hitting.
   const { from: activityFrom, to: activityTo } = activityRange(filters);
   const orderFilterForActivity = stripOrderCreatedAt(where);
-  const activityLogWhere = (statusKeyword: string): Prisma.OrderLogWhereInput => ({
-    type: 'confirmation',
-    createdAt: { gte: activityFrom, lte: activityTo },
-    action: { contains: `Confirmation → ${statusKeyword}` },
-    order: orderFilterForActivity,
-  });
+  const distinctOrdersWithStatusLog = (statusKeyword: string) =>
+    prisma.order.count({
+      where: {
+        ...orderFilterForActivity,
+        logs: {
+          some: {
+            type: 'confirmation',
+            createdAt: { gte: activityFrom, lte: activityTo },
+            action: { contains: `Confirmation → ${statusKeyword}` },
+          },
+        },
+      },
+    });
 
-  const [total, confirmed, cancelled, unreachable, pending, merged, confirmedSample] =
+  const [total, confirmed, cancelled, unreachable, decisionPool, pending, merged, confirmedSample] =
     await Promise.all([
       prisma.order.count({ where }),
-      prisma.orderLog.count({ where: activityLogWhere('confirmed') }),
-      prisma.orderLog.count({ where: activityLogWhere('cancelled') }),
-      prisma.orderLog.count({ where: activityLogWhere('unreachable') }),
+      distinctOrdersWithStatusLog('confirmed'),
+      distinctOrdersWithStatusLog('cancelled'),
+      distinctOrdersWithStatusLog('unreachable'),
+      // Distinct orders that had ANY decision in the range. Used as the
+      // denominator for the rates — avoids the double-counting that
+      // (confirmed + cancelled + unreachable) would produce if a single
+      // order flipped multiple ways within the range.
+      prisma.order.count({
+        where: {
+          ...orderFilterForActivity,
+          logs: {
+            some: {
+              type: 'confirmation',
+              createdAt: { gte: activityFrom, lte: activityTo },
+              OR: [
+                { action: { contains: 'Confirmation → confirmed' } },
+                { action: { contains: 'Confirmation → cancelled' } },
+                { action: { contains: 'Confirmation → unreachable' } },
+              ],
+            },
+          },
+        },
+      }),
       prisma.order.count({
         where: { ...where, confirmationStatus: { in: ['pending', 'awaiting', 'callback'] } },
       }),
       prisma.order.count({ where: { ...mergedWhere, mergedIntoId: { not: null } } }),
+      // Sample for avg-confirmation-time. Pull confirmation logs in the
+      // range, deduped to the EARLIEST per order so re-confirmations don't
+      // skew the mean. Avg = log.createdAt − order.createdAt, in hours.
       prisma.orderLog.findMany({
-        where: activityLogWhere('confirmed'),
-        select: { createdAt: true, order: { select: { createdAt: true } } },
+        where: {
+          type: 'confirmation',
+          createdAt: { gte: activityFrom, lte: activityTo },
+          action: { contains: 'Confirmation → confirmed' },
+          order: orderFilterForActivity,
+        },
+        select: { createdAt: true, orderId: true, order: { select: { createdAt: true } } },
+        orderBy: { createdAt: 'asc' },
         take: 5000,
       }),
     ]);
 
-  // Rates over actual decisions in the period (no pending in the denominator
-  // — pending is "no decision yet", not part of today's call-center output).
-  const decidedPool = confirmed + cancelled + unreachable;
-  const confirmationRate = safeRate(confirmed, decidedPool);
-  const cancellationRate = safeRate(cancelled, decidedPool);
+  // Rates over distinct decided orders.
+  const confirmationRate = safeRate(confirmed, decisionPool);
+  const cancellationRate = safeRate(cancelled, decisionPool);
   const mergedRate = safeRate(merged, total + merged);
 
   let avgConfirmationHours = 0;
-  if (confirmedSample.length > 0) {
-    const totalMs = confirmedSample.reduce(
-      (s, r) => s + (r.createdAt.getTime() - r.order.createdAt.getTime()),
-      0,
-    );
-    avgConfirmationHours = Math.round((totalMs / confirmedSample.length / 3_600_000) * 10) / 10;
+  // First confirmation per order: orderBy createdAt asc means the first
+  // log we see for each orderId is the earliest. Skip subsequent ones.
+  const seenForAvg = new Set<string>();
+  let avgN = 0;
+  let avgMs = 0;
+  for (const r of confirmedSample) {
+    if (seenForAvg.has(r.orderId)) continue;
+    seenForAvg.add(r.orderId);
+    avgMs += r.createdAt.getTime() - r.order.createdAt.getTime();
+    avgN += 1;
+  }
+  if (avgN > 0) {
+    avgConfirmationHours = Math.round((avgMs / avgN / 3_600_000) * 10) / 10;
   }
 
   return {
@@ -697,12 +743,14 @@ export async function computeConfirmationTab(
         where,
         select: { confirmationStatus: true, customer: { select: { city: true } } },
       }),
-      // Pull every confirmation transition (the OrderLog rows that
-      // updateOrderStatus writes) within the trend window. Bucketing these by
-      // log.createdAt — the real time of the status change — replaces the
-      // old Order.updatedAt bucketing which was wrong: any later edit
-      // (Coliix label sent, address fixed, unreachable counter bumped) would
-      // shove the order into "today" and leave previous days flat.
+      // Pull every confirmation transition in the trend window. Bucketing
+      // by log.createdAt — the real time of the status change — replaces
+      // the old Order.updatedAt bucketing which was wrong: any later edit
+      // (Coliix label sent, address fixed, unreachable counter bumped)
+      // would shove the order into "today" and leave previous days flat.
+      // We also pull orderId so the bars can dedupe to DISTINCT orders per
+      // day (a re-confirmation contributes 0, not 1, to that day's bar) —
+      // same semantic as the KPI cards.
       prisma.orderLog.findMany({
         where: {
           type: 'confirmation',
@@ -713,7 +761,7 @@ export async function computeConfirmationTab(
           ],
           order: orderFilterForTrend,
         },
-        select: { action: true, createdAt: true },
+        select: { action: true, createdAt: true, orderId: true },
       }),
     ]);
 
@@ -853,23 +901,27 @@ export async function computeConfirmationTab(
     .slice(0, 12);
 
   // ── Trend ──────────────────────────────────────────────────────────────
-  // Bucket every confirmation transition by when it was actually logged.
-  // Counts each transition independently — if the same order is confirmed
-  // and later cancelled, both days are credited, which is what an admin
-  // wants to see when inspecting daily call-center activity.
-  const trendBucket = new Map<string, { confirmed: number; cancelled: number }>();
+  // Bucket each (orderId, status) into the day its transition was logged.
+  // Counts DISTINCT orders per day — a re-confirmation of the same order
+  // on the same day no longer adds a second tally to that day's bar.
+  // Matches the KPI cards above so the bar for "today" equals the
+  // Confirmed + Cancelled cards exactly.
+  const trendBucket = new Map<
+    string,
+    { confirmed: Set<string>; cancelled: Set<string> }
+  >();
   for (let d = new Date(trendFrom); d <= trendTo; d.setDate(d.getDate() + 1)) {
-    trendBucket.set(dayKey(d), { confirmed: 0, cancelled: 0 });
+    trendBucket.set(dayKey(d), { confirmed: new Set(), cancelled: new Set() });
   }
   for (const log of trendLogs) {
     const key = dayKey(log.createdAt);
     const b = trendBucket.get(key);
     if (!b) continue;
-    if (log.action.includes('Confirmation → confirmed')) b.confirmed += 1;
-    else if (log.action.includes('Confirmation → cancelled')) b.cancelled += 1;
+    if (log.action.includes('Confirmation → confirmed')) b.confirmed.add(log.orderId);
+    else if (log.action.includes('Confirmation → cancelled')) b.cancelled.add(log.orderId);
   }
   const trend = Array.from(trendBucket.entries())
-    .map(([date, v]) => ({ date, confirmed: v.confirmed, cancelled: v.cancelled }))
+    .map(([date, v]) => ({ date, confirmed: v.confirmed.size, cancelled: v.cancelled.size }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
   const kpis: ConfirmationKPIs = {
