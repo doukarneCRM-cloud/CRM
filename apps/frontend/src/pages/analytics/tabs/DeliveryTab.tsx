@@ -31,6 +31,40 @@ function fmt(n: number): string {
   return n.toLocaleString('fr-MA');
 }
 
+// Deterministic color per pipeline bucket. Coliix's literal wordings ("Ramassé",
+// "Attente De Ramassage", …) aren't in our static color table, so without this
+// every row would collapse to the same fallback gray. The palette is hand-
+// picked to read well together; an FNV-ish hash maps each unique status string
+// to a stable index so the same wording always shows the same color.
+const PIPELINE_PALETTE = [
+  '#3B82F6', // blue
+  '#10B981', // emerald
+  '#F59E0B', // amber
+  '#EF4444', // red
+  '#8B5CF6', // violet
+  '#06B6D4', // cyan
+  '#EC4899', // pink
+  '#84CC16', // lime
+  '#F97316', // orange
+  '#6366F1', // indigo
+  '#14B8A6', // teal
+  '#A855F7', // purple
+];
+
+function colorForBucket(status: string, fallback: string): string {
+  if (!status) return fallback;
+  // Stable bucket → fallback for the synthetic ones so they don't shift
+  // colour as Coliix wordings come and go.
+  if (status === 'Not Shipped') return '#9CA3AF';
+  if (status === 'Label Created') return '#3B82F6';
+  let hash = 2166136261;
+  for (let i = 0; i < status.length; i++) {
+    hash ^= status.charCodeAt(i);
+    hash = (hash * 16777619) >>> 0;
+  }
+  return PIPELINE_PALETTE[hash % PIPELINE_PALETTE.length];
+}
+
 export function DeliveryTab() {
   const { t } = useTranslation();
   const filters = useAnalyticsFilters();
@@ -228,8 +262,13 @@ function ShippingPipelineCard({
       ) : (
         <div className="flex flex-col gap-2 overflow-y-auto pr-1">
           {pipeline.map((b) => {
+            // Pipeline buckets are now Coliix's literal wordings — fall back
+            // to the static colour table for legacy/synthetic buckets, but
+            // hash unfamiliar wordings to a stable palette colour so each
+            // unique state reads as a distinct bar.
+            const legacyColor = SHIPPING_HEX[b.status as ShippingStatus];
+            const color = legacyColor ?? colorForBucket(b.status, '#9CA3AF');
             const cfg = SHIPPING_STATUS_COLORS[b.status as ShippingStatus];
-            const color = SHIPPING_HEX[b.status as ShippingStatus] ?? '#9CA3AF';
             return (
               <div key={b.status} className="flex items-center gap-3">
                 <span

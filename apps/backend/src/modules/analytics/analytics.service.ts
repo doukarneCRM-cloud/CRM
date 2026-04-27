@@ -149,36 +149,6 @@ export interface DeliveryTabPayload {
   trend: DeliveryTrendPoint[];
 }
 
-const SHIPPING_ORDER: Array<
-  | 'not_shipped'
-  | 'label_created'
-  | 'picked_up'
-  | 'in_transit'
-  | 'out_for_delivery'
-  | 'delivered'
-  | 'attempted'
-  | 'returned'
-  | 'return_validated'
-  | 'return_refused'
-  | 'exchange'
-  | 'lost'
-  | 'destroyed'
-> = [
-  'not_shipped',
-  'label_created',
-  'picked_up',
-  'in_transit',
-  'out_for_delivery',
-  'delivered',
-  'attempted',
-  'returned',
-  'return_validated',
-  'return_refused',
-  'exchange',
-  'lost',
-  'destroyed',
-];
-
 async function computeDeliveryCore(filters: OrderFilterParams) {
   const where = buildOrderWhereClause(filters);
 
@@ -230,14 +200,17 @@ async function computeDeliveryCore(filters: OrderFilterParams) {
 export async function computeDeliveryTab(filters: OrderFilterParams): Promise<DeliveryTabPayload> {
   const where = buildOrderWhereClause(filters);
 
-  const [current, previous, pipelineGroups, cityRows, agentGroups, productRows, trendRows] =
+  const [current, previous, pipelineRows, cityRows, agentGroups, productRows, trendRows] =
     await Promise.all([
       computeDeliveryCore(filters),
       computeDeliveryCore(mirrorRange(filters)),
-      prisma.order.groupBy({
-        by: ['shippingStatus'],
+      // Pipeline is now driven by Coliix's literal wording instead of our
+      // internal enum — admins have asked to see exactly what Coliix
+      // reports. Orders not yet handed off to Coliix fall into synthetic
+      // "Not Shipped" / "Label Created" buckets so nothing disappears.
+      prisma.order.findMany({
         where,
-        _count: { _all: true },
+        select: { coliixRawState: true, labelSent: true },
       }),
       prisma.order.findMany({
         where: { ...where, labelSent: true },
@@ -280,10 +253,23 @@ export async function computeDeliveryTab(filters: OrderFilterParams): Promise<De
       }),
     ]);
 
-  // ── Pipeline buckets in canonical order ────────────────────────────────
+  // ── Pipeline buckets — keyed by Coliix's literal wording ───────────────
+  // Orders without a coliixRawState fall back to the labelSent flag so
+  // unpushed and just-pushed orders still show up. Sort by count desc so
+  // the most-populated buckets appear first; ties resolved alphabetically
+  // for stability.
   const countsByStatus = new Map<string, number>();
-  for (const g of pipelineGroups) countsByStatus.set(g.shippingStatus, g._count._all);
-  const pipeline = SHIPPING_ORDER.map((s) => ({ status: s, count: countsByStatus.get(s) ?? 0 }));
+  for (const o of pipelineRows) {
+    const key = o.coliixRawState
+      ? o.coliixRawState
+      : o.labelSent
+        ? 'Label Created'
+        : 'Not Shipped';
+    countsByStatus.set(key, (countsByStatus.get(key) ?? 0) + 1);
+  }
+  const pipeline = Array.from(countsByStatus.entries())
+    .map(([status, count]) => ({ status, count }))
+    .sort((a, b) => (b.count - a.count) || a.status.localeCompare(b.status));
 
   // ── Per-city breakdown ─────────────────────────────────────────────────
   const byCity = new Map<
