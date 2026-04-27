@@ -106,15 +106,29 @@ async function postForm(params: Record<string, string | number>): Promise<unknow
     throw new ColiixError(`Coliix HTTP ${res.status}`, res.status, payload);
   }
 
-  // Coliix reports success/failure via body.status, not HTTP.
-  const bodyStatus =
+  // Coliix reports success/failure via body.status, not HTTP. The API is
+  // inconsistent across actions:
+  //   - `add` (create parcel)      → status: 200 (number) on success
+  //   - `track` (lookup)           → status: true (boolean) on success
+  //   - failures                   → status: 204 (number), msg: string
+  // Treat both `200`/`"200"` and `true` as success, anything else as error.
+  const rawStatus =
     payload && typeof payload === 'object' && 'status' in payload
-      ? Number((payload as { status: unknown }).status)
+      ? (payload as { status: unknown }).status
       : null;
+  const isSuccess = rawStatus === true || rawStatus === 200 || rawStatus === '200';
   const bodyMsg = extractMsg(payload);
 
-  if (bodyStatus !== null && bodyStatus !== 200) {
-    throw new ColiixError(bodyMsg || `Coliix error (status ${bodyStatus})`, bodyStatus, payload);
+  if (rawStatus !== null && !isSuccess) {
+    const numericForLog =
+      typeof rawStatus === 'number' ? rawStatus :
+      typeof rawStatus === 'string' ? Number(rawStatus) || 0 :
+      rawStatus === false ? 0 : 0;
+    throw new ColiixError(
+      bodyMsg || `Coliix error (status ${String(rawStatus)})`,
+      numericForLog,
+      payload,
+    );
   }
 
   return payload;
@@ -204,23 +218,79 @@ function extractTracking(payload: unknown): string | null {
   return null;
 }
 
+// Coliix's track response stuffs the events history into `msg` (an array
+// of objects with `status` + `time`), not into `events` / `history`. Detect
+// this shape first; fall back to the legacy field names for safety.
+function rawEventsArray(p: Record<string, unknown>): unknown[] | null {
+  if (Array.isArray(p.msg)) return p.msg;
+  if (Array.isArray(p.events)) return p.events;
+  if (Array.isArray(p.history)) return p.history;
+  const data = p.data as Record<string, unknown> | undefined;
+  if (data && Array.isArray(data.events)) return data.events;
+  return null;
+}
+
+// Pluck the parcel-state name from one event object. Coliix uses `status`
+// for the parcel state name (e.g. "Nouveau Colis", "Attente De Ramassage")
+// and `etat` for the payment state ("Non Payé") — we want `status`.
+function eventStateName(e: unknown): string | null {
+  if (!e || typeof e !== 'object') return null;
+  const r = e as Record<string, unknown>;
+  if (typeof r.status === 'string' && r.status.trim()) return r.status.trim();
+  if (typeof r.state === 'string' && r.state.trim()) return r.state.trim();
+  return null;
+}
+
+// Coliix's `time` field arrives as "YYYY-MM-DD HH:MM :SS" — note the space
+// before the seconds colon, which `new Date()` rejects. Strip the offending
+// space so we can parse it. Returns null on any other malformed input.
+function parseColiixTime(value: unknown): Date | null {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const cleaned = value.replace(/\s+:/g, ':').trim();
+  const d = new Date(cleaned);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 function extractCurrentState(payload: unknown): string {
   if (!payload || typeof payload !== 'object') return 'Unknown';
   const p = payload as Record<string, unknown>;
-  const s = p.state ?? p.status_label ?? p.status ?? (p.data as Record<string, unknown> | undefined)?.state;
+
+  // Coliix track returns the events array in `msg`. The latest event is the
+  // current state. Sort by `time` descending so we don't depend on Coliix's
+  // ordering (which we've observed as oldest-first, but contracts are not
+  // guaranteed). Fall back to last-in-array when times are missing.
+  const events = rawEventsArray(p);
+  if (events && events.length > 0) {
+    const sorted = [...events].sort((a, b) => {
+      const ta = parseColiixTime((a as Record<string, unknown>)?.time)?.getTime() ?? 0;
+      const tb = parseColiixTime((b as Record<string, unknown>)?.time)?.getTime() ?? 0;
+      return tb - ta;
+    });
+    const latest = eventStateName(sorted[0]);
+    if (latest) return latest;
+  }
+
+  // Legacy/alternate top-level shapes — keep these so other Coliix endpoints
+  // (or future API drift) don't break us.
+  const s =
+    p.state ??
+    p.status_label ??
+    (typeof p.status === 'string' ? p.status : null) ??
+    (p.data as Record<string, unknown> | undefined)?.state;
   return typeof s === 'string' && s.trim() ? s.trim() : 'Unknown';
 }
 
 function extractEvents(payload: unknown): ColiixTrackEvent[] {
   if (!payload || typeof payload !== 'object') return [];
   const p = payload as Record<string, unknown>;
-  const rawEvents = (p.events ?? p.history ?? (p.data as Record<string, unknown> | undefined)?.events) as unknown;
-  if (!Array.isArray(rawEvents)) return [];
-  return rawEvents.map((e) => {
+  const raw = rawEventsArray(p);
+  if (!raw) return [];
+  const events = raw.map((e) => {
     const r = e as Record<string, unknown>;
+    const parsed = parseColiixTime(r.time ?? r.date);
     return {
-      state: typeof r.state === 'string' ? r.state : typeof r.status === 'string' ? r.status : 'Unknown',
-      date: typeof r.date === 'string' ? r.date : undefined,
+      state: eventStateName(r) ?? 'Unknown',
+      date: parsed ? parsed.toISOString() : undefined,
       message: typeof r.message === 'string' ? r.message : undefined,
       driverNote:
         typeof r.driver_note === 'string'
@@ -230,4 +300,13 @@ function extractEvents(payload: unknown): ColiixTrackEvent[] {
           : undefined,
     };
   });
+  // Sort newest-first so callers (trackers, diagnostic table) can read
+  // events[0] as "the latest event" without re-sorting. Coliix's actual
+  // order is undocumented; sorting here is the contract.
+  events.sort((a, b) => {
+    const ta = a.date ? new Date(a.date).getTime() : 0;
+    const tb = b.date ? new Date(b.date).getTime() : 0;
+    return tb - ta;
+  });
+  return events;
 }
