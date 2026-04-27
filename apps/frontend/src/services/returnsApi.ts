@@ -50,15 +50,28 @@ export interface ReturnListResponse {
 
 export type VerifyOutcome = 'good' | 'damaged' | 'wrong';
 
+// Filter params accepted by both list and stats — mirrors the global
+// dashboard filter shape (date range, agent, source, city, product) so a
+// single GlobalFilterBar selection narrows the page consistently.
+export interface ReturnsFilterParams {
+  dateFrom?: string;
+  dateTo?: string;
+  agentIds?: string;
+  sources?: string;
+  cities?: string;
+  productIds?: string;
+}
+
 export const returnsApi = {
-  list: (params: {
+  list: (params: ReturnsFilterParams & {
     page?: number;
     pageSize?: number;
     scope?: 'pending' | 'verified' | 'all';
     search?: string;
   }) => api.get<ReturnListResponse>('/returns', { params }).then((r) => r.data),
 
-  stats: () => api.get<ReturnStats>('/returns/stats').then((r) => r.data),
+  stats: (params: ReturnsFilterParams = {}) =>
+    api.get<ReturnStats>('/returns/stats', { params }).then((r) => r.data),
 
   scan: (query: string) =>
     api.get<ReturnOrder>(`/returns/scan/${encodeURIComponent(query)}`).then((r) => r.data),

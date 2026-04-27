@@ -49,6 +49,16 @@ export async function returnsRoutes(app: FastifyInstance) {
         pageSize: q.pageSize ? Number(q.pageSize) : undefined,
         scope: (q.scope as 'pending' | 'verified' | 'all' | undefined) ?? 'pending',
         search: q.search,
+        // Forward dashboard filters so date range / agent / source / etc.
+        // narrow the list the same way they narrow the rest of the app.
+        dateFrom: q.dateFrom,
+        dateTo: q.dateTo,
+        agentIds: q.agentIds,
+        sources: q.sources,
+        cities: q.cities,
+        productIds: q.productIds,
+        confirmationStatuses: q.confirmationStatuses,
+        shippingStatuses: q.shippingStatuses,
       });
       return reply.send(payload);
     },
@@ -57,8 +67,16 @@ export async function returnsRoutes(app: FastifyInstance) {
   app.get(
     '/stats',
     { preHandler: [verifyJWT, requirePermission('returns:verify')] },
-    async (_request, reply) => {
-      const stats = await getReturnStats();
+    async (request, reply) => {
+      const q = request.query as Record<string, string | undefined>;
+      const stats = await getReturnStats({
+        dateFrom: q.dateFrom,
+        dateTo: q.dateTo,
+        agentIds: q.agentIds,
+        sources: q.sources,
+        cities: q.cities,
+        productIds: q.productIds,
+      });
       return reply.send(stats);
     },
   );

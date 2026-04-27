@@ -1036,8 +1036,14 @@ export async function computeProfitTab(filters: OrderFilterParams): Promise<Prof
       select: {
         total: true,
         shippingPrice: true,
-        deliveredAt: true,
-        updatedAt: true,
+        // createdAt drives the trend bucket so the per-day bars line up
+        // with the same date filter the rest of the tab uses (KPIs,
+        // by-product, by-agent — all pre-filtered on Order.createdAt via
+        // buildOrderWhereClause). The previous bucketing on
+        // (deliveredAt ?? updatedAt) silently dropped any order whose
+        // creation date was inside the range but whose delivery happened
+        // outside, leaving phantom-empty days.
+        createdAt: true,
         agentId: true,
         agent: { select: { id: true, name: true } },
         items: {
@@ -1078,8 +1084,7 @@ export async function computeProfitTab(filters: OrderFilterParams): Promise<Prof
   }
 
   for (const o of orderRows) {
-    const when = o.deliveredAt ?? o.updatedAt;
-    const k = dayKey(when);
+    const k = dayKey(o.createdAt);
     if (!dailyRevenue.has(k)) continue;
     dailyRevenue.set(k, (dailyRevenue.get(k) ?? 0) + o.total);
     dailyShipping.set(k, (dailyShipping.get(k) ?? 0) + o.shippingPrice);

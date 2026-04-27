@@ -13,6 +13,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../shared/prisma';
 import { emitToRoom, emitToUser } from '../../shared/socket';
+import { buildOrderWhereClause, type OrderFilterParams } from '../../utils/filterBuilder';
 
 export type VerifyOutcome = 'good' | 'damaged' | 'wrong';
 
@@ -23,11 +24,11 @@ const PENDING_STATUSES = ['returned', 'attempted', 'lost'] as const;
 // Statuses that are ALREADY verified — shown on the "Verified" tab for history.
 const VERIFIED_STATUSES = ['return_validated', 'return_refused'] as const;
 
-export interface ListParams {
+export interface ListParams extends OrderFilterParams {
   page?: number;
   pageSize?: number;
   scope?: 'pending' | 'verified' | 'all';
-  search?: string;
+  // search inherited from OrderFilterParams
 }
 
 export async function listReturns(params: ListParams) {
@@ -42,22 +43,15 @@ export async function listReturns(params: ListParams) {
         ? VERIFIED_STATUSES
         : [...PENDING_STATUSES, ...VERIFIED_STATUSES];
 
+  // Honour the dashboard-style filters (date range, agent, source, etc.) so
+  // the Returns list shrinks to the same scope as the headline KPIs above
+  // it. buildOrderWhereClause already defaults isArchived to false, which
+  // matches what we want here.
+  const baseWhere = buildOrderWhereClause(params);
   const where: Prisma.OrderWhereInput = {
+    ...baseWhere,
     shippingStatus: { in: statuses as unknown as Prisma.EnumShippingStatusFilter['in'] },
-    isArchived: false,
   };
-
-  if (params.search) {
-    const s = params.search.trim();
-    where.OR = [
-      { reference: { contains: s, mode: 'insensitive' } },
-      { coliixTrackingId: { contains: s, mode: 'insensitive' } },
-      { customer: { fullName: { contains: s, mode: 'insensitive' } } },
-      { customer: { phone: { contains: s, mode: 'insensitive' } } },
-      { customer: { phoneDisplay: { contains: s, mode: 'insensitive' } } },
-      { customer: { city: { contains: s, mode: 'insensitive' } } },
-    ];
-  }
 
   const [rows, total] = await Promise.all([
     prisma.order.findMany({
@@ -115,17 +109,23 @@ export async function listReturns(params: ListParams) {
  * warehouse view and the leadership dashboard always agree on the headline
  * number — it's the first thing an agent cross-checks.
  */
-export async function getReturnStats() {
+export async function getReturnStats(filters: OrderFilterParams = {}) {
+  // Respect the dashboard's date-range / agent / source filters so this
+  // page agrees with the rest of the app instead of always reporting
+  // all-time totals — the previous behaviour broke trust whenever an
+  // operator switched the global date range and the headline numbers
+  // didn't move.
+  const where = buildOrderWhereClause(filters);
   const [deliveredCount, pendingCount, verifiedGoodCount, verifiedRefusedCount] = await Promise.all([
-    prisma.order.count({ where: { shippingStatus: 'delivered', isArchived: false } }),
+    prisma.order.count({ where: { ...where, shippingStatus: 'delivered' } }),
     prisma.order.count({
       where: {
+        ...where,
         shippingStatus: { in: PENDING_STATUSES as unknown as Prisma.EnumShippingStatusFilter['in'] },
-        isArchived: false,
       },
     }),
-    prisma.order.count({ where: { shippingStatus: 'return_validated', isArchived: false } }),
-    prisma.order.count({ where: { shippingStatus: 'return_refused', isArchived: false } }),
+    prisma.order.count({ where: { ...where, shippingStatus: 'return_validated' } }),
+    prisma.order.count({ where: { ...where, shippingStatus: 'return_refused' } }),
   ]);
 
   const returnedTotal = pendingCount + verifiedGoodCount + verifiedRefusedCount;
