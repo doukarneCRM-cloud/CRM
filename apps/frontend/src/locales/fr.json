@@ -214,6 +214,8 @@
     "viewHistory": "Voir l'historique de la commande",
     "whatsapp": "WhatsApp",
     "viewOrder": "Aperçu de la commande",
+    "unreachableTooltip_one": "Marquée injoignable {{count}} fois",
+    "unreachableTooltip_other": "Marquée injoignable {{count}} fois",
     "editOrder": "Modifier la commande",
     "assignAgent": "Attribuer un agent",
     "archiveOrder": "Archiver la commande",

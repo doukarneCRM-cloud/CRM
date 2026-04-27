@@ -10,7 +10,7 @@ import {
 import {
   ChevronLeft, ChevronRight, ChevronDown, Edit2, Archive, Eye,
   UserPlus, MessageCircle, History, Send, MapPin, User,
-  DownloadCloud, Check, Loader2,
+  DownloadCloud, Check, Loader2, PhoneOff,
 } from 'lucide-react';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { OrderSourceIcon } from '@/components/ui/OrderSourceIcon';
@@ -456,6 +456,14 @@ export function OrdersTable({
             <div className="flex items-center gap-1">
               <span className="w-[14px] shrink-0 text-[9px] font-bold uppercase text-gray-300">C</span>
               <StatusBadge status={row.original.confirmationStatus} size="sm" showDot />
+              {row.original.unreachableCount > 0 && (
+                <span
+                  className="inline-flex items-center gap-0.5 rounded-full bg-red-500/90 px-1.5 py-0.5 text-[9px] font-bold text-white"
+                  title={t('orders.unreachableTooltip', { count: row.original.unreachableCount })}
+                >
+                  <PhoneOff size={8} /> ×{row.original.unreachableCount}
+                </span>
+              )}
               {hasDeletedProduct && (
                 <span
                   className="inline-flex items-center rounded-badge border border-red-200 bg-red-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-red-600"

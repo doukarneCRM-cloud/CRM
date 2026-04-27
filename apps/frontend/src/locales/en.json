@@ -214,6 +214,8 @@
     "viewHistory": "View order history",
     "whatsapp": "WhatsApp",
     "viewOrder": "Preview order details",
+    "unreachableTooltip_one": "Marked unreachable {{count}} time",
+    "unreachableTooltip_other": "Marked unreachable {{count}} times",
     "editOrder": "Edit order",
     "assignAgent": "Assign agent",
     "archiveOrder": "Archive order",
