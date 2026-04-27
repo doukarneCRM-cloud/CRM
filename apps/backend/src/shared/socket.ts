@@ -84,35 +84,71 @@ export function initSocket(app: FastifyInstance) {
       socket.join('whatsapp:monitor');
     }
 
-    // Mark online
-    onlineUsers.set(user.sub, { socketId: socket.id, lastHeartbeat: new Date() });
+    // Verify the user exists and cache their identity for online/offline
+    // broadcasts. The mark-online side-effect lives in markOnline() below.
     const dbUser = await prisma.user
-      .update({
-        where: { id: user.sub },
-        data: { isOnline: true, lastSeenAt: new Date() },
-        select: { name: true, avatarUrl: true },
-      })
+      .findUnique({ where: { id: user.sub }, select: { name: true, avatarUrl: true } })
       .catch((err) => {
-        app.log.warn({ err, userId: user.sub }, '[Socket] user not found — disconnecting');
+        app.log.warn({ err, userId: user.sub }, '[Socket] user lookup failed');
         return null;
       });
     if (!dbUser) {
       socket.disconnect(true);
       return;
     }
-    lastPersistedAt.set(user.sub, Date.now());
 
-    io.emit('user:online', {
-      userId: user.sub,
-      name: dbUser.name,
-      avatarUrl: dbUser.avatarUrl,
-      roleName: user.roleName,
-    });
+    // ── Helpers: presence transitions tied to this socket ────────────────
+    // The user can transition online/offline multiple times within one
+    // socket lifetime now that presence is gated on real input activity
+    // (mouse / keys / scroll / tab visible). Each transition is idempotent
+    // and only writes when the in-memory state actually changes.
+    async function markOnline() {
+      const existing = onlineUsers.get(user.sub);
+      if (existing && existing.socketId === socket.id) {
+        existing.lastHeartbeat = new Date();
+        return;
+      }
+      onlineUsers.set(user.sub, { socketId: socket.id, lastHeartbeat: new Date() });
+      lastPersistedAt.set(user.sub, Date.now());
+      await prisma.user
+        .update({ where: { id: user.sub }, data: { isOnline: true, lastSeenAt: new Date() } })
+        .catch((err) => app.log.warn({ err, userId: user.sub }, '[Socket] markOnline persist failed'));
+      io.emit('user:online', {
+        userId: user.sub,
+        name: dbUser!.name,
+        avatarUrl: dbUser!.avatarUrl,
+        roleName: user.roleName,
+      });
+    }
+
+    async function markOffline() {
+      const entry = onlineUsers.get(user.sub);
+      // Only flip offline if this socket is the one currently tracked. A
+      // newer socket replacing this one (refresh / second tab) must not
+      // clobber the map.
+      if (!entry || entry.socketId !== socket.id) return;
+      onlineUsers.delete(user.sub);
+      lastPersistedAt.delete(user.sub);
+      await prisma.user
+        .update({ where: { id: user.sub }, data: { isOnline: false, lastSeenAt: new Date() } })
+        .catch((err) => app.log.warn({ err, userId: user.sub }, '[Socket] markOffline persist failed'));
+      io.emit('user:offline', { userId: user.sub });
+    }
+
+    // Initial connect counts as "user is here right now" — page just loaded.
+    await markOnline();
 
     socket.on('heartbeat', async () => {
       const now = Date.now();
       const entry = onlineUsers.get(user.sub);
-      if (entry) entry.lastHeartbeat = new Date(now);
+      // If the entry is missing (idle-removed) or owned by another socket,
+      // resurrect — this socket is alive AND the client only heartbeats
+      // while active, so the user is genuinely back.
+      if (!entry || entry.socketId !== socket.id) {
+        await markOnline();
+      } else {
+        entry.lastHeartbeat = new Date(now);
+      }
       socket.emit('heartbeat:ack');
 
       const lastPersist = lastPersistedAt.get(user.sub) ?? 0;
@@ -123,24 +159,17 @@ export function initSocket(app: FastifyInstance) {
         .catch((err) => app.log.warn({ err, userId: user.sub }, '[Socket] heartbeat persist failed'));
     });
 
+    socket.on('presence:active', () => {
+      void markOnline();
+    });
+
+    socket.on('presence:idle', () => {
+      void markOffline();
+    });
+
     socket.on('disconnect', async () => {
       app.log.info(`[Socket] disconnected: ${user.sub}`);
-      // Only flip offline if this disconnect is from the currently-tracked
-      // socket. A newer socket may have replaced this one (refresh, second
-      // tab, reconnect after blip) — in that case the user is still online
-      // via the new socket, and we must not clobber the map.
-      const entry = onlineUsers.get(user.sub);
-      if (!entry || entry.socketId !== socket.id) return;
-
-      onlineUsers.delete(user.sub);
-      lastPersistedAt.delete(user.sub);
-
-      await prisma.user.update({
-        where: { id: user.sub },
-        data: { isOnline: false, lastSeenAt: new Date() },
-      });
-
-      io.emit('user:offline', { userId: user.sub });
+      await markOffline();
     });
   });
 
