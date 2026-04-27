@@ -350,7 +350,9 @@
       "delivered": "Livrées",
       "cancelled": "Annulées",
       "returnRate": "Taux de retour",
-      "noOrdersYet": "Aucune commande pour l'instant"
+      "noOrdersYet": "Aucune commande pour l'instant",
+      "moreItems_one": "{{count}} autre article",
+      "moreItems_other": "{{count}} autres articles"
     },
     "agentPicker": {
       "titleSingle": "Attribuer un agent",

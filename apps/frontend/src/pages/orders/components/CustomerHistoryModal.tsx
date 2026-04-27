@@ -30,8 +30,21 @@ function StatBox({ label, value, color = 'text-gray-900' }: { label: string; val
 // ─── Order mini-row ───────────────────────────────────────────────────────────
 
 function OrderRow({ order }: { order: Order }) {
-  const product = order.items[0]?.variant?.product?.name ?? '—';
+  const { t } = useTranslation();
+  const firstItem = order.items[0];
+  const product = firstItem?.variant?.product?.name ?? '—';
+  const color = firstItem?.variant?.color;
+  const size = firstItem?.variant?.size;
+  // Skip the meaningless "default → default" placeholder YouCan emits for
+  // single-variant products so the row doesn't show "Default / Default".
+  const isDefault = (s: string | null | undefined) =>
+    !!s && s.toLowerCase() === 'default';
+  const variationParts = [
+    !isDefault(color) ? color : null,
+    !isDefault(size) ? size : null,
+  ].filter((s): s is string => !!s && s.length > 0);
   const qty = order.items.reduce((s, i) => s + i.quantity, 0);
+  const extraItems = order.items.length - 1;
 
   return (
     <div className="flex items-center justify-between gap-3 border-b border-gray-50 py-2.5 last:border-0">
@@ -40,9 +53,25 @@ function OrderRow({ order }: { order: Order }) {
           <span className="font-mono text-xs font-semibold text-gray-700">{order.reference}</span>
           <span className="text-[10px] text-gray-400">{formatDateShort(order.createdAt)}</span>
         </div>
-        <p className="truncate text-xs text-gray-500">
-          {product}{qty > 1 ? ` ×${qty}` : ''}
-        </p>
+        <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
+          <span className="truncate">{product}</span>
+          {variationParts.map((v) => (
+            <span
+              key={v}
+              className="inline-flex items-center rounded-badge bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-gray-700"
+            >
+              {v}
+            </span>
+          ))}
+          {qty > 1 && (
+            <span className="text-[10px] font-semibold text-gray-500">×{qty}</span>
+          )}
+          {extraItems > 0 && (
+            <span className="text-[10px] text-gray-400">
+              +{t('orders.customerHistory.moreItems', { count: extraItems })}
+            </span>
+          )}
+        </div>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <StatusBadge status={order.confirmationStatus} size="sm" />

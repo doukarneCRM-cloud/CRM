@@ -350,7 +350,9 @@
       "delivered": "Delivered",
       "cancelled": "Cancelled",
       "returnRate": "Return Rate",
-      "noOrdersYet": "No orders yet"
+      "noOrdersYet": "No orders yet",
+      "moreItems_one": "{{count}} more item",
+      "moreItems_other": "{{count}} more items"
     },
     "agentPicker": {
       "titleSingle": "Assign Agent",
