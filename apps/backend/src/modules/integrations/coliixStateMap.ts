@@ -23,105 +23,36 @@ function normalize(input: string): string {
  * Ordered from most-specific to most-general. First matching normalized key wins.
  * Values are Prisma's ShippingStatus enum — keep in sync with schema.prisma.
  *
- * The order matters because of the loose substring fallback at the bottom of
- * mapColiixState. "Attente de ramassage" used to fall through to `picked_up`
- * via the `ramassage` substring before this rule list was reorganised — the
- * waiting-for-pickup state is semantically still a pre-pickup state, so we
- * keep `attente_de_ramassage` as an exact key in `label_created` ABOVE the
- * `picked_up` rule, ensuring the label-stage rule wins for that input.
+ * The operator wants ONLY two transitions to flow into our internal
+ * shipping enum:
+ *
+ *   - "Livré" / "Livrée" → delivered      (drives revenue, KPIs, commission)
+ *   - "Retour" / "Retourné" / etc. → returned (drives the returns workflow)
+ *
+ * Every other Coliix wording (Ramassé, Expédié, Mise en distribution, En
+ * cours, Attente de ramassage, Refusé par client, Tentative, …) stays
+ * unmapped — coliixRawState is updated with the literal text for display
+ * everywhere, but shippingStatus is left alone so transient courier
+ * states don't pollute reporting. Operators handle nuance manually
+ * through the order action panel when they need to.
  */
 const RULES: Array<{ keys: string[]; status: ShippingStatus }> = [
   // Delivered — STRICTLY "Livré" / "Livrée" (and the English literal,
   // kept as an unambiguous safety net even though Coliix is French-only).
-  // Earlier versions also accepted "Reçu" / "Reçue" and "Livraison
-  // effectuée" but the operator confirmed those are NOT delivery in
-  // their workflow ("Reçu" is courier-side, the parcel is at the hub),
-  // so they were silently inflating the delivered count on the
-  // dashboard. Anything else stays unmapped and is shown as the raw
-  // Coliix wording without counting toward delivered KPIs.
+  // Anything else (Reçu, Livraison effectuée, …) stays unmapped.
   { keys: ['livre', 'livree', 'delivered'], status: 'delivered' },
 
-  // Return validated (accepted by admin)
-  { keys: ['retour_valide', 'return_validated'], status: 'return_validated' },
-
-  // Return refused / refused at door
+  // Returned — covers all the obvious "the parcel is coming back"
+  // wordings. return_validated / return_refused / exchange used to be
+  // separate enum buckets; per operator request they're no longer
+  // mapped automatically. The operator promotes them by hand from the
+  // order panel when the physical return is verified.
   {
-    keys: ['refuse', 'refuse_par_client', 'client_refuse', 'return_refused', 'retour_refuse'],
-    status: 'return_refused',
-  },
-
-  // Returned (parcel coming back)
-  {
-    keys: ['retour', 'retourne', 'en_retour', 'returned', 'retour_en_cours'],
+    keys: [
+      'retour', 'retourne', 'retournee', 'en_retour', 'retour_en_cours',
+      'returned',
+    ],
     status: 'returned',
-  },
-
-  // Exchange
-  { keys: ['echange', 'exchange'], status: 'exchange' },
-
-  // Destroyed / lost
-  { keys: ['detruit', 'destroyed'], status: 'destroyed' },
-  { keys: ['perdu', 'lost'], status: 'lost' },
-
-  // Out for delivery — "Mise en distribution" is Coliix's wording for
-  // "the courier is out delivering today".
-  {
-    keys: [
-      'en_livraison', 'en_cours_de_livraison', 'out_for_delivery',
-      'livreur_en_route', 'mise_en_distribution',
-    ],
-    status: 'out_for_delivery',
-  },
-
-  // Delivery attempted (client absent / reschedule). `injoignable`,
-  // `reporte`, `client_interesse` are Coliix wordings for "the courier
-  // tried but couldn't drop the parcel" — same operational meaning.
-  {
-    keys: [
-      'tentative', 'client_absent', 'non_livre', 'attempted',
-      'tentative_de_livraison', 'injoignable', 'reporte',
-      'client_interesse',
-    ],
-    status: 'attempted',
-  },
-
-  // In transit — "Expédié" is Coliix's wording for "shipped" / left
-  // the warehouse, parcel now travelling toward the destination.
-  {
-    keys: [
-      'en_cours', 'en_transit', 'in_transit', 'transite', 'en_route',
-      'expedie', 'expediee',
-    ],
-    status: 'in_transit',
-  },
-
-  // Label/parcel registered — keep ABOVE picked_up so "Attente de ramassage"
-  // (waiting-for-pickup) lands here via the exact key match instead of being
-  // pulled into `picked_up` by the `ramassage` substring fallback.
-  {
-    keys: [
-      'cree', 'nouveau', 'new', 'created', 'pending',
-      'label_created', 'prete', 'en_attente',
-      'attente_de_ramassage', 'en_attente_de_ramassage', 'attente_ramassage',
-      'nouveau_colis',
-    ],
-    status: 'label_created',
-  },
-
-  // Picked up from warehouse — courier physically collected the parcel.
-  // `ramasse` is the past participle Coliix emits ("Ramassé") and
-  // `confirmer_par_le_livreur` is the wording for "courier confirmed
-  // receipt" — both belong here, NOT in delivered. Without explicit
-  // exact keys the substring fallback used to pull these into the
-  // wrong bucket (livre being a substring of livreur was the killer).
-  {
-    keys: [
-      'pris_en_charge', 'ramasse', 'ramassee', 'ramasses',
-      'ramassage', 'pickup', 'picked_up', 'collecte', 'recupere',
-      'confirmer_par_le_livreur', 'confirme_par_le_livreur',
-      'confirmation_du_livreur', 'recu_par_le_livreur',
-    ],
-    status: 'picked_up',
   },
 ];
 
@@ -159,14 +90,10 @@ export function mapColiixState(rawState: string | null | undefined): ShippingSta
 
   // Token fallback. Stricter than a simple "any token matches" — we
   // require ALL of a rule key's NON-GENERIC tokens to be present in the
-  // input. That prevents weakly-shared tokens like `client` from
-  // mis-routing "Client intéressé" → return_refused via
-  // `refuse_par_client`'s `client` token. It still resolves the cases
-  // the fallback was designed for: "Refusé par le client" matches the
-  // rule key `refuse` (one specific token, present), "Livraison
-  // effectuée" matches `livraison_effectuee` (both specific tokens
-  // present), "Tentative 2" matches `tentative` (one specific token
-  // present).
+  // input. With the operator-narrowed rule list (only delivered + returned)
+  // this mostly catches "retour …" variants ("Retour client", "Retour
+  // entreprise", …) that all share the `retour` token and should still
+  // flip the order to `returned`.
   const inputTokens = new Set(tokens(key));
   for (const rule of RULES) {
     for (const k of rule.keys) {
