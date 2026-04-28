@@ -295,12 +295,16 @@ export async function integrationsRoutes(app: FastifyInstance) {
           where: { labelSent: true, coliixRawState: null },
         }),
       ]);
-      const synthetic: Array<{ value: string; count: number }> = [];
-      if (notShippedCount > 0) synthetic.push({ value: 'Not Shipped', count: notShippedCount });
-      if (labelCreatedCount > 0) synthetic.push({ value: 'Label Created', count: labelCreatedCount });
+      // Synthetic buckets are ALWAYS surfaced (even at count 0) so the
+      // filter chip stays a stable option in the UI -- the operator
+      // expects to be able to pick "Not Shipped" at any time, including
+      // right after a sweep that emptied the bucket. Real wordings only
+      // appear once observed in the data because the chip would
+      // otherwise grow unboundedly.
       return reply.send({
         states: [
-          ...synthetic,
+          { value: 'Not Shipped', count: notShippedCount },
+          { value: 'Label Created', count: labelCreatedCount },
           ...rows
             .filter((r) => r.coliixRawState !== null)
             .map((r) => ({ value: r.coliixRawState as string, count: r._count._all })),
