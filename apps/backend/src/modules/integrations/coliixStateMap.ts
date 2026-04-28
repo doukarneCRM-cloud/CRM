@@ -87,19 +87,33 @@ const RULES: Array<{ keys: string[]; status: ShippingStatus }> = [
   },
 
   // Picked up from warehouse — courier physically collected the parcel.
-  // `ramasse` is the past participle Coliix actually emits ("Ramassé") and
-  // MUST be an exact key here: the substring `ramasse` also appears inside
-  // label_created's `attente_de_ramassage` key, so without an explicit
-  // exact match the loose fallback would pull "Ramassé" into the
-  // waiting-for-pickup bucket instead of the actually-picked-up bucket.
+  // `ramasse` is the past participle Coliix emits ("Ramassé") and
+  // `confirmer_par_le_livreur` is the wording for "courier confirmed
+  // receipt" — both belong here, NOT in delivered. Without explicit
+  // exact keys the substring fallback used to pull these into the
+  // wrong bucket (livre being a substring of livreur was the killer).
   {
     keys: [
       'pris_en_charge', 'ramasse', 'ramassee', 'ramasses',
       'ramassage', 'pickup', 'picked_up', 'collecte', 'recupere',
+      'confirmer_par_le_livreur', 'confirme_par_le_livreur',
+      'confirmation_du_livreur', 'recu_par_le_livreur',
     ],
     status: 'picked_up',
   },
 ];
+
+// Word-boundary tokeniser: split on `_` so the loose fallback compares
+// whole tokens rather than raw substrings. The old implementation used
+// `key.includes(k) || k.includes(key)`, which made "livre" (delivered)
+// match "livreur" (in "Confirmer par le livreur") and silently flipped
+// shipped-not-delivered orders to delivered. Token equality eliminates
+// this whole class of false positives without losing the variant
+// matches the fallback was meant to catch (e.g. "Refusé par le client"
+// → token `refuse` matches the rule key token `refuse`).
+function tokens(s: string): string[] {
+  return s.split('_').filter(Boolean);
+}
 
 /** Returns the mapped ShippingStatus, or null when Coliix's state is unknown. */
 export function mapColiixState(rawState: string | null | undefined): ShippingStatus | null {
@@ -109,9 +123,18 @@ export function mapColiixState(rawState: string | null | undefined): ShippingSta
   for (const rule of RULES) {
     if (rule.keys.includes(key)) return rule.status;
   }
-  // Loose prefix/suffix fallback — lets us catch "livraison réussie" → livre etc.
+  // Token-based fallback — first rule whose any-key shares at least one
+  // whole-token with the input wins. Catches "Livraison effectuée" (key
+  // tokens [livraison, effectuee]) → delivered (rule token `livraison`),
+  // "Refusé par le client" (tokens [refuse, par, le, client]) →
+  // return_refused (rule token `refuse`), without the substring trap
+  // that confused livre / livreur etc.
+  const inputTokens = new Set(tokens(key));
   for (const rule of RULES) {
-    if (rule.keys.some((k) => key.includes(k) || k.includes(key))) return rule.status;
+    for (const k of rule.keys) {
+      const ks = tokens(k);
+      if (ks.some((t) => inputTokens.has(t))) return rule.status;
+    }
   }
   return null;
 }
