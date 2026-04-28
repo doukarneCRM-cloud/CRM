@@ -278,16 +278,28 @@ export async function ingestStatus(input: {
   const mapped = mapColiixState(input.rawState);
 
   if (!mapped) {
-    // Persist the raw state on the order even though we couldn't map it to
-    // an enum — the UI prefers the raw text for display, so the new wording
-    // shows up even when our internal classification doesn't keep up.
-    if (trimmedRaw && order.coliixRawState !== trimmedRaw) {
-      await prisma.order.update({
-        where: { id: order.id },
-        data: { coliixRawState: trimmedRaw, lastTrackedAt: new Date() },
-      });
-      emitToRoom('orders:all', 'order:updated', { orderId: order.id });
+    // Idempotent on the raw wording. The poller re-fetches every 5 min;
+    // without this guard, every tick wrote a new "Coliix raw state → X"
+    // log entry even when nothing changed — one user reported 169
+    // identical "Expédié" rows on a single order. Bail out early when
+    // there's nothing new to record.
+    if (!trimmedRaw || order.coliixRawState === trimmedRaw) {
+      return {
+        matched: true,
+        changed: false,
+        orderId: order.id,
+        reference: order.reference,
+        reason: 'Raw state unchanged',
+      };
     }
+
+    // rawState actually changed → persist + log + dispatch (once).
+    await prisma.order.update({
+      where: { id: order.id },
+      data: { coliixRawState: trimmedRaw, lastTrackedAt: new Date() },
+    });
+    emitToRoom('orders:all', 'order:updated', { orderId: order.id });
+
     await prisma.orderLog.create({
       data: {
         orderId: order.id,
@@ -301,15 +313,15 @@ export async function ingestStatus(input: {
         } as Prisma.InputJsonValue,
       },
     });
+
     // Fire the custom Coliix-state automation even though we couldn't
     // map the wording to an enum — that's the whole point of the
     // ColiixStateTemplate path: cover statuses outside our enum.
-    if (trimmedRaw && order.coliixRawState !== trimmedRaw) {
-      void dispatchColiixStateChange(order.id, order.coliixRawState, trimmedRaw);
-    }
+    void dispatchColiixStateChange(order.id, order.coliixRawState, trimmedRaw);
+
     return {
       matched: true,
-      changed: trimmedRaw !== '' && order.coliixRawState !== trimmedRaw,
+      changed: true,
       orderId: order.id,
       reference: order.reference,
       reason: `Raw state saved: ${input.rawState}`,
@@ -676,6 +688,109 @@ export async function remapShippingStatusesFromRawState(): Promise<RemapStatuses
   }
 
   return { scanned, changed, unchanged, unmapped, rows };
+}
+
+// One-shot cleanup for the duplicate-shipping-log incident: before the
+// no-mapping branch in `ingestStatus` learned to short-circuit on an
+// unchanged rawState, the poller (every 5 min) wrote a fresh OrderLog
+// row every tick — one user reported 169 identical "Expédié" entries
+// on a single order. Status-change rows (`meta.mapped` set) and remap
+// rows (`meta.source === 'remap'`) are unique by construction and must
+// never be touched here. This function only deletes redundant
+// no-mapping rows, keeping the OLDEST occurrence per (order, rawState)
+// so the timeline still shows when the wording first appeared.
+export interface DedupeShippingLogsResult {
+  scanned: number;
+  candidates: number;       // no-mapping rows considered
+  duplicateGroups: number;  // (orderId, rawState) groups that had > 1 row
+  deleted: number;
+  examples: Array<{
+    orderId: string;
+    reference: string;
+    rawState: string;
+    deleted: number;
+  }>;
+}
+
+export async function dedupeColiixShippingLogs(): Promise<DedupeShippingLogsResult> {
+  const logs = await prisma.orderLog.findMany({
+    where: { type: 'shipping' },
+    select: {
+      id: true,
+      orderId: true,
+      meta: true,
+      order: { select: { reference: true } },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  type Candidate = {
+    id: string;
+    orderId: string;
+    reference: string;
+    rawState: string;
+  };
+  const candidates: Candidate[] = [];
+  for (const log of logs) {
+    const m = log.meta as Record<string, unknown> | null;
+    if (!m || m.provider !== 'coliix') continue;
+    if (m.mapped) continue;             // status-change row — keep
+    if (m.source === 'remap') continue; // remap row — keep
+    const rawState = typeof m.rawState === 'string' ? m.rawState.trim() : '';
+    if (!rawState) continue;
+    candidates.push({
+      id: log.id,
+      orderId: log.orderId,
+      reference: log.order.reference,
+      rawState,
+    });
+  }
+
+  const groups = new Map<
+    string,
+    { orderId: string; reference: string; rawState: string; deleteIds: string[] }
+  >();
+  for (const c of candidates) {
+    const key = `${c.orderId}::${c.rawState}`;
+    const existing = groups.get(key);
+    if (!existing) {
+      groups.set(key, {
+        orderId: c.orderId,
+        reference: c.reference,
+        rawState: c.rawState,
+        deleteIds: [],
+      });
+    } else {
+      existing.deleteIds.push(c.id);
+    }
+  }
+
+  const dupGroups = Array.from(groups.values()).filter((g) => g.deleteIds.length > 0);
+  const idsToDelete = dupGroups.flatMap((g) => g.deleteIds);
+
+  // Chunked delete — Postgres caps a single `IN (…)` at ~32k parameters and
+  // pgbouncer is friendlier with smaller statements anyway.
+  const CHUNK = 500;
+  for (let i = 0; i < idsToDelete.length; i += CHUNK) {
+    const chunk = idsToDelete.slice(i, i + CHUNK);
+    await prisma.orderLog.deleteMany({ where: { id: { in: chunk } } });
+  }
+
+  return {
+    scanned: logs.length,
+    candidates: candidates.length,
+    duplicateGroups: dupGroups.length,
+    deleted: idsToDelete.length,
+    examples: dupGroups
+      .sort((a, b) => b.deleteIds.length - a.deleteIds.length)
+      .slice(0, 20)
+      .map((g) => ({
+        orderId: g.orderId,
+        reference: g.reference,
+        rawState: g.rawState,
+        deleted: g.deleteIds.length,
+      })),
+  };
 }
 
 export interface RefreshAllResult {

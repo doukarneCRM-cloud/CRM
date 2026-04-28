@@ -142,6 +142,25 @@ export const coliixApi = {
       }>('/integrations/coliix/remap-statuses', undefined, { timeout: 120_000 })
       .then((r) => r.data),
 
+  // One-shot cleanup of duplicate "no-mapping" Coliix shipping logs from
+  // before ingestStatus learned to skip unchanged rawStates. Keeps the
+  // oldest row per (order, rawState) so the timeline is preserved.
+  dedupeLogs: () =>
+    api
+      .post<{
+        scanned: number;
+        candidates: number;
+        duplicateGroups: number;
+        deleted: number;
+        examples: Array<{
+          orderId: string;
+          reference: string;
+          rawState: string;
+          deleted: number;
+        }>;
+      }>('/integrations/coliix/dedupe-logs', undefined, { timeout: 120_000 })
+      .then((r) => r.data),
+
   // "Is Coliix actually calling us?" health snapshot.
   webhookHealth: () =>
     api.get<ColiixWebhookHealth>('/integrations/coliix/webhook-health').then((r) => r.data),

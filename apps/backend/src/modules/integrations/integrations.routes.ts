@@ -243,6 +243,18 @@ export async function integrationsRoutes(app: FastifyInstance) {
     },
   );
 
+  // One-shot cleanup for the duplicate-shipping-log incident — see the
+  // service-level comment on dedupeColiixShippingLogs. Safe to re-run
+  // (idempotent: nothing left to dedupe = zero deletes).
+  app.post(
+    '/coliix/dedupe-logs',
+    { preHandler: [verifyJWT, requirePermission('shipping:push')] },
+    async (_req, reply) => {
+      const result = await coliix.dedupeColiixShippingLogs();
+      return reply.send(result);
+    },
+  );
+
   // Webhook health — last inbound webhook, last poller hit, count in the
   // last hour and 24 hours. Lets the admin tell at a glance whether Coliix
   // is actually calling our URL (the precondition for "instant" updates).

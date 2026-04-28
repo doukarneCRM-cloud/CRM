@@ -32,7 +32,14 @@ function normalize(input: string): string {
  */
 const RULES: Array<{ keys: string[]; status: ShippingStatus }> = [
   // Delivered — most positive terminal state
-  { keys: ['livre', 'livree', 'delivered', 'livraison_effectuee'], status: 'delivered' },
+  // `recu` covers Coliix's "Reçu" wording (= parcel received by client).
+  {
+    keys: [
+      'livre', 'livree', 'delivered', 'livraison_effectuee',
+      'recu', 'recue',
+    ],
+    status: 'delivered',
+  },
 
   // Return validated (accepted by admin)
   { keys: ['retour_valide', 'return_validated'], status: 'return_validated' },
@@ -56,21 +63,35 @@ const RULES: Array<{ keys: string[]; status: ShippingStatus }> = [
   { keys: ['detruit', 'destroyed'], status: 'destroyed' },
   { keys: ['perdu', 'lost'], status: 'lost' },
 
-  // Out for delivery
+  // Out for delivery — "Mise en distribution" is Coliix's wording for
+  // "the courier is out delivering today".
   {
-    keys: ['en_livraison', 'en_cours_de_livraison', 'out_for_delivery', 'livreur_en_route'],
+    keys: [
+      'en_livraison', 'en_cours_de_livraison', 'out_for_delivery',
+      'livreur_en_route', 'mise_en_distribution',
+    ],
     status: 'out_for_delivery',
   },
 
-  // Delivery attempted (client absent / reschedule)
+  // Delivery attempted (client absent / reschedule). `injoignable`,
+  // `reporte`, `client_interesse` are Coliix wordings for "the courier
+  // tried but couldn't drop the parcel" — same operational meaning.
   {
-    keys: ['tentative', 'client_absent', 'non_livre', 'attempted', 'tentative_de_livraison'],
+    keys: [
+      'tentative', 'client_absent', 'non_livre', 'attempted',
+      'tentative_de_livraison', 'injoignable', 'reporte',
+      'client_interesse',
+    ],
     status: 'attempted',
   },
 
-  // In transit
+  // In transit — "Expédié" is Coliix's wording for "shipped" / left
+  // the warehouse, parcel now travelling toward the destination.
   {
-    keys: ['en_cours', 'en_transit', 'in_transit', 'transite', 'en_route'],
+    keys: [
+      'en_cours', 'en_transit', 'in_transit', 'transite', 'en_route',
+      'expedie', 'expediee',
+    ],
     status: 'in_transit',
   },
 
@@ -82,6 +103,7 @@ const RULES: Array<{ keys: string[]; status: ShippingStatus }> = [
       'cree', 'nouveau', 'new', 'created', 'pending',
       'label_created', 'prete', 'en_attente',
       'attente_de_ramassage', 'en_attente_de_ramassage', 'attente_ramassage',
+      'nouveau_colis',
     ],
     status: 'label_created',
   },
@@ -104,36 +126,53 @@ const RULES: Array<{ keys: string[]; status: ShippingStatus }> = [
 ];
 
 // Word-boundary tokeniser: split on `_` so the loose fallback compares
-// whole tokens rather than raw substrings. The old implementation used
-// `key.includes(k) || k.includes(key)`, which made "livre" (delivered)
-// match "livreur" (in "Confirmer par le livreur") and silently flipped
-// shipped-not-delivered orders to delivered. Token equality eliminates
-// this whole class of false positives without losing the variant
-// matches the fallback was meant to catch (e.g. "Refusé par le client"
-// → token `refuse` matches the rule key token `refuse`).
+// whole tokens rather than raw substrings. The old `String.includes`
+// approach made "livre" (delivered) match "livreur" (in "Confirmer par
+// le livreur") and silently flipped shipped-not-delivered orders to
+// delivered.
 function tokens(s: string): string[] {
   return s.split('_').filter(Boolean);
 }
+
+// Generic / structural words that can appear in many unrelated wordings
+// ("client" shows up in both "Client absent" → attempted and "Refusé
+// par client" → return_refused, etc.). We exclude them when deciding
+// whether a rule key shares enough specificity with the input to count
+// as a match. Keeps "client" alone from being a strong signal — only a
+// SECOND token (refuse / absent / …) can disambiguate.
+const GENERIC_TOKENS = new Set([
+  'par', 'le', 'la', 'les', 'de', 'du', 'des', 'au', 'aux', 'a',
+  'en', 'et', 'ou', 'avec', 'pour', 'non', 'colis', 'client',
+]);
 
 /** Returns the mapped ShippingStatus, or null when Coliix's state is unknown. */
 export function mapColiixState(rawState: string | null | undefined): ShippingStatus | null {
   if (!rawState) return null;
   const key = normalize(rawState);
   if (!key) return null;
+
+  // Exact match — the fast, most-trusted path. Most known Coliix wordings
+  // resolve here.
   for (const rule of RULES) {
     if (rule.keys.includes(key)) return rule.status;
   }
-  // Token-based fallback — first rule whose any-key shares at least one
-  // whole-token with the input wins. Catches "Livraison effectuée" (key
-  // tokens [livraison, effectuee]) → delivered (rule token `livraison`),
-  // "Refusé par le client" (tokens [refuse, par, le, client]) →
-  // return_refused (rule token `refuse`), without the substring trap
-  // that confused livre / livreur etc.
+
+  // Token fallback. Stricter than a simple "any token matches" — we
+  // require ALL of a rule key's NON-GENERIC tokens to be present in the
+  // input. That prevents weakly-shared tokens like `client` from
+  // mis-routing "Client intéressé" → return_refused via
+  // `refuse_par_client`'s `client` token. It still resolves the cases
+  // the fallback was designed for: "Refusé par le client" matches the
+  // rule key `refuse` (one specific token, present), "Livraison
+  // effectuée" matches `livraison_effectuee` (both specific tokens
+  // present), "Tentative 2" matches `tentative` (one specific token
+  // present).
   const inputTokens = new Set(tokens(key));
   for (const rule of RULES) {
     for (const k of rule.keys) {
-      const ks = tokens(k);
-      if (ks.some((t) => inputTokens.has(t))) return rule.status;
+      const specific = tokens(k).filter((t) => !GENERIC_TOKENS.has(t));
+      if (specific.length === 0) continue; // key was all-generic, skip
+      if (specific.every((t) => inputTokens.has(t))) return rule.status;
     }
   }
   return null;

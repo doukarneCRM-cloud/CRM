@@ -217,6 +217,26 @@ export function ColiixTab() {
     }
   };
 
+  const [dedupingLogs, setDedupingLogs] = useState(false);
+  const [dedupeMessage, setDedupeMessage] = useState<string | null>(null);
+  const handleDedupeLogs = async () => {
+    setDedupingLogs(true);
+    setDedupeMessage(null);
+    try {
+      const result = await coliixApi.dedupeLogs();
+      setDedupeMessage(
+        t('integrations.coliix.dedupeResult', {
+          deleted: result.deleted,
+          groups: result.duplicateGroups,
+        }),
+      );
+    } catch (e: unknown) {
+      setDedupeMessage(apiErrorMessage(e, t('integrations.coliix.dedupeFailed')));
+    } finally {
+      setDedupingLogs(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -504,6 +524,37 @@ export function ColiixTab() {
                 {remapMessage && (
                   <div className="mt-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
                     {remapMessage}
+                  </div>
+                )}
+
+                {/* Dedupe redundant shipping logs — one-shot fix for the
+                    incident where the poller wrote a fresh log every 5 min
+                    even when the Coliix wording hadn't changed. Keeps the
+                    oldest row per (order, rawState). */}
+                <div className="mt-3 flex items-center justify-between gap-2 border-t border-gray-100 pt-3">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-700">
+                      {t('integrations.coliix.dedupeTitle')}
+                    </p>
+                    <p className="text-[11px] text-gray-400">
+                      {t('integrations.coliix.dedupeSubtitle')}
+                    </p>
+                  </div>
+                  <CRMButton
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleDedupeLogs}
+                    disabled={dedupingLogs}
+                    leftIcon={
+                      dedupingLogs ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />
+                    }
+                  >
+                    {dedupingLogs ? t('integrations.coliix.deduping') : t('integrations.coliix.dedupeCta')}
+                  </CRMButton>
+                </div>
+                {dedupeMessage && (
+                  <div className="mt-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                    {dedupeMessage}
                   </div>
                 )}
               </div>
