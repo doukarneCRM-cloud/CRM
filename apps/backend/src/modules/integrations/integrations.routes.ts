@@ -270,22 +270,41 @@ export async function integrationsRoutes(app: FastifyInstance) {
   // Distinct Coliix raw-state values currently present on orders. Drives
   // the shipping-status chip dropdown so admins filter by Coliix's actual
   // wordings (Ramassé, Livré, Attente De Ramassage, …) instead of our
-  // internal enum.
+  // internal enum. Two synthetic states are appended at the top of the
+  // list when their pool is non-empty:
+  //   - "Not Shipped"   = confirmed orders not yet pushed to Coliix
+  //   - "Label Created" = pushed but no Coliix tracking event yet
+  // filterBuilder.coliixRawStates knows how to translate each back into
+  // the right SQL clause.
   app.get(
     '/coliix/states',
     { preHandler: [verifyJWT] },
     async (_req, reply) => {
       const { prisma } = await import('../../shared/prisma');
-      const rows = await prisma.order.groupBy({
-        by: ['coliixRawState'],
-        where: { coliixRawState: { not: null } },
-        _count: { _all: true },
-        orderBy: { _count: { coliixRawState: 'desc' } },
-      });
+      const [rows, notShippedCount, labelCreatedCount] = await Promise.all([
+        prisma.order.groupBy({
+          by: ['coliixRawState'],
+          where: { coliixRawState: { not: null } },
+          _count: { _all: true },
+          orderBy: { _count: { coliixRawState: 'desc' } },
+        }),
+        prisma.order.count({
+          where: { labelSent: false, confirmationStatus: 'confirmed' },
+        }),
+        prisma.order.count({
+          where: { labelSent: true, coliixRawState: null },
+        }),
+      ]);
+      const synthetic: Array<{ value: string; count: number }> = [];
+      if (notShippedCount > 0) synthetic.push({ value: 'Not Shipped', count: notShippedCount });
+      if (labelCreatedCount > 0) synthetic.push({ value: 'Label Created', count: labelCreatedCount });
       return reply.send({
-        states: rows
-          .filter((r) => r.coliixRawState !== null)
-          .map((r) => ({ value: r.coliixRawState as string, count: r._count._all })),
+        states: [
+          ...synthetic,
+          ...rows
+            .filter((r) => r.coliixRawState !== null)
+            .map((r) => ({ value: r.coliixRawState as string, count: r._count._all })),
+        ],
       });
     },
   );

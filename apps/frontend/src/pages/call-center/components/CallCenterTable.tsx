@@ -1119,16 +1119,28 @@ export function CallCenterTable({ onCreate }: { onCreate?: () => void } = {}) {
     });
   }, [orders, search]);
 
-  // Pipeline split: the Confirmation tab owns orders still being worked by the
-  // call center (any confirmation status — pending, callback, confirmed, etc.).
-  // The Shipping tab only shows orders that have been exported to Coliix —
-  // tracked via `labelSent`. Once a label is sent, follow-up moves to Shipping.
+  // Pipeline split:
+  //   - Confirmation tab: orders the call center is still resolving
+  //     (pending, callback, unreachable, out_of_stock, cancelled, …).
+  //   - Shipping tab: orders that need shipping action OR are already
+  //     in flight. Confirmed-but-not-yet-pushed orders ("ready-to-ship")
+  //     surface here under the synthetic 'Not Shipped' bucket so the
+  //     operator sees the pile alongside the in-flight ones, exactly
+  //     as requested.
+  // Once an order is pushed to Coliix (labelSent=true) it stays in
+  // Shipping regardless of later confirmation-status changes.
   const confirmationOrders = useMemo(
-    () => searchedOrders.filter((o) => !o.labelSent),
+    () =>
+      searchedOrders.filter(
+        (o) => o.confirmationStatus !== 'confirmed' && !o.labelSent,
+      ),
     [searchedOrders],
   );
   const shippingOrders = useMemo(
-    () => searchedOrders.filter((o) => o.labelSent),
+    () =>
+      searchedOrders.filter(
+        (o) => o.labelSent || o.confirmationStatus === 'confirmed',
+      ),
     [searchedOrders],
   );
 

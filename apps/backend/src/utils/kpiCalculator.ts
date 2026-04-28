@@ -764,21 +764,28 @@ export async function computeStatusBreakdown(
   // (labelSent: true). Orders we haven't shipped yet aren't in the
   // shipping pipeline, and orders pushed but with no Coliix update yet
   // fall into a synthetic 'Label Created' bucket so they aren't lost.
-  const [confirmationGroups, coliixGroups, pendingPushedCount] = await Promise.all([
-    prisma.order.groupBy({
-      by: ['confirmationStatus'],
-      where,
-      _count: { _all: true },
-    }),
-    prisma.order.groupBy({
-      by: ['coliixRawState'],
-      where: { ...where, labelSent: true, coliixRawState: { not: null } },
-      _count: { _all: true },
-    }),
-    prisma.order.count({
-      where: { ...where, labelSent: true, coliixRawState: null },
-    }),
-  ]);
+  const [confirmationGroups, coliixGroups, pendingPushedCount, notShippedCount] =
+    await Promise.all([
+      prisma.order.groupBy({
+        by: ['confirmationStatus'],
+        where,
+        _count: { _all: true },
+      }),
+      prisma.order.groupBy({
+        by: ['coliixRawState'],
+        where: { ...where, labelSent: true, coliixRawState: { not: null } },
+        _count: { _all: true },
+      }),
+      prisma.order.count({
+        where: { ...where, labelSent: true, coliixRawState: null },
+      }),
+      // Confirmed orders the operator hasn't pushed to Coliix yet — the
+      // "ready-to-ship" pile. Surfacing it as a synthetic bucket on the
+      // shipping pipeline so it's visible at a glance and filter-able.
+      prisma.order.count({
+        where: { ...where, labelSent: false, confirmationStatus: 'confirmed' },
+      }),
+    ]);
 
   const confirmation: Record<string, number> = {};
   for (const g of confirmationGroups) confirmation[g.confirmationStatus] = g._count._all;
@@ -787,6 +794,7 @@ export async function computeStatusBreakdown(
     if (g.coliixRawState) shipping[g.coliixRawState] = g._count._all;
   }
   if (pendingPushedCount > 0) shipping['Label Created'] = pendingPushedCount;
+  if (notShippedCount > 0) shipping['Not Shipped'] = notShippedCount;
 
   return { confirmation, shipping };
 }
