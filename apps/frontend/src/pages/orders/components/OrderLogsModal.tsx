@@ -7,6 +7,7 @@ import type { OrderLog } from '@/types/orders';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/store/authStore';
 import { PERMISSIONS } from '@/constants/permissions';
+import { colourForColiixRawState } from '@/lib/coliixColour';
 
 // ─── Log type config ──────────────────────────────────────────────────────────
 
@@ -40,36 +41,6 @@ function formatDateTime(iso: string) {
     hour: '2-digit',
     minute: '2-digit',
   });
-}
-
-// Stable colour per Coliix wording — same FNV-ish hash used on the
-// Dashboard / Analytics pipeline so a state reads as the same colour
-// everywhere it appears.
-const COLIIX_PALETTE = [
-  '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
-  '#06B6D4', '#EC4899', '#84CC16', '#F97316', '#6366F1',
-  '#14B8A6', '#A855F7',
-];
-function colourForRawState(s: string): string {
-  // A handful of well-known wordings get a meaningful colour rather than
-  // the hashed default — green for delivered, red for refused, etc.
-  const k = s
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '');
-  if (k.includes('livre')) return '#10B981';            // delivered
-  if (k.includes('refuse')) return '#EF4444';           // refused
-  if (k.includes('retour')) return '#F97316';           // returned
-  if (k.includes('expedie') || k.includes('cours')) return '#3B82F6';
-  if (k.includes('ramasse')) return '#A855F7';          // picked up
-  if (k.includes('attente') || k.includes('nouveau')) return '#9CA3AF';
-  if (k.includes('injoignable')) return '#F59E0B';
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = (h * 16777619) >>> 0;
-  }
-  return COLIIX_PALETTE[h % COLIIX_PALETTE.length];
 }
 
 // Pull Coliix's literal wording out of a shipping log. Prefers
@@ -142,7 +113,7 @@ function LogEntry({ log, isLast }: { log: OrderLog; isLast: boolean }) {
 function ColiixTimelineEntry({ log, isLast }: { log: OrderLog; isLast: boolean }) {
   const rawState = extractColiixRawState(log);
   const displayState = rawState ?? log.action;
-  const colour = rawState ? colourForRawState(rawState) : '#9CA3AF';
+  const colour = rawState ? colourForColiixRawState(rawState) : '#9CA3AF';
   const meta = log.meta as Record<string, unknown> | null;
   const driverNote =
     meta && typeof meta.driverNote === 'string' && meta.driverNote.trim()

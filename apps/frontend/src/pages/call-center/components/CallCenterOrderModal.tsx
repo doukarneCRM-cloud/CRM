@@ -15,6 +15,7 @@ import { ordersApi, supportApi, customersApi, type PendingSibling } from '@/serv
 import type { Order, Product, ShippingCity } from '@/types/orders';
 import { cn } from '@/lib/cn';
 import { apiErrorMessage } from '@/lib/apiError';
+import { colourForColiixRawState } from '@/lib/coliixColour';
 import { useCallCenterStore } from '../callCenterStore';
 import { DuplicateOrdersDialog } from './DuplicateOrdersDialog';
 
@@ -581,7 +582,20 @@ export function CallCenterOrderModal() {
         {/* Status strip */}
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={order.confirmationStatus} size="sm" showDot />
-          <StatusBadge status={order.shippingStatus} size="sm" showDot />
+          {order.coliixRawState ? (
+            <span
+              className="inline-flex items-center gap-1.5 rounded-badge bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-700"
+              title={order.coliixRawState}
+            >
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: colourForColiixRawState(order.coliixRawState) }}
+              />
+              {order.coliixRawState}
+            </span>
+          ) : (
+            <StatusBadge status={order.shippingStatus} size="sm" showDot />
+          )}
           <span className={cn('rounded-badge px-2 py-0.5 text-[10px] font-semibold', tagBadge.className)}>
             {tagBadge.label}
           </span>

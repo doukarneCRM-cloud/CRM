@@ -21,6 +21,7 @@ import {
 import type { Order } from '@/types/orders';
 import { cn } from '@/lib/cn';
 import { formatRef, formatDate } from '@/lib/orderFormat';
+import { colourForColiixRawState } from '@/lib/coliixColour';
 import { useClickOutside } from '@/hooks/useClickOutside';
 import { useCallCenterStore } from '../callCenterStore';
 import { OrderLogsModal } from '@/pages/orders/components/OrderLogsModal';
@@ -217,9 +218,27 @@ function ConfirmationPill({ order, onOpenModal, onRefresh }: ConfirmationPillPro
 }
 
 // ─── Pill: shipping status (read-only display in call center) ────────────────
+// Mirrors the Coliix tracking page: prefer Coliix's own wording (Ramassé,
+// Livré, Mise en distribution…) with a per-state colour, and fall back to
+// the internal enum only for orders that have never been pushed to Coliix.
 
 function ShippingPill({ order }: { order: Order }) {
   const { t } = useTranslation();
+  if (order.coliixRawState) {
+    const colour = colourForColiixRawState(order.coliixRawState);
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 rounded-badge bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-700"
+        title={t('callCenter.row.shippingTooltip', { label: order.coliixRawState })}
+      >
+        <span
+          className="h-1.5 w-1.5 rounded-full"
+          style={{ backgroundColor: colour }}
+        />
+        {order.coliixRawState}
+      </span>
+    );
+  }
   const cfg = SHIPPING_STATUS_COLORS[order.shippingStatus as ShippingStatus];
   if (!cfg) return null;
   return (
