@@ -629,6 +629,51 @@ export async function remapShippingStatusesFromRawState(): Promise<RemapStatuses
     scanned++;
     const mapped = mapColiixState(o.coliixRawState);
     if (mapped === null) {
+      // Special case: order is currently 'delivered' but the wording
+      // that put it there no longer maps to delivered (e.g. "Reçu" was
+      // narrowed out of the delivered bucket because the operator
+      // confirmed it's a hub-side receipt, not client delivery).
+      // Leaving shippingStatus='delivered' here would keep inflating
+      // the dashboard KPI. Demote to 'picked_up' (most conservative
+      // truth: Coliix has the parcel, exact phase unknown) and null
+      // out deliveredAt so revenue analytics drops it.
+      if (o.shippingStatus === 'delivered') {
+        await prisma.order.update({
+          where: { id: o.id },
+          data: {
+            shippingStatus: 'picked_up',
+            deliveredAt: null,
+            lastTrackedAt: new Date(),
+          },
+        });
+        await prisma.orderLog.create({
+          data: {
+            orderId: o.id,
+            type: 'shipping',
+            action: `Coliix re-map: delivered → picked_up (raw "${o.coliixRawState}" no longer mapped)`,
+            performedBy: 'System',
+            meta: {
+              provider: 'coliix',
+              rawState: o.coliixRawState,
+              prevStatus: 'delivered',
+              newStatus: 'picked_up',
+              source: 'remap',
+              reason: 'rawState no longer maps to delivered',
+            } as Prisma.InputJsonValue,
+          },
+        });
+        emitToRoom('orders:all', 'order:updated', { orderId: o.id });
+        changed++;
+        rows.push({
+          orderId: o.id,
+          reference: o.reference,
+          rawState: o.coliixRawState,
+          prevStatus: 'delivered',
+          newStatus: 'picked_up',
+          changed: true,
+        });
+        continue;
+      }
       unmapped++;
       rows.push({
         orderId: o.id,

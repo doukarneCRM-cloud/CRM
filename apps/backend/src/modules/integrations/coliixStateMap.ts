@@ -31,15 +31,15 @@ function normalize(input: string): string {
  * `picked_up` rule, ensuring the label-stage rule wins for that input.
  */
 const RULES: Array<{ keys: string[]; status: ShippingStatus }> = [
-  // Delivered — most positive terminal state
-  // `recu` covers Coliix's "Reçu" wording (= parcel received by client).
-  {
-    keys: [
-      'livre', 'livree', 'delivered', 'livraison_effectuee',
-      'recu', 'recue',
-    ],
-    status: 'delivered',
-  },
+  // Delivered — STRICTLY "Livré" / "Livrée" (and the English literal,
+  // kept as an unambiguous safety net even though Coliix is French-only).
+  // Earlier versions also accepted "Reçu" / "Reçue" and "Livraison
+  // effectuée" but the operator confirmed those are NOT delivery in
+  // their workflow ("Reçu" is courier-side, the parcel is at the hub),
+  // so they were silently inflating the delivered count on the
+  // dashboard. Anything else stays unmapped and is shown as the raw
+  // Coliix wording without counting toward delivered KPIs.
+  { keys: ['livre', 'livree', 'delivered'], status: 'delivered' },
 
   // Return validated (accepted by admin)
   { keys: ['retour_valide', 'return_validated'], status: 'return_validated' },
