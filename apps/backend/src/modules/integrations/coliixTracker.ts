@@ -13,7 +13,7 @@
 
 import { prisma } from '../../shared/prisma';
 import { trackParcel, ColiixError } from './coliixClient';
-import { ingestStatus } from './coliix.service';
+import { ingestStatus, backfillColiixHistoryLogs } from './coliix.service';
 import { getOrCreateProvider } from './providers.service';
 import type { ShippingStatus } from '@prisma/client';
 
@@ -62,11 +62,21 @@ async function pollOnce() {
       if (!order.coliixTrackingId) continue;
       try {
         const track = await trackParcel(order.coliixTrackingId);
+        // Replay any Coliix events we've never logged before — fixes the
+        // "operator sees Livré on Coliix but our timeline doesn't have it"
+        // case where a single event slipped past ingestStatus's idempotent
+        // guard (e.g. API briefly returned a stale latest event).
+        await backfillColiixHistoryLogs(order.id, track.events);
+        // events[0] is the actual newest event by time (extractEvents
+        // sorts newest-first), strictly more reliable than currentState
+        // when the latest event lacks a `status` field. Fall back to
+        // currentState if the events array is empty.
+        const latest = track.events[0];
         await ingestStatus({
           tracking: order.coliixTrackingId,
-          rawState: track.currentState,
-          driverNote: track.events[0]?.driverNote ?? null,
-          eventDate: track.events[0]?.date ? new Date(track.events[0].date) : null,
+          rawState: latest?.state && latest.state !== 'Unknown' ? latest.state : track.currentState,
+          driverNote: latest?.driverNote ?? null,
+          eventDate: latest?.date ? new Date(latest.date) : null,
           source: 'poller',
         });
       } catch (err) {

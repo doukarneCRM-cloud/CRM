@@ -430,6 +430,84 @@ export async function ingestStatus(input: {
   };
 }
 
+/**
+ * Backfill any Coliix events that don't yet have a matching OrderLog row.
+ *
+ * Why this exists: ingestStatus only acts on the latest single event per
+ * tick, so any event that flows by while we're polling the same wording
+ * twice (or while Coliix's API briefly returns stale data) gets lost
+ * forever — the operator complaint that "Coliix shows Livré but our
+ * timeline doesn't". This helper iterates the full Coliix history and
+ * INSERTs any event whose (eventDate, rawState) pair we haven't already
+ * logged for this order. Pure timeline replay — does NOT touch the
+ * order's shippingStatus or fire automations (the caller's ingestStatus
+ * on the latest event handles that).
+ *
+ * Dedupe key is the ISO string of `eventDate` + `||` + the trimmed raw
+ * state. Older logs that didn't carry an eventDate are ignored when
+ * computing the seen-set so we err on the side of NOT spuriously
+ * inserting events we'd already logged via the legacy path.
+ */
+export async function backfillColiixHistoryLogs(
+  orderId: string,
+  events: ColiixTrackEvent[],
+): Promise<{ inserted: number }> {
+  if (events.length === 0) return { inserted: 0 };
+
+  const existing = await prisma.orderLog.findMany({
+    where: { orderId, type: 'shipping' },
+    select: { meta: true, action: true, createdAt: true },
+  });
+
+  const seen = new Set<string>();
+  for (const log of existing) {
+    const m = log.meta as Record<string, unknown> | null;
+    if (!m || m.provider !== 'coliix') continue;
+    const ed = typeof m.eventDate === 'string' ? m.eventDate : null;
+    const rs = typeof m.rawState === 'string' ? m.rawState.trim() : null;
+    if (!ed || !rs) continue;
+    seen.add(`${ed}||${rs}`);
+  }
+
+  // Process oldest-first so the timeline reads naturally if anyone
+  // queries by createdAt as a tiebreaker. Skip events without a
+  // parseable date — those can't be deduped reliably and we don't
+  // want to insert them every poll tick.
+  const oldestFirst = [...events]
+    .filter((e) => e.date && e.state && e.state !== 'Unknown')
+    .sort((a, b) => new Date(a.date!).getTime() - new Date(b.date!).getTime());
+
+  let inserted = 0;
+  for (const evt of oldestFirst) {
+    const trimmedState = evt.state.trim();
+    const key = `${evt.date}||${trimmedState}`;
+    if (seen.has(key)) continue;
+    await prisma.orderLog.create({
+      data: {
+        orderId,
+        type: 'shipping',
+        action: `Coliix raw state → "${trimmedState}" (poller, history backfill)`,
+        performedBy: 'System',
+        meta: {
+          provider: 'coliix',
+          rawState: trimmedState,
+          source: 'poller',
+          eventDate: evt.date,
+          driverNote: evt.driverNote ?? null,
+          historical: true,
+        } as Prisma.InputJsonValue,
+      },
+    });
+    seen.add(key);
+    inserted++;
+  }
+
+  if (inserted > 0) {
+    emitToRoom('orders:all', 'order:updated', { orderId });
+  }
+  return { inserted };
+}
+
 export async function exportOrders(orderIds: string[], actor: JwtPayload): Promise<{
   results: ExportResult[];
   summary: { total: number; ok: number; failed: number };
@@ -575,11 +653,16 @@ export async function trackOrderNow(orderId: string): Promise<TrackNowResult> {
 
   try {
     const track = await trackParcel(order.coliixTrackingId);
+    // Replay any Coliix events not yet in our timeline, then run the
+    // normal ingest on the latest one. See backfillColiixHistoryLogs.
+    await backfillColiixHistoryLogs(order.id, track.events);
+    const latest = track.events[0];
     const ingest = await ingestStatus({
       tracking: order.coliixTrackingId,
-      rawState: track.currentState,
-      driverNote: track.events[0]?.driverNote ?? null,
-      eventDate: track.events[0]?.date ? new Date(track.events[0].date) : null,
+      rawState:
+        latest?.state && latest.state !== 'Unknown' ? latest.state : track.currentState,
+      driverNote: latest?.driverNote ?? null,
+      eventDate: latest?.date ? new Date(latest.date) : null,
       source: 'poller',
     });
     return {

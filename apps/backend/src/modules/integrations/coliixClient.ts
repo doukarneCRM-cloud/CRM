@@ -232,12 +232,28 @@ function rawEventsArray(p: Record<string, unknown>): unknown[] | null {
 
 // Pluck the parcel-state name from one event object. Coliix uses `status`
 // for the parcel state name (e.g. "Nouveau Colis", "Attente De Ramassage")
-// and `etat` for the payment state ("Non Payé") — we want `status`.
+// and `etat` for the payment state ("Non Payé"). For terminal events
+// like "Livré" their dashboard shows the state next to the payment row,
+// and we've seen the state arrive under a few different field names
+// across endpoints / payment states. Walk the common candidates so a
+// missing `status` doesn't make us fall through and emit "Unknown" for
+// an order that genuinely just got delivered.
+const STATE_FIELD_CANDIDATES = [
+  'status',
+  'state',
+  'colorstatus',
+  'etat_colis',
+  'parcel_status',
+  'state_label',
+  'status_label',
+] as const;
 function eventStateName(e: unknown): string | null {
   if (!e || typeof e !== 'object') return null;
   const r = e as Record<string, unknown>;
-  if (typeof r.status === 'string' && r.status.trim()) return r.status.trim();
-  if (typeof r.state === 'string' && r.state.trim()) return r.state.trim();
+  for (const field of STATE_FIELD_CANDIDATES) {
+    const v = r[field];
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
   return null;
 }
 
@@ -266,8 +282,16 @@ function extractCurrentState(payload: unknown): string {
       const tb = parseColiixTime((b as Record<string, unknown>)?.time)?.getTime() ?? 0;
       return tb - ta;
     });
-    const latest = eventStateName(sorted[0]);
-    if (latest) return latest;
+    // Walk the sorted array so a single event with a missing state field
+    // (we've observed this happen for terminal "Livré" events on some
+    // accounts) doesn't make us bail to the legacy fallback and return
+    // "Unknown". The original code returned only on sorted[0]; if that
+    // one event lacked a parseable state, every later, well-formed event
+    // was ignored.
+    for (const evt of sorted) {
+      const state = eventStateName(evt);
+      if (state) return state;
+    }
   }
 
   // Legacy/alternate top-level shapes — keep these so other Coliix endpoints
