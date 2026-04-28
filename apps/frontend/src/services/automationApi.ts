@@ -52,6 +52,18 @@ export interface MessageTemplate {
   updatedAt: string;
 }
 
+// Custom WhatsApp template tied to a literal Coliix raw-state wording.
+// Lets the operator automate around any Coliix wording (Ramassé, Livré,
+// Hub Casablanca, …) without us having to extend the AutomationTrigger
+// enum every time Coliix invents a new state.
+export interface ColiixStateTemplate {
+  id: string;
+  coliixRawState: string;
+  enabled: boolean;
+  body: string;
+  updatedAt: string;
+}
+
 export interface MessageLogRow {
   id: string;
   trigger: AutomationTrigger;
@@ -84,6 +96,18 @@ export const automationApi = {
     api.get<{ data: MessageTemplate[] }>('/automation/templates').then((r) => r.data.data),
   updateTemplate: (trigger: AutomationTrigger, patch: { enabled?: boolean; body?: string }) =>
     api.patch<MessageTemplate>(`/automation/templates/${trigger}`, patch).then((r) => r.data),
+
+  // Coliix-state-keyed templates — one per literal Coliix wording.
+  listColiixTemplates: () =>
+    api
+      .get<{ data: ColiixStateTemplate[] }>('/automation/coliix-templates')
+      .then((r) => r.data.data),
+  upsertColiixTemplate: (payload: { coliixRawState: string; body: string; enabled?: boolean }) =>
+    api
+      .put<ColiixStateTemplate>('/automation/coliix-templates', payload)
+      .then((r) => r.data),
+  deleteColiixTemplate: (id: string) =>
+    api.delete<{ ok: true }>(`/automation/coliix-templates/${id}`).then((r) => r.data),
   listLogs: (query: LogsQuery = {}) =>
     api
       .get<{ rows: MessageLogRow[]; total: number }>('/automation/logs', { params: query })

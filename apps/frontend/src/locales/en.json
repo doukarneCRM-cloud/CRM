@@ -1593,7 +1593,27 @@
       "preview": "Preview",
       "empty": "Empty",
       "saving": "Saving…",
-      "save": "Save"
+      "save": "Save",
+      "coliix": {
+        "title": "Custom Coliix-state templates",
+        "subtitle": "Send a WhatsApp message automatically when an order reaches a specific Coliix status (Ramassé, Livré, Hub Casablanca…). Pin a wording even if no order has it yet — when one arrives, the message fires.",
+        "createTitle": "Add a new Coliix-state template",
+        "pickState": "Pick a Coliix status",
+        "pickStatePlaceholder": "Choose…",
+        "noStatesAvailable": "No new Coliix statuses to pick — every wording already has a template",
+        "customState": "Or type a custom one",
+        "customStatePlaceholder": "e.g. Ramassé, Hub Casablanca",
+        "enabledLabel": "Active immediately",
+        "createCta": "Add template",
+        "creating": "Adding…",
+        "created": "Coliix template added",
+        "rowHint": "Coliix raw state",
+        "delete": "Delete",
+        "deleteConfirm": "Delete the template for \"{{state}}\"?",
+        "deleted": "Coliix template deleted",
+        "deleteFailed": "Failed to delete the Coliix template",
+        "empty": "No Coliix-state templates yet. Add one above to send a custom WhatsApp the moment a parcel reaches a specific status."
+      }
     },
     "sessions": {
       "createFailed": "Failed to create session",

@@ -162,6 +162,52 @@ export async function dispatchOrderStatusChange(
   }
 }
 
+// Fires when Coliix reports a NEW raw-state wording for an order. Looks
+// up a ColiixStateTemplate keyed on that exact wording — this is the
+// path that lets the operator automate around any Coliix state without
+// extending the AutomationTrigger enum (e.g. "Hub Casablanca",
+// "Tentative 2", anything Coliix invents).
+//
+// One template per rawState, no rules / conditions stack — keeps the
+// feature obvious for non-engineers. Dedup on (orderId, rawState) so
+// the same state seen twice in a row only sends once even if a webhook
+// retries.
+export async function dispatchColiixStateChange(
+  orderId: string,
+  prevRawState: string | null,
+  nextRawState: string,
+): Promise<void> {
+  const trimmed = nextRawState.trim();
+  if (!trimmed) return;
+  if (prevRawState && prevRawState.trim() === trimmed) return;
+
+  const template = await prisma.coliixStateTemplate.findUnique({
+    where: { coliixRawState: trimmed },
+  });
+  if (!template || !template.enabled) return;
+
+  const loaded = await loadOrderContext(orderId);
+  if (!loaded) return;
+  const { order, ctx } = loaded;
+
+  const customer = order.customer as typeof order.customer & { whatsappOptOut?: boolean };
+  if (customer.whatsappOptOut) return;
+
+  const body = render(template.body, ctx);
+  // Re-use the existing message log table — pick the closest enum-based
+  // trigger purely so the existing schema's foreign keys + Bull queue
+  // pipeline work without adding columns. The dedupeKey uniquely names
+  // the rawState so this can't collide with the legacy enum dispatchers.
+  await enqueueMessage({
+    trigger: 'shipping_label_created' as AutomationTrigger, // closest enum bucket — see comment above
+    dedupeKey: `${orderId}:coliix-state:${trimmed}`,
+    orderId,
+    agentId: order.agentId,
+    recipientPhone: order.customer.phone,
+    body,
+  });
+}
+
 export async function dispatchCommissionPaid(paymentId: string): Promise<void> {
   const rules = await prisma.automationRule.findMany({
     where: { trigger: 'commission_paid', enabled: true },

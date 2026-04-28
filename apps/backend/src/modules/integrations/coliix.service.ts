@@ -19,7 +19,7 @@ import { emitToRoom } from '../../shared/socket';
 import { createParcel, trackParcel, ColiixError, type ColiixTrackEvent } from './coliixClient';
 import { mapColiixState } from './coliixStateMap';
 import type { JwtPayload } from '../../shared/jwt';
-import { dispatchOrderStatusChange } from '../automation/dispatcher';
+import { dispatchOrderStatusChange, dispatchColiixStateChange } from '../automation/dispatcher';
 
 export interface ExportResult {
   orderId: string;
@@ -301,6 +301,12 @@ export async function ingestStatus(input: {
         } as Prisma.InputJsonValue,
       },
     });
+    // Fire the custom Coliix-state automation even though we couldn't
+    // map the wording to an enum — that's the whole point of the
+    // ColiixStateTemplate path: cover statuses outside our enum.
+    if (trimmedRaw && order.coliixRawState !== trimmedRaw) {
+      void dispatchColiixStateChange(order.id, order.coliixRawState, trimmedRaw);
+    }
     return {
       matched: true,
       changed: trimmedRaw !== '' && order.coliixRawState !== trimmedRaw,
@@ -357,10 +363,20 @@ export async function ingestStatus(input: {
   emitToRoom('dashboard', 'kpi:refresh', {});
 
   // Automation — WhatsApp client notification for the new shipping state.
+  // Two paths fire in parallel:
+  //   1. The legacy enum-based dispatcher for any rule keyed on the
+  //      mapped ShippingStatus enum (shipping_picked_up, shipping_delivered…).
+  //   2. The new Coliix-state-keyed dispatcher for any custom template the
+  //      operator pinned to this exact wording (Ramassé, Hub Casablanca…).
+  // Both are fire-and-forget; the queue + dedupe key make repeated calls
+  // for the same state a no-op.
   void dispatchOrderStatusChange(order.id, {
     prev: { confirmation: order.confirmationStatus, shipping: order.shippingStatus },
     next: { confirmation: order.confirmationStatus, shipping: mapped },
   });
+  if (trimmedRaw) {
+    void dispatchColiixStateChange(order.id, order.coliixRawState, trimmedRaw);
+  }
 
   return {
     matched: true,

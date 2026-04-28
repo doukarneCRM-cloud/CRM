@@ -1124,6 +1124,23 @@ enum WhatsAppMessageDirection {
   out
 }
 
+// Custom WhatsApp templates keyed on Coliix's literal status wordings —
+// lets the operator define an automation for any Coliix state (Ramassé,
+// Livré, Hub Casablanca, …) without us having to extend the
+// AutomationTrigger enum. Fired by the Coliix dispatcher whenever a
+// parcel's coliixRawState changes to the wording stored here.
+model ColiixStateTemplate {
+  id             String   @id @default(cuid())
+  coliixRawState String   @unique
+  enabled        Boolean  @default(false)
+  body           String
+  updatedById    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([enabled])
+}
+
 model MessageTemplate {
   id          String            @id @default(cuid())
   trigger     AutomationTrigger @unique

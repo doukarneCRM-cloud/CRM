@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { Save } from 'lucide-react';
+import { Plus, Save, Trash2 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { useAuthStore } from '@/store/authStore';
@@ -10,8 +10,10 @@ import { PERMISSIONS } from '@/constants/permissions';
 import {
   automationApi,
   type AutomationTrigger,
+  type ColiixStateTemplate,
   type MessageTemplate,
 } from '@/services/automationApi';
+import { coliixApi } from '@/services/providersApi';
 import { VariableChips } from '../components/VariableChips';
 
 function triggerLabel(t: TFunction, trigger: AutomationTrigger): string {
@@ -73,6 +75,7 @@ export function TemplatesTab() {
   }
 
   return (
+    <div className="flex flex-col gap-6">
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
       {templates.map((tpl) => {
         const draft = drafts[tpl.trigger] ?? { enabled: tpl.enabled, body: tpl.body };
@@ -109,6 +112,9 @@ export function TemplatesTab() {
           />
         );
       })}
+    </div>
+
+      <ColiixStateTemplatesSection canManage={canManage} />
     </div>
   );
 }
@@ -239,5 +245,275 @@ function Toggle({
         ].join(' ')}
       />
     </button>
+  );
+}
+
+// ─── Coliix-state-keyed templates ──────────────────────────────────────────
+// Custom templates pinned to Coliix's literal status wordings. The
+// dropdown is populated from coliixApi.states() (= wordings actually
+// present on orders) plus a free-text input so the operator can pin a
+// template to a wording that hasn't appeared yet — when Coliix later
+// flips a parcel to it, the dispatcher fires the matching template.
+
+function ColiixStateTemplatesSection({ canManage }: { canManage: boolean }) {
+  const { t } = useTranslation();
+  const pushToast = useToastStore((s) => s.push);
+  const [items, setItems] = useState<ColiixStateTemplate[]>([]);
+  const [knownStates, setKnownStates] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // New-template form state
+  const [newState, setNewState] = useState('');
+  const [customState, setCustomState] = useState('');
+  const [newBody, setNewBody] = useState('');
+  const [newEnabled, setNewEnabled] = useState(true);
+  const [creating, setCreating] = useState(false);
+
+  // Per-row edit state
+  const [drafts, setDrafts] = useState<Record<string, { body: string; enabled: boolean }>>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [tpls, states] = await Promise.all([
+        automationApi.listColiixTemplates(),
+        coliixApi.states().catch(() => []),
+      ]);
+      setItems(tpls);
+      setKnownStates(states.map((s) => s.value));
+      const d: Record<string, { body: string; enabled: boolean }> = {};
+      for (const it of tpls) d[it.id] = { body: it.body, enabled: it.enabled };
+      setDrafts(d);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  // Statuses that don't already have a template — those are the ones the
+  // dropdown should propose. Existing templates can still be edited via
+  // the row below, no need to re-pick them in the picker.
+  const taken = useMemo(() => new Set(items.map((i) => i.coliixRawState)), [items]);
+  const pickable = useMemo(
+    () => knownStates.filter((s) => !taken.has(s)).sort((a, b) => a.localeCompare(b, 'fr')),
+    [knownStates, taken],
+  );
+
+  const resolvedNewState = (customState.trim() || newState.trim()).trim();
+  const canCreate =
+    canManage && !creating && resolvedNewState.length > 0 && newBody.trim().length > 0;
+
+  const handleCreate = async () => {
+    if (!canCreate) return;
+    setCreating(true);
+    try {
+      await automationApi.upsertColiixTemplate({
+        coliixRawState: resolvedNewState,
+        body: newBody,
+        enabled: newEnabled,
+      });
+      setNewState('');
+      setCustomState('');
+      setNewBody('');
+      setNewEnabled(true);
+      await load();
+      pushToast({ kind: 'success', title: t('automation.templates.coliix.created') });
+    } catch {
+      pushToast({ kind: 'error', title: t('automation.templates.saveFailed') });
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleSave = async (item: ColiixStateTemplate) => {
+    const draft = drafts[item.id];
+    if (!draft) return;
+    setSavingId(item.id);
+    try {
+      const updated = await automationApi.upsertColiixTemplate({
+        coliixRawState: item.coliixRawState,
+        body: draft.body,
+        enabled: draft.enabled,
+      });
+      setItems((list) => list.map((x) => (x.id === item.id ? updated : x)));
+      pushToast({ kind: 'success', title: t('automation.templates.saved') });
+    } catch {
+      pushToast({ kind: 'error', title: t('automation.templates.saveFailed') });
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const handleDelete = async (item: ColiixStateTemplate) => {
+    if (!confirm(t('automation.templates.coliix.deleteConfirm', { state: item.coliixRawState }))) {
+      return;
+    }
+    setSavingId(item.id);
+    try {
+      await automationApi.deleteColiixTemplate(item.id);
+      setItems((list) => list.filter((x) => x.id !== item.id));
+      pushToast({ kind: 'success', title: t('automation.templates.coliix.deleted') });
+    } catch {
+      pushToast({ kind: 'error', title: t('automation.templates.coliix.deleteFailed') });
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  return (
+    <section className="flex flex-col gap-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <div>
+          <h2 className="text-base font-semibold text-gray-900">
+            {t('automation.templates.coliix.title')}
+          </h2>
+          <p className="text-[11px] text-gray-400">
+            {t('automation.templates.coliix.subtitle')}
+          </p>
+        </div>
+      </div>
+
+      {canManage && (
+        <GlassCard padding="md" className="flex flex-col gap-3">
+          <p className="text-xs font-semibold text-gray-700">
+            {t('automation.templates.coliix.createTitle')}
+          </p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-[11px] font-semibold text-gray-500">
+                {t('automation.templates.coliix.pickState')}
+              </label>
+              <select
+                value={newState}
+                onChange={(e) => {
+                  setNewState(e.target.value);
+                  if (e.target.value) setCustomState('');
+                }}
+                disabled={!canManage || pickable.length === 0}
+                className="w-full rounded-btn border border-gray-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none disabled:bg-gray-50"
+              >
+                <option value="">
+                  {pickable.length > 0
+                    ? t('automation.templates.coliix.pickStatePlaceholder')
+                    : t('automation.templates.coliix.noStatesAvailable')}
+                </option>
+                {pickable.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] font-semibold text-gray-500">
+                {t('automation.templates.coliix.customState')}
+              </label>
+              <input
+                type="text"
+                value={customState}
+                onChange={(e) => {
+                  setCustomState(e.target.value);
+                  if (e.target.value) setNewState('');
+                }}
+                placeholder={t('automation.templates.coliix.customStatePlaceholder') as string}
+                className="w-full rounded-btn border border-gray-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none"
+                maxLength={120}
+              />
+            </div>
+          </div>
+          <textarea
+            value={newBody}
+            onChange={(e) => setNewBody(e.target.value)}
+            rows={3}
+            placeholder={t('automation.templates.bodyPlaceholder')}
+            className="w-full resize-y rounded-btn border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+          <div className="flex items-center justify-between gap-3">
+            <label className="flex items-center gap-2 text-xs text-gray-600">
+              <Toggle checked={newEnabled} onChange={setNewEnabled} />
+              {t('automation.templates.coliix.enabledLabel')}
+            </label>
+            <CRMButton
+              size="sm"
+              leftIcon={<Plus size={14} />}
+              disabled={!canCreate}
+              onClick={handleCreate}
+            >
+              {creating
+                ? t('automation.templates.coliix.creating')
+                : t('automation.templates.coliix.createCta')}
+            </CRMButton>
+          </div>
+        </GlassCard>
+      )}
+
+      {loading ? (
+        <div className="skeleton h-32 w-full rounded-card" />
+      ) : items.length === 0 ? (
+        <p className="rounded-card border border-dashed border-gray-200 bg-gray-50/60 px-3 py-6 text-center text-xs text-gray-400">
+          {t('automation.templates.coliix.empty')}
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+          {items.map((item) => {
+            const draft = drafts[item.id] ?? { body: item.body, enabled: item.enabled };
+            const dirty = draft.body !== item.body || draft.enabled !== item.enabled;
+            const setDraft = (next: Partial<{ body: string; enabled: boolean }>) =>
+              setDrafts((d) => ({ ...d, [item.id]: { ...draft, ...next } }));
+            return (
+              <GlassCard key={item.id} padding="md" className="flex flex-col gap-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">{item.coliixRawState}</h3>
+                    <p className="text-[10px] uppercase tracking-wide text-gray-400">
+                      {t('automation.templates.coliix.rowHint')}
+                    </p>
+                  </div>
+                  <Toggle
+                    checked={draft.enabled}
+                    onChange={(v) => setDraft({ enabled: v })}
+                    disabled={!canManage}
+                  />
+                </div>
+                <textarea
+                  value={draft.body}
+                  onChange={(e) => setDraft({ body: e.target.value })}
+                  disabled={!canManage}
+                  rows={4}
+                  className="w-full resize-y rounded-btn border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:bg-gray-50"
+                />
+                {canManage && (
+                  <div className="flex items-center justify-between gap-2">
+                    <CRMButton
+                      variant="ghost"
+                      size="sm"
+                      leftIcon={<Trash2 size={13} />}
+                      onClick={() => handleDelete(item)}
+                      className="text-red-600 hover:bg-red-50"
+                    >
+                      {t('automation.templates.coliix.delete')}
+                    </CRMButton>
+                    <CRMButton
+                      size="sm"
+                      leftIcon={<Save size={13} />}
+                      disabled={!dirty || savingId === item.id}
+                      onClick={() => handleSave(item)}
+                    >
+                      {savingId === item.id
+                        ? t('automation.templates.saving')
+                        : t('automation.templates.save')}
+                    </CRMButton>
+                  </div>
+                )}
+              </GlassCard>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }

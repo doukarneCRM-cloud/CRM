@@ -28,6 +28,50 @@ export async function automationRoutes(app: FastifyInstance) {
     },
   );
 
+  // ── Coliix-state-keyed templates ─────────────────────────────────────
+  // Custom templates that fire when an order's coliixRawState changes to
+  // a wording the operator pinned (Ramassé, Livré, Hub Casablanca, …).
+  app.get(
+    '/coliix-templates',
+    { preHandler: [verifyJWT, requirePermission('automation:view')] },
+    async (_req, reply) => {
+      const rows = await svc.listColiixStateTemplates();
+      return reply.send({ data: rows });
+    },
+  );
+
+  app.put(
+    '/coliix-templates',
+    { preHandler: [verifyJWT, requirePermission('automation:manage')] },
+    async (req, reply) => {
+      const body = req.body as {
+        coliixRawState: string;
+        body: string;
+        enabled?: boolean;
+      };
+      if (!body?.coliixRawState || typeof body.body !== 'string') {
+        return reply.status(400).send({
+          error: { code: 'VALIDATION_ERROR', message: 'coliixRawState and body are required' },
+        });
+      }
+      const row = await svc.upsertColiixStateTemplate(
+        body.coliixRawState,
+        { body: body.body, enabled: body.enabled },
+        req.user.sub,
+      );
+      return reply.send(row);
+    },
+  );
+
+  app.delete<{ Params: { id: string } }>(
+    '/coliix-templates/:id',
+    { preHandler: [verifyJWT, requirePermission('automation:manage')] },
+    async (req, reply) => {
+      await svc.deleteColiixStateTemplate(req.params.id);
+      return reply.send({ ok: true });
+    },
+  );
+
   app.get(
     '/logs',
     { preHandler: [verifyJWT, requirePermission('automation:view')] },

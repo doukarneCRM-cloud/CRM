@@ -1593,7 +1593,27 @@
       "preview": "Aperçu",
       "empty": "Vide",
       "saving": "Enregistrement…",
-      "save": "Enregistrer"
+      "save": "Enregistrer",
+      "coliix": {
+        "title": "Modèles personnalisés (statuts Coliix)",
+        "subtitle": "Envoyer un WhatsApp automatiquement quand une commande atteint un statut Coliix précis (Ramassé, Livré, Hub Casablanca…). Pinglez un libellé même s'il n'existe encore sur aucune commande — il s'activera dès qu'une l'atteint.",
+        "createTitle": "Ajouter un nouveau modèle Coliix",
+        "pickState": "Choisir un statut Coliix",
+        "pickStatePlaceholder": "Choisir…",
+        "noStatesAvailable": "Tous les statuts Coliix existants ont déjà un modèle",
+        "customState": "Ou en saisir un autre",
+        "customStatePlaceholder": "ex. Ramassé, Hub Casablanca",
+        "enabledLabel": "Actif immédiatement",
+        "createCta": "Ajouter le modèle",
+        "creating": "Ajout…",
+        "created": "Modèle Coliix ajouté",
+        "rowHint": "État Coliix",
+        "delete": "Supprimer",
+        "deleteConfirm": "Supprimer le modèle pour « {{state}} » ?",
+        "deleted": "Modèle Coliix supprimé",
+        "deleteFailed": "Échec de la suppression du modèle Coliix",
+        "empty": "Aucun modèle Coliix pour l'instant. Ajoutez-en un ci-dessus pour envoyer un WhatsApp personnalisé dès qu'un colis atteint un statut donné."
+      }
     },
     "sessions": {
       "createFailed": "Échec de la création de la session",
