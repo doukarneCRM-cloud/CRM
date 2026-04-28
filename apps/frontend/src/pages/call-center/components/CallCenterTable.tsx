@@ -895,11 +895,19 @@ function FilterPills({ section, orders, selected, onChange }: FilterPillsProps) 
           </span>
         </button>
         {visibleStatusKeys.map((status) => {
-          const cfg = getStatusConfig(status);
           const count = counts.get(status) ?? 0;
           if (count === 0) return null;
           const active = selected === status;
           const showTodayBadge = status === 'callback' && callbackTodayCount > 0;
+          // Shipping section uses Coliix's own wordings ("Expédié",
+          // "Ramassé", …) which aren't in the internal enum, so
+          // getStatusConfig falls back to gray for all of them. Look
+          // up the per-state colour so pills are visually distinct
+          // and match the row badges + the order-log timeline.
+          const isColiixPill =
+            section === 'shipping' && status !== 'Label Created' && status !== 'Not Shipped';
+          const coliixColour = isColiixPill ? colourForColiixRawState(status) : null;
+          const cfg = getStatusConfig(status);
           return (
             <button
               key={status}
@@ -907,14 +915,25 @@ function FilterPills({ section, orders, selected, onChange }: FilterPillsProps) 
               onClick={() => onChange(active ? null : status)}
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-badge px-2.5 py-1 text-[11px] font-semibold transition',
-                active
+                isColiixPill
+                  ? cn(
+                      'bg-gray-100 text-gray-700',
+                      active ? 'shadow-sm ring-2' : 'opacity-70 hover:opacity-100',
+                    )
+                  : active
                   ? cn(cfg.bg, cfg.text, 'ring-2 ring-primary/40 shadow-sm')
                   : cn(cfg.bg, cfg.text, 'opacity-70 hover:opacity-100'),
               )}
+              style={isColiixPill && active && coliixColour
+                ? { boxShadow: `0 0 0 2px ${coliixColour}66` }
+                : undefined}
               title={showTodayBadge ? t('callCenter.toCallToday', { count: callbackTodayCount }) : undefined}
             >
-              <span className={cn('h-1.5 w-1.5 rounded-full', cfg.dot)} />
-              {cfg.label}
+              <span
+                className={cn('h-1.5 w-1.5 rounded-full', !isColiixPill && cfg.dot)}
+                style={isColiixPill && coliixColour ? { backgroundColor: coliixColour } : undefined}
+              />
+              {isColiixPill ? status : cfg.label}
               <span className="rounded-full bg-white/60 px-1.5 text-[10px] font-bold">
                 {count}
               </span>
