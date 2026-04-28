@@ -294,22 +294,45 @@ export async function ingestStatus(input: {
     }
 
     // rawState actually changed → persist + log + dispatch (once).
+    // Self-correcting demote: when the previous wording put the order
+    // into 'delivered' but the new wording no longer maps there (e.g.
+    // a courier later corrected "Livré" to "En cours" or to a wording
+    // we don't recognise), we MUST move shippingStatus out of
+    // delivered. Otherwise dashboard KPIs and the Coliix-wording
+    // breakdown disagree forever — the operator complaint that "Livré
+    // count and delivered KPI never match". picked_up is the safest
+    // truth: Coliix has the parcel, exact phase unknown.
+    const demoteFromDelivered = order.shippingStatus === 'delivered';
     await prisma.order.update({
       where: { id: order.id },
-      data: { coliixRawState: trimmedRaw, lastTrackedAt: new Date() },
+      data: {
+        coliixRawState: trimmedRaw,
+        lastTrackedAt: new Date(),
+        ...(demoteFromDelivered
+          ? { shippingStatus: 'picked_up', deliveredAt: null }
+          : {}),
+      },
     });
     emitToRoom('orders:all', 'order:updated', { orderId: order.id });
+    if (demoteFromDelivered) {
+      emitToRoom('dashboard', 'kpi:refresh', {});
+    }
 
     await prisma.orderLog.create({
       data: {
         orderId: order.id,
         type: 'shipping',
-        action: `Coliix raw state → "${input.rawState}" (${input.source}) — no enum mapping, raw text saved`,
+        action: demoteFromDelivered
+          ? `Coliix raw state → "${input.rawState}" (${input.source}) — demoted from delivered (wording no longer maps to delivered)`
+          : `Coliix raw state → "${input.rawState}" (${input.source}) — no enum mapping, raw text saved`,
         performedBy: 'System',
         meta: {
           provider: 'coliix',
           rawState: input.rawState,
           source: input.source,
+          ...(demoteFromDelivered
+            ? { demoted: true, prevStatus: 'delivered', newStatus: 'picked_up' }
+            : {}),
         } as Prisma.InputJsonValue,
       },
     });
