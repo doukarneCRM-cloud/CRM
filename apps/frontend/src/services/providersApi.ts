@@ -120,6 +120,28 @@ export const coliixApi = {
       )
       .then((r) => r.data),
 
+  // Re-apply the local Coliix → ShippingStatus mapping to every order
+  // that has a stored coliixRawState. No outbound API calls; corrects
+  // historical mismappings (e.g. orders previously bucketed wrongly
+  // when "Confirmer par le livreur" was mapping to delivered).
+  remapStatuses: () =>
+    api
+      .post<{
+        scanned: number;
+        changed: number;
+        unchanged: number;
+        unmapped: number;
+        rows: Array<{
+          orderId: string;
+          reference: string;
+          rawState: string;
+          prevStatus: string;
+          newStatus: string | null;
+          changed: boolean;
+        }>;
+      }>('/integrations/coliix/remap-statuses', undefined, { timeout: 120_000 })
+      .then((r) => r.data),
+
   // "Is Coliix actually calling us?" health snapshot.
   webhookHealth: () =>
     api.get<ColiixWebhookHealth>('/integrations/coliix/webhook-health').then((r) => r.data),

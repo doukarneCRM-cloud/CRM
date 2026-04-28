@@ -571,6 +571,113 @@ export async function trackOrderNow(orderId: string): Promise<TrackNowResult> {
   }
 }
 
+// Re-applies the current mapColiixState rules to every order that has a
+// stored coliixRawState. Doesn't talk to Coliix at all — just recomputes
+// the enum bucket from the wording we already have in the DB. Use this
+// after changing the mapping rules so existing orders inherit the new
+// classification without waiting for the next webhook / poller tick.
+export interface RemapStatusesResult {
+  scanned: number;
+  changed: number;
+  unchanged: number;
+  unmapped: number;
+  rows: Array<{
+    orderId: string;
+    reference: string;
+    rawState: string;
+    prevStatus: ShippingStatus;
+    newStatus: ShippingStatus | null;
+    changed: boolean;
+  }>;
+}
+
+export async function remapShippingStatusesFromRawState(): Promise<RemapStatusesResult> {
+  const orders = await prisma.order.findMany({
+    where: {
+      coliixRawState: { not: null },
+      labelSent: true,
+    },
+    select: {
+      id: true,
+      reference: true,
+      coliixRawState: true,
+      shippingStatus: true,
+      deliveredAt: true,
+    },
+  });
+
+  let scanned = 0;
+  let changed = 0;
+  let unchanged = 0;
+  let unmapped = 0;
+  const rows: RemapStatusesResult['rows'] = [];
+
+  for (const o of orders) {
+    if (!o.coliixRawState) continue;
+    scanned++;
+    const mapped = mapColiixState(o.coliixRawState);
+    if (mapped === null) {
+      unmapped++;
+      rows.push({
+        orderId: o.id,
+        reference: o.reference,
+        rawState: o.coliixRawState,
+        prevStatus: o.shippingStatus,
+        newStatus: null,
+        changed: false,
+      });
+      continue;
+    }
+    if (mapped === o.shippingStatus) {
+      unchanged++;
+      continue;
+    }
+    // Promote / demote the order. Side effects:
+    //   - if we're newly delivering it AND deliveredAt is null, stamp it now
+    //   - if we're moving OUT of delivered (i.e. correcting an old mismap),
+    //     null out deliveredAt so revenue analytics drops it
+    const data: Prisma.OrderUpdateInput = {
+      shippingStatus: mapped,
+      lastTrackedAt: new Date(),
+    };
+    if (mapped === 'delivered' && !o.deliveredAt) data.deliveredAt = new Date();
+    if (o.shippingStatus === 'delivered' && mapped !== 'delivered') data.deliveredAt = null;
+
+    await prisma.order.update({ where: { id: o.id }, data });
+    await prisma.orderLog.create({
+      data: {
+        orderId: o.id,
+        type: 'shipping',
+        action: `Coliix re-map: ${o.shippingStatus} → ${mapped} (raw "${o.coliixRawState}")`,
+        performedBy: 'System',
+        meta: {
+          provider: 'coliix',
+          rawState: o.coliixRawState,
+          prevStatus: o.shippingStatus,
+          newStatus: mapped,
+          source: 'remap',
+        } as Prisma.InputJsonValue,
+      },
+    });
+    emitToRoom('orders:all', 'order:updated', { orderId: o.id });
+    changed++;
+    rows.push({
+      orderId: o.id,
+      reference: o.reference,
+      rawState: o.coliixRawState,
+      prevStatus: o.shippingStatus,
+      newStatus: mapped,
+      changed: true,
+    });
+  }
+
+  if (changed > 0) {
+    emitToRoom('dashboard', 'kpi:refresh', {});
+  }
+
+  return { scanned, changed, unchanged, unmapped, rows };
+}
+
 export interface RefreshAllResult {
   total: number;
   changed: number;

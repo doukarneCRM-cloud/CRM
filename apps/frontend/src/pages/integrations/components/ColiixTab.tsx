@@ -196,6 +196,27 @@ export function ColiixTab() {
     }
   };
 
+  const [remapping, setRemapping] = useState(false);
+  const [remapMessage, setRemapMessage] = useState<string | null>(null);
+  const handleRemap = async () => {
+    setRemapping(true);
+    setRemapMessage(null);
+    try {
+      const result = await coliixApi.remapStatuses();
+      setRemapMessage(
+        t('integrations.coliix.remapResult', {
+          scanned: result.scanned,
+          changed: result.changed,
+          unmapped: result.unmapped,
+        }),
+      );
+    } catch (e: unknown) {
+      setRemapMessage(apiErrorMessage(e, t('integrations.coliix.remapFailed')));
+    } finally {
+      setRemapping(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -455,6 +476,36 @@ export function ColiixTab() {
                 )}
 
                 {syncResult && <SyncResultsPanel result={syncResult} />}
+
+                {/* Re-map existing orders against the current rules — useful
+                    after a mapping bugfix lands so historical orders inherit
+                    the corrected enum without waiting for the next webhook. */}
+                <div className="mt-3 flex items-center justify-between gap-2 border-t border-gray-100 pt-3">
+                  <div>
+                    <p className="text-xs font-semibold text-gray-700">
+                      {t('integrations.coliix.remapTitle')}
+                    </p>
+                    <p className="text-[11px] text-gray-400">
+                      {t('integrations.coliix.remapSubtitle')}
+                    </p>
+                  </div>
+                  <CRMButton
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleRemap}
+                    disabled={remapping}
+                    leftIcon={
+                      remapping ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />
+                    }
+                  >
+                    {remapping ? t('integrations.coliix.remapping') : t('integrations.coliix.remapCta')}
+                  </CRMButton>
+                </div>
+                {remapMessage && (
+                  <div className="mt-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                    {remapMessage}
+                  </div>
+                )}
               </div>
             )}
           </div>

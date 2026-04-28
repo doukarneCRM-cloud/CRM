@@ -229,6 +229,20 @@ export async function integrationsRoutes(app: FastifyInstance) {
     return reply.send(result);
   });
 
+  // Re-apply the current mapColiixState rules to every order with a
+  // stored coliixRawState. No Coliix API calls — just recomputes the
+  // enum bucket from data we already have. Use after a mapping rule
+  // change to backfill existing orders without waiting for the next
+  // webhook / poller tick.
+  app.post(
+    '/coliix/remap-statuses',
+    { preHandler: [verifyJWT, requirePermission('shipping:push')] },
+    async (_req, reply) => {
+      const result = await coliix.remapShippingStatusesFromRawState();
+      return reply.send(result);
+    },
+  );
+
   // Webhook health — last inbound webhook, last poller hit, count in the
   // last hour and 24 hours. Lets the admin tell at a glance whether Coliix
   // is actually calling our URL (the precondition for "instant" updates).
