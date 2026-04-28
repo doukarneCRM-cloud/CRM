@@ -1141,6 +1141,30 @@ model ColiixStateTemplate {
   @@index([enabled])
 }
 
+// Admin-editable mapping from Coliix's literal wording to our internal
+// ShippingStatus enum. Replaces the hard-coded RULES table that used to
+// live in coliixStateMap.ts. internalStatus = null means "stay raw":
+// coliixRawState on the order still updates with the literal wording so
+// the timeline shows what Coliix said, but shippingStatus is left alone
+// so the wording never pollutes KPIs. mapColiixState reads this table
+// (cached in-memory with 60s TTL + explicit invalidation on save).
+//
+// Seeded by migration with parity to the previous hard-coded rules, plus
+// an auto-discover row per coliixRawState already observed on Order rows
+// so the editor lists everything in production from day one. Subsequent
+// ingestStatus calls upsert any newly seen wording with internalStatus
+// null, so the table grows naturally.
+model ColiixStatusMapping {
+  coliixWording  String          @id
+  internalStatus ShippingStatus?
+  note           String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  updatedById    String?
+
+  @@index([internalStatus])
+}
+
 model MessageTemplate {
   id          String            @id @default(cuid())
   trigger     AutomationTrigger @unique

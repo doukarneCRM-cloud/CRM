@@ -275,7 +275,25 @@ export async function ingestStatus(input: {
   }
 
   const trimmedRaw = input.rawState.trim();
-  const mapped = mapColiixState(input.rawState);
+
+  // Auto-discover: ensure every Coliix wording we see has a row in the
+  // mapping table so the admin editor shows it. internalStatus = NULL
+  // means "stay raw" — the wording flows into coliixRawState and the
+  // timeline, but doesn't transition shippingStatus. Idempotent on
+  // repeat hits because we only upsert when the wording is actually
+  // new for this order. Fire-and-forget: webhook 200s never depend on
+  // this finishing.
+  if (trimmedRaw && trimmedRaw !== order.coliixRawState) {
+    void prisma.coliixStatusMapping
+      .upsert({
+        where: { coliixWording: trimmedRaw },
+        update: {},
+        create: { coliixWording: trimmedRaw, internalStatus: null },
+      })
+      .catch(() => {});
+  }
+
+  const mapped = await mapColiixState(input.rawState);
 
   if (!mapped) {
     // Idempotent on the raw wording. The poller re-fetches every 5 min;
@@ -672,7 +690,7 @@ export async function trackOrderNow(orderId: string): Promise<TrackNowResult> {
       tracking: order.coliixTrackingId,
       prevStatus: order.shippingStatus,
       coliix: { currentState: track.currentState, events: track.events },
-      mapped: ingest.newStatus ?? mapColiixState(track.currentState),
+      mapped: ingest.newStatus ?? (await mapColiixState(track.currentState)),
       changed: ingest.changed,
       newStatus: ingest.newStatus,
       reason: ingest.reason,
@@ -741,7 +759,7 @@ export async function remapShippingStatusesFromRawState(): Promise<RemapStatuses
   for (const o of orders) {
     if (!o.coliixRawState) continue;
     scanned++;
-    const mapped = mapColiixState(o.coliixRawState);
+    const mapped = await mapColiixState(o.coliixRawState);
     if (mapped === null) {
       // Special case: order is currently 'delivered' but the wording
       // that put it there no longer maps to delivered (e.g. "Reçu" was
