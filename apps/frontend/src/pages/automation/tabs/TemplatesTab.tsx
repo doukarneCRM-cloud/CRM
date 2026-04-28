@@ -14,7 +14,7 @@ import {
   type MessageTemplate,
 } from '@/services/automationApi';
 import { coliixApi } from '@/services/providersApi';
-import { VariableChips } from '../components/VariableChips';
+import { VariableChips, CLIENT_BASE_CHIPS } from '../components/VariableChips';
 
 function triggerLabel(t: TFunction, trigger: AutomationTrigger): string {
   return t(`automation.triggersLong.${trigger}`);
@@ -268,10 +268,36 @@ function ColiixStateTemplatesSection({ canManage }: { canManage: boolean }) {
   const [newBody, setNewBody] = useState('');
   const [newEnabled, setNewEnabled] = useState(true);
   const [creating, setCreating] = useState(false);
+  const newBodyRef = useRef<HTMLTextAreaElement>(null);
 
   // Per-row edit state
   const [drafts, setDrafts] = useState<Record<string, { body: string; enabled: boolean }>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const editRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
+
+  // Insert a `{{scope.key}}` token at the textarea's current cursor (or at
+  // the end if no element / no selection). Mirrors the helper used by the
+  // legacy TemplateCard so chips behave identically here.
+  const insertAt = (
+    el: HTMLTextAreaElement | null | undefined,
+    current: string,
+    token: string,
+    setBody: (s: string) => void,
+  ) => {
+    if (!el) {
+      setBody((current ?? '') + token);
+      return;
+    }
+    const start = el.selectionStart ?? current.length;
+    const end = el.selectionEnd ?? current.length;
+    const next = current.slice(0, start) + token + current.slice(end);
+    setBody(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + token.length;
+      el.setSelectionRange(pos, pos);
+    });
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -425,7 +451,19 @@ function ColiixStateTemplatesSection({ canManage }: { canManage: boolean }) {
               />
             </div>
           </div>
+          <div className="flex flex-col gap-2">
+            <p className="text-[11px] font-medium text-gray-500">
+              {t('automation.templates.variablesHint')}
+            </p>
+            <VariableChips
+              groups={CLIENT_BASE_CHIPS}
+              onInsert={(token) =>
+                insertAt(newBodyRef.current, newBody, token, setNewBody)
+              }
+            />
+          </div>
           <textarea
+            ref={newBodyRef}
             value={newBody}
             onChange={(e) => setNewBody(e.target.value)}
             rows={3}
@@ -479,7 +517,23 @@ function ColiixStateTemplatesSection({ canManage }: { canManage: boolean }) {
                     disabled={!canManage}
                   />
                 </div>
+                <div className="flex flex-col gap-2">
+                  <p className="text-[11px] font-medium text-gray-500">
+                    {t('automation.templates.variablesHint')}
+                  </p>
+                  <VariableChips
+                    groups={CLIENT_BASE_CHIPS}
+                    onInsert={(token) =>
+                      insertAt(editRefs.current[item.id], draft.body, token, (b) =>
+                        setDraft({ body: b }),
+                      )
+                    }
+                  />
+                </div>
                 <textarea
+                  ref={(el) => {
+                    editRefs.current[item.id] = el;
+                  }}
                   value={draft.body}
                   onChange={(e) => setDraft({ body: e.target.value })}
                   disabled={!canManage}

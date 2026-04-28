@@ -5,8 +5,15 @@ import { render } from './templateEngine';
 import { evaluate, type RuleConditions, type EvalContext } from './conditionEvaluator';
 import { normalizePhone } from '../../utils/phoneNormalize';
 
-// Map a status transition to the automation trigger that should fire (or null).
-// Only fires on the *transition into* the target state.
+// Map a status transition to the automation trigger that should fire (or
+// null). Only fires on the transition INTO the target state.
+//
+// Note: shipping_* triggers are no longer mapped here. Every shipping
+// notification now flows through ColiixStateTemplate (keyed on Coliix's
+// literal wording) via dispatchColiixStateChange. The shipping_* values
+// remain in the AutomationTrigger enum so legacy MessageLog rows still
+// have a valid foreign key, but they're effectively dormant — the
+// dispatcher won't return them, so no rule keyed on them can ever fire.
 export function triggerForOrderTransition(
   prev: { confirmation: ConfirmationStatus; shipping: ShippingStatus },
   next: { confirmation: ConfirmationStatus; shipping: ShippingStatus },
@@ -15,15 +22,6 @@ export function triggerForOrderTransition(
     if (next.confirmation === 'confirmed') return 'confirmation_confirmed';
     if (next.confirmation === 'cancelled') return 'confirmation_cancelled';
     if (next.confirmation === 'unreachable') return 'confirmation_unreachable';
-  }
-  if (next.shipping !== prev.shipping) {
-    if (next.shipping === 'label_created') return 'shipping_label_created';
-    if (next.shipping === 'picked_up') return 'shipping_picked_up';
-    if (next.shipping === 'in_transit') return 'shipping_in_transit';
-    if (next.shipping === 'out_for_delivery') return 'shipping_out_for_delivery';
-    if (next.shipping === 'delivered') return 'shipping_delivered';
-    if (next.shipping === 'returned') return 'shipping_returned';
-    if (next.shipping === 'return_validated') return 'shipping_return_validated';
   }
   return null;
 }

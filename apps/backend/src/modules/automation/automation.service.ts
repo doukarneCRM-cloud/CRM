@@ -11,11 +11,14 @@ export async function ensureDefaultTemplates(): Promise<void> {
   const missing = TRIGGER_ORDER.filter((t) => !present.has(t));
   if (missing.length === 0) return;
   await prisma.messageTemplate.createMany({
-    data: missing.map((trigger) => ({
-      trigger,
-      body: DEFAULT_TEMPLATES[trigger].body,
-      enabled: false,
-    })),
+    data: missing.map((trigger) => {
+      const def = DEFAULT_TEMPLATES[trigger as keyof typeof DEFAULT_TEMPLATES];
+      return {
+        trigger,
+        body: def?.body ?? '',
+        enabled: false,
+      };
+    }),
     skipDuplicates: true,
   });
 }
@@ -26,10 +29,11 @@ export async function listTemplates() {
   const byTrigger = new Map(rows.map((r) => [r.trigger, r]));
   return TRIGGER_ORDER.map((trigger) => {
     const row = byTrigger.get(trigger)!;
+    const def = DEFAULT_TEMPLATES[trigger as keyof typeof DEFAULT_TEMPLATES];
     return {
       id: row.id,
       trigger,
-      label: DEFAULT_TEMPLATES[trigger].label,
+      label: def?.label ?? trigger,
       enabled: row.enabled,
       body: row.body,
       updatedAt: row.updatedAt,
