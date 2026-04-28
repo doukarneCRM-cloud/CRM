@@ -6,8 +6,11 @@
 -- pairs the code used to define. Then we auto-discover every coliixRawState
 -- already observed on Order rows so the editor lists everything in
 -- production from day one.
+--
+-- All DDL/DML is idempotent (IF NOT EXISTS, ON CONFLICT DO NOTHING) so a
+-- partial-then-rolled-back run can be re-applied cleanly.
 
-CREATE TABLE "ColiixStatusMapping" (
+CREATE TABLE IF NOT EXISTS "ColiixStatusMapping" (
     "coliixWording"  TEXT NOT NULL PRIMARY KEY,
     "internalStatus" "ShippingStatus",
     "note"           TEXT,
@@ -16,29 +19,30 @@ CREATE TABLE "ColiixStatusMapping" (
     "updatedById"    TEXT
 );
 
-CREATE INDEX "ColiixStatusMapping_internalStatus_idx"
+CREATE INDEX IF NOT EXISTS "ColiixStatusMapping_internalStatus_idx"
   ON "ColiixStatusMapping"("internalStatus");
 
--- Parity with the previous hard-coded rules. Conflict-safe so re-running
--- the migration locally never explodes.
+-- Parity with the previous hard-coded rules. Explicit ::"ShippingStatus"
+-- casts so Postgres doesn't have to infer the enum type from a string
+-- literal — that inference can fail on some setups and was the suspected
+-- cause of the first deploy of this migration getting stuck in P3009.
 INSERT INTO "ColiixStatusMapping" ("coliixWording", "internalStatus") VALUES
-  ('Livré',           'delivered'),
-  ('Livrée',          'delivered'),
-  ('Delivered',       'delivered'),
-  ('Retour',          'returned'),
-  ('Retourné',        'returned'),
-  ('Retournée',       'returned'),
-  ('En retour',       'returned'),
-  ('Retour en cours', 'returned'),
-  ('Returned',        'returned')
+  ('Livré',           'delivered'::"ShippingStatus"),
+  ('Livrée',          'delivered'::"ShippingStatus"),
+  ('Delivered',       'delivered'::"ShippingStatus"),
+  ('Retour',          'returned'::"ShippingStatus"),
+  ('Retourné',        'returned'::"ShippingStatus"),
+  ('Retournée',       'returned'::"ShippingStatus"),
+  ('En retour',       'returned'::"ShippingStatus"),
+  ('Retour en cours', 'returned'::"ShippingStatus"),
+  ('Returned',        'returned'::"ShippingStatus")
 ON CONFLICT ("coliixWording") DO NOTHING;
 
 -- Auto-discover: insert a row (with NULL = "stay raw") for every distinct
--- coliixRawState already on production orders. Trimmed so trailing
--- whitespace doesn't create duplicates. Anything already inserted above
--- (e.g. an order whose rawState is exactly "Livré") is left alone.
+-- coliixRawState already on production orders. NULL is cast to the enum
+-- so Postgres knows the column type from a SELECT.
 INSERT INTO "ColiixStatusMapping" ("coliixWording", "internalStatus")
-SELECT DISTINCT trim("coliixRawState"), NULL
+SELECT DISTINCT trim("coliixRawState"), NULL::"ShippingStatus"
 FROM "Order"
 WHERE "coliixRawState" IS NOT NULL
   AND trim("coliixRawState") <> ''
