@@ -879,21 +879,29 @@ function FilterPills({ section, orders, selected, onChange }: FilterPillsProps) 
       )}
 
       <div className="flex flex-wrap items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => onChange(null)}
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-badge px-2.5 py-1 text-[11px] font-semibold transition',
-            selected === null
-              ? 'bg-primary text-white shadow-sm'
-              : 'bg-white/70 text-gray-600 hover:bg-white',
-          )}
-        >
-          {t('callCenter.all')}
-          <span className="rounded-full bg-black/10 px-1.5 text-[10px] font-bold">
-            {orders.length}
-          </span>
-        </button>
+        {/* Hide the inner "All" pill when a group tab is active — the
+            group tab itself already plays that role for its bucket and
+            two stacked "All"s read as redundant ("All 24" sitting under
+            "En Route 2" was confusing). When no group is selected, or
+            on the confirmation tab where group tabs don't apply, keep
+            it so the agent can still clear a status filter. */}
+        {!(section === 'shipping' && showGroupTabs && activeGroupId !== null) && (
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-badge px-2.5 py-1 text-[11px] font-semibold transition',
+              selected === null
+                ? 'bg-primary text-white shadow-sm'
+                : 'bg-white/70 text-gray-600 hover:bg-white',
+            )}
+          >
+            {t('callCenter.all')}
+            <span className="rounded-full bg-black/10 px-1.5 text-[10px] font-bold">
+              {orders.length}
+            </span>
+          </button>
+        )}
         {visibleStatusKeys.map((status) => {
           const count = counts.get(status) ?? 0;
           if (count === 0) return null;
