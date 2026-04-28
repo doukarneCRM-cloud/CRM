@@ -12,6 +12,7 @@ import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
+import formbody from '@fastify/formbody';
 import { Prisma } from '@prisma/client';
 
 import { prisma } from './shared/prisma';
@@ -97,10 +98,25 @@ app.register(rateLimit, {
   max: 200,
   timeWindow: '1 minute',
   keyGenerator: (req) => req.ip,
-  // Evolution can burst dozens of webhook events per second while a session
-  // is negotiating — the global 200/min limit isn't meant to apply to them.
-  allowList: (req) => req.url.startsWith('/api/v1/whatsapp/webhook'),
+  // Inbound webhooks bypass the rate limit:
+  //   - WhatsApp (Evolution) bursts dozens of events while a session is
+  //     negotiating
+  //   - Coliix can fire one event per parcel state change; a delivery wave
+  //     across many parcels would otherwise share the global 200/min cap
+  //     with regular API traffic and start 429-ing legitimate webhook hits
+  allowList: (req) =>
+    req.url.startsWith('/api/v1/whatsapp/webhook') ||
+    req.url.startsWith('/api/v1/integrations/coliix/webhook'),
 });
+
+// Parse application/x-www-form-urlencoded bodies. Coliix posts webhook
+// callbacks with that content-type (matches the convention they use on
+// their own API — see coliixClient.postForm). Without this plugin
+// Fastify rejects the request with 415 Unsupported Media Type before
+// the route handler runs — no audit row is written, so the operator's
+// "Webhook Health" panel reads "Never" even when Coliix IS calling us.
+// JSON and text/plain are handled by Fastify's built-in parsers.
+app.register(formbody);
 
 // Multipart (file uploads) — 50 MB per file to cover WhatsApp voice notes,
 // videos, and documents. Per-route handlers enforce stricter limits when
