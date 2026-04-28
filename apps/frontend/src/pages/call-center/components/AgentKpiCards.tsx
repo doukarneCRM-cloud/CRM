@@ -11,6 +11,7 @@ import {
   type ShippingStatus,
 } from '@/constants/statusColors';
 import { cn } from '@/lib/cn';
+import { colourForColiixRawState } from '@/lib/coliixColour';
 import { useCallCenterStore, type PipelineSection } from '../callCenterStore';
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
@@ -55,10 +56,14 @@ interface StatusChipProps {
   bg: string;
   text: string;
   dot: string;
+  // When the dot colour comes from Coliix's palette rather than Tailwind
+  // utility classes (free-form raw wordings like "Expédié"), pass the hex
+  // through so we can paint the dot inline without extending the palette.
+  dotColour?: string;
   onClick?: () => void;
 }
 
-function StatusChip({ label, count, bg, text, dot, onClick }: StatusChipProps) {
+function StatusChip({ label, count, bg, text, dot, dotColour, onClick }: StatusChipProps) {
   const className = cn(
     'flex items-center justify-between gap-2 rounded-badge px-2.5 py-1.5 text-left',
     bg,
@@ -67,7 +72,10 @@ function StatusChip({ label, count, bg, text, dot, onClick }: StatusChipProps) {
   const body = (
     <>
       <div className="flex min-w-0 items-center gap-1.5">
-        <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', dot)} />
+        <span
+          className={cn('h-1.5 w-1.5 shrink-0 rounded-full', !dotColour && dot)}
+          style={dotColour ? { backgroundColor: dotColour } : undefined}
+        />
         <span className={cn('truncate text-[11px] font-semibold', text)}>{label}</span>
       </div>
       <span className={cn('shrink-0 text-sm font-bold', text)}>{count}</span>
@@ -239,16 +247,37 @@ export function AgentKpiCards({ className }: AgentKpiCardsProps) {
         ) : (
           <div className="grid grid-cols-2 gap-1.5">
             {shippingEntries.map(([status, count]) => {
+              // Backend keys this by Coliix's literal wording (Expédié,
+              // Ramassé, Livré, …) plus a synthetic 'Label Created' for
+              // pushed orders with no Coliix update yet. The internal
+              // ShippingStatus enum no longer covers any of these, so the
+              // old `if (!cfg) return null` was hiding every chip on a
+              // 24-order shipping pipeline. Render Coliix wordings with
+              // the per-state palette and only fall through to the
+              // internal enum for the synthetic 'Label Created' bucket.
               const cfg = SHIPPING_STATUS_COLORS[status as ShippingStatus];
-              if (!cfg) return null;
+              if (cfg) {
+                return (
+                  <StatusChip
+                    key={status}
+                    label={cfg.label}
+                    count={count}
+                    bg={cfg.bg}
+                    text={cfg.text}
+                    dot={cfg.dot}
+                    onClick={() => jumpToPipeline('shipping', status)}
+                  />
+                );
+              }
               return (
                 <StatusChip
                   key={status}
-                  label={cfg.label}
+                  label={status}
                   count={count}
-                  bg={cfg.bg}
-                  text={cfg.text}
-                  dot={cfg.dot}
+                  bg="bg-gray-100"
+                  text="text-gray-700"
+                  dot=""
+                  dotColour={colourForColiixRawState(status)}
                   onClick={() => jumpToPipeline('shipping', status)}
                 />
               );

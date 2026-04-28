@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { verifyJWT } from '../../shared/middleware/verifyJWT';
-import { requirePermission } from '../../shared/middleware/rbac.middleware';
+import { requirePermission, requireAnyPermission } from '../../shared/middleware/rbac.middleware';
 import * as svc from './shippingStatusGroups.service';
 import {
   CreateGroupSchema,
@@ -9,13 +9,14 @@ import {
 } from './shippingStatusGroups.schema';
 
 export async function shippingStatusGroupsRoutes(app: FastifyInstance) {
-  // Anyone who can see orders can read groups — they affect how the Call
-  // Center pill row renders for every operator. Mutation routes below are
-  // gated by the dedicated `shipping_groups:manage` permission so a non-admin
-  // can't reshape the shared bucket layout.
+  // Anyone who can see orders OR work the call center can read groups —
+  // they shape how the Call Center pill row renders for every operator,
+  // and confirmation agents (call_center:view, no orders:view) need them
+  // too. Mutation routes below stay gated on `shipping_groups:manage` so
+  // a non-admin can't reshape the shared bucket layout.
   app.get(
     '/',
-    { preHandler: [verifyJWT, requirePermission('orders:view')] },
+    { preHandler: [verifyJWT, requireAnyPermission('orders:view', 'call_center:view')] },
     async (_req, reply) => {
       const groups = await svc.listGroups();
       return reply.send({ data: groups });
