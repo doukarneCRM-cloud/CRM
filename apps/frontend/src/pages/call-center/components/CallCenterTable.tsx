@@ -743,7 +743,11 @@ function FilterPills({ section, orders, selected, onChange }: FilterPillsProps) 
   // (cheap idempotent fetch) but we ignore the result to keep code branches
   // tight.
   const { groups } = useShippingStatusGroups();
-  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  // Live in the store so the row table can scope itself to the active
+  // group (clicking an empty group used to leave the table showing
+  // every order from other groups).
+  const activeGroupId = useCallCenterStore((s) => s.shippingGroupId);
+  const setActiveGroupId = useCallCenterStore((s) => s.setShippingGroupId);
   const [manageOpen, setManageOpen] = useState(false);
 
   const counts = useMemo(() => {
@@ -1034,6 +1038,12 @@ export function CallCenterTable({ onCreate }: { onCreate?: () => void } = {}) {
   const setConfirmationFilter = useCallCenterStore((s) => s.setConfirmationFilter);
   const shippingFilter = useCallCenterStore((s) => s.shippingFilter);
   const setShippingFilter = useCallCenterStore((s) => s.setShippingFilter);
+  const shippingGroupId = useCallCenterStore((s) => s.shippingGroupId);
+  // Read the active group's status keys here too so the row table can scope
+  // itself to "orders whose Coliix wording belongs to this group". Without
+  // this scope the table kept showing orders from other groups when the
+  // agent clicked an empty group.
+  const { groups: shippingGroups } = useShippingStatusGroups();
   const [search, setSearch] = useState('');
 
   const fetchOrders = useCallback(async () => {
@@ -1130,17 +1140,37 @@ export function CallCenterTable({ onCreate }: { onCreate?: () => void } = {}) {
     [confirmationOrders, confirmationFilter],
   );
 
+  // Two-stage filter on the Shipping tab:
+  //   1. If a group is active, scope to orders whose Coliix wording is
+  //      claimed by that group (or, for the synthetic "Other" group, NOT
+  //      claimed by any group). Empty group → empty table — clicking an
+  //      empty group used to bleed orders from other groups through.
+  //   2. If a specific status pill is active, narrow further to that
+  //      exact wording. Pills are keyed on Coliix's literal wording with
+  //      synthetic 'Label Created' / 'Not Shipped' buckets for pre-Coliix
+  //      orders — same key calc as the counts map.
   const filteredShipping = useMemo(() => {
-    if (!shippingFilter) return shippingOrders;
-    // Pills are now keyed on Coliix's literal wording, with synthetic
-    // 'Label Created' / 'Not Shipped' buckets for orders with no Coliix
-    // update yet — match the same way `counts` was computed above so
-    // clicking a pill narrows to exactly the orders it counted.
-    return shippingOrders.filter((o) => {
-      const k = o.coliixRawState ?? (o.labelSent ? 'Label Created' : 'Not Shipped');
-      return k === shippingFilter;
-    });
-  }, [shippingOrders, shippingFilter]);
+    const keyOf = (o: typeof shippingOrders[number]) =>
+      o.coliixRawState ?? (o.labelSent ? 'Label Created' : 'Not Shipped');
+
+    let pool = shippingOrders;
+    if (shippingGroupId !== null && shippingGroups.length > 0) {
+      if (shippingGroupId === '__other__') {
+        const claimed = new Set<string>();
+        for (const g of shippingGroups) for (const k of g.statusKeys) claimed.add(k);
+        pool = pool.filter((o) => !claimed.has(keyOf(o)));
+      } else {
+        const grp = shippingGroups.find((g) => g.id === shippingGroupId);
+        if (grp) {
+          const allowed = new Set(grp.statusKeys);
+          pool = pool.filter((o) => allowed.has(keyOf(o)));
+        }
+      }
+    }
+
+    if (!shippingFilter) return pool;
+    return pool.filter((o) => keyOf(o) === shippingFilter);
+  }, [shippingOrders, shippingFilter, shippingGroupId, shippingGroups]);
 
   if (loading) {
     return (
