@@ -12,8 +12,17 @@ import {
 import * as svc from './integrations.service';
 import * as providers from './providers.service';
 import * as coliix from './coliix.service';
+import * as coliixMapping from './coliixMapping.service';
+import { ShippingStatus } from '@prisma/client';
 import { maskSecret } from '../../shared/encryption';
 import { z } from 'zod';
+
+// Body schema for PATCH /coliix/mappings/:wording. internalStatus
+// can be null (stay raw) or one of the ShippingStatus enum values.
+const UpdateMappingSchema = z.object({
+  internalStatus: z.nativeEnum(ShippingStatus).nullable(),
+  note: z.string().nullable().optional(),
+});
 
 const BulkExportSchema = z.object({
   orderIds: z.array(z.string().min(1)).min(1).max(100),
@@ -310,6 +319,48 @@ export async function integrationsRoutes(app: FastifyInstance) {
             .map((r) => ({ value: r.coliixRawState as string, count: r._count._all })),
         ],
       });
+    },
+  );
+
+  // ── Coliix status mapping (admin-editable) ────────────────────────────────
+  // GET lists every known wording with order counts + the bucket they
+  // currently sit in. PATCH writes the new mapping and re-buckets every
+  // order with that wording in one transaction. See coliixMapping.service.
+
+  app.get(
+    '/coliix/mappings',
+    { preHandler: [verifyJWT, requirePermission('integrations:view')] },
+    async (_req, reply) => {
+      const mappings = await coliixMapping.listMappings();
+      return reply.send({ mappings });
+    },
+  );
+
+  app.patch(
+    '/coliix/mappings/:wording',
+    { preHandler: [verifyJWT, requirePermission('integrations:manage')] },
+    async (req, reply) => {
+      const { wording: rawWording } = req.params as { wording: string };
+      // Wording is base64-url-encoded by the client because it can contain
+      // spaces, accents, and slashes that would otherwise need triple URI
+      // escaping. Decode here.
+      let wording: string;
+      try {
+        wording = Buffer.from(rawWording, 'base64url').toString('utf8');
+      } catch {
+        return reply.status(400).send({ error: 'Invalid wording encoding' });
+      }
+      if (!wording.trim()) {
+        return reply.status(400).send({ error: 'wording must not be empty' });
+      }
+      const body = UpdateMappingSchema.parse(req.body);
+      const result = await coliixMapping.updateMapping(
+        wording,
+        body.internalStatus,
+        req.user.sub,
+        body.note,
+      );
+      return reply.send(result);
     },
   );
 

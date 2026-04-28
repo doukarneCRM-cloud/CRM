@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Loader2,
   MapPin,
+  ListTree,
 } from 'lucide-react';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { CRMInput } from '@/components/ui/CRMInput';
@@ -26,6 +27,7 @@ import {
 } from '@/services/providersApi';
 import { CitiesTab } from '@/pages/settings/components/CitiesTab';
 import { apiErrorMessage } from '@/lib/apiError';
+import { ColiixMappingsModal } from './ColiixMappingsModal';
 
 const BACKEND_ORIGIN = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 
@@ -53,6 +55,7 @@ export function ColiixTab() {
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [citiesOpen, setCitiesOpen] = useState(false);
+  const [mappingsOpen, setMappingsOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<RefreshAllResult | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -285,6 +288,14 @@ export function ColiixTab() {
           >
             {t('integrations.coliix.citiesButton')}
           </CRMButton>
+          <CRMButton
+            variant="secondary"
+            size="sm"
+            onClick={() => setMappingsOpen(true)}
+            leftIcon={<ListTree size={14} />}
+          >
+            {t('integrations.coliix.mappingsButton')}
+          </CRMButton>
           {canManage && (
             <CRMButton
               variant={provider.isActive ? 'secondary' : 'primary'}
@@ -306,6 +317,11 @@ export function ColiixTab() {
       >
         <CitiesTab />
       </GlassModal>
+
+      <ColiixMappingsModal
+        open={mappingsOpen}
+        onClose={() => setMappingsOpen(false)}
+      />
 
       {error && (
         <div className="flex items-start justify-between gap-3 rounded-xl border border-red-100 bg-red-50 px-4 py-2 text-xs text-red-700">
