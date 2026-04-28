@@ -42,9 +42,69 @@ function formatDateTime(iso: string) {
   });
 }
 
+// Stable colour per Coliix wording — same FNV-ish hash used on the
+// Dashboard / Analytics pipeline so a state reads as the same colour
+// everywhere it appears.
+const COLIIX_PALETTE = [
+  '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
+  '#06B6D4', '#EC4899', '#84CC16', '#F97316', '#6366F1',
+  '#14B8A6', '#A855F7',
+];
+function colourForRawState(s: string): string {
+  // A handful of well-known wordings get a meaningful colour rather than
+  // the hashed default — green for delivered, red for refused, etc.
+  const k = s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '');
+  if (k.includes('livre')) return '#10B981';            // delivered
+  if (k.includes('refuse')) return '#EF4444';           // refused
+  if (k.includes('retour')) return '#F97316';           // returned
+  if (k.includes('expedie') || k.includes('cours')) return '#3B82F6';
+  if (k.includes('ramasse')) return '#A855F7';          // picked up
+  if (k.includes('attente') || k.includes('nouveau')) return '#9CA3AF';
+  if (k.includes('injoignable')) return '#F59E0B';
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = (h * 16777619) >>> 0;
+  }
+  return COLIIX_PALETTE[h % COLIIX_PALETTE.length];
+}
+
+// Pull Coliix's literal wording out of a shipping log. Prefers
+// meta.rawState (set by every ingestStatus path), falls back to parsing
+// the legacy action text so old logs render cleanly too.
+function extractColiixRawState(log: OrderLog): string | null {
+  const meta = log.meta as Record<string, unknown> | null;
+  if (meta && typeof meta.rawState === 'string' && meta.rawState.trim()) {
+    return meta.rawState.trim();
+  }
+  // Legacy formats:
+  //   'Coliix unknown state "Ramassé" (poller) — ignored'
+  //   'Coliix raw state → "Expédié" (poller) — no enum mapping, raw text saved'
+  const m = /["“"']([^"”"']+)["”"']/.exec(log.action);
+  return m ? m[1].trim() : null;
+}
+
+function isColiixShippingLog(log: OrderLog): boolean {
+  if (log.type !== 'shipping') return false;
+  const meta = log.meta as Record<string, unknown> | null;
+  if (meta?.provider === 'coliix') return true;
+  return /^Coliix /.test(log.action);
+}
+
 // ─── Log entry ────────────────────────────────────────────────────────────────
 
 function LogEntry({ log, isLast }: { log: OrderLog; isLast: boolean }) {
+  // Coliix shipping logs render as a clean timeline row to mirror Coliix's
+  // own tracking page — colored dot per status, the Coliix wording as the
+  // main label, time + driver-note below. Strips our internal phrasing
+  // ("was X", "no enum mapping", "ignored") which is noise to the operator.
+  if (isColiixShippingLog(log)) {
+    return <ColiixTimelineEntry log={log} isLast={isLast} />;
+  }
+
   const config = LOG_TYPE_CONFIG[log.type] ?? LOG_TYPE_CONFIG.system;
   const Icon = config.icon;
 
@@ -72,6 +132,45 @@ function LogEntry({ log, isLast }: { log: OrderLog; isLast: boolean }) {
         {log.meta && 'note' in log.meta && (
           <p className="mt-1 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
             {log.meta.note as string}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ColiixTimelineEntry({ log, isLast }: { log: OrderLog; isLast: boolean }) {
+  const rawState = extractColiixRawState(log);
+  const displayState = rawState ?? log.action;
+  const colour = rawState ? colourForRawState(rawState) : '#9CA3AF';
+  const meta = log.meta as Record<string, unknown> | null;
+  const driverNote =
+    meta && typeof meta.driverNote === 'string' && meta.driverNote.trim()
+      ? meta.driverNote.trim()
+      : null;
+  return (
+    <div className="flex gap-3">
+      {/* Timeline dot + line */}
+      <div className="flex flex-col items-center">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center">
+          <span
+            className="h-3 w-3 rounded-full ring-4 ring-white"
+            style={{ backgroundColor: colour, boxShadow: `0 0 0 2px ${colour}33` }}
+          />
+        </div>
+        {!isLast && <div className="mt-1 w-0.5 flex-1 bg-gray-200" />}
+      </div>
+
+      {/* Content */}
+      <div className="mb-4 min-w-0 flex-1">
+        <p className="text-sm font-semibold text-gray-900">{displayState}</p>
+        <div className="mt-0.5 flex items-center gap-1 text-xs text-gray-400">
+          <Clock size={10} />
+          {formatDateTime(log.createdAt)}
+        </div>
+        {driverNote && (
+          <p className="mt-1 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
+            {driverNote}
           </p>
         )}
       </div>
