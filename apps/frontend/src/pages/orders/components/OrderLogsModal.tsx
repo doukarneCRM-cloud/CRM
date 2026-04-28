@@ -119,6 +119,15 @@ function ColiixTimelineEntry({ log, isLast }: { log: OrderLog; isLast: boolean }
     meta && typeof meta.driverNote === 'string' && meta.driverNote.trim()
       ? meta.driverNote.trim()
       : null;
+  // Prefer Coliix's actual event timestamp (when the courier scanned)
+  // over our ingestion time (when our poller noticed). Without this
+  // the timeline drifted by up to 5 minutes from Coliix's tracking
+  // page and the operator complained the times "don't match Coliix".
+  // Falls back to log.createdAt for legacy entries written before we
+  // started persisting eventDate.
+  const eventDateIso =
+    meta && typeof meta.eventDate === 'string' && meta.eventDate ? meta.eventDate : null;
+  const displayTime = eventDateIso ?? log.createdAt;
   return (
     <div className="flex gap-3">
       {/* Timeline dot + line */}
@@ -137,7 +146,7 @@ function ColiixTimelineEntry({ log, isLast }: { log: OrderLog; isLast: boolean }
         <p className="text-sm font-semibold text-gray-900">{displayState}</p>
         <div className="mt-0.5 flex items-center gap-1 text-xs text-gray-400">
           <Clock size={10} />
-          {formatDateTime(log.createdAt)}
+          {formatDateTime(displayTime)}
         </div>
         {driverNote && (
           <p className="mt-1 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
@@ -188,10 +197,28 @@ export function OrderLogsModal({
       .finally(() => setLoading(false));
   }, [orderId]);
 
-  const filtered = useMemo(
-    () => (activeFilter === 'all' ? logs : logs.filter((l) => l.type === activeFilter)),
-    [logs, activeFilter],
-  );
+  // Effective timestamp for ordering: prefer Coliix's own event time on
+  // shipping rows (so the timeline matches Coliix's tracking page), fall
+  // back to our ingestion time on everything else and on legacy rows.
+  const effectiveTime = (log: OrderLog): number => {
+    const meta = log.meta as Record<string, unknown> | null;
+    if (
+      log.type === 'shipping' &&
+      meta &&
+      typeof meta.eventDate === 'string' &&
+      meta.eventDate
+    ) {
+      const t = new Date(meta.eventDate).getTime();
+      if (Number.isFinite(t)) return t;
+    }
+    return new Date(log.createdAt).getTime();
+  };
+
+  const filtered = useMemo(() => {
+    const visible = activeFilter === 'all' ? logs : logs.filter((l) => l.type === activeFilter);
+    // Sort newest-first by effective time, not strictly by ingestion time.
+    return [...visible].sort((a, b) => effectiveTime(b) - effectiveTime(a));
+  }, [logs, activeFilter]);
 
   const filters: { key: LogFilter; label: string; count: number }[] = canSeeAll
     ? [

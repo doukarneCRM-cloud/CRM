@@ -330,6 +330,9 @@ export async function ingestStatus(input: {
           provider: 'coliix',
           rawState: input.rawState,
           source: input.source,
+          // Coliix's own event timestamp — drives the timeline in the
+          // order-history modal. See the mapped branch for context.
+          eventDate: input.eventDate ? input.eventDate.toISOString() : null,
           ...(demoteFromDelivered
             ? { demoted: true, prevStatus: 'delivered', newStatus: 'picked_up' }
             : {}),
@@ -389,6 +392,11 @@ export async function ingestStatus(input: {
         mapped,
         driverNote: input.driverNote ?? null,
         source: input.source,
+        // Coliix's own event timestamp (when the courier scanned, not
+        // when our poller noticed). Drives the timeline in the order-
+        // history modal so what the operator reads matches Coliix's
+        // tracking page exactly.
+        eventDate: input.eventDate ? input.eventDate.toISOString() : null,
       } as Prisma.InputJsonValue,
     },
   });
