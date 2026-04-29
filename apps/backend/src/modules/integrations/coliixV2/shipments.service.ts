@@ -132,12 +132,31 @@ export async function createShipmentFromOrder(input: CreateShipmentInput): Promi
 
   const cod = input.cod ?? Number(order.total);
 
-  // Reuse an existing pending shipment if one exists for this order. Stops
-  // double-clicks on the UI from creating two parcels.
-  const existing = await prisma.shipment.findFirst({
-    where: { orderId: order.id, state: { in: ['pending', 'push_failed'] } },
-    select: { id: true, state: true, accountId: true },
+  // Refuse re-push of an order that already has a shipment in flight or
+  // terminal — the parcel exists at Coliix; pushing again would create a
+  // duplicate. Only `pending` and `push_failed` shipments are retryable;
+  // `cancelled` shipments are local-only and may also be retried.
+  const anyShipment = await prisma.shipment.findFirst({
+    where: { orderId: order.id },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true, state: true, trackingCode: true, accountId: true },
   });
+  if (
+    anyShipment &&
+    !['pending', 'push_failed', 'cancelled'].includes(anyShipment.state)
+  ) {
+    throw new ShipmentValidationError(
+      'already_sent',
+      `Order already sent to Coliix (tracking: ${anyShipment.trackingCode ?? '—'}, state: ${anyShipment.state})`,
+    );
+  }
+
+  // Reuse an existing retryable shipment so double-clicks don't create two
+  // parcels for the same order.
+  const existing =
+    anyShipment && ['pending', 'push_failed'].includes(anyShipment.state)
+      ? anyShipment
+      : null;
 
   let shipmentId: string;
   if (existing) {
@@ -176,6 +195,16 @@ export async function createShipmentFromOrder(input: CreateShipmentInput): Promi
       data: { idempotencyKey: shipmentId },
     });
   }
+
+  // Flip the legacy Order.labelSent bit immediately so the orders list
+  // hides the "Send" button right after click — even before the worker
+  // actually pushes to Coliix. This is the UX guard against double-clicks
+  // and accidental dup-sends. If the push fails permanently the worker
+  // resets labelSent to false (see push.worker markFailed).
+  await prisma.order.update({
+    where: { id: order.id },
+    data: { labelSent: true, labelSentAt: new Date(), trackingProvider: 'coliix_v2' },
+  });
 
   // Enqueue with shipment id as the job id — Bull dedupes by jobId, so a
   // double-click can't push the parcel twice.

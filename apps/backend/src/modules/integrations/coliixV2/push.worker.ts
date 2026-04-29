@@ -86,6 +86,19 @@ coliixV2PushQueue.process(async (job) => {
           dedupeHash: `push:${shipmentId}:${Date.now()}`,
         },
       }),
+      // Bridge to legacy Order fields so existing UI logic that gates on
+      // labelSent / coliixTrackingId / trackingProvider (call-center filters,
+      // edit-modal lock, "label sent" badge) automatically reflects V2 push.
+      prisma.order.update({
+        where: { id: shipment.orderId },
+        data: {
+          labelSent: true,
+          labelSentAt: new Date(),
+          coliixTrackingId: tracking,
+          trackingProvider: 'coliix_v2',
+          shippingStatus: 'label_created',
+        },
+      }),
     ]);
 
     try {
@@ -132,15 +145,32 @@ coliixV2PushQueue.on('failed', (job, err) => {
 });
 
 async function markFailed(shipmentId: string, message: string, attempts: number) {
-  await prisma.shipment.update({
+  // Pull orderId for the legacy bridge so the user can re-click "Send"
+  // after a permanent failure.
+  const ship = await prisma.shipment.findUnique({
     where: { id: shipmentId },
-    data: {
-      state: 'push_failed',
-      lastPushError: message.slice(0, 1000),
-      pushAttempts: attempts,
-      nextPollAt: null,
-    },
+    select: { orderId: true },
   });
+  await prisma.$transaction([
+    prisma.shipment.update({
+      where: { id: shipmentId },
+      data: {
+        state: 'push_failed',
+        lastPushError: message.slice(0, 1000),
+        pushAttempts: attempts,
+        nextPollAt: null,
+      },
+    }),
+    // Reset the legacy flags so the orders list re-shows the "Send" button.
+    ...(ship
+      ? [
+          prisma.order.update({
+            where: { id: ship.orderId },
+            data: { labelSent: false, labelSentAt: null, trackingProvider: null },
+          }),
+        ]
+      : []),
+  ]);
   try {
     emitToAll('shipment:updated', {
       shipmentId,
