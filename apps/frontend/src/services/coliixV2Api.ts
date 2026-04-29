@@ -206,6 +206,9 @@ export const coliixV2Api = {
   health: (id: string) =>
     api.get<AccountHealth>(`/coliixv2/accounts/${id}/health`).then((r) => r.data),
 
+  diagnostic: (id: string) =>
+    api.get<unknown>(`/coliixv2/accounts/${id}/diagnostic`).then((r) => r.data),
+
   // Shipments
   createShipment: (
     orderId: string,

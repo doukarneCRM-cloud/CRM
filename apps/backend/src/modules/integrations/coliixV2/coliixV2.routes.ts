@@ -203,6 +203,141 @@ export async function coliixV2Routes(app: FastifyInstance) {
     },
   );
 
+  // ── Diagnostic — single endpoint that returns every observable signal
+  // we'd otherwise have to hunt for. Used for "why isn't V2 working" triage.
+  app.get(
+    '/accounts/:id/diagnostic',
+    { preHandler: [verifyJWT, requirePermission('integrations:view')] },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      const since1h = new Date(Date.now() - 60 * 60_000);
+      const since24h = new Date(Date.now() - 24 * 60 * 60_000);
+
+      const [
+        account,
+        shipmentTotal,
+        shipmentByState,
+        latestShipment,
+        latestEvent,
+        webhook1h,
+        webhook24h,
+        webhookLast,
+        webhookLastFail,
+        recentEvents,
+        v1OrderCount,
+        v1OrderInflight,
+        v1OrderMigrated,
+      ] = await Promise.all([
+        prisma.carrierAccount.findUnique({
+          where: { id },
+          select: { id: true, hubLabel: true, isActive: true, lastError: true, lastHealthAt: true },
+        }),
+        prisma.shipment.count({ where: { accountId: id } }),
+        prisma.shipment.groupBy({
+          by: ['state'],
+          where: { accountId: id },
+          _count: { _all: true },
+        }),
+        prisma.shipment.findFirst({
+          where: { accountId: id },
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            trackingCode: true,
+            state: true,
+            rawState: true,
+            createdAt: true,
+            updatedAt: true,
+            nextPollAt: true,
+            lastPolledAt: true,
+            orderId: true,
+          },
+        }),
+        prisma.shipmentEvent.findFirst({
+          where: { shipment: { accountId: id } },
+          orderBy: { receivedAt: 'desc' },
+          select: { id: true, source: true, rawState: true, receivedAt: true },
+        }),
+        prisma.webhookEventLog.count({
+          where: { provider: 'coliix_v2', createdAt: { gte: since1h } },
+        }),
+        prisma.webhookEventLog.count({
+          where: { provider: 'coliix_v2', createdAt: { gte: since24h } },
+        }),
+        prisma.webhookEventLog.findFirst({
+          where: { provider: 'coliix_v2' },
+          orderBy: { createdAt: 'desc' },
+          select: {
+            createdAt: true,
+            ok: true,
+            statusCode: true,
+            tracking: true,
+            rawState: true,
+            reason: true,
+          },
+        }),
+        prisma.webhookEventLog.findFirst({
+          where: { provider: 'coliix_v2', ok: false },
+          orderBy: { createdAt: 'desc' },
+          select: {
+            createdAt: true,
+            statusCode: true,
+            tracking: true,
+            reason: true,
+          },
+        }),
+        prisma.shipmentEvent.findMany({
+          where: { shipment: { accountId: id } },
+          orderBy: { receivedAt: 'desc' },
+          take: 5,
+          select: {
+            source: true,
+            rawState: true,
+            mappedState: true,
+            occurredAt: true,
+            shipment: { select: { trackingCode: true, state: true, orderId: true } },
+          },
+        }),
+        // V1 order context (independent of any V2 account)
+        prisma.order.count({ where: { coliixTrackingId: { not: null } } }),
+        prisma.order.count({
+          where: {
+            coliixTrackingId: { not: null },
+            shippingStatus: {
+              notIn: ['delivered', 'returned', 'return_validated', 'return_refused', 'exchange', 'lost', 'destroyed'],
+            },
+          },
+        }),
+        prisma.shipment.count({ where: { accountId: id, idempotencyKey: { startsWith: 'migrated-' } } }),
+      ]);
+
+      return reply.send({
+        deployHint: 'Compare these counts before/after running migrate or after a known Coliix state change.',
+        account,
+        shipments: {
+          total: shipmentTotal,
+          byState: shipmentByState.map((b) => ({ state: b.state, count: b._count._all })),
+          latest: latestShipment,
+          migratedCount: v1OrderMigrated,
+        },
+        events: {
+          latest: latestEvent,
+          recent: recentEvents,
+        },
+        webhook: {
+          count1h: webhook1h,
+          count24h: webhook24h,
+          last: webhookLast,
+          lastFailure: webhookLastFail,
+        },
+        v1Context: {
+          totalOrdersWithTrackingCode: v1OrderCount,
+          inflightOrdersToMigrate: v1OrderInflight,
+        },
+      });
+    },
+  );
+
   app.get(
     '/accounts/:id/health',
     { preHandler: [verifyJWT, requirePermission('integrations:view')] },

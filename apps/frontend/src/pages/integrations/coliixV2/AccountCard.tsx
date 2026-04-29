@@ -13,7 +13,10 @@ import {
   Activity,
   Truck,
   Upload,
+  Stethoscope,
+  Copy,
 } from 'lucide-react';
+import { GlassModal } from '@/components/ui/GlassModal';
 import { CRMButton } from '@/components/ui/CRMButton';
 import {
   coliixV2Api,
@@ -33,6 +36,7 @@ export function AccountCard({ account, onConfigure, onDeleted, onChanged }: Prop
   const [health, setHealth] = useState<AccountHealth | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [csvOpen, setCsvOpen] = useState(false);
+  const [diagnostic, setDiagnostic] = useState<unknown>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -74,6 +78,18 @@ export function AccountCard({ account, onConfigure, onDeleted, onChanged }: Prop
       onDeleted();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Delete failed');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleDiagnostic() {
+    setBusy('diagnostic');
+    try {
+      const d = await coliixV2Api.diagnostic(account.id);
+      setDiagnostic(d);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Diagnostic failed');
     } finally {
       setBusy(null);
     }
@@ -196,6 +212,15 @@ export function AccountCard({ account, onConfigure, onDeleted, onChanged }: Prop
         <CRMButton
           size="sm"
           variant="ghost"
+          onClick={handleDiagnostic}
+          loading={busy === 'diagnostic'}
+          leftIcon={<Stethoscope className="h-4 w-4" />}
+        >
+          Diagnostic
+        </CRMButton>
+        <CRMButton
+          size="sm"
+          variant="ghost"
           onClick={() => setCsvOpen(true)}
           leftIcon={<Upload className="h-4 w-4" />}
         >
@@ -225,6 +250,40 @@ export function AccountCard({ account, onConfigure, onDeleted, onChanged }: Prop
         accountId={account.id}
         onClose={() => setCsvOpen(false)}
       />
+
+      <GlassModal
+        open={diagnostic !== null}
+        onClose={() => setDiagnostic(null)}
+        title="V2 Diagnostic"
+        size="2xl"
+      >
+        <p className="mb-2 text-xs text-gray-500">
+          Copy this JSON and send it back so the bug can be diagnosed remotely.
+        </p>
+        <textarea
+          readOnly
+          value={JSON.stringify(diagnostic, null, 2)}
+          className="h-96 w-full rounded-md border border-gray-200 bg-gray-50 p-2 font-mono text-xs"
+          onFocus={(e) => e.currentTarget.select()}
+        />
+        <div className="mt-3 flex justify-end gap-2">
+          <CRMButton
+            size="sm"
+            variant="ghost"
+            leftIcon={<Copy className="h-4 w-4" />}
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(JSON.stringify(diagnostic, null, 2));
+                alert('Copied');
+              } catch {
+                alert('Could not copy — select manually');
+              }
+            }}
+          >
+            Copy
+          </CRMButton>
+        </div>
+      </GlassModal>
     </div>
   );
 }
