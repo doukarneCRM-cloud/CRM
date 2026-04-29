@@ -1066,28 +1066,52 @@ export function CallCenterTable({ onCreate }: { onCreate?: () => void } = {}) {
     fetchOrders();
   }, [fetchOrders, refreshKey]);
 
-  // Live updates
+  // Live updates — surgical patches so open modals / popups / scroll /
+  // selection survive when another agent edits a different order. See the
+  // matching comment in useOrders.ts for the full reasoning.
   useEffect(() => {
     try {
       const socket = getSocket();
-      const handler = () => fetchOrders();
-      socket.on('order:assigned', handler);
-      socket.on('order:updated', handler);
-      socket.on('order:created', handler);
-      socket.on('order:archived', handler);
-      socket.on('order:bulk_updated', handler);
-      // New: when a variant drops to 0, the backend broadcasts a warning for
-      // each pending order touching it. Refetching reshapes the order with
-      // hasStockWarning=true so the row/modal badge lights up without the
-      // agent needing to manually refresh.
-      socket.on('order:stock_warning', handler);
+
+      const patchOne = async (payload: unknown) => {
+        const orderId = (payload as { orderId?: string })?.orderId;
+        if (!orderId) return;
+        try {
+          const fresh = await ordersApi.getById(orderId);
+          setOrders((prev) => {
+            const idx = prev.findIndex((o) => o.id === orderId);
+            if (idx === -1) return prev;
+            const next = prev.slice();
+            next[idx] = { ...next[idx], ...fresh };
+            return next;
+          });
+        } catch {
+          setOrders((prev) => prev.filter((o) => o.id !== orderId));
+        }
+      };
+
+      const dropOne = (payload: unknown) => {
+        const orderId = (payload as { orderId?: string })?.orderId;
+        if (!orderId) return;
+        setOrders((prev) => prev.filter((o) => o.id !== orderId));
+      };
+
+      const fullRefresh = () => fetchOrders();
+
+      socket.on('order:updated', patchOne);
+      socket.on('order:assigned', patchOne);
+      socket.on('order:stock_warning', patchOne);
+      socket.on('order:archived', dropOne);
+      socket.on('order:created', fullRefresh);
+      socket.on('order:bulk_updated', fullRefresh);
+
       return () => {
-        socket.off('order:assigned', handler);
-        socket.off('order:updated', handler);
-        socket.off('order:created', handler);
-        socket.off('order:archived', handler);
-        socket.off('order:bulk_updated', handler);
-        socket.off('order:stock_warning', handler);
+        socket.off('order:updated', patchOne);
+        socket.off('order:assigned', patchOne);
+        socket.off('order:stock_warning', patchOne);
+        socket.off('order:archived', dropOne);
+        socket.off('order:created', fullRefresh);
+        socket.off('order:bulk_updated', fullRefresh);
       };
     } catch {
       // socket not ready
