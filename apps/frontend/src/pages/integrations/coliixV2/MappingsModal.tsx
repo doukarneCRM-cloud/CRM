@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Loader2, Save, AlertTriangle, Trash2 } from 'lucide-react';
+import { Loader2, Save, AlertTriangle } from 'lucide-react';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { GlassModal } from '@/components/ui/GlassModal';
 import {
