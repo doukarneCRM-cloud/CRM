@@ -65,7 +65,9 @@ export async function createShipmentFromOrder(input: CreateShipmentInput): Promi
   const order = await prisma.order.findUnique({
     where: { id: input.orderId },
     include: {
-      customer: { select: { name: true, phone: true, address: true, city: true } },
+      customer: {
+        select: { fullName: true, phoneDisplay: true, phone: true, address: true, city: true },
+      },
       items: { include: { variant: { include: { product: { select: { name: true } } } } } },
       store: { select: { id: true } },
     },
@@ -79,8 +81,11 @@ export async function createShipmentFromOrder(input: CreateShipmentInput): Promi
   }
 
   const c = order.customer;
-  if (!c.name?.trim()) throw new ShipmentValidationError('customer_name_missing', 'Customer name is required');
-  if (!c.phone?.trim()) throw new ShipmentValidationError('customer_phone_missing', 'Customer phone is required');
+  if (!c.fullName?.trim()) throw new ShipmentValidationError('customer_name_missing', 'Customer name is required');
+  // phoneDisplay is the 06XXXXXXXX form (already Moroccan-friendly); phone is
+  // the normalised +212 form. Prefer display, fall back to normalised.
+  const rawPhone = c.phoneDisplay?.trim() || c.phone?.trim() || '';
+  if (!rawPhone) throw new ShipmentValidationError('customer_phone_missing', 'Customer phone is required');
   if (!c.address?.trim()) throw new ShipmentValidationError('customer_address_missing', 'Customer address is required');
   if (!c.city?.trim()) throw new ShipmentValidationError('customer_city_missing', 'Customer city (ville) is required');
 
@@ -116,7 +121,7 @@ export async function createShipmentFromOrder(input: CreateShipmentInput): Promi
   }
 
   // Phone normalisation. Throws on bad input — caller surfaces via 400.
-  const phone = normalisePhone(c.phone);
+  const phone = normalisePhone(rawPhone);
 
   // Goods label: human-readable summary, e.g. "Sweater × 2, Bag × 1"
   const goodsLabel = order.items
@@ -157,7 +162,7 @@ export async function createShipmentFromOrder(input: CreateShipmentInput): Promi
         city: c.city.trim(),
         zone: null,
         address: c.address.trim(),
-        recipientName: c.name.trim(),
+        recipientName: c.fullName.trim(),
         recipientPhone: phone,
         goodsLabel: goodsLabel || 'Articles',
         goodsQty: Math.max(1, goodsQty),
