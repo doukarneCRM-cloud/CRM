@@ -48,7 +48,8 @@ const CreateShipmentSchema = z.object({
 });
 
 const UpdateMappingSchema = z.object({
-  internalState: z.nativeEnum(ShipmentState),
+  // null = "stay raw" (no enum bucket flip on this wording)
+  internalState: z.nativeEnum(ShipmentState).nullable(),
   isTerminal: z.boolean().optional(),
   note: z.string().max(500).nullable().optional(),
 });
@@ -551,12 +552,18 @@ export async function coliixV2Routes(app: FastifyInstance) {
         },
       });
       invalidateMappingCache();
-      // Re-bucket existing shipments that match this wording.
-      const rebucket = await prisma.shipment.updateMany({
-        where: { rawState: updated.rawWording },
-        data: { state: updated.internalState },
-      });
-      return reply.send({ mapping: updated, rebucketed: rebucket.count });
+      // Re-bucket existing shipments that match this wording — only when
+      // the new mapping is concrete (null = "stay raw" should NOT touch
+      // existing shipments' state).
+      let rebucketed = 0;
+      if (updated.internalState !== null) {
+        const r = await prisma.shipment.updateMany({
+          where: { rawState: updated.rawWording },
+          data: { state: updated.internalState },
+        });
+        rebucketed = r.count;
+      }
+      return reply.send({ mapping: updated, rebucketed });
     },
   );
 

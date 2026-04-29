@@ -39,7 +39,7 @@ export function MappingsModal({ open, onClose }: Props) {
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [edits, setEdits] = useState<Record<string, { internalState?: ShipmentState; isTerminal?: boolean }>>({});
+  const [edits, setEdits] = useState<Record<string, { internalState?: ShipmentState | null; isTerminal?: boolean }>>({});
 
   useEffect(() => {
     if (!open) return;
@@ -53,11 +53,13 @@ export function MappingsModal({ open, onClose }: Props) {
 
   async function handleSave(row: MappingRow) {
     const edit = edits[row.id];
-    if (!edit?.internalState) return;
+    if (edit === undefined) return;
+    const nextState =
+      edit.internalState !== undefined ? edit.internalState : row.internalState;
     setSavingId(row.id);
     try {
       const r = await coliixV2Api.updateMapping(row.id, {
-        internalState: edit.internalState,
+        internalState: nextState,
         isTerminal: edit.isTerminal ?? row.isTerminal,
       });
       setRows((prev) => prev.map((p) => (p.id === row.id ? { ...p, ...r.mapping } : p)));
@@ -100,25 +102,37 @@ export function MappingsModal({ open, onClose }: Props) {
             <tbody>
               {rows.map((r) => {
                 const edit = edits[r.id];
-                const internalState = edit?.internalState ?? r.internalState;
+                const internalState =
+                  edit?.internalState !== undefined ? edit.internalState : r.internalState;
                 const isTerminal = edit?.isTerminal ?? r.isTerminal;
                 const dirty =
                   edit !== undefined &&
                   (internalState !== r.internalState || isTerminal !== r.isTerminal);
                 return (
                   <tr key={r.id} className="border-b border-gray-100 last:border-0">
-                    <td className="py-2 font-mono text-xs">{r.rawWording}</td>
+                    <td className="py-2 font-mono text-xs">
+                      {r.rawWording}
+                      {r.internalState === null && (
+                        <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                          unmapped
+                        </span>
+                      )}
+                    </td>
                     <td className="py-2">
                       <select
                         className="rounded-md border border-gray-200 px-2 py-1 text-sm"
-                        value={internalState}
+                        value={internalState ?? ''}
                         onChange={(e) =>
                           setEdits((prev) => ({
                             ...prev,
-                            [r.id]: { ...prev[r.id], internalState: e.target.value as ShipmentState },
+                            [r.id]: {
+                              ...prev[r.id],
+                              internalState: e.target.value === '' ? null : (e.target.value as ShipmentState),
+                            },
                           }))
                         }
                       >
+                        <option value="">— (stay raw, no enum change) —</option>
                         {STATES.map((s) => (
                           <option key={s} value={s}>
                             {SHIPMENT_STATE_LABEL[s]}

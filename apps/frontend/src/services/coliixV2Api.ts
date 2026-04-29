@@ -86,7 +86,8 @@ export interface MappingRow {
   id: string;
   carrierCode: string;
   rawWording: string;
-  internalState: ShipmentState;
+  // null = stay-raw (no enum change on ingest)
+  internalState: ShipmentState | null;
   isTerminal: boolean;
   note: string | null;
   shipmentCount: number;
@@ -251,7 +252,7 @@ export const coliixV2Api = {
 
   updateMapping: (
     id: string,
-    input: { internalState: ShipmentState; isTerminal?: boolean; note?: string | null },
+    input: { internalState: ShipmentState | null; isTerminal?: boolean; note?: string | null },
   ) =>
     api
       .patch<{ mapping: MappingRow; rebucketed: number }>(`/coliixv2/mappings/${id}`, input)

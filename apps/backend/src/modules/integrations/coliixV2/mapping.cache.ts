@@ -17,7 +17,10 @@ const TTL_MS = 60_000;
 
 interface CacheEntry {
   rawWording: string;
-  internalState: ShipmentState;
+  // Null = explicit "stay raw" mapping (admin chose not to bucket this
+  // wording, or it's auto-discovered and unreviewed). Callers must skip
+  // state changes when null.
+  internalState: ShipmentState | null;
   isTerminal: boolean;
 }
 
@@ -85,7 +88,7 @@ export function invalidateMappingCache() {
 
 export interface MappingHit {
   rawWording: string;
-  internalState: ShipmentState;
+  internalState: ShipmentState | null;
   isTerminal: boolean;
   tier: 'exact' | 'normalized' | 'first-token';
 }
@@ -105,11 +108,11 @@ export async function mapWording(rawState: string): Promise<MappingHit | null> {
 }
 
 /**
- * On every ingest of an unknown wording, we upsert a row with no internal
- * mapping so the admin sees the new wording surface in the editor without
- * waiting for a manual report. internalState is required by the V2 schema
- * (no nullable column) so we park it on `pushed` — a non-terminal default
- * that won't trigger spurious "delivered" KPIs. Admin re-buckets it.
+ * On every ingest of an unknown wording, we upsert a row with NULL
+ * internalState so the admin sees the new wording surface in the editor
+ * without it silently downgrading the shipment. Null is the "stay raw"
+ * sentinel — ingestEvent stores the rawState but skips the enum diff,
+ * preserving whatever state earlier mapped events produced.
  */
 export async function upsertUnknownWording(rawWording: string): Promise<void> {
   await prisma.coliixV2StatusMapping.upsert({
@@ -117,7 +120,7 @@ export async function upsertUnknownWording(rawWording: string): Promise<void> {
     create: {
       carrierCode: CARRIER_CODE,
       rawWording,
-      internalState: 'pushed',
+      internalState: null,
       isTerminal: false,
       note: '(auto-discovered — please review)',
     },

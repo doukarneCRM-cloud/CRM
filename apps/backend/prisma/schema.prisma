@@ -1525,15 +1525,19 @@ model ShipmentEvent {
 // ShipmentState (the V2 enum) and scoped by carrier code so future carriers
 // share the table.
 model ColiixV2StatusMapping {
-  id            String        @id @default(cuid())
-  carrierCode   String        // "coliix_v2"
+  id            String         @id @default(cuid())
+  carrierCode   String         // "coliix_v2"
   rawWording    String
-  internalState ShipmentState
-  isTerminal    Boolean       @default(false)
+  // Null = "stay raw" — store the rawState on the shipment but don't flip
+  // the enum bucket. Used for auto-discovered wordings until an admin
+  // reviews them. Without this, an unknown wording would silently
+  // downgrade the shipment to a default state on every poll.
+  internalState ShipmentState?
+  isTerminal    Boolean        @default(false)
   note          String?
-  updatedAt     DateTime      @updatedAt
+  updatedAt     DateTime       @updatedAt
   updatedById   String?
-  createdAt     DateTime      @default(now())
+  createdAt     DateTime       @default(now())
 
   @@unique([carrierCode, rawWording])
   @@index([carrierCode, internalState])
