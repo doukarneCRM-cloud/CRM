@@ -1,0 +1,193 @@
+/**
+ * Account card — shown in the V2 tab list. One row per (carrier × hub).
+ * Compact health summary with rotate-secret + edit affordances.
+ */
+
+import { useEffect, useState } from 'react';
+import {
+  CheckCircle2,
+  AlertTriangle,
+  RefreshCw,
+  Settings,
+  Trash2,
+  Activity,
+} from 'lucide-react';
+import { CRMButton } from '@/components/ui/CRMButton';
+import {
+  coliixV2Api,
+  type CarrierAccount,
+  type AccountHealth,
+} from '@/services/coliixV2Api';
+
+interface Props {
+  account: CarrierAccount;
+  onConfigure: () => void;
+  onDeleted: () => void;
+  onChanged: (updated: CarrierAccount) => void;
+}
+
+export function AccountCard({ account, onConfigure, onDeleted, onChanged }: Props) {
+  const [health, setHealth] = useState<AccountHealth | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const tick = () => {
+      coliixV2Api
+        .health(account.id)
+        .then((h) => {
+          if (!cancelled) setHealth(h);
+        })
+        .catch(() => {
+          /* silent */
+        });
+    };
+    tick();
+    const id = setInterval(tick, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [account.id]);
+
+  async function handleToggle() {
+    setBusy('toggle');
+    try {
+      const updated = await coliixV2Api.updateAccount(account.id, {
+        isActive: !account.isActive,
+      });
+      onChanged(updated);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleDelete() {
+    if (!window.confirm(`Delete the ${account.hubLabel} account? Active shipments must be cleared first.`)) return;
+    setBusy('delete');
+    try {
+      await coliixV2Api.deleteAccount(account.id);
+      onDeleted();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Delete failed');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const lastWebhookText = health?.lastWebhookAt
+    ? new Date(health.lastWebhookAt).toLocaleString()
+    : 'No webhook yet';
+
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <h3 className="text-base font-semibold text-gray-900">{account.hubLabel}</h3>
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                account.isActive
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'bg-gray-100 text-gray-500'
+              }`}
+            >
+              {account.isActive ? 'Active' : 'Disabled'}
+            </span>
+          </div>
+          <p className="mt-0.5 text-xs text-gray-500">
+            Key: <span className="font-mono">{account.apiKeyMask ?? '—'}</span> ·{' '}
+            <span className="text-gray-400">{account.apiBaseUrl}</span>
+          </p>
+        </div>
+        <div className="flex items-center gap-1">
+          <CRMButton size="sm" variant="ghost" onClick={onConfigure} leftIcon={<Settings className="h-4 w-4" />}>
+            Configure
+          </CRMButton>
+          <CRMButton
+            size="sm"
+            variant="ghost"
+            onClick={handleDelete}
+            loading={busy === 'delete'}
+            leftIcon={<Trash2 className="h-4 w-4 text-red-500" />}
+          >
+            <span className="text-red-500">Delete</span>
+          </CRMButton>
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-3 gap-3">
+        <Metric
+          icon={<Activity className="h-4 w-4" />}
+          label="Webhooks 1h / 24h"
+          value={
+            health
+              ? `${health.count1h.toLocaleString()} / ${health.count24h.toLocaleString()}`
+              : '—'
+          }
+        />
+        <Metric
+          icon={
+            health?.lastWebhookOk === false ? (
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+            )
+          }
+          label="Last webhook"
+          value={lastWebhookText}
+        />
+        <Metric
+          icon={<RefreshCw className="h-4 w-4" />}
+          label="Last health check"
+          value={
+            account.lastHealthAt
+              ? new Date(account.lastHealthAt).toLocaleString()
+              : 'Never'
+          }
+        />
+      </div>
+
+      {health?.recentRejections.length ? (
+        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs">
+          <div className="mb-1 font-medium text-amber-800">
+            Recent rejections (last 24 h)
+          </div>
+          <ul className="space-y-0.5 text-amber-900">
+            {health.recentRejections.slice(0, 3).map((r, i) => (
+              <li key={i}>
+                <span className="font-mono text-[10px]">
+                  {new Date(r.createdAt).toLocaleTimeString()}
+                </span>{' '}
+                — HTTP {r.statusCode}: {r.reason ?? '—'}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      <div className="mt-4 flex justify-end">
+        <CRMButton
+          size="sm"
+          variant={account.isActive ? 'secondary' : 'primary'}
+          onClick={handleToggle}
+          loading={busy === 'toggle'}
+        >
+          {account.isActive ? 'Pause' : 'Activate'}
+        </CRMButton>
+      </div>
+    </div>
+  );
+}
+
+function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-gray-100 bg-gray-50/60 p-3">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
+        {icon}
+        {label}
+      </div>
+      <div className="mt-1 text-sm font-semibold text-gray-900">{value}</div>
+    </div>
+  );
+}

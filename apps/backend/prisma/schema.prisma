@@ -258,6 +258,8 @@ model Store {
   products   Product[]
   orders     Order[]
   importLogs ImportLog[]
+  // Coliix V2 carrier accounts scoped to this store (null = global)
+  carrierAccounts CarrierAccount[]
 }
 
 // ─── Shipping providers (Coliix, etc.) ───────────────────────────────────────
@@ -397,6 +399,10 @@ model Order {
   items            OrderItem[]
   logs             OrderLog[]
   messageLogs      MessageLog[]
+  // Coliix V2 — parallel to V1 fields above (coliixTrackingId, etc.). When
+  // shipments[] is non-empty the order is on V2; V1 fields stay null. New
+  // shipments only — V1 orders are not migrated.
+  shipments        Shipment[]
 
   @@index([confirmationStatus])
   @@index([shippingStatus])
@@ -1361,4 +1367,169 @@ model BroadcastRecipient {
 
   @@unique([broadcastId, userId])
   @@index([userId, ackedAt])
+}
+
+// ─── Coliix V2 — Carrier-agnostic shipment model ─────────────────────────────
+// Built parallel to the V1 ShippingProvider/Order coliix* fields. V1 stays
+// untouched; new orders that opt into V2 get a Shipment row instead of
+// flipping Order.labelSent. The Shipment is the unit of carrier work; events
+// are append-only so the timeline is forensically complete.
+
+// Top-level carrier registry. Today this is just "coliix_v2"; the design
+// scales to more carriers without further schema work.
+model Carrier {
+  id        String   @id @default(cuid())
+  code      String   @unique // "coliix_v2"
+  label     String              // "Coliix"
+  createdAt DateTime @default(now())
+
+  accounts CarrierAccount[]
+}
+
+// One row per (carrier × hub). The user's screenshot showed a single API key
+// per hub on the Coliix side (Agadir / Casablanca) — V1 only modelled one,
+// which is why we built this multi-account from day one. Webhook secret is a
+// random path segment; rotated via UI.
+model CarrierAccount {
+  id             String   @id @default(cuid())
+  carrierId      String
+  storeId        String?              // null = global; set = scoped to a store
+  hubLabel       String               // "Agadir", "Casablanca", custom
+  apiBaseUrl     String               // e.g. https://my.coliix.com
+  apiKey         String               // AES-256-GCM blob (encryptSecret)
+  webhookSecret  String               // path segment
+  isActive       Boolean  @default(false)
+  lastHealthAt   DateTime?
+  lastError      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  carrier   Carrier        @relation(fields: [carrierId], references: [id], onDelete: Cascade)
+  store     Store?         @relation(fields: [storeId], references: [id])
+  shipments Shipment[]
+  cities    CarrierCity[]
+
+  @@unique([carrierId, hubLabel])
+  @@index([carrierId, isActive])
+  @@index([storeId])
+}
+
+// "List Ville et zone" cached per account. Used to validate addresses BEFORE
+// pushing to Coliix — an unrecognised ville is the most common rejection
+// in V1, and we surface it earlier in V2.
+model CarrierCity {
+  id          String   @id @default(cuid())
+  accountId   String
+  ville       String
+  zone        String?
+  refreshedAt DateTime @default(now())
+
+  account CarrierAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, ville])
+  @@index([accountId, ville])
+}
+
+enum ShipmentState {
+  pending           // created in CRM, not pushed
+  push_failed       // push attempts exhausted
+  pushed            // tracking code returned, awaiting first scan
+  picked_up         // Ramassé
+  in_transit
+  out_for_delivery
+  delivered         // terminal
+  refused           // terminal
+  returned          // terminal
+  lost              // terminal
+  cancelled         // terminal (local-only — Coliix has no cancel API)
+}
+
+enum ShipmentEventSource {
+  webhook
+  poll
+  push
+  manual
+}
+
+// One per parcel. Order ↔ Shipment is 1..N (split parcels supported by design;
+// UI defaults to 1:1). trackingCode is unique because Coliix never reuses one.
+// idempotencyKey is the shipment id, surfaced in the push payload as a tag in
+// `note` so we can detect double-creates server-side.
+model Shipment {
+  id              String        @id @default(cuid())
+  orderId         String
+  accountId       String
+  trackingCode    String?       @unique
+  idempotencyKey  String        @unique
+  state           ShipmentState @default(pending)
+  rawState        String?
+  cod             Decimal       @db.Decimal(12, 2)
+  city            String
+  zone            String?
+  address         String
+  recipientName   String
+  recipientPhone  String
+  goodsLabel      String
+  goodsQty        Int
+  note            String?
+  labelPdfUrl     String?
+  pushAttempts    Int           @default(0)
+  lastPushError   String?
+  pushedAt        DateTime?
+  deliveredAt     DateTime?
+  returnedAt      DateTime?
+  // Adaptive polling — null = terminal, no more polls. Worker rewrites this
+  // each time it ingests an event.
+  nextPollAt      DateTime?
+  lastPolledAt    DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  account CarrierAccount @relation(fields: [accountId], references: [id])
+  events  ShipmentEvent[]
+
+  @@index([orderId])
+  @@index([accountId, state])
+  @@index([nextPollAt])
+  @@index([state, updatedAt])
+}
+
+// Append-only event log. Every webhook hit, every poll diff, every push.
+// dedupeHash = sha256(code|state|datereported) — second-layer replay guard
+// after the Redis NX SET in the webhook handler.
+model ShipmentEvent {
+  id          String              @id @default(cuid())
+  shipmentId  String
+  source      ShipmentEventSource
+  rawState    String?
+  mappedState ShipmentState?
+  driverNote  String?
+  occurredAt  DateTime
+  receivedAt  DateTime            @default(now())
+  payload     Json
+  dedupeHash  String
+
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@unique([shipmentId, dedupeHash])
+  @@index([shipmentId, occurredAt])
+}
+
+// V2 mapping table — parallel to ColiixStatusMapping (V1) but typed against
+// ShipmentState (the V2 enum) and scoped by carrier code so future carriers
+// share the table.
+model ColiixV2StatusMapping {
+  id            String        @id @default(cuid())
+  carrierCode   String        // "coliix_v2"
+  rawWording    String
+  internalState ShipmentState
+  isTerminal    Boolean       @default(false)
+  note          String?
+  updatedAt     DateTime      @updatedAt
+  updatedById   String?
+  createdAt     DateTime      @default(now())
+
+  @@unique([carrierCode, rawWording])
+  @@index([carrierCode, internalState])
 }

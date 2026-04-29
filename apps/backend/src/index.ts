@@ -25,6 +25,8 @@ import { customersRoutes } from './modules/customers/customers.routes';
 import { productsRoutes } from './modules/products/products.routes';
 import { teamRoutes } from './modules/team/team.routes';
 import { integrationsRoutes } from './modules/integrations/integrations.routes';
+import { coliixV2Routes } from './modules/integrations/coliixV2/coliixV2.routes';
+import { startColiixV2Poller } from './modules/integrations/coliixV2/poll.worker';
 import { startOrderPoller } from './modules/integrations/orderPoller';
 import { backfillStripDescriptionsOnce } from './jobs/backfillStripDescriptions';
 import { listProvidersPublic } from './modules/integrations/providers.service';
@@ -54,6 +56,7 @@ import { startAttendanceCron } from './modules/atelie/weeklyAttendanceCron';
 // Bull workers — side-effect imports register .process() handlers.
 import './jobs/callbackAlert.job';
 import './jobs/whatsappSend.job';
+import './jobs/registerColiixV2Workers';
 import { simulateAssign } from './utils/autoAssign';
 import {
   computeKPIsWithComparison,
@@ -106,7 +109,8 @@ app.register(rateLimit, {
   //     with regular API traffic and start 429-ing legitimate webhook hits
   allowList: (req) =>
     req.url.startsWith('/api/v1/whatsapp/webhook') ||
-    req.url.startsWith('/api/v1/integrations/coliix/webhook'),
+    req.url.startsWith('/api/v1/integrations/coliix/webhook') ||
+    req.url.startsWith('/api/v1/coliixv2/webhook'),
 });
 
 // Parse application/x-www-form-urlencoded bodies. Coliix posts webhook
@@ -253,6 +257,10 @@ app.register(teamRoutes, { prefix: '/api/v1' });
 
 // Integrations (YouCan stores, imports, webhooks)
 app.register(integrationsRoutes, { prefix: '/api/v1/integrations' });
+
+// Coliix V2 — parallel integration alongside V1. Public webhook +
+// authenticated admin/shipment endpoints.
+app.register(coliixV2Routes, { prefix: '/api/v1/coliixv2' });
 
 // Assignment rule simulator — "what if 5 orders arrived now?"
 app.get('/api/v1/assignment-rules/simulate', { preHandler: [verifyJWT] }, async (request, reply) => {
@@ -477,6 +485,10 @@ async function start() {
     // Fallback tracker — webhooks are the primary (instant) path; this sweeps
     // in-flight orders every 5 min in case a webhook is dropped.
     startColiixTracker();
+
+    // Coliix V2 fallback poller — same idea, scoped to the new Shipment table.
+    // Runs every 60s with adaptive cadence per parcel state.
+    startColiixV2Poller();
 
     // Seed the current week's attendance rows for every active employee on
     // boot + hourly (covers Monday rollover without a separate scheduler).

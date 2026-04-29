@@ -3,8 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { PillTabGroup } from '@/components/ui/PillTab';
 import { YoucanTab } from './components/YoucanTab';
 import { ColiixTab } from './components/ColiixTab';
+import { ColiixV2Tab } from './coliixV2/ColiixV2Tab';
 
-type TabId = 'youcan' | 'coliix';
+type TabId = 'youcan' | 'coliix' | 'coliix_v2';
 
 export default function IntegrationsPage() {
   const { t } = useTranslation();
@@ -14,6 +15,7 @@ export default function IntegrationsPage() {
     () => [
       { id: 'youcan', label: t('integrations.page.tabs.youcan') },
       { id: 'coliix', label: t('integrations.page.tabs.coliix') },
+      { id: 'coliix_v2', label: 'Coliix V2' },
     ],
     [t],
   );
@@ -35,6 +37,7 @@ export default function IntegrationsPage() {
 
       {activeTab === 'youcan' && <YoucanTab />}
       {activeTab === 'coliix' && <ColiixTab />}
+      {activeTab === 'coliix_v2' && <ColiixV2Tab />}
     </div>
   );
 }
