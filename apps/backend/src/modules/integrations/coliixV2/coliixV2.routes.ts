@@ -46,6 +46,9 @@ const CreateShipmentSchema = z.object({
   accountId: z.string().optional(),
   cod: z.number().positive().optional(),
   note: z.string().max(500).nullable().optional(),
+  // Skip the "already sent" guard. Use to push a duplicate parcel for the
+  // same order (replacement, customer re-ordered, etc.).
+  force: z.boolean().optional(),
 });
 
 const UpdateMappingSchema = z.object({
@@ -542,12 +545,15 @@ export async function coliixV2Routes(app: FastifyInstance) {
     { preHandler: [verifyJWT, requirePermission('shipping:push')] },
     async (req, reply) => {
       const body = z
-        .object({ orderIds: z.array(z.string()).min(1).max(100) })
+        .object({
+          orderIds: z.array(z.string()).min(1).max(100),
+          force: z.boolean().optional(),
+        })
         .parse(req.body);
       const results: Array<{ orderId: string; ok: boolean; shipmentId?: string; error?: string }> = [];
       for (const orderId of body.orderIds) {
         try {
-          const r = await shipments.createShipmentFromOrder({ orderId });
+          const r = await shipments.createShipmentFromOrder({ orderId, force: body.force });
           results.push({ orderId, ok: true, shipmentId: r.shipmentId });
         } catch (err) {
           results.push({

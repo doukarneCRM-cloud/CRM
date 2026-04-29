@@ -342,12 +342,15 @@ export default function OrdersPage() {
   // code is filled in async (within seconds) — the orders list refresh + the
   // shipment:updated socket event surface it. We adapt V2's response shape
   // to V1's ExportResult so the existing result modal stays unchanged.
+  //
+  // already_sent → ask the operator whether to push a duplicate parcel
+  // (legitimate use case: replacement, customer re-ordered same items).
   const handleSendColiix = useCallback(
     async (order: Order) => {
       if (!canShip) return;
       setSendingIds((prev) => [...prev, order.id]);
-      try {
-        const r = await coliixV2Api.createShipment(order.id);
+      const attempt = async (force: boolean) => {
+        const r = await coliixV2Api.createShipment(order.id, force ? { force: true } : undefined);
         const adapted: ExportResult = {
           orderId: order.id,
           reference: order.reference,
@@ -361,12 +364,34 @@ export default function OrdersPage() {
           summary: { total: 1, ok: 1, failed: 0 },
         });
         refresh();
+      };
+      try {
+        await attempt(false);
       } catch (e: any) {
+        const code = e?.response?.data?.code;
         const message =
           e?.response?.data?.error ??
           e?.response?.data?.message ??
           e?.message ??
           t('orders.exportFailed');
+        if (code === 'already_sent') {
+          const ok = window.confirm(
+            `${message}\n\nPush a NEW parcel anyway?\n\nThe old parcel stays at Coliix; this creates a second one with a fresh tracking code (use for replacements / re-orders).`,
+          );
+          if (ok) {
+            try {
+              await attempt(true);
+              return;
+            } catch (e2: any) {
+              const m2 = e2?.response?.data?.error ?? e2?.message ?? message;
+              setColiixResult({
+                results: [{ orderId: order.id, reference: order.reference, ok: false, error: String(m2) }],
+                summary: { total: 1, ok: 0, failed: 1 },
+              });
+              return;
+            }
+          }
+        }
         setColiixResult({
           results: [{ orderId: order.id, reference: order.reference, ok: false, error: String(message) }],
           summary: { total: 1, ok: 0, failed: 1 },

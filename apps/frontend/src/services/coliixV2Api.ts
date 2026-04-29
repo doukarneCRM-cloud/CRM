@@ -263,7 +263,7 @@ export const coliixV2Api = {
   // Shipments
   createShipment: (
     orderId: string,
-    input?: { accountId?: string; cod?: number; note?: string | null },
+    input?: { accountId?: string; cod?: number; note?: string | null; force?: boolean },
   ) =>
     api
       .post<{ shipmentId: string; state: string; accountId: string; hubLabel: string }>(
@@ -272,14 +272,14 @@ export const coliixV2Api = {
       )
       .then((r) => r.data),
 
-  bulkShipments: (orderIds: string[]) =>
+  bulkShipments: (orderIds: string[], force = false) =>
     api
       .post<{
         total: number;
         ok: number;
         failed: number;
         results: Array<{ orderId: string; ok: boolean; shipmentId?: string; error?: string }>;
-      }>('/coliixv2/shipments/bulk', { orderIds })
+      }>('/coliixv2/shipments/bulk', { orderIds, force })
       .then((r) => r.data),
 
   shipment: (id: string) =>

@@ -103,6 +103,12 @@ export interface CreateShipmentInput {
   cod?: number;
   // Optional driver note
   note?: string | null;
+  // When true, skip the "already sent" guard and create a brand-new
+  // Shipment + Coliix parcel even if a previous shipment exists in any
+  // state. Use when the customer re-ordered the same items, the first
+  // parcel was lost, or you genuinely want a replacement parcel. Old
+  // shipment stays intact (still tracked).
+  force?: boolean;
 }
 
 export interface CreatedShipment {
@@ -219,25 +225,29 @@ export async function createShipmentFromOrder(input: CreateShipmentInput): Promi
   // terminal — the parcel exists at Coliix; pushing again would create a
   // duplicate. Only `pending` and `push_failed` shipments are retryable;
   // `cancelled` shipments are local-only and may also be retried.
+  // Override with input.force=true when the operator genuinely wants a
+  // duplicate parcel (replacement, customer re-ordered, etc.).
   const anyShipment = await prisma.shipment.findFirst({
     where: { orderId: order.id },
     orderBy: { createdAt: 'desc' },
     select: { id: true, state: true, trackingCode: true, accountId: true },
   });
   if (
+    !input.force &&
     anyShipment &&
     !['pending', 'push_failed', 'cancelled'].includes(anyShipment.state)
   ) {
     throw new ShipmentValidationError(
       'already_sent',
-      `Order already sent to Coliix (tracking: ${anyShipment.trackingCode ?? '—'}, state: ${anyShipment.state})`,
+      `Order already sent to Coliix (tracking: ${anyShipment.trackingCode ?? '—'}, state: ${anyShipment.state}). Use force=true to push another parcel anyway.`,
     );
   }
 
   // Reuse an existing retryable shipment so double-clicks don't create two
-  // parcels for the same order.
+  // parcels for the same order. When force=true we always create a fresh
+  // shipment row instead of reusing — operator explicitly asked for a duplicate.
   const existing =
-    anyShipment && ['pending', 'push_failed'].includes(anyShipment.state)
+    !input.force && anyShipment && ['pending', 'push_failed'].includes(anyShipment.state)
       ? anyShipment
       : null;
 
