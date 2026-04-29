@@ -140,7 +140,7 @@ export async function migrateV1Orders(accountId: string): Promise<MigrationResul
           idempotencyKey: placeholderKey,
           state: v2State,
           rawState: order.coliixRawState ?? null,
-          cod: order.total as Prisma.Decimal,
+          cod: new Prisma.Decimal(order.total.toString()),
           city: c.city.trim(),
           zone: null,
           address: c.address.trim(),
