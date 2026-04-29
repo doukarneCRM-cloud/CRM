@@ -6,6 +6,7 @@ import { CRMButton } from '@/components/ui/CRMButton';
 import { useAuthStore } from '@/store/authStore';
 import { ordersApi, supportApi } from '@/services/ordersApi';
 import { coliixApi, type ExportResult } from '@/services/providersApi';
+import { coliixV2Api } from '@/services/coliixV2Api';
 import {
   CONFIRMATION_STATUS_OPTIONS,
   SOURCE_OPTIONS,
@@ -337,19 +338,35 @@ export default function OrdersPage() {
 
   // ── Coliix export ─────────────────────────────────────────────────────────
 
+  // V2 push: API returns immediately after queuing the worker job. Tracking
+  // code is filled in async (within seconds) — the orders list refresh + the
+  // shipment:updated socket event surface it. We adapt V2's response shape
+  // to V1's ExportResult so the existing result modal stays unchanged.
   const handleSendColiix = useCallback(
     async (order: Order) => {
       if (!canShip) return;
       setSendingIds((prev) => [...prev, order.id]);
       try {
-        const result = await coliixApi.exportOne(order.id);
+        const r = await coliixV2Api.createShipment(order.id);
+        const adapted: ExportResult = {
+          orderId: order.id,
+          reference: order.reference,
+          ok: true,
+          // V2 worker fills the Coliix code asynchronously — surface the
+          // shipment id here as a placeholder so the modal renders cleanly.
+          tracking: r.shipmentId,
+        };
         setColiixResult({
-          results: [result],
-          summary: { total: 1, ok: result.ok ? 1 : 0, failed: result.ok ? 0 : 1 },
+          results: [adapted],
+          summary: { total: 1, ok: 1, failed: 0 },
         });
         refresh();
       } catch (e: any) {
-        const message = e?.response?.data?.error?.message ?? e?.response?.data?.error ?? t('orders.exportFailed');
+        const message =
+          e?.response?.data?.error ??
+          e?.response?.data?.message ??
+          e?.message ??
+          t('orders.exportFailed');
         setColiixResult({
           results: [{ orderId: order.id, reference: order.reference, ok: false, error: String(message) }],
           summary: { total: 1, ok: 0, failed: 1 },
@@ -367,8 +384,24 @@ export default function OrdersPage() {
     setColiixShipping(true);
     setSendingIds(selectedIds);
     try {
-      const response = await coliixApi.exportBulk(selectedIds);
-      setColiixResult(response);
+      const response = await coliixV2Api.bulkShipments(selectedIds);
+      // Adapt V2 result to V1 ExportResult shape (orderId, reference, ok, tracking?, error?).
+      // We don't have references in V2's response, so look them up from the
+      // orders cache; fall back to '—' if missing.
+      const results: ExportResult[] = response.results.map((row) => {
+        const o = orders.find((x) => x.id === row.orderId);
+        return {
+          orderId: row.orderId,
+          reference: o?.reference ?? '—',
+          ok: row.ok,
+          tracking: row.shipmentId,
+          error: row.error,
+        };
+      });
+      setColiixResult({
+        results,
+        summary: { total: response.total, ok: response.ok, failed: response.failed },
+      });
       setSelectedIds([]);
       refresh();
     } catch (e: any) {
@@ -381,7 +414,7 @@ export default function OrdersPage() {
       setColiixShipping(false);
       setSendingIds([]);
     }
-  }, [canShip, selectedIds, setSelectedIds, refresh, t]);
+  }, [canShip, selectedIds, setSelectedIds, refresh, t, orders]);
 
   const showBulkBar = selectedIds.length > 0;
 
