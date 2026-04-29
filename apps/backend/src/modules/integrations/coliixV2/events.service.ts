@@ -8,12 +8,30 @@
  */
 
 import crypto from 'node:crypto';
-import { Prisma, type ShipmentState, type ShipmentEventSource } from '@prisma/client';
+import { Prisma, type ShipmentState, type ShipmentEventSource, type ShippingStatus } from '@prisma/client';
 import { prisma } from '../../../shared/prisma';
 import { mapWording, upsertUnknownWording } from './mapping.cache';
 import { emitToAll } from '../../../shared/socket';
 
 const TERMINAL_STATES: ShipmentState[] = ['delivered', 'returned', 'refused', 'lost', 'cancelled'];
+
+// V2 → V1 enum bridge. Used to keep Order.shippingStatus synced with the
+// Shipment row so the orders list, KPIs, commission rules, and filters all
+// reflect the V2 update. Without this, the V2 system tracks reality but the
+// rest of the CRM keeps reading the stale V1 status.
+const V2_TO_V1_STATUS: Record<ShipmentState, ShippingStatus> = {
+  pending: 'not_shipped',
+  push_failed: 'not_shipped',
+  pushed: 'label_created',
+  picked_up: 'picked_up',
+  in_transit: 'in_transit',
+  out_for_delivery: 'out_for_delivery',
+  delivered: 'delivered',
+  refused: 'return_refused',
+  returned: 'returned',
+  lost: 'lost',
+  cancelled: 'not_shipped',
+};
 
 export function isTerminal(state: ShipmentState): boolean {
   return TERMINAL_STATES.includes(state);
@@ -157,6 +175,30 @@ export async function ingestEvent(input: IngestInput): Promise<IngestResult> {
         select: { id: true, state: true, orderId: true },
       });
 
+      // Bridge to the parent Order row so the rest of the CRM (orders list,
+      // KPIs, commission, filters) reflects V2 updates without code change.
+      // We always sync coliixRawState (literal wording) and lastTrackedAt;
+      // shippingStatus only when the V2 enum actually moved AND the V1
+      // mapping yields a different value than what's stored.
+      const orderPatch: Prisma.OrderUpdateInput = {
+        coliixRawState: input.rawState,
+        lastTrackedAt: new Date(),
+      };
+      if (stateChanged && newState) {
+        orderPatch.shippingStatus = V2_TO_V1_STATUS[newState];
+        if (newState === 'delivered') orderPatch.deliveredAt = input.occurredAt;
+      }
+      try {
+        await tx.order.update({
+          where: { id: updated.orderId },
+          data: orderPatch,
+        });
+      } catch (err) {
+        // Order missing? Should never happen given FK, but don't fail the
+        // whole event over it. Log and move on.
+        console.warn(`[coliix-v2:events] order patch failed for ${updated.orderId}:`, err);
+      }
+
       // Real-time UX hook — fire-and-forget.
       try {
         emitToAll('shipment:updated', {
@@ -164,6 +206,13 @@ export async function ingestEvent(input: IngestInput): Promise<IngestResult> {
           orderId: updated.orderId,
           state: updated.state,
           rawState: input.rawState,
+        });
+        // Mirror to the legacy `order:updated` channel so orders-list views
+        // refresh their row without needing V2-specific socket plumbing.
+        emitToAll('order:updated', {
+          orderId: updated.orderId,
+          shippingStatus: orderPatch.shippingStatus,
+          coliixRawState: input.rawState,
         });
       } catch {
         /* socket not initialized yet (cold boot) — fine to drop */
