@@ -156,6 +156,15 @@ export const coliixV2Api = {
       )
       .then((r) => r.data),
 
+  importV1Cities: (id: string) =>
+    api
+      .post<{ total: number; inserted: number; updated: number }>(
+        `/coliixv2/accounts/${id}/import-v1-cities`,
+        undefined,
+        { timeout: 120_000 },
+      )
+      .then((r) => r.data),
+
   listCities: (id: string) =>
     api
       .get<{ cities: CarrierCity[] }>(`/coliixv2/accounts/${id}/cities`)

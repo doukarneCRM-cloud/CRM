@@ -141,6 +141,18 @@ export async function coliixV2Routes(app: FastifyInstance) {
     },
   );
 
+  // Bridge from V1 ShippingCity table — admins have already curated
+  // city / zone / price there, so V2 inherits with one click.
+  app.post(
+    '/accounts/:id/import-v1-cities',
+    { preHandler: [verifyJWT, requirePermission('integrations:manage')] },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      const result = await cities.importFromV1Cities(id);
+      return reply.send(result);
+    },
+  );
+
   app.get(
     '/accounts/:id/cities',
     { preHandler: [verifyJWT, requirePermission('integrations:view')] },

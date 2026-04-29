@@ -177,6 +177,22 @@ export function ConnectWizard({ open, initialAccount, onClose, onComplete }: Pro
     }
   }
 
+  // Bridge to V1's ShippingCity table — admins have already curated city +
+  // zone + delivery price there. One click to inherit it for V2.
+  async function handleStep4ImportV1() {
+    if (!account) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await coliixV2Api.importV1Cities(account.id);
+      setCitySync({ ...result, removed: 0 });
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not import V1 cities'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleFinish() {
     if (!account) return;
     setBusy(true);
@@ -303,18 +319,46 @@ export function ConnectWizard({ open, initialAccount, onClose, onComplete }: Pro
         {step === 4 && account && (
           <Step
             icon={<MapPin className="h-5 w-5" />}
-            title="Sync delivery cities"
-            description="We pre-validate every order's city against this list — fewer rejections at push time."
+            title="Delivery cities"
+            description="Used to validate every order's city + show the delivery price before pushing."
           >
-            <div className="rounded-lg border border-gray-200 bg-gray-50/60 p-4">
-              {citySync ? (
-                <div className="text-sm text-gray-700">
-                  Synced <strong>{citySync.total}</strong> cities ({citySync.inserted} new,{' '}
-                  {citySync.updated} updated, {citySync.removed} removed).
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">Click the button below to pull the list.</p>
-              )}
+            <div className="space-y-3">
+              <div className="rounded-lg border border-gray-200 bg-gray-50/60 p-4">
+                {citySync ? (
+                  <div className="text-sm text-gray-700">
+                    Loaded <strong>{citySync.total}</strong> cities ({citySync.inserted} new,{' '}
+                    {citySync.updated} updated{citySync.removed ? `, ${citySync.removed} removed` : ''}).
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">
+                    Pick a source. Re-runnable any time from the account card.
+                  </p>
+                )}
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={handleStep4ImportV1}
+                  disabled={busy}
+                  className="rounded-lg border border-gray-200 bg-white p-3 text-left transition hover:border-primary hover:bg-primary/5 disabled:opacity-60"
+                >
+                  <div className="text-sm font-medium text-gray-900">Import from CRM cities</div>
+                  <div className="mt-0.5 text-xs text-gray-500">
+                    Use your existing list (with delivery prices). Fastest.
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleStep4Sync}
+                  disabled={busy}
+                  className="rounded-lg border border-gray-200 bg-white p-3 text-left transition hover:border-primary hover:bg-primary/5 disabled:opacity-60"
+                >
+                  <div className="text-sm font-medium text-gray-900">Sync from Coliix</div>
+                  <div className="mt-0.5 text-xs text-gray-500">
+                    Pull "Liste Ville et zone" from Coliix. No prices.
+                  </div>
+                </button>
+              </div>
             </div>
           </Step>
         )}
@@ -363,23 +407,14 @@ export function ConnectWizard({ open, initialAccount, onClose, onComplete }: Pro
             </CRMButton>
           )}
           {step === 4 && (
-            <>
-              <CRMButton
-                variant={citySync ? 'secondary' : 'primary'}
-                onClick={handleStep4Sync}
-                loading={busy}
-                disabled={busy}
-              >
-                {citySync ? 'Re-sync' : 'Sync cities'}
-              </CRMButton>
-              <CRMButton
-                onClick={handleFinish}
-                disabled={busy}
-                rightIcon={<PartyPopper className="h-4 w-4" />}
-              >
-                Activate
-              </CRMButton>
-            </>
+            <CRMButton
+              onClick={handleFinish}
+              disabled={busy}
+              loading={busy}
+              rightIcon={<PartyPopper className="h-4 w-4" />}
+            >
+              {citySync ? 'Activate' : 'Skip & activate'}
+            </CRMButton>
           )}
         </div>
       </div>

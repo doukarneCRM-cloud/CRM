@@ -1418,11 +1418,16 @@ model CarrierAccount {
 // pushing to Coliix — an unrecognised ville is the most common rejection
 // in V1, and we surface it earlier in V2.
 model CarrierCity {
-  id          String   @id @default(cuid())
-  accountId   String
-  ville       String
-  zone        String?
-  refreshedAt DateTime @default(now())
+  id            String   @id @default(cuid())
+  accountId     String
+  ville         String
+  zone          String?
+  // Delivery fee in MAD shown to staff on shipment creation. Sourced from
+  // V1 `ShippingCity` (bridge endpoint) or admin-edited per account. Null =
+  // unknown — UI shows a warning so the operator types it manually before
+  // pushing the parcel.
+  deliveryPrice Decimal? @db.Decimal(12, 2)
+  refreshedAt   DateTime @default(now())
 
   account CarrierAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 

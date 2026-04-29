@@ -73,7 +73,7 @@ export async function listCities(accountId: string) {
   return prisma.carrierCity.findMany({
     where: { accountId },
     orderBy: { ville: 'asc' },
-    select: { ville: true, zone: true, refreshedAt: true },
+    select: { ville: true, zone: true, deliveryPrice: true, refreshedAt: true },
   });
 }
 
@@ -85,4 +85,53 @@ export async function isVilleKnown(accountId: string, ville: string): Promise<bo
     select: { id: true },
   });
   return hit !== null;
+}
+
+/**
+ * Bridge V1's ShippingCity table → V2 CarrierCity for the given account.
+ * V1 admins have already curated cities + delivery prices + zones; this
+ * lets V2 inherit that work with one click instead of typing it twice.
+ *
+ * Behaviour:
+ *   - Active V1 cities only (isActive=true)
+ *   - Upsert on (accountId, ville) — does NOT delete V2 rows that don't
+ *     exist in V1, so a Coliix-synced ville stays put.
+ *   - Overwrites zone + deliveryPrice (V1 is the source of truth here).
+ */
+export async function importFromV1Cities(accountId: string) {
+  // Confirm account exists
+  await prisma.carrierAccount.findUniqueOrThrow({ where: { id: accountId } });
+
+  const v1 = await prisma.shippingCity.findMany({
+    where: { isActive: true },
+    select: { name: true, zone: true, price: true },
+    orderBy: { name: 'asc' },
+  });
+
+  let inserted = 0;
+  let updated = 0;
+  for (const c of v1) {
+    const existing = await prisma.carrierCity.findUnique({
+      where: { accountId_ville: { accountId, ville: c.name } },
+      select: { id: true },
+    });
+    if (existing) {
+      await prisma.carrierCity.update({
+        where: { id: existing.id },
+        data: { zone: c.zone ?? null, deliveryPrice: c.price, refreshedAt: new Date() },
+      });
+      updated++;
+    } else {
+      await prisma.carrierCity.create({
+        data: {
+          accountId,
+          ville: c.name,
+          zone: c.zone ?? null,
+          deliveryPrice: c.price,
+        },
+      });
+      inserted++;
+    }
+  }
+  return { total: v1.length, inserted, updated };
 }
