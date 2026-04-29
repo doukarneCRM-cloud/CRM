@@ -66,7 +66,23 @@ export async function coliixV2WebhookHandler(req: FastifyRequest, reply: Fastify
         : typeof source.event_date === 'string'
           ? source.event_date
           : null;
-  const eventDate = eventDateStr ? new Date(eventDateStr) : null;
+  // Coliix sends dates without a timezone marker, e.g. "2026-04-29 15:36:34".
+  // V8 parses such strings as the server's local time → on a UTC Railway box
+  // we'd record the event as one hour later than Coliix actually meant. We
+  // assume Morocco time (UTC+1, year-round since 2018) and append the
+  // offset before parsing so the wall-clock matches what the driver saw.
+  // ISO strings (with 'T' or trailing 'Z'/offset) are passed through unchanged.
+  function parseMoroccoDate(s: string): Date {
+    const trimmed = s.trim().replace(/\s+:/g, ':');
+    const hasOffset = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(trimmed);
+    const isoLike = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(trimmed);
+    if (isoLike && !hasOffset) {
+      // Replace space with T (so JS parses as ISO) and append +01:00.
+      return new Date(trimmed.replace(' ', 'T') + '+01:00');
+    }
+    return new Date(trimmed);
+  }
+  const eventDate = eventDateStr ? parseMoroccoDate(eventDateStr) : null;
   const eventDateIso = eventDate && !Number.isNaN(eventDate.getTime()) ? eventDate.toISOString() : null;
 
   // Audit-log every hit BEFORE branching, mirroring V1. Reuses the existing

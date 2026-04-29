@@ -230,6 +230,112 @@ export async function coliixV2Routes(app: FastifyInstance) {
     },
   );
 
+  // Per-order diagnostic — pin-point why a specific order looks "stuck".
+  // Returns the order's V2 shipment(s), every shipment event, every
+  // webhook hit matching the tracking code, and the mapping in effect for
+  // each rawState seen. Operators paste an order reference and get the
+  // full picture in one call.
+  app.get(
+    '/diagnostic/order/:reference',
+    { preHandler: [verifyJWT, requirePermission('shipping:push')] },
+    async (req, reply) => {
+      const { reference } = req.params as { reference: string };
+      const order = await prisma.order.findUnique({
+        where: { reference },
+        select: {
+          id: true,
+          reference: true,
+          confirmationStatus: true,
+          shippingStatus: true,
+          coliixRawState: true,
+          coliixTrackingId: true,
+          trackingProvider: true,
+          labelSent: true,
+          labelSentAt: true,
+          deliveredAt: true,
+          updatedAt: true,
+        },
+      });
+      if (!order) return reply.status(404).send({ error: 'Order not found' });
+
+      const shipments = await prisma.shipment.findMany({
+        where: { orderId: order.id },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          events: { orderBy: { occurredAt: 'desc' }, take: 20 },
+          account: { select: { hubLabel: true, isActive: true } },
+        },
+      });
+
+      const trackingCodes = [order.coliixTrackingId, ...shipments.map((s) => s.trackingCode)]
+        .filter((t): t is string => Boolean(t));
+
+      const webhookHits = trackingCodes.length === 0
+        ? []
+        : await prisma.webhookEventLog.findMany({
+            where: {
+              provider: { in: ['coliix', 'coliix_v2'] },
+              tracking: { in: trackingCodes },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 20,
+            select: {
+              createdAt: true,
+              provider: true,
+              ok: true,
+              statusCode: true,
+              tracking: true,
+              rawState: true,
+              reason: true,
+            },
+          });
+
+      // Show the mapping rule in effect for every distinct rawState we've seen.
+      const rawStatesSeen = Array.from(
+        new Set(
+          shipments.flatMap((s) => s.events.map((e) => e.rawState)).filter(Boolean) as string[],
+        ),
+      );
+      const mappings = rawStatesSeen.length === 0
+        ? []
+        : await prisma.coliixV2StatusMapping.findMany({
+            where: { rawWording: { in: rawStatesSeen } },
+            select: { rawWording: true, internalState: true, isTerminal: true },
+          });
+
+      return reply.send({
+        order,
+        shipments,
+        webhookHits,
+        mappings,
+        hint: shipments.length === 0
+          ? 'No V2 shipment for this order — push it via Send to Coliix, or run "Migrate V1 orders" if it was pushed via V1.'
+          : webhookHits.length === 0
+            ? 'No Coliix webhook ever matched this tracking code. Either Coliix has not fired yet for this parcel, or the tracking code on Coliix differs.'
+            : 'Latest webhook + event timestamps below — check whether occurredAt is moving as expected.',
+      });
+    },
+  );
+
+  // Force-poll every non-terminal shipment NOW. Operators run this when
+  // some orders look frozen and they want to bypass the adaptive cadence.
+  app.post(
+    '/accounts/:id/force-refresh-all',
+    { preHandler: [verifyJWT, requirePermission('integrations:manage')] },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      const updated = await prisma.shipment.updateMany({
+        where: {
+          accountId: id,
+          state: { notIn: ['delivered', 'returned', 'refused', 'lost', 'cancelled'] },
+          trackingCode: { not: null },
+        },
+        data: { nextPollAt: new Date(), lastPolledAt: null },
+      });
+      return reply.send({ scheduled: updated.count });
+    },
+  );
+
   // ── Diagnostic — single endpoint that returns every observable signal
   // we'd otherwise have to hunt for. Used for "why isn't V2 working" triage.
   app.get(

@@ -246,6 +246,20 @@ export const coliixV2Api = {
   diagnostic: (id: string) =>
     api.get<unknown>(`/coliixv2/accounts/${id}/diagnostic`).then((r) => r.data),
 
+  diagnoseOrder: (reference: string) =>
+    api
+      .get<unknown>(`/coliixv2/diagnostic/order/${encodeURIComponent(reference)}`)
+      .then((r) => r.data),
+
+  forceRefreshAll: (id: string) =>
+    api
+      .post<{ scheduled: number }>(
+        `/coliixv2/accounts/${id}/force-refresh-all`,
+        undefined,
+        { timeout: 60_000 },
+      )
+      .then((r) => r.data),
+
   // Shipments
   createShipment: (
     orderId: string,

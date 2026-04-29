@@ -97,6 +97,40 @@ export function AccountCard({ account, onConfigure, onDeleted, onChanged }: Prop
     }
   }
 
+  async function handleDiagnoseOrder() {
+    const ref = window.prompt(
+      'Enter the order reference (e.g. ORD-26-12345). The system will dump everything it knows about that order’s V2 pipeline.',
+    );
+    if (!ref?.trim()) return;
+    setBusy('diagnoseOrder');
+    try {
+      const d = await coliixV2Api.diagnoseOrder(ref.trim());
+      setDiagnostic(d);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Order diagnostic failed');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleForceRefreshAll() {
+    if (
+      !window.confirm(
+        'Force-poll every non-terminal V2 shipment on this account NOW (bypassing the adaptive cadence)? Useful when many parcels look frozen.',
+      )
+    )
+      return;
+    setBusy('forceRefresh');
+    try {
+      const r = await coliixV2Api.forceRefreshAll(account.id);
+      alert(`${r.scheduled} shipment(s) queued for immediate poll. They will refresh within ~60 seconds.`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Force refresh failed');
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function handleMigrate() {
     if (!window.confirm(
       'Mirror every in-flight V1 order onto this V2 account so Coliix webhooks can update them instantly?\n\n' +
@@ -211,6 +245,24 @@ export function AccountCard({ account, onConfigure, onDeleted, onChanged }: Prop
       ) : null}
 
       <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+        <CRMButton
+          size="sm"
+          variant="ghost"
+          onClick={handleDiagnoseOrder}
+          loading={busy === 'diagnoseOrder'}
+          leftIcon={<Stethoscope className="h-4 w-4" />}
+        >
+          Diagnose order
+        </CRMButton>
+        <CRMButton
+          size="sm"
+          variant="ghost"
+          onClick={handleForceRefreshAll}
+          loading={busy === 'forceRefresh'}
+          leftIcon={<RefreshCw className="h-4 w-4" />}
+        >
+          Force refresh all
+        </CRMButton>
         <CRMButton
           size="sm"
           variant="ghost"

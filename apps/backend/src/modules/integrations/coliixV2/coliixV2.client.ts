@@ -314,7 +314,14 @@ function eventStateName(e: unknown): string | null {
 function parseColiixTime(v: unknown): Date | null {
   if (typeof v !== 'string' || !v.trim()) return null;
   const cleaned = v.replace(/\s+:/g, ':').trim();
-  const d = new Date(cleaned);
+  // Coliix sends "YYYY-MM-DD HH:MM:SS" without a timezone marker. V8 parses
+  // such strings as the server's LOCAL time → on a UTC Railway box we'd
+  // record events one hour off. Morocco runs UTC+1 year-round (since 2018);
+  // append the offset before parsing so wall-clock matches Coliix exactly.
+  const hasOffset = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(cleaned);
+  const isoLike = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(cleaned);
+  const fixed = isoLike && !hasOffset ? cleaned.replace(' ', 'T') + '+01:00' : cleaned;
+  const d = new Date(fixed);
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
