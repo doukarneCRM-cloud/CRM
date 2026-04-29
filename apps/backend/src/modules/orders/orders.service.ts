@@ -759,6 +759,31 @@ export async function updateOrderStatus(id: string, input: UpdateStatusInput, ac
   if (input.callbackAt) updateData.callbackAt = new Date(input.callbackAt);
   if (input.cancellationReason) updateData.cancellationReason = input.cancellationReason;
 
+  // Per-metric timestamps. We stamp on transition INTO the state so the
+  // KPI cards can date-filter "confirmed today" / "cancelled today" /
+  // "unreachable today" by the moment the agent actually acted.
+  // Only set when the status is newly entered — re-confirming an already-
+  // confirmed order doesn't bump confirmedAt.
+  const now = new Date();
+  if (
+    input.confirmationStatus === 'confirmed' &&
+    order.confirmationStatus !== 'confirmed'
+  ) {
+    updateData.confirmedAt = now;
+  }
+  if (
+    input.confirmationStatus === 'cancelled' &&
+    order.confirmationStatus !== 'cancelled'
+  ) {
+    updateData.cancelledAt = now;
+  }
+  if (
+    input.confirmationStatus === 'unreachable' &&
+    order.confirmationStatus !== 'unreachable'
+  ) {
+    updateData.unreachableAt = now;
+  }
+
   // Count every "unreachable" submission as one failed contact attempt, even
   // when the order is already in that state — agents retry the same customer
   // several times and expect the counter to climb with each failed try.
@@ -770,6 +795,9 @@ export async function updateOrderStatus(id: string, input: UpdateStatusInput, ac
     if (nextCount >= 9) {
       updateData.confirmationStatus = 'cancelled';
       updateData.cancellationReason = `Auto-cancelled after ${nextCount} unreachable attempts`;
+      // Stamp cancelledAt for the auto-cancel branch too — same per-metric
+      // semantics as the manual cancel above.
+      if (order.confirmationStatus !== 'cancelled') updateData.cancelledAt = now;
       actionParts.push(`Auto-cancelled (${nextCount} unreachable attempts)`);
     }
   }

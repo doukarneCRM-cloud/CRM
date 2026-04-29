@@ -157,31 +157,39 @@ export interface DeliveryTabPayload {
 const VERIFIED_RETURN_STATUSES = ['return_validated', 'return_refused'] as const;
 
 async function computeDeliveryCore(filters: OrderFilterParams) {
-  const where = buildOrderWhereClause(filters);
+  // Per-metric date fields. Each delivery metric dates against the column
+  // that records WHEN that step happened: labelSentAt for shipped,
+  // deliveredAt for delivered, returnVerifiedAt for returned. In-transit
+  // is a snapshot ("currently in transit") so it stays on createdAt.
+  const whereCreated   = buildOrderWhereClause(filters, { dateField: 'createdAt' });
+  const whereShipped   = buildOrderWhereClause(filters, { dateField: 'labelSentAt' });
+  const whereConfirmed = buildOrderWhereClause(filters, { dateField: 'confirmedAt' });
+  const whereDelivered = buildOrderWhereClause(filters, { dateField: 'deliveredAt' });
+  const whereReturned  = buildOrderWhereClause(filters, { dateField: 'returnVerifiedAt' });
 
   const [shipped, confirmed, delivered, returned, inTransit, revenueAgg, deliveredSample] =
     await Promise.all([
-      prisma.order.count({ where: { ...where, labelSent: true } }),
+      prisma.order.count({ where: { ...whereShipped, labelSent: true } }),
       // Confirmed = denominator for deliveryRate, matching kpiCalculator's
       // canonical formula (delivered / confirmed).
-      prisma.order.count({ where: { ...where, confirmationStatus: 'confirmed' } }),
-      prisma.order.count({ where: { ...where, shippingStatus: 'delivered' } }),
+      prisma.order.count({ where: { ...whereConfirmed, confirmationStatus: 'confirmed' } }),
+      prisma.order.count({ where: { ...whereDelivered, shippingStatus: 'delivered' } }),
       prisma.order.count({
-        where: { ...where, shippingStatus: { in: [...VERIFIED_RETURN_STATUSES] } },
+        where: { ...whereReturned, shippingStatus: { in: [...VERIFIED_RETURN_STATUSES] } },
       }),
       prisma.order.count({
         where: {
-          ...where,
+          ...whereCreated,
           shippingStatus: { in: ['picked_up', 'in_transit', 'out_for_delivery'] },
         },
       }),
       prisma.order.aggregate({
-        where: { ...where, shippingStatus: 'delivered' },
+        where: { ...whereDelivered, shippingStatus: 'delivered' },
         _sum: { total: true },
       }),
       prisma.order.findMany({
         where: {
-          ...where,
+          ...whereDelivered,
           shippingStatus: 'delivered',
           labelSentAt: { not: null },
           deliveredAt: { not: null },
@@ -587,35 +595,34 @@ const CONFIRMATION_ORDER: Array<
 ];
 
 async function computeConfirmationCore(filters: OrderFilterParams) {
-  const where = buildOrderWhereClause(filters);
-  // Merged orders are archived, so `where` (which excludes archived by default)
-  // won't include them — count them with the archive filter disabled.
-  const mergedWhere = buildOrderWhereClause({ ...filters, isArchived: 'all' });
+  // Per-metric date fields. Total = createdAt (orders that arrived);
+  // Confirmed/Cancelled/Unreachable = the timestamp when the agent acted on
+  // them (so "Confirmed today" means agent confirmed it today, regardless
+  // of when the order originally arrived). Pending stays on createdAt —
+  // it has no transition timestamp by definition.
+  const whereTotal       = buildOrderWhereClause(filters, { dateField: 'createdAt' });
+  const whereConfirmed   = buildOrderWhereClause(filters, { dateField: 'confirmedAt' });
+  const whereCancelled   = buildOrderWhereClause(filters, { dateField: 'cancelledAt' });
+  const whereUnreachable = buildOrderWhereClause(filters, { dateField: 'unreachableAt' });
+  const wherePending     = whereTotal;
+  // Merged orders are archived, so the default where excludes them — count
+  // them with archive filter disabled, dated on createdAt of the duplicate.
+  const mergedWhere = buildOrderWhereClause(
+    { ...filters, isArchived: 'all' },
+    { dateField: 'createdAt' },
+  );
 
-  // ── KPI counts ──────────────────────────────────────────────────────────
-  // Aligned with the Confirmation Funnel donut — Confirmed / Cancelled /
-  // Unreachable count orders BY THEIR CURRENT confirmation status (not by
-  // historical transitions). Previously these were activity counts, which
-  // produced visible drift on the page: an order that hit 9 unreachable
-  // attempts and auto-cancelled was being counted both in Unreachable
-  // (it had unreachable transitions) and in Cancelled (its current state),
-  // while the funnel only counted it once under Cancelled. The 26-vs-8
-  // gap users hit on Unreachable was exactly that pattern.
-  //
-  // Avg confirmation time still uses OrderLog so re-confirmations don't
-  // skew the mean — that one is genuinely a "first time it happened"
-  // measurement, not a snapshot.
   const { from: activityFrom, to: activityTo } = activityRange(filters);
-  const orderFilterForActivity = stripOrderCreatedAt(where);
+  const orderFilterForActivity = stripOrderCreatedAt(whereTotal);
 
   const [total, confirmed, cancelled, unreachable, pending, merged, confirmedSample] =
     await Promise.all([
-      prisma.order.count({ where }),
-      prisma.order.count({ where: { ...where, confirmationStatus: 'confirmed' } }),
-      prisma.order.count({ where: { ...where, confirmationStatus: 'cancelled' } }),
-      prisma.order.count({ where: { ...where, confirmationStatus: 'unreachable' } }),
+      prisma.order.count({ where: whereTotal }),
+      prisma.order.count({ where: { ...whereConfirmed, confirmationStatus: 'confirmed' } }),
+      prisma.order.count({ where: { ...whereCancelled, confirmationStatus: 'cancelled' } }),
+      prisma.order.count({ where: { ...whereUnreachable, confirmationStatus: 'unreachable' } }),
       prisma.order.count({
-        where: { ...where, confirmationStatus: { in: ['pending', 'awaiting', 'callback'] } },
+        where: { ...wherePending, confirmationStatus: { in: ['pending', 'awaiting', 'callback'] } },
       }),
       prisma.order.count({ where: { ...mergedWhere, mergedIntoId: { not: null } } }),
       // First confirmation log per order in the activity window, used to

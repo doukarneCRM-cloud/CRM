@@ -75,20 +75,33 @@ const RETURNED_STATUSES: ShippingStatus[] = [
 ];
 
 export async function computeKPIs(filters: OrderFilterParams): Promise<KPIResult> {
-  const where = buildOrderWhereClause(filters);
+  // Per-metric date fields: each count answers "X happened in this window"
+  // using the column that records when X actually happened. Without per-metric
+  // dating, "Confirmed today" filtered on createdAt and missed orders that
+  // were created yesterday but confirmed today — which is the most common
+  // operator workflow. See migrations/20260429160000_order_status_timestamps.
+  const whereTotal       = buildOrderWhereClause(filters, { dateField: 'createdAt' });
+  const whereConfirmed   = buildOrderWhereClause(filters, { dateField: 'confirmedAt' });
+  const whereDelivered   = buildOrderWhereClause(filters, { dateField: 'deliveredAt' });
+  const whereShipped     = buildOrderWhereClause(filters, { dateField: 'labelSentAt' });
+  const whereReturned    = buildOrderWhereClause(filters, { dateField: 'returnVerifiedAt' });
 
-  const totalOrders = await prisma.order.count({ where });
+  const totalOrders = await prisma.order.count({ where: whereTotal });
 
   // Merged orders are archived, so the default where clause excludes them —
-  // re-run the filter with isArchived:'all' to count them across the same scope.
-  const mergedWhere = buildOrderWhereClause({ ...filters, isArchived: 'all' });
+  // re-run with isArchived:'all'. Date-filter on createdAt: we want merged
+  // duplicates that arrived in the window (the window is about lead activity).
+  const mergedWhere = buildOrderWhereClause(
+    { ...filters, isArchived: 'all' },
+    { dateField: 'createdAt' },
+  );
 
   const [confirmedCount, deliveredCount, shippedCount, returnedCount, mergedCount] = await Promise.all([
-    prisma.order.count({ where: { ...where, confirmationStatus: 'confirmed' } }),
-    prisma.order.count({ where: { ...where, shippingStatus: 'delivered' } }),
-    prisma.order.count({ where: { ...where, labelSent: true } }),
+    prisma.order.count({ where: { ...whereConfirmed, confirmationStatus: 'confirmed' } }),
+    prisma.order.count({ where: { ...whereDelivered, shippingStatus: 'delivered' } }),
+    prisma.order.count({ where: { ...whereShipped, labelSent: true } }),
     prisma.order.count({
-      where: { ...where, shippingStatus: { in: RETURNED_STATUSES } },
+      where: { ...whereReturned, shippingStatus: { in: RETURNED_STATUSES } },
     }),
     prisma.order.count({ where: { ...mergedWhere, mergedIntoId: { not: null } } }),
   ]);
@@ -107,16 +120,16 @@ export async function computeKPIs(filters: OrderFilterParams): Promise<KPIResult
   const denominatorCount = totalOrders;
   const deliveryDenomCount = confirmedCount;
 
-  // ── 5. Revenue: SUM(total) WHERE delivered ───────────────────────────────
+  // ── 5. Revenue: SUM(total) WHERE delivered, by deliveredAt window ────────
   const revenueAgg = await prisma.order.aggregate({
-    where: { ...where, shippingStatus: 'delivered' },
+    where: { ...whereDelivered, shippingStatus: 'delivered' },
     _sum: { total: true },
   });
   const revenue = revenueAgg._sum.total ?? 0;
 
-  // ── 6. Profit: Revenue − shipping fees (delivered orders) ────────────────
+  // ── 6. Profit: Revenue − shipping fees (delivered, deliveredAt-windowed) ─
   const shippingCostAgg = await prisma.order.aggregate({
-    where: { ...where, shippingStatus: 'delivered' },
+    where: { ...whereDelivered, shippingStatus: 'delivered' },
     _sum: { shippingPrice: true },
   });
   const shippingCosts = shippingCostAgg._sum.shippingPrice ?? 0;
@@ -283,11 +296,14 @@ export interface AgentPerformance {
 export async function computeAgentPerformance(
   filters: OrderFilterParams,
 ): Promise<AgentPerformance[]> {
-  const where = buildOrderWhereClause(filters);
+  // Per-metric date fields, same approach as computeKPIs.
+  const whereTotal     = buildOrderWhereClause(filters, { dateField: 'createdAt' });
+  const whereConfirmed = buildOrderWhereClause(filters, { dateField: 'confirmedAt' });
+  const whereDelivered = buildOrderWhereClause(filters, { dateField: 'deliveredAt' });
 
   const agentGroups = await prisma.order.groupBy({
     by: ['agentId'],
-    where: { ...where, agentId: { not: null } },
+    where: { ...whereTotal, agentId: { not: null } },
     _count: { id: true },
   });
   const agentIds = agentGroups.map((g) => g.agentId!).filter(Boolean);
@@ -299,17 +315,17 @@ export async function computeAgentPerformance(
     }),
     prisma.order.groupBy({
       by: ['agentId'],
-      where: { ...where, agentId: { not: null }, confirmationStatus: 'confirmed' },
+      where: { ...whereConfirmed, agentId: { not: null }, confirmationStatus: 'confirmed' },
       _count: { id: true },
     }),
     prisma.order.groupBy({
       by: ['agentId'],
-      where: { ...where, agentId: { not: null }, shippingStatus: 'delivered' },
+      where: { ...whereDelivered, agentId: { not: null }, shippingStatus: 'delivered' },
       _count: { id: true },
     }),
     prisma.order.groupBy({
       by: ['agentId'],
-      where: { ...where, agentId: { not: null }, shippingStatus: 'delivered' },
+      where: { ...whereDelivered, agentId: { not: null }, shippingStatus: 'delivered' },
       _sum: { total: true },
     }),
   ]);

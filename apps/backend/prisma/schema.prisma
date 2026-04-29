@@ -353,6 +353,14 @@ model Order {
   shippingInstruction String?
   cancellationReason  String?
   callbackAt          DateTime?
+  // Per-metric timestamps so KPI cards can answer "confirmed today",
+  // "cancelled this week", etc. by the date the transition actually
+  // happened — instead of by createdAt (which described WHEN the
+  // order arrived, not when the agent decided). Set by the route that
+  // flips confirmationStatus; backfilled from OrderLog on migration.
+  confirmedAt         DateTime?
+  cancelledAt         DateTime?
+  unreachableAt       DateTime?
   coliixTrackingId    String?
   youcanOrderId       String?            @unique
   labelSent           Boolean            @default(false)

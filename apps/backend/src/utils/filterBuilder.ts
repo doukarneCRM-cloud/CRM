@@ -23,12 +23,37 @@ function toArray(val: string | string[] | undefined): string[] {
   return Array.isArray(val) ? val : val.split(',').filter(Boolean);
 }
 
+// Order column to apply the date-range filter against. Default is createdAt
+// (when the order arrived). KPI functions override this per metric so e.g.
+// "confirmed today" date-filters on confirmedAt, "delivered today" on
+// deliveredAt — matching human intuition. See utils/kpiCalculator.ts.
+export type OrderDateField =
+  | 'createdAt'
+  | 'confirmedAt'
+  | 'cancelledAt'
+  | 'unreachableAt'
+  | 'labelSentAt'
+  | 'deliveredAt'
+  | 'returnVerifiedAt'
+  | 'updatedAt';
+
+export interface BuildWhereOptions {
+  /** Order column to apply date range against. Default: createdAt. */
+  dateField?: OrderDateField;
+}
+
 /**
  * Converts URL query params → Prisma `where` clause for Order queries.
  * Used by every KPI, dashboard, and order list query.
+ *
+ * Pass `{ dateField: 'confirmedAt' }` (etc.) to make the date range filter
+ * on a different timestamp column. The single source of truth for "this
+ * order's confirmation happened in the window" is confirmedAt, not
+ * createdAt — see kpiCalculator.ts for the per-metric mapping.
  */
 export function buildOrderWhereClause(
   params: OrderFilterParams,
+  options: BuildWhereOptions = {},
 ): Prisma.OrderWhereInput {
   const where: Prisma.OrderWhereInput = {};
 
@@ -114,17 +139,20 @@ export function buildOrderWhereClause(
     where.source = { in: sources };
   }
 
-  // Date range filter
+  // Date range filter — applied against the column named in options.dateField
+  // so callers can ask for "confirmed in this window" by passing
+  // dateField=confirmedAt instead of the default createdAt.
   if (params.dateFrom || params.dateTo) {
-    where.createdAt = {};
-    if (params.dateFrom) {
-      (where.createdAt as Prisma.DateTimeFilter).gte = new Date(params.dateFrom);
-    }
+    const field: OrderDateField = options.dateField ?? 'createdAt';
+    const range: Prisma.DateTimeFilter = {};
+    if (params.dateFrom) range.gte = new Date(params.dateFrom);
     if (params.dateTo) {
       const to = new Date(params.dateTo);
       to.setHours(23, 59, 59, 999);
-      (where.createdAt as Prisma.DateTimeFilter).lte = to;
+      range.lte = to;
     }
+    // Cast: every key in OrderDateField is an Order column accepting DateTimeFilter.
+    (where as Record<string, unknown>)[field] = range;
   }
 
   // Product filter (via orderItems → variant → product)
