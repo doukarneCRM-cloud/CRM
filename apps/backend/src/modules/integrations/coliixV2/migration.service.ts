@@ -150,9 +150,10 @@ export async function migrateV1Orders(accountId: string): Promise<MigrationResul
           goodsQty: Math.max(1, goodsQty),
           note: null,
           pushedAt: order.labelSentAt,
-          // Adaptive cadence still applies — webhook is primary, poll is the
-          // safety net. Schedule a poll within the hour as a guard.
-          nextPollAt: new Date(Date.now() + 30 * 60_000),
+          // Force a poll on the next worker tick so the timeline is
+          // backfilled with Coliix's full event history within ~60s of
+          // migration. Adaptive cadence resumes once the first poll lands.
+          nextPollAt: new Date(),
         },
         select: { id: true },
       });

@@ -80,6 +80,50 @@ export interface IngestResult {
 }
 
 /**
+ * Ingest the FULL event history from a Coliix track response, not just
+ * the latest. Used by poll + manual refresh so historical events (and
+ * their original timestamps) populate the order timeline. The dedupeHash
+ * unique constraint guarantees idempotency — second call on the same
+ * track response is a no-op.
+ *
+ * Events are processed oldest-first so state transitions land in
+ * chronological order. The final state on the Shipment ends up matching
+ * the latest event after the loop.
+ */
+export async function ingestTrackHistory(input: {
+  shipmentId: string;
+  source: ShipmentEventSource;
+  events: Array<{ state: string; occurredAt?: string; driverNote?: string; message?: string }>;
+  rawPayload: unknown;
+}): Promise<{ ingested: number; changed: number; latestState: ShipmentState | null }> {
+  // Process oldest → newest so transitions are correct on the parent.
+  const sorted = [...input.events].sort((a, b) => {
+    const ta = a.occurredAt ? new Date(a.occurredAt).getTime() : 0;
+    const tb = b.occurredAt ? new Date(b.occurredAt).getTime() : 0;
+    return ta - tb;
+  });
+  let ingested = 0;
+  let changed = 0;
+  let latestState: ShipmentState | null = null;
+  for (const e of sorted) {
+    if (!e.state || e.state === 'Unknown') continue;
+    const occurredAt = e.occurredAt ? new Date(e.occurredAt) : new Date();
+    const r = await ingestEvent({
+      shipmentId: input.shipmentId,
+      source: input.source,
+      rawState: e.state,
+      driverNote: e.driverNote ?? null,
+      occurredAt: Number.isNaN(occurredAt.getTime()) ? new Date() : occurredAt,
+      payload: input.rawPayload as Record<string, unknown>,
+    });
+    if (r.inserted) ingested++;
+    if (r.changed) changed++;
+    if (r.newState) latestState = r.newState;
+  }
+  return { ingested, changed, latestState };
+}
+
+/**
  * Apply one inbound event. Three layers of safety:
  *   1. Dedupe via (shipmentId, dedupeHash) unique index.
  *   2. Single transaction over event insert + shipment update.
@@ -197,6 +241,35 @@ export async function ingestEvent(input: IngestInput): Promise<IngestResult> {
         // Order missing? Should never happen given FK, but don't fail the
         // whole event over it. Log and move on.
         console.warn(`[coliix-v2:events] order patch failed for ${updated.orderId}:`, err);
+      }
+
+      // Mirror the event into OrderLog (type='shipping') so the legacy
+      // Order detail timeline shows V2 history — same column the V1 system
+      // uses, so admins see the full lifecycle in one place. Driver note +
+      // Coliix's own event timestamp are stashed in meta for the detail
+      // panel.
+      try {
+        await tx.orderLog.create({
+          data: {
+            orderId: updated.orderId,
+            type: 'shipping',
+            action: stateChanged && newState
+              ? `Coliix → "${input.rawState}" (${input.source}) — mapped to ${newState}`
+              : `Coliix → "${input.rawState}" (${input.source})`,
+            performedBy: 'System',
+            meta: {
+              provider: 'coliix_v2',
+              shipmentId: updated.id,
+              rawState: input.rawState,
+              mappedState: newState,
+              source: input.source,
+              driverNote: input.driverNote ?? null,
+              eventDate: input.occurredAt.toISOString(),
+            } as Prisma.InputJsonValue,
+          },
+        });
+      } catch (err) {
+        console.warn('[coliix-v2:events] orderLog write failed:', err);
       }
 
       // Real-time UX hook — fire-and-forget.

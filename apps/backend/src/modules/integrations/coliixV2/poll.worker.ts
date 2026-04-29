@@ -12,7 +12,7 @@
 import { coliixV2PollQueue } from '../../../shared/queue';
 import { prisma } from '../../../shared/prisma';
 import { decryptAccount, trackParcel, ColiixV2Error } from './coliixV2.client';
-import { ingestEvent } from './events.service';
+import { ingestTrackHistory } from './events.service';
 
 const BATCH_SIZE = 50;
 const TICK_INTERVAL_MS = 60_000;
@@ -55,26 +55,16 @@ coliixV2PollQueue.process(async () => {
     try {
       const tr = await trackParcel(acct, s.trackingCode);
       polled++;
-      const top = tr.events[0];
-      if (!top || !top.state || top.state === 'Unknown') {
-        await prisma.shipment.update({
-          where: { id: s.id },
-          data: { lastPolledAt: now, nextPollAt: new Date(now.getTime() + 30 * 60_000) },
-        });
-        continue;
-      }
-      const occurredAt = top.occurredAt ? new Date(top.occurredAt) : new Date();
-      const result = await ingestEvent({
+      // Persist the FULL event history — not just the latest. dedupeHash
+      // keeps re-polls idempotent, and this gives migrated V1 orders a
+      // populated timeline on first sweep.
+      const history = await ingestTrackHistory({
         shipmentId: s.id,
         source: 'poll',
-        rawState: top.state,
-        driverNote: top.driverNote ?? null,
-        occurredAt: Number.isNaN(occurredAt.getTime()) ? new Date() : occurredAt,
-        payload: tr.raw as Record<string, unknown>,
+        events: tr.events,
+        rawPayload: tr.raw,
       });
-      if (result.changed) changed++;
-      // ingestEvent already wrote nextPollAt via the cadence; we just touch
-      // lastPolledAt for the throttle.
+      if (history.changed > 0) changed++;
       await prisma.shipment.update({
         where: { id: s.id },
         data: { lastPolledAt: now },

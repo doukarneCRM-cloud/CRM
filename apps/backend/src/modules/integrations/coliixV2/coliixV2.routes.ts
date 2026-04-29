@@ -21,7 +21,7 @@ import { migrateV1Orders } from './migration.service';
 import { decryptAccount, ping } from './coliixV2.client';
 import { invalidateMappingCache } from './mapping.cache';
 import { coliixV2WebhookHandler } from './webhook.controller';
-import { ingestEvent } from './events.service';
+import { ingestTrackHistory } from './events.service';
 import { trackParcel } from './coliixV2.client';
 
 const CARRIER_CODE = 'coliix_v2';
@@ -339,17 +339,16 @@ export async function coliixV2Routes(app: FastifyInstance) {
         apiKey: ship.account.apiKey,
       });
       const tr = await trackParcel(acct, ship.trackingCode);
-      const top = tr.events[0];
-      if (!top) {
-        return reply.send({ ok: true, changed: false, reason: 'no_events' });
+      if (tr.events.length === 0) {
+        return reply.send({ ok: true, changed: 0, ingested: 0, reason: 'no_events' });
       }
-      const result = await ingestEvent({
+      // Persist the full history — refresh-now should backfill anything we
+      // missed, not just the latest. dedupeHash keeps it idempotent.
+      const result = await ingestTrackHistory({
         shipmentId: ship.id,
         source: 'manual',
-        rawState: top.state,
-        driverNote: top.driverNote ?? null,
-        occurredAt: top.occurredAt ? new Date(top.occurredAt) : new Date(),
-        payload: tr.raw as Record<string, unknown>,
+        events: tr.events,
+        rawPayload: tr.raw,
       });
       return reply.send({ ok: true, ...result });
     },
