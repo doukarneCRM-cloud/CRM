@@ -154,6 +154,32 @@ export async function coliixV2Routes(app: FastifyInstance) {
     },
   );
 
+  // CSV import — admins paste rows from spreadsheet. Schema mirrors V1's
+  // ShippingCity import for muscle-memory (name → ville here).
+  const ImportCitiesCsvSchema = z.object({
+    rows: z
+      .array(
+        z.object({
+          ville: z.string().min(1).max(120),
+          zone: z.string().max(80).nullable().optional(),
+          deliveryPrice: z.number().nonnegative().max(10_000).nullable().optional(),
+        }),
+      )
+      .min(1)
+      .max(2000),
+    mode: z.enum(['upsert', 'replace']).default('upsert'),
+  });
+  app.post(
+    '/accounts/:id/import-cities-csv',
+    { preHandler: [verifyJWT, requirePermission('integrations:manage')] },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      const body = ImportCitiesCsvSchema.parse(req.body);
+      const result = await cities.importCitiesCsv(id, body.rows, body.mode);
+      return reply.send(result);
+    },
+  );
+
   // V1 → V2 migration. Creates Shipment rows for every in-flight V1 order
   // (has coliixTrackingId, not terminal) so V2 webhooks can find them by
   // tracking code. Idempotent — re-runs are safe.

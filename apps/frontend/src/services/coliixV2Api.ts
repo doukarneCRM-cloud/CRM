@@ -165,6 +165,26 @@ export const coliixV2Api = {
       )
       .then((r) => r.data),
 
+  importCitiesCsv: (
+    id: string,
+    rows: Array<{ ville: string; zone?: string | null; deliveryPrice?: number | null }>,
+    mode: 'upsert' | 'replace' = 'upsert',
+  ) =>
+    api
+      .post<{
+        total: number;
+        inserted: number;
+        updated: number;
+        unchanged: number;
+        removed: number;
+        skipped: Array<{ ville: string; reason: string }>;
+      }>(
+        `/coliixv2/accounts/${id}/import-cities-csv`,
+        { rows, mode },
+        { timeout: 120_000 },
+      )
+      .then((r) => r.data),
+
   migrateV1Orders: (id: string) =>
     api
       .post<{

@@ -31,6 +31,7 @@ import {
   type CarrierAccount,
 } from '@/services/coliixV2Api';
 import { apiErrorMessage } from '@/lib/apiError';
+import { CitiesCsvModal } from './CitiesCsvModal';
 
 const BACKEND_ORIGIN = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 type StepId = 1 | 2 | 3 | 4;
@@ -53,6 +54,7 @@ export function ConnectWizard({ open, initialAccount, onClose, onComplete }: Pro
   const [copied, setCopied] = useState(false);
   const [webhookOk, setWebhookOk] = useState(false);
   const [citySync, setCitySync] = useState<{ total: number; inserted: number; updated: number; removed: number } | null>(null);
+  const [csvOpen, setCsvOpen] = useState(false);
 
   const webhookUrl = useMemo(
     () =>
@@ -335,16 +337,27 @@ export function ConnectWizard({ open, initialAccount, onClose, onComplete }: Pro
                   </p>
                 )}
               </div>
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid gap-2 sm:grid-cols-3">
                 <button
                   type="button"
                   onClick={handleStep4ImportV1}
                   disabled={busy}
                   className="rounded-lg border border-gray-200 bg-white p-3 text-left transition hover:border-primary hover:bg-primary/5 disabled:opacity-60"
                 >
-                  <div className="text-sm font-medium text-gray-900">Import from CRM cities</div>
+                  <div className="text-sm font-medium text-gray-900">From CRM cities</div>
                   <div className="mt-0.5 text-xs text-gray-500">
-                    Use your existing list (with delivery prices). Fastest.
+                    Use your existing V1 list with prices. Fastest.
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCsvOpen(true)}
+                  disabled={busy}
+                  className="rounded-lg border border-gray-200 bg-white p-3 text-left transition hover:border-primary hover:bg-primary/5 disabled:opacity-60"
+                >
+                  <div className="text-sm font-medium text-gray-900">Upload CSV</div>
+                  <div className="mt-0.5 text-xs text-gray-500">
+                    Paste your own list with prices. Template provided.
                   </div>
                 </button>
                 <button
@@ -353,9 +366,9 @@ export function ConnectWizard({ open, initialAccount, onClose, onComplete }: Pro
                   disabled={busy}
                   className="rounded-lg border border-gray-200 bg-white p-3 text-left transition hover:border-primary hover:bg-primary/5 disabled:opacity-60"
                 >
-                  <div className="text-sm font-medium text-gray-900">Sync from Coliix</div>
+                  <div className="text-sm font-medium text-gray-900">From Coliix</div>
                   <div className="mt-0.5 text-xs text-gray-500">
-                    Pull "Liste Ville et zone" from Coliix. No prices.
+                    Pull list from Coliix API. No prices.
                   </div>
                 </button>
               </div>
@@ -418,6 +431,20 @@ export function ConnectWizard({ open, initialAccount, onClose, onComplete }: Pro
           )}
         </div>
       </div>
+
+      <CitiesCsvModal
+        open={csvOpen}
+        accountId={account?.id ?? null}
+        onClose={() => setCsvOpen(false)}
+        onComplete={(r) =>
+          setCitySync({
+            total: r.total,
+            inserted: r.inserted,
+            updated: r.updated,
+            removed: r.removed,
+          })
+        }
+      />
     </GlassModal>
   );
 }

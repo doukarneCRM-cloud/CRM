@@ -88,6 +88,124 @@ export async function isVilleKnown(accountId: string, ville: string): Promise<bo
 }
 
 /**
+ * Bulk import V2 cities from a parsed CSV.
+ *
+ * Each row: { ville, zone?, deliveryPrice? }. Mode:
+ *   - upsert  : insert new, update existing rows (matched on ville).
+ *   - replace : same as upsert, but villes NOT in the input are removed.
+ *               Safe-ish — only the carrier-cities cache is touched, never
+ *               existing shipments (those live on Shipment.city, decoupled).
+ */
+export interface CsvImportRow {
+  ville: string;
+  zone?: string | null;
+  deliveryPrice?: number | null;
+}
+
+export async function importCitiesCsv(
+  accountId: string,
+  rows: CsvImportRow[],
+  mode: 'upsert' | 'replace' = 'upsert',
+): Promise<{
+  total: number;
+  inserted: number;
+  updated: number;
+  unchanged: number;
+  removed: number;
+  skipped: Array<{ ville: string; reason: string }>;
+}> {
+  await prisma.carrierAccount.findUniqueOrThrow({ where: { id: accountId } });
+
+  // Dedupe within input — keep the last value per ville (case-sensitive,
+  // matching Coliix's behaviour).
+  const byVille = new Map<string, CsvImportRow>();
+  for (const r of rows) {
+    const ville = r.ville?.trim();
+    if (!ville) continue;
+    byVille.set(ville, {
+      ville,
+      zone: r.zone?.trim?.() || null,
+      deliveryPrice:
+        typeof r.deliveryPrice === 'number' && !Number.isNaN(r.deliveryPrice)
+          ? r.deliveryPrice
+          : null,
+    });
+  }
+
+  const existing = await prisma.carrierCity.findMany({
+    where: { accountId },
+    select: { id: true, ville: true, zone: true, deliveryPrice: true },
+  });
+  const existingByVille = new Map(existing.map((c) => [c.ville, c]));
+
+  let inserted = 0;
+  let updated = 0;
+  let unchanged = 0;
+  const skipped: Array<{ ville: string; reason: string }> = [];
+
+  for (const [ville, row] of byVille) {
+    const prev = existingByVille.get(ville);
+    if (!prev) {
+      try {
+        await prisma.carrierCity.create({
+          data: {
+            accountId,
+            ville,
+            zone: row.zone ?? null,
+            deliveryPrice: row.deliveryPrice ?? null,
+          },
+        });
+        inserted++;
+      } catch (err) {
+        skipped.push({
+          ville,
+          reason: err instanceof Error ? err.message : 'insert failed',
+        });
+      }
+      continue;
+    }
+    const prevPrice = prev.deliveryPrice == null ? null : Number(prev.deliveryPrice);
+    const nextPrice = row.deliveryPrice ?? null;
+    const changed =
+      (prev.zone ?? null) !== (row.zone ?? null) || prevPrice !== nextPrice;
+    if (!changed) {
+      unchanged++;
+      continue;
+    }
+    await prisma.carrierCity.update({
+      where: { id: prev.id },
+      data: {
+        zone: row.zone ?? null,
+        deliveryPrice: row.deliveryPrice ?? null,
+        refreshedAt: new Date(),
+      },
+    });
+    updated++;
+  }
+
+  let removed = 0;
+  if (mode === 'replace') {
+    const importedKeys = new Set(byVille.keys());
+    const toRemove = existing.filter((c) => !importedKeys.has(c.ville));
+    if (toRemove.length > 0) {
+      await prisma.carrierCity.deleteMany({
+        where: { id: { in: toRemove.map((c) => c.id) } },
+      });
+      removed = toRemove.length;
+    }
+  }
+
+  return {
+    total: byVille.size,
+    inserted,
+    updated,
+    unchanged,
+    removed,
+    skipped,
+  };
+}
+
+/**
  * Bridge V1's ShippingCity table → V2 CarrierCity for the given account.
  * V1 admins have already curated cities + delivery prices + zones; this
  * lets V2 inherit that work with one click instead of typing it twice.

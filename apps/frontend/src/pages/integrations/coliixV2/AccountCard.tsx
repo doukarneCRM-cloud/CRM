@@ -12,6 +12,7 @@ import {
   Trash2,
   Activity,
   Truck,
+  Upload,
 } from 'lucide-react';
 import { CRMButton } from '@/components/ui/CRMButton';
 import {
@@ -19,6 +20,7 @@ import {
   type CarrierAccount,
   type AccountHealth,
 } from '@/services/coliixV2Api';
+import { CitiesCsvModal } from './CitiesCsvModal';
 
 interface Props {
   account: CarrierAccount;
@@ -30,6 +32,7 @@ interface Props {
 export function AccountCard({ account, onConfigure, onDeleted, onChanged }: Props) {
   const [health, setHealth] = useState<AccountHealth | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [csvOpen, setCsvOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -193,6 +196,14 @@ export function AccountCard({ account, onConfigure, onDeleted, onChanged }: Prop
         <CRMButton
           size="sm"
           variant="ghost"
+          onClick={() => setCsvOpen(true)}
+          leftIcon={<Upload className="h-4 w-4" />}
+        >
+          Import cities
+        </CRMButton>
+        <CRMButton
+          size="sm"
+          variant="ghost"
           onClick={handleMigrate}
           loading={busy === 'migrate'}
           leftIcon={<Truck className="h-4 w-4" />}
@@ -208,6 +219,12 @@ export function AccountCard({ account, onConfigure, onDeleted, onChanged }: Prop
           {account.isActive ? 'Pause' : 'Activate'}
         </CRMButton>
       </div>
+
+      <CitiesCsvModal
+        open={csvOpen}
+        accountId={account.id}
+        onClose={() => setCsvOpen(false)}
+      />
     </div>
   );
 }
