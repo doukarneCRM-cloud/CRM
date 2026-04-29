@@ -13,6 +13,79 @@ import { coliixV2PushQueue } from '../../../shared/queue';
 import { pickAccountForStore } from './accounts.service';
 import { isVilleKnown } from './cities.service';
 
+interface MerchandiseItem {
+  quantity: number;
+  variant: {
+    color: string | null;
+    size: string | null;
+    product: { name: string };
+  };
+}
+
+/**
+ * Builds the human-readable merchandise label printed on the Coliix label
+ * — "Marchandise" field. Includes variant color + size so the driver can
+ * confirm the right item with the customer at delivery. Same shape as V1's
+ * buildMerchandise so labels look identical across V1 and V2 fleets.
+ *
+ * Examples:
+ *   single product, no variant   → "Robe été"
+ *   single product, color/size   → "Robe été / Bleu / M"
+ *   single product, qty > 1      → "Robe été / Bleu / M x2"
+ *   multiple variants of one     → "Robe été (Bleu / M, Rouge / L)"
+ *   multiple distinct products   → "Robe été / Bleu / M, Sac cuir x2"
+ */
+function buildMerchandise(items: MerchandiseItem[]): string {
+  const byProduct = new Map<
+    string,
+    Array<{ color: string | null; size: string | null; quantity: number }>
+  >();
+  for (const i of items) {
+    const name = i.variant?.product?.name?.trim();
+    if (!name) continue;
+    const bucket = byProduct.get(name) ?? [];
+    bucket.push({
+      color: i.variant.color?.trim() || null,
+      size: i.variant.size?.trim() || null,
+      quantity: i.quantity,
+    });
+    byProduct.set(name, bucket);
+  }
+
+  const formatVariant = (v: {
+    color: string | null;
+    size: string | null;
+    quantity: number;
+  }) => {
+    const parts: string[] = [];
+    if (v.color) parts.push(v.color);
+    if (v.size) parts.push(v.size);
+    const base = parts.join(' / ');
+    const qty = v.quantity > 1 ? ` x${v.quantity}` : '';
+    return (base + qty).trim();
+  };
+
+  const products: string[] = [];
+  for (const [name, variants] of byProduct) {
+    if (variants.length === 1) {
+      const v = variants[0];
+      const label = formatVariant(v);
+      if (!label) {
+        products.push(name);
+      } else if (v.color || v.size) {
+        products.push(`${name} / ${label}`);
+      } else {
+        products.push(`${name} ${label}`);
+      }
+    } else {
+      const variantLabels = variants.map(formatVariant).filter(Boolean);
+      products.push(variantLabels.length ? `${name} (${variantLabels.join(', ')})` : name);
+    }
+  }
+
+  return products.join(', ');
+}
+
 export class ShipmentValidationError extends Error {
   code: string;
   constructor(code: string, message: string) {
@@ -68,7 +141,17 @@ export async function createShipmentFromOrder(input: CreateShipmentInput): Promi
       customer: {
         select: { fullName: true, phoneDisplay: true, phone: true, address: true, city: true },
       },
-      items: { include: { variant: { include: { product: { select: { name: true } } } } } },
+      items: {
+        include: {
+          variant: {
+            select: {
+              color: true,
+              size: true,
+              product: { select: { name: true } },
+            },
+          },
+        },
+      },
       store: { select: { id: true } },
     },
   });
@@ -123,11 +206,11 @@ export async function createShipmentFromOrder(input: CreateShipmentInput): Promi
   // Phone normalisation. Throws on bad input — caller surfaces via 400.
   const phone = normalisePhone(rawPhone);
 
-  // Goods label: human-readable summary, e.g. "Sweater × 2, Bag × 1"
-  const goodsLabel = order.items
-    .map((it) => `${it.variant.product.name} × ${it.quantity}`)
-    .join(', ')
-    .slice(0, 240);
+  // Goods label printed on the Coliix label "Marchandise" field. Includes
+  // variant color + size so the driver can confirm the exact item with the
+  // customer at delivery (the screenshot showed "Ensemble Luméa × 1 (1)"
+  // which is product name only — bug fix here matches V1 output).
+  const goodsLabel = buildMerchandise(order.items).slice(0, 240) || order.reference;
   const goodsQty = order.items.reduce((sum, it) => sum + it.quantity, 0);
 
   const cod = input.cod ?? Number(order.total);
@@ -185,7 +268,11 @@ export async function createShipmentFromOrder(input: CreateShipmentInput): Promi
         recipientPhone: phone,
         goodsLabel: goodsLabel || 'Articles',
         goodsQty: Math.max(1, goodsQty),
-        note: input.note ?? null,
+        // Note printed on the Coliix label "Commentaire" field. Defaults to
+        // the order's shippingInstruction (whatever the operator typed for
+        // the driver). The previous V2 build was prefixing [id:<idem>]
+        // here, which polluted every printed label.
+        note: (input.note ?? order.shippingInstruction ?? '').trim() || null,
       },
       select: { id: true },
     });

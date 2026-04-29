@@ -180,18 +180,19 @@ export function decryptAccount(row: { apiBaseUrl: string; apiKey: string }): Car
   return { apiBaseUrl: row.apiBaseUrl, apiKey: decryptSecret(row.apiKey) };
 }
 
-/** Create a parcel; returns the tracking code Coliix assigned. */
+/** Create a parcel; returns the tracking code Coliix assigned.
+ *
+ *  Important: the `note` field surfaces in Coliix's printed label as
+ *  "Commentaire" (driver-visible, customer-visible). DO NOT add internal
+ *  tags here — idempotency is enforced by Bull's jobId + the Shipment
+ *  row's unique idempotencyKey + Coliix's own tracking-code uniqueness.
+ *  Earlier versions prefixed [id:<idem>] which polluted the customer's
+ *  printed Commentaire on every parcel. */
 export async function pushParcel(
   account: CarrierAccountSecrets,
   input: PushParcelInput,
 ): Promise<PushParcelResult> {
-  // Embed the idempotency key as a tag so duplicate pushes are diagnosable
-  // even if Coliix doesn't expose them in their dashboard. Format:
-  // "[id:<idem>] <user-note>" — single-line, easy to grep.
-  const idemTag = `[id:${input.idempotencyKey}]`;
-  const fullNote = input.driverNote
-    ? `${idemTag} ${input.driverNote}`.slice(0, 240)
-    : idemTag;
+  const note = (input.driverNote ?? '').trim().slice(0, 240);
 
   const payload = await postForm(account, {
     action: 'add',
@@ -201,7 +202,7 @@ export async function pushParcel(
     marchandise_qty: input.goodsQty,
     ville: input.city,
     adresse: input.address,
-    note: fullNote,
+    note,
     stock: 0,
     price: input.cod,
   });
