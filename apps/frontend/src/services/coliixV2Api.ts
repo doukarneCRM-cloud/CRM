@@ -165,6 +165,19 @@ export const coliixV2Api = {
       )
       .then((r) => r.data),
 
+  migrateV1Orders: (id: string) =>
+    api
+      .post<{
+        scanned: number;
+        migrated: number;
+        skippedAlreadyMigrated: number;
+        skippedNoTracking: number;
+        skippedTerminal: number;
+        skippedNoCustomerData: number;
+        errors: Array<{ orderId: string; reference: string; reason: string }>;
+      }>(`/coliixv2/accounts/${id}/migrate-v1`, undefined, { timeout: 300_000 })
+      .then((r) => r.data),
+
   listCities: (id: string) =>
     api
       .get<{ cities: CarrierCity[] }>(`/coliixv2/accounts/${id}/cities`)

@@ -17,6 +17,7 @@ import { prisma } from '../../../shared/prisma';
 import * as accounts from './accounts.service';
 import * as cities from './cities.service';
 import * as shipments from './shipments.service';
+import { migrateV1Orders } from './migration.service';
 import { decryptAccount, ping } from './coliixV2.client';
 import { invalidateMappingCache } from './mapping.cache';
 import { coliixV2WebhookHandler } from './webhook.controller';
@@ -149,6 +150,19 @@ export async function coliixV2Routes(app: FastifyInstance) {
     async (req, reply) => {
       const { id } = req.params as { id: string };
       const result = await cities.importFromV1Cities(id);
+      return reply.send(result);
+    },
+  );
+
+  // V1 → V2 migration. Creates Shipment rows for every in-flight V1 order
+  // (has coliixTrackingId, not terminal) so V2 webhooks can find them by
+  // tracking code. Idempotent — re-runs are safe.
+  app.post(
+    '/accounts/:id/migrate-v1',
+    { preHandler: [verifyJWT, requirePermission('integrations:manage')] },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      const result = await migrateV1Orders(id);
       return reply.send(result);
     },
   );

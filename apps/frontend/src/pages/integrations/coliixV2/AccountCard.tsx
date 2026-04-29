@@ -11,6 +11,7 @@ import {
   Settings,
   Trash2,
   Activity,
+  Truck,
 } from 'lucide-react';
 import { CRMButton } from '@/components/ui/CRMButton';
 import {
@@ -70,6 +71,28 @@ export function AccountCard({ account, onConfigure, onDeleted, onChanged }: Prop
       onDeleted();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Delete failed');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleMigrate() {
+    if (!window.confirm(
+      'Mirror every in-flight V1 order onto this V2 account so Coliix webhooks can update them instantly?\n\n' +
+      'Idempotent — safe to re-run.'
+    )) return;
+    setBusy('migrate');
+    try {
+      const r = await coliixV2Api.migrateV1Orders(account.id);
+      alert(
+        `Scanned ${r.scanned}\n` +
+        `Migrated ${r.migrated}\n` +
+        `Already migrated: ${r.skippedAlreadyMigrated}\n` +
+        `Missing data: ${r.skippedNoCustomerData}\n` +
+        (r.errors.length ? `Errors:\n${r.errors.slice(0, 5).map((e) => `  • ${e.reference}: ${e.reason}`).join('\n')}` : ''),
+      );
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Migration failed');
     } finally {
       setBusy(null);
     }
@@ -166,7 +189,16 @@ export function AccountCard({ account, onConfigure, onDeleted, onChanged }: Prop
         </div>
       ) : null}
 
-      <div className="mt-4 flex justify-end">
+      <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+        <CRMButton
+          size="sm"
+          variant="ghost"
+          onClick={handleMigrate}
+          loading={busy === 'migrate'}
+          leftIcon={<Truck className="h-4 w-4" />}
+        >
+          Migrate V1 orders
+        </CRMButton>
         <CRMButton
           size="sm"
           variant={account.isActive ? 'secondary' : 'primary'}
