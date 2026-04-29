@@ -18,6 +18,7 @@ import * as accounts from './accounts.service';
 import * as cities from './cities.service';
 import * as shipments from './shipments.service';
 import { migrateV1Orders } from './migration.service';
+import { previewBrokenParcels, repushBrokenParcels } from './repush.service';
 import { decryptAccount, ping } from './coliixV2.client';
 import { invalidateMappingCache } from './mapping.cache';
 import { coliixV2WebhookHandler } from './webhook.controller';
@@ -190,6 +191,31 @@ export async function coliixV2Routes(app: FastifyInstance) {
     async (req, reply) => {
       const { id } = req.params as { id: string };
       const result = await migrateV1Orders(id);
+      return reply.send(result);
+    },
+  );
+
+  // Re-push detection + execution for parcels created with the
+  // Commentaire / Marchandise bug (commit ca056a9). Two-step UX: GET
+  // returns the candidates; POST executes (optionally a subset).
+  app.get(
+    '/accounts/:id/repush-broken/preview',
+    { preHandler: [verifyJWT, requirePermission('integrations:manage')] },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      const result = await previewBrokenParcels(id);
+      return reply.send(result);
+    },
+  );
+  app.post(
+    '/accounts/:id/repush-broken',
+    { preHandler: [verifyJWT, requirePermission('integrations:manage')] },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      const body = z
+        .object({ shipmentIds: z.array(z.string()).optional() })
+        .parse(req.body ?? {});
+      const result = await repushBrokenParcels(id, body.shipmentIds);
       return reply.send(result);
     },
   );

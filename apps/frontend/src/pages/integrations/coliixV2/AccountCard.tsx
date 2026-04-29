@@ -24,6 +24,7 @@ import {
   type AccountHealth,
 } from '@/services/coliixV2Api';
 import { CitiesCsvModal } from './CitiesCsvModal';
+import { RepushBrokenModal } from './RepushBrokenModal';
 
 interface Props {
   account: CarrierAccount;
@@ -37,6 +38,7 @@ export function AccountCard({ account, onConfigure, onDeleted, onChanged }: Prop
   const [busy, setBusy] = useState<string | null>(null);
   const [csvOpen, setCsvOpen] = useState(false);
   const [diagnostic, setDiagnostic] = useState<unknown>(null);
+  const [repushOpen, setRepushOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -237,6 +239,14 @@ export function AccountCard({ account, onConfigure, onDeleted, onChanged }: Prop
         </CRMButton>
         <CRMButton
           size="sm"
+          variant="ghost"
+          onClick={() => setRepushOpen(true)}
+          leftIcon={<RefreshCw className="h-4 w-4" />}
+        >
+          Re-push broken
+        </CRMButton>
+        <CRMButton
+          size="sm"
           variant={account.isActive ? 'secondary' : 'primary'}
           onClick={handleToggle}
           loading={busy === 'toggle'}
@@ -249,6 +259,12 @@ export function AccountCard({ account, onConfigure, onDeleted, onChanged }: Prop
         open={csvOpen}
         accountId={account.id}
         onClose={() => setCsvOpen(false)}
+      />
+
+      <RepushBrokenModal
+        open={repushOpen}
+        accountId={account.id}
+        onClose={() => setRepushOpen(false)}
       />
 
       <GlassModal

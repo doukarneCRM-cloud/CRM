@@ -199,6 +199,42 @@ export const coliixV2Api = {
       }>(`/coliixv2/accounts/${id}/migrate-v1`, undefined, { timeout: 300_000 })
       .then((r) => r.data),
 
+  repushPreview: (id: string) =>
+    api
+      .get<{
+        total: number;
+        candidates: Array<{
+          shipmentId: string;
+          orderId: string;
+          orderReference: string;
+          trackingCode: string | null;
+          state: string;
+          note: string | null;
+          goodsLabel: string;
+          pushedAt: string | null;
+          customerName: string;
+          city: string;
+        }>;
+      }>(`/coliixv2/accounts/${id}/repush-broken/preview`)
+      .then((r) => r.data),
+
+  repushExecute: (id: string, shipmentIds?: string[]) =>
+    api
+      .post<{
+        total: number;
+        ok: number;
+        failed: number;
+        results: Array<{
+          shipmentId: string;
+          orderId: string;
+          orderReference: string;
+          ok: boolean;
+          newShipmentId?: string;
+          error?: string;
+        }>;
+      }>(`/coliixv2/accounts/${id}/repush-broken`, { shipmentIds }, { timeout: 300_000 })
+      .then((r) => r.data),
+
   listCities: (id: string) =>
     api
       .get<{ cities: CarrierCity[] }>(`/coliixv2/accounts/${id}/cities`)
