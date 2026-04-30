@@ -127,17 +127,19 @@ export async function ingestTrackHistory(input: {
  * Apply one inbound event. Three layers of safety:
  *   1. Dedupe via (shipmentId, dedupeHash) unique index.
  *   2. Single transaction over event insert + shipment update.
- *   3. Unknown wording → register it (auto-discover) and skip enum diff so
- *      raw still surfaces but KPIs don't churn.
+ *   3. Unknown wording → smart-fallback buckets it (delivered / returned /
+ *      in_transit) AND auto-registers it so the admin can override later.
  */
 export async function ingestEvent(input: IngestInput): Promise<IngestResult> {
   const dedupeHash = buildDedupeHash(input.rawState, input.occurredAt);
 
-  // Map first (cheap, in-memory cache hit). null = unknown wording.
+  // Map first (cheap, in-memory cache hit). The mapper always returns a hit:
+  // admin overrides win; otherwise smart-fallback buckets to delivered /
+  // returned / in_transit by string-contains.
   const hit = await mapWording(input.rawState);
-  if (!hit) {
-    // Auto-discover: register so the admin sees it appear in the editor.
-    // We keep the rawState on the shipment but don't bucket-flip the enum.
+  if (hit.tier === 'smart-fallback') {
+    // Auto-discover so the admin sees the new wording surface in the editor
+    // and can override the fallback bucket if needed.
     await upsertUnknownWording(input.rawState).catch(() => {
       // Even if upsert fails (race), the event still records below.
     });
@@ -166,7 +168,7 @@ export async function ingestEvent(input: IngestInput): Promise<IngestResult> {
             shipmentId: input.shipmentId,
             source: input.source,
             rawState: input.rawState,
-            mappedState: hit?.internalState ?? null,
+            mappedState: hit.internalState,
             driverNote: input.driverNote ?? null,
             occurredAt: input.occurredAt,
             payload: (input.payload ?? {}) as Prisma.InputJsonValue,
@@ -185,8 +187,8 @@ export async function ingestEvent(input: IngestInput): Promise<IngestResult> {
       }
 
       // Decide whether to flip the parent shipment state.
-      const newState = hit?.internalState ?? null;
-      const stateChanged = newState !== null && newState !== shipment.state;
+      const newState = hit.internalState;
+      const stateChanged = newState !== shipment.state;
       const rawChanged = input.rawState !== (shipment.rawState ?? '');
 
       if (!stateChanged && !rawChanged) {
@@ -203,7 +205,7 @@ export async function ingestEvent(input: IngestInput): Promise<IngestResult> {
         rawState: input.rawState,
       };
 
-      if (stateChanged && newState) {
+      if (stateChanged) {
         data.state = newState;
         data.nextPollAt = nextPollCadence(newState);
         if (newState === 'delivered') {
@@ -228,7 +230,7 @@ export async function ingestEvent(input: IngestInput): Promise<IngestResult> {
         coliixRawState: input.rawState,
         lastTrackedAt: new Date(),
       };
-      if (stateChanged && newState) {
+      if (stateChanged) {
         orderPatch.shippingStatus = V2_TO_V1_STATUS[newState];
         if (newState === 'delivered') orderPatch.deliveredAt = input.occurredAt;
       }
@@ -253,7 +255,7 @@ export async function ingestEvent(input: IngestInput): Promise<IngestResult> {
           data: {
             orderId: updated.orderId,
             type: 'shipping',
-            action: stateChanged && newState
+            action: stateChanged
               ? `Coliix → "${input.rawState}" (${input.source}) — mapped to ${newState}`
               : `Coliix → "${input.rawState}" (${input.source})`,
             performedBy: 'System',

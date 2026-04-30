@@ -3,10 +3,13 @@
  * invalidation on save — matches the V1 pattern (coliixMappingCache.ts) so
  * ops have one mental model.
  *
- * Three-tier lookup:
- *   1. exact     — Coliix sends "Livré"   → hit
- *   2. normalized — strip diacritics + lowercase ("livre" matches "Livré")
- *   3. token      — first significant token ("livre client" matches "Livré")
+ * Lookup order:
+ *   1. exact         — Coliix sends "Livré"   → hit
+ *   2. normalized    — strip diacritics + lowercase ("livre" matches "Livré")
+ *   3. first-token   — first significant token ("livre client" matches "Livré")
+ *   4. smart-fallback — string-contains buckets so unknown wordings still
+ *      land in delivered / returned / in_transit instead of staying null.
+ *      Driven by the same rules surfaced in the admin UI legend.
  */
 
 import type { ShipmentState } from '@prisma/client';
@@ -88,23 +91,40 @@ export function invalidateMappingCache() {
 
 export interface MappingHit {
   rawWording: string;
-  internalState: ShipmentState | null;
+  internalState: ShipmentState;
   isTerminal: boolean;
-  tier: 'exact' | 'normalized' | 'first-token';
+  tier: 'exact' | 'normalized' | 'first-token' | 'smart-fallback';
 }
 
-/** Maps a Coliix wording to a ShipmentState. Returns null if no rule found. */
-export async function mapWording(rawState: string): Promise<MappingHit | null> {
+// String-contains rules mirrored in the admin UI legend. Keep these in sync
+// with MappingsModal's "How it works" block.
+function smartFallback(rawState: string): MappingHit {
+  const norm = normalize(rawState);
+  if (norm.includes('livr')) {
+    return { rawWording: rawState, internalState: 'delivered', isTerminal: true, tier: 'smart-fallback' };
+  }
+  if (norm.includes('refus') || norm.includes('retour') || norm.includes('annul')) {
+    return { rawWording: rawState, internalState: 'returned', isTerminal: true, tier: 'smart-fallback' };
+  }
+  return { rawWording: rawState, internalState: 'in_transit', isTerminal: false, tier: 'smart-fallback' };
+}
+
+/**
+ * Maps a Coliix wording to a ShipmentState. Always returns a hit — admin DB
+ * overrides win; otherwise the smart-fallback buckets the wording so no event
+ * is left with mappedState = null.
+ */
+export async function mapWording(rawState: string): Promise<MappingHit> {
   const c = await getCache();
   const exact = c.byExact.get(rawState);
-  if (exact) return { ...exact, tier: 'exact' };
+  if (exact && exact.internalState) return { ...exact, internalState: exact.internalState, tier: 'exact' };
   const norm = normalize(rawState);
   const normHit = c.byNormalized.get(norm);
-  if (normHit) return { ...normHit, tier: 'normalized' };
+  if (normHit && normHit.internalState) return { ...normHit, internalState: normHit.internalState, tier: 'normalized' };
   const tok = firstToken(rawState);
   const tokHit = c.byFirstToken.get(tok);
-  if (tokHit) return { ...tokHit, tier: 'first-token' };
-  return null;
+  if (tokHit && tokHit.internalState) return { ...tokHit, internalState: tokHit.internalState, tier: 'first-token' };
+  return smartFallback(rawState);
 }
 
 /**
