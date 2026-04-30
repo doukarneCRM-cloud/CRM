@@ -660,7 +660,17 @@ export function OrderEditModal({ order, onClose, onSaved }: OrderEditModalProps)
                 <div className="h-3 w-px bg-gray-200" />
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-gray-400">{t('orders.edit.statusShipping')}</span>
-                  <StatusBadge status={order.shippingStatus} />
+                  {order.coliixRawState ? (
+                    <span
+                      className="inline-flex items-center gap-1.5 rounded-badge bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-700"
+                      title={order.coliixRawState}
+                    >
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" />
+                      {order.coliixRawState}
+                    </span>
+                  ) : (
+                    <StatusBadge status={order.shippingStatus} />
+                  )}
                 </div>
                 <div className="ml-auto flex items-center gap-2">
                   {canVerifyReturns &&
