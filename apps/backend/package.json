@@ -1,6 +1,6 @@
 {
   "name": "@anaqatoki/backend",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "engines": {
     "node": ">=20.0.0"
@@ -8,8 +8,8 @@
   "scripts": {
     "dev": "nodemon --watch src --ext ts --exec \"ts-node -r tsconfig-paths/register src/index.ts\"",
     "build": "tsc",
-    "start": "npx prisma migrate deploy && node dist/index.js",
-    "migrate": "npx prisma migrate deploy && node dist/index.js",
+    "start": "node dist/index.js",
+    "migrate": "prisma migrate deploy",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
     "db:seed": "ts-node -r tsconfig-paths/register src/prisma/seed.ts",
