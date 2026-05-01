@@ -359,9 +359,18 @@ export async function createShipment(input: CreateShipmentInput): Promise<Create
       },
     });
 
+    // Mirror the shipment state onto the order's shippingStatus so the
+    // orders table / dashboard / pipeline cards reflect the new state
+    // immediately. Without this the Shipment row says `pushed` but the
+    // Order row stays `not_shipped`, so the row badge never moves until
+    // a tracking event later flips it.
     await tx.order.update({
       where: { id: order.id },
-      data: { labelSent: true, labelSentAt: now },
+      data: {
+        labelSent: true,
+        labelSentAt: now,
+        shippingStatus: 'pushed',
+      },
     });
 
     await tx.orderLog.create({
