@@ -157,17 +157,27 @@ export function disconnectSocket() {
   socket = null;
 }
 
-// Force the socket to drop its current connection and reopen with the latest
-// access token from the auth store. Call this immediately after the token is
-// refreshed by the axios interceptor — io() captures `auth.token` at
-// construct time, so reconnect attempts otherwise replay the OLD token, get
-// rejected by the JWT handshake, and the user silently goes presence-offline
-// even though their REST traffic is happily using the new token.
+// Force the socket to reauthenticate with the latest access token.
+//
+// Critical: we DO NOT replace the socket instance — that would orphan every
+// `socket.on(...)` listener attached by React components, and after a token
+// refresh the new instance would receive events but nothing would handle them.
+// Symptom of the old behaviour: a second browser sat stale on the dashboard
+// because its dashboard cards' listeners were bound to a defunct socket
+// after the first 401-driven reauth.
+//
+// Instead we mutate `socket.auth` (Socket.IO supports this — the next
+// reconnect picks up the fresh token) and trigger a clean disconnect/connect
+// cycle on the SAME instance. Listeners survive because the instance survives.
 export function reauthSocket() {
   if (!useAuthStore.getState().isAuthenticated) return;
-  if (socket) {
-    socket.disconnect();
-    socket = null;
+  const { accessToken } = useAuthStore.getState();
+  if (!socket) {
+    connectSocket();
+    return;
   }
-  connectSocket();
+  // socket.auth is typed as object | function — overwriting works at runtime.
+  (socket as { auth: Record<string, unknown> }).auth = { token: accessToken };
+  if (socket.connected) socket.disconnect();
+  socket.connect();
 }

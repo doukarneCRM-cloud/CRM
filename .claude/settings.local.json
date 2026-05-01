@@ -68,7 +68,8 @@
       "Bash(grep -nB2 -A20 \"TSError\\\\|Error:\" \"C:\\\\Users\\\\OMARDO~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-Omar-Doukarne-Desktop-clone-CRM\\\\160ba431-e0fc-40ac-a2e0-44a33984f6db\\\\tasks\\\\b005gidl7.output\")",
       "Bash(curl -s \"http://localhost:5173/src/hooks/useOrderNotifications.ts\")",
       "Bash(curl -s \"http://localhost:5173/src/services/socket.ts\")",
-      "Bash(curl -s \"http://localhost:5173/src/services/api.ts\")"
+      "Bash(curl -s \"http://localhost:5173/src/services/api.ts\")",
+      "Bash(curl -s \"http://localhost:5173/src/pages/dashboard/hooks/useDashboardCard.ts\")"
     ]
   }
 }
