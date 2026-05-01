@@ -171,6 +171,13 @@ export function useNavBadges(): NavBadges {
       socket?.off('task:created', scheduleRefetch);
       socket?.off('task:updated', scheduleRefetch);
       socket?.off('task:deleted', scheduleRefetch);
+      // Drop any pending debounced refetch — without this, a no-hint event
+      // arriving just before a logout / unmount fires `refetch()` after the
+      // hook is gone, calling setBadges on an unmounted component.
+      if (refetchTimer.current) {
+        clearTimeout(refetchTimer.current);
+        refetchTimer.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);

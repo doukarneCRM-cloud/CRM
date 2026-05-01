@@ -276,52 +276,52 @@ app.get('/api/v1/nav/badges', { preHandler: [verifyJWT] }, async (request, reply
   const perms = new Set(role?.permissions.map((p) => p.permission.key) ?? []);
   const can = (key: string) => perms.has(key);
 
+  // Run every count the user is entitled to in parallel — they're all
+  // independent reads on indexed columns, but in series they stack up to
+  // ~5x the latency. The DB takes them as a single round-trip wave.
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
+
+  const [ordersPending, callbacksToday, returnsToVerify, coliixErrors, atelieTasks] =
+    await Promise.all([
+      can('orders:view') || can('call_center:view')
+        ? prisma.order.count({
+            where: {
+              confirmationStatus: 'pending',
+              isArchived: false,
+              ...(isAdmin ? {} : { agentId: user.sub }),
+            },
+          })
+        : Promise.resolve(undefined),
+      can('call_center:view') || can('orders:view')
+        ? prisma.order.count({
+            where: {
+              confirmationStatus: 'callback',
+              isArchived: false,
+              callbackAt: { lte: todayEnd },
+              ...(isAdmin ? {} : { agentId: user.sub }),
+            },
+          })
+        : Promise.resolve(undefined),
+      can('returns:verify')
+        ? prisma.order.count({
+            where: { shippingStatus: 'returned', returnVerifiedAt: null, isArchived: false },
+          })
+        : Promise.resolve(undefined),
+      can('integrations:view')
+        ? prisma.coliixIntegrationError.count({ where: { resolved: false } })
+        : Promise.resolve(undefined),
+      can('atelie:view')
+        ? prisma.atelieTask.count({ where: { ownerId: user.sub, status: { not: 'done' } } })
+        : Promise.resolve(undefined),
+    ]);
+
   const out: Record<string, number> = {};
-
-  // Orders pending — agents see only their own queue; admins see all.
-  if (can('orders:view') || can('call_center:view')) {
-    out.ordersPending = await prisma.order.count({
-      where: {
-        confirmationStatus: 'pending',
-        isArchived: false,
-        ...(isAdmin ? {} : { agentId: user.sub }),
-      },
-    });
-  }
-
-  // Callbacks needing a call today / overdue.
-  if (can('call_center:view') || can('orders:view')) {
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
-    out.callbacksToday = await prisma.order.count({
-      where: {
-        confirmationStatus: 'callback',
-        isArchived: false,
-        callbackAt: { lte: todayEnd },
-        ...(isAdmin ? {} : { agentId: user.sub }),
-      },
-    });
-  }
-
-  // Returns awaiting verification.
-  if (can('returns:verify')) {
-    out.returnsToVerify = await prisma.order.count({
-      where: { shippingStatus: 'returned', returnVerifiedAt: null, isArchived: false },
-    });
-  }
-
-  // Coliix unresolved errors — admin only.
-  if (can('integrations:view')) {
-    out.coliixErrors = await prisma.coliixIntegrationError.count({ where: { resolved: false } });
-  }
-
-  // My open Atelie tasks (assigned to me, not done).
-  if (can('atelie:view')) {
-    out.atelieTasks = await prisma.atelieTask.count({
-      where: { ownerId: user.sub, status: { not: 'done' } },
-    });
-  }
-
+  if (ordersPending !== undefined) out.ordersPending = ordersPending;
+  if (callbacksToday !== undefined) out.callbacksToday = callbacksToday;
+  if (returnsToVerify !== undefined) out.returnsToVerify = returnsToVerify;
+  if (coliixErrors !== undefined) out.coliixErrors = coliixErrors;
+  if (atelieTasks !== undefined) out.atelieTasks = atelieTasks;
   return reply.send(out);
 });
 

@@ -40,6 +40,12 @@ interface ColiixErrorPayload {
   ts?: number;
 }
 
+interface BulkAssignedPayload {
+  count: number;
+  assignedBy?: string;
+  ts: number;
+}
+
 interface WhatsAppRateLimitedPayload {
   sessionId: string;
   reason?: string;
@@ -65,6 +71,10 @@ export function useOrderNotifications() {
   const recentConfirm = useRef<Map<string, number>>(new Map());
   const recentDelivered = useRef<Map<string, number>>(new Map());
   const recentNewOrder = useRef<Map<string, number>>(new Map());
+  // These need to outlive the effect's lifetime — declaring them inside the
+  // effect would reset the dedupe state on every effect re-run, defeating it.
+  const recentColiixError = useRef<Map<string, number>>(new Map());
+  const recentRateLimited = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     if (!isAuthenticated || !user) return;
@@ -197,11 +207,10 @@ export function useOrderNotifications() {
     // Coliix integration error — admins/supervisors need to triage before more
     // pile up. Resolved-on-emit (rare; happens if a webhook re-fires after the
     // admin already cleared it) doesn't toast.
-    const recentColiixError = new Map<string, number>();
     const handleColiixError = (payload: ColiixErrorPayload) => {
       if (!isAdmin) return;
       if (payload.resolved) return;
-      if (withinDedupe({ current: recentColiixError } as MutableRefObject<Map<string, number>>, payload.id)) return;
+      if (withinDedupe(recentColiixError, payload.id)) return;
 
       pushToast({
         kind: 'error',
@@ -215,12 +224,9 @@ export function useOrderNotifications() {
     // by a session-level limit they didn't trigger. The OverviewTab also shows
     // an inline banner; the toast is for when the admin is on a different
     // page (call center, dashboard, anywhere) and would otherwise miss it.
-    const recentRateLimited = new Map<string, number>();
     const handleRateLimited = (payload: WhatsAppRateLimitedPayload) => {
       if (!isAdmin) return;
-      if (withinDedupe({ current: recentRateLimited } as MutableRefObject<Map<string, number>>, payload.sessionId, 60_000)) {
-        return;
-      }
+      if (withinDedupe(recentRateLimited, payload.sessionId, 60_000)) return;
       const counts =
         payload.hourlyUsed != null && payload.hourlyLimit != null
           ? `${payload.hourlyUsed}/${payload.hourlyLimit} this hour`
@@ -233,12 +239,26 @@ export function useOrderNotifications() {
       });
     };
 
+    // Bulk-assign — single toast for the whole batch (replaces the 50-of-them
+    // spam from the old per-row order:assigned emit).
+    const handleBulkAssigned = (payload: BulkAssignedPayload) => {
+      if (payload.count <= 0) return;
+      playNotificationSound('assignment');
+      pushToast({
+        kind: 'assignment',
+        title: `${payload.count} new orders assigned`,
+        body: payload.assignedBy ? `by ${payload.assignedBy}` : undefined,
+        href: ROUTES.CALL_CENTER,
+      });
+    };
+
     socket.on('order:assigned', handleAssigned);
     socket.on('order:confirmed', handleConfirmed);
     socket.on('order:delivered', handleDelivered);
     socket.on('notification:new', handleNotification);
     socket.on('coliix:error', handleColiixError);
     socket.on('whatsapp:rate_limited', handleRateLimited);
+    socket.on('order:bulk_assigned', handleBulkAssigned);
     return () => {
       socket.off('order:assigned', handleAssigned);
       socket.off('order:confirmed', handleConfirmed);
@@ -246,6 +266,7 @@ export function useOrderNotifications() {
       socket.off('notification:new', handleNotification);
       socket.off('coliix:error', handleColiixError);
       socket.off('whatsapp:rate_limited', handleRateLimited);
+      socket.off('order:bulk_assigned', handleBulkAssigned);
     };
   }, [isAuthenticated, user, pushToast]);
 }

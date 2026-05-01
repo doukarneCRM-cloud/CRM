@@ -148,11 +148,18 @@ export function AgentKpiCards({ className }: AgentKpiCardsProps) {
       socket.on('order:assigned', fetchAll);
       socket.on('order:updated', fetchAll);
       socket.on('order:archived', fetchAll);
+      // Bulk events: one fetchAll for the whole batch, never per-row. The
+      // backend stopped emitting per-row order:assigned during bulk
+      // operations precisely so this card doesn't refetch 50 times.
+      socket.on('order:bulk_updated', fetchAll);
+      socket.on('order:bulk_assigned', fetchAll);
       return () => {
         socket.off('order:created', fetchAll);
         socket.off('order:assigned', fetchAll);
         socket.off('order:updated', fetchAll);
         socket.off('order:archived', fetchAll);
+        socket.off('order:bulk_updated', fetchAll);
+        socket.off('order:bulk_assigned', fetchAll);
       };
     } catch {
       // socket not ready yet

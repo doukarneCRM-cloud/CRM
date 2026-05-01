@@ -1195,9 +1195,11 @@ export async function bulkAction(input: BulkActionInput, actor: JwtPayload) {
       }),
     ]);
 
-    if (input.action === 'assign' && input.agentId) {
-      emitToRoom(`agent:${input.agentId}`, 'order:assigned', { orderId });
-    }
+    // Per-row `order:assigned` emits used to fire here. They caused a refetch
+    // storm — the receiving agent's KPI cards / pipeline subscribed to
+    // `order:assigned` and did a full reload PER EVENT, so a 50-order bulk
+    // assign triggered 50 simultaneous round-trips on the agent's machine.
+    // The bulk_updated event below covers the same UI refresh in one shot.
   };
 
   for (let i = 0; i < input.orderIds.length; i += BULK_CHUNK_SIZE) {
@@ -1208,8 +1210,22 @@ export async function bulkAction(input: BulkActionInput, actor: JwtPayload) {
 
   emitToRoom('orders:all', 'order:bulk_updated', {
     count: input.orderIds.length,
+    action: input.action,
     ts: Date.now(),
   });
+
+  // One targeted notification per bulk-assign so the receiving agent gets
+  // a single "N orders assigned to you" toast + a single pipeline refetch,
+  // instead of 50 of each. The orders:all bulk_updated above already
+  // refreshes everyone's table; this is just for the personal toast +
+  // KPI cards rebound in agent:<id> rooms.
+  if (input.action === 'assign' && input.agentId && input.orderIds.length > 0) {
+    emitToRoom(`agent:${input.agentId}`, 'order:bulk_assigned', {
+      count: input.orderIds.length,
+      assignedBy: actorName,
+      ts: Date.now(),
+    });
+  }
 
   const succeeded = results.filter((r) => r.status === 'fulfilled').length;
   const failed = results.filter((r) => r.status === 'rejected').length;

@@ -58,7 +58,10 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:4000/)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:4000/health)",
       "Bash(curl -sS http://localhost:4000/health)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(curl -s -o /dev/null -w \"GET /api/v1/nav/badges \\(no auth\\): %{http_code}\\\\n\" http://localhost:4000/api/v1/nav/badges)"
     ]
   }
 }

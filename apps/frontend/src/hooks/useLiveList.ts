@@ -106,10 +106,14 @@ export function useLiveList<T extends { id: string }>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [depKey, refetch]);
 
-  // Socket subscriptions. Re-bind whenever the binding list changes; the ref
-  // dance above keeps each handler reading the latest bindings without
-  // needing to re-bind on every render.
-  const eventSig = bindings.map((b) => `${b.kind}:${b.event}`).join('|');
+  // Socket subscriptions. Re-bind only when the *event names* actually change
+  // — not on every render. Callers typically pass a fresh literal array
+  // (`[{ kind: 'patch', event: 'order:updated', fetchOne }]`) on each render,
+  // so a naive `bindings`-based dep would cause `socket.off` + `socket.on` on
+  // every render → a microsecond gap where events are dropped, plus listener
+  // churn under the hood. Sorting + joining the names keeps the signature
+  // stable across renders that didn't actually change the binding list.
+  const eventSig = [...bindings.map((b) => `${b.kind}:${b.event}`)].sort().join('|');
   useEffect(() => {
     let socket: ReturnType<typeof getSocket> | null = null;
     try {
