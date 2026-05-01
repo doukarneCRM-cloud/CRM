@@ -111,51 +111,6 @@ export async function retryLog(id: string) {
   return { ok: true };
 }
 
-// ─── Coliix-state-keyed templates ──────────────────────────────────────────
-// Custom templates that fire when an order's coliixRawState changes to a
-// specific Coliix wording. Independent from MessageTemplate (which is
-// keyed on the AutomationTrigger enum) so we can cover statuses Coliix
-// invents on the fly without touching the enum or the dispatcher.
-
-export async function listColiixStateTemplates() {
-  return prisma.coliixStateTemplate.findMany({
-    orderBy: { coliixRawState: 'asc' },
-  });
-}
-
-export async function upsertColiixStateTemplate(
-  coliixRawState: string,
-  patch: { body: string; enabled?: boolean },
-  updatedById: string,
-) {
-  const trimmed = coliixRawState.trim();
-  if (!trimmed) {
-    throw {
-      statusCode: 400,
-      code: 'VALIDATION_ERROR',
-      message: 'coliixRawState is required',
-    };
-  }
-  return prisma.coliixStateTemplate.upsert({
-    where: { coliixRawState: trimmed },
-    create: {
-      coliixRawState: trimmed,
-      body: patch.body,
-      enabled: patch.enabled ?? false,
-      updatedById,
-    },
-    update: {
-      body: patch.body,
-      ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
-      updatedById,
-    },
-  });
-}
-
-export async function deleteColiixStateTemplate(id: string) {
-  await prisma.coliixStateTemplate.delete({ where: { id } });
-}
-
 // ─── System-session selector (stored in Setting table) ─────────────────────
 const SYSTEM_SESSION_KEY = 'whatsapp.systemSessionId';
 

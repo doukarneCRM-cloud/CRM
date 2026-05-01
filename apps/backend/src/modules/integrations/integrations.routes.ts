@@ -7,29 +7,11 @@ import {
   OAuthCallbackSchema,
   ImportProductsSchema,
   ImportOrdersSchema,
-  UpdateProviderSchema,
 } from './integrations.schema';
 import * as svc from './integrations.service';
-import * as providers from './providers.service';
-import * as coliix from './coliix.service';
-import * as coliixMapping from './coliixMapping.service';
-import { ShippingStatus } from '@prisma/client';
-import { maskSecret } from '../../shared/encryption';
-import { z } from 'zod';
-
-// Body schema for PATCH /coliix/mappings/:wording. internalStatus
-// can be null (stay raw) or one of the ShippingStatus enum values.
-const UpdateMappingSchema = z.object({
-  internalStatus: z.nativeEnum(ShippingStatus).nullable(),
-  note: z.string().nullable().optional(),
-});
-
-const BulkExportSchema = z.object({
-  orderIds: z.array(z.string().min(1)).min(1).max(100),
-});
 
 export async function integrationsRoutes(app: FastifyInstance) {
-  // ── Store CRUD ──────────────────────────────────────────────────────────────
+  // ── Store CRUD (YouCan) ───────────────────────────────────────────────────
 
   app.get('/stores', { preHandler: [verifyJWT, requirePermission('integrations:view')] }, async (_req, reply) => {
     const stores = await svc.listStores();
@@ -67,7 +49,7 @@ export async function integrationsRoutes(app: FastifyInstance) {
     return reply.send(store);
   });
 
-  // ── OAuth ───────────────────────────────────────────────────────────────────
+  // ── OAuth ─────────────────────────────────────────────────────────────────
 
   app.get('/stores/:id/oauth/authorize', { preHandler: [verifyJWT, requirePermission('integrations:manage')] }, async (req, reply) => {
     const { id } = req.params as { id: string };
@@ -129,12 +111,6 @@ export async function integrationsRoutes(app: FastifyInstance) {
     return reply.send(result);
   });
 
-  // On-demand reconciliation — pulls the last N hours of orders from
-  // YouCan, compares against the CRM by youcanOrderId, attempts import
-  // for anything missing, and returns a per-order outcome list. Use
-  // this when an admin notices a gap (orders visible on YouCan but not
-  // in the CRM) — answers "what's missing today" and "why" in one
-  // round-trip without touching the periodic poller's lastSyncAt.
   app.post(
     '/stores/:id/reconcile',
     { preHandler: [verifyJWT, requirePermission('integrations:manage')] },
@@ -147,11 +123,6 @@ export async function integrationsRoutes(app: FastifyInstance) {
     },
   );
 
-  // One-shot repair: re-fetch every imported YouCan order and patch its
-  // Order.createdAt to the original placement timestamp from YouCan. Needed
-  // because older imports defaulted to `now()` and the CRM list ended up
-  // sorted by Prisma insert order. Safe to re-run — already-correct rows
-  // (within 1 second) are skipped.
   app.post(
     '/youcan/backfill-created-at',
     { preHandler: [verifyJWT, requirePermission('integrations:manage')] },
@@ -170,363 +141,7 @@ export async function integrationsRoutes(app: FastifyInstance) {
     return reply.send(result);
   });
 
-  // ── Shipping providers (Coliix, etc.) ──────────────────────────────────────
-
-  app.get('/providers', { preHandler: [verifyJWT, requirePermission('integrations:view')] }, async (_req, reply) => {
-    const rows = await providers.listProvidersPublic();
-    return reply.send({ data: rows });
-  });
-
-  app.get('/providers/:name', { preHandler: [verifyJWT, requirePermission('integrations:view')] }, async (req, reply) => {
-    const { name } = req.params as { name: string };
-    const row = await providers.getProviderPublic(name);
-    return reply.send(row);
-  });
-
-  app.patch('/providers/:name', { preHandler: [verifyJWT, requirePermission('integrations:manage')] }, async (req, reply) => {
-    const { name } = req.params as { name: string };
-    const input = UpdateProviderSchema.parse(req.body);
-    const row = await providers.updateProvider(name, input);
-    return reply.send(row);
-  });
-
-  app.post('/providers/:name/rotate-secret', { preHandler: [verifyJWT, requirePermission('integrations:manage')] }, async (req, reply) => {
-    const { name } = req.params as { name: string };
-    const row = await providers.rotateWebhookSecret(name);
-    return reply.send(row);
-  });
-
-  app.post('/providers/:name/test', { preHandler: [verifyJWT, requirePermission('integrations:manage')] }, async (req, reply) => {
-    const { name } = req.params as { name: string };
-    const result = await providers.testConnection(name);
-    return reply.send(result);
-  });
-
-  // ── Coliix export ─────────────────────────────────────────────────────────
-
-  app.post('/coliix/export/:orderId', { preHandler: [verifyJWT, requirePermission('shipping:push')] }, async (req, reply) => {
-    const { orderId } = req.params as { orderId: string };
-    const result = await coliix.exportOrder(orderId, req.user);
-    const status = result.ok ? 200 : 400;
-    return reply.status(status).send(result);
-  });
-
-  app.post('/coliix/export', { preHandler: [verifyJWT, requirePermission('shipping:push')] }, async (req, reply) => {
-    const { orderIds } = BulkExportSchema.parse(req.body);
-    const result = await coliix.exportOrders(orderIds, req.user);
-    return reply.send(result);
-  });
-
-  // ── Coliix tracking — manual diagnostics ──────────────────────────────────
-  // The poller runs every 5 minutes; these endpoints let an admin force a
-  // refresh now and inspect the raw Coliix response (state + history) so the
-  // mapping can be verified end-to-end without waiting for the next tick.
-
-  app.get('/coliix/in-flight', { preHandler: [verifyJWT, requirePermission('shipping:push')] }, async (_req, reply) => {
-    const orders = await coliix.listInFlightOrders();
-    return reply.send({ total: orders.length, orders });
-  });
-
-  app.post('/coliix/track/:orderId', { preHandler: [verifyJWT, requirePermission('shipping:push')] }, async (req, reply) => {
-    const { orderId } = req.params as { orderId: string };
-    const result = await coliix.trackOrderNow(orderId);
-    return reply.status(result.ok ? 200 : 400).send(result);
-  });
-
-  app.post('/coliix/refresh-all', { preHandler: [verifyJWT, requirePermission('shipping:push')] }, async (_req, reply) => {
-    const result = await coliix.refreshAllInFlight();
-    return reply.send(result);
-  });
-
-  // Re-apply the current mapColiixState rules to every order with a
-  // stored coliixRawState. No Coliix API calls — just recomputes the
-  // enum bucket from data we already have. Use after a mapping rule
-  // change to backfill existing orders without waiting for the next
-  // webhook / poller tick.
-  app.post(
-    '/coliix/remap-statuses',
-    { preHandler: [verifyJWT, requirePermission('shipping:push')] },
-    async (_req, reply) => {
-      const result = await coliix.remapShippingStatusesFromRawState();
-      return reply.send(result);
-    },
-  );
-
-  // One-shot cleanup for the duplicate-shipping-log incident — see the
-  // service-level comment on dedupeColiixShippingLogs. Safe to re-run
-  // (idempotent: nothing left to dedupe = zero deletes).
-  app.post(
-    '/coliix/dedupe-logs',
-    { preHandler: [verifyJWT, requirePermission('shipping:push')] },
-    async (_req, reply) => {
-      const result = await coliix.dedupeColiixShippingLogs();
-      return reply.send(result);
-    },
-  );
-
-  // Webhook health — last inbound webhook, last poller hit, count in the
-  // last hour and 24 hours. Lets the admin tell at a glance whether Coliix
-  // is actually calling our URL (the precondition for "instant" updates).
-  app.get(
-    '/coliix/webhook-health',
-    { preHandler: [verifyJWT, requirePermission('shipping:push')] },
-    async (_req, reply) => {
-      const health = await providers.getColiixWebhookHealth();
-      return reply.send(health);
-    },
-  );
-
-  // Distinct Coliix raw-state values currently present on orders. Drives
-  // the shipping-status chip dropdown so admins filter by Coliix's actual
-  // wordings (Ramassé, Livré, Attente De Ramassage, …) instead of our
-  // internal enum. Two synthetic states are appended at the top of the
-  // list when their pool is non-empty:
-  //   - "Not Shipped"   = confirmed orders not yet pushed to Coliix
-  //   - "Label Created" = pushed but no Coliix tracking event yet
-  // filterBuilder.coliixRawStates knows how to translate each back into
-  // the right SQL clause.
-  app.get(
-    '/coliix/states',
-    { preHandler: [verifyJWT] },
-    async (_req, reply) => {
-      const { prisma } = await import('../../shared/prisma');
-      const [rows, notShippedCount, labelCreatedCount] = await Promise.all([
-        prisma.order.groupBy({
-          by: ['coliixRawState'],
-          where: { coliixRawState: { not: null } },
-          _count: { _all: true },
-          orderBy: { _count: { coliixRawState: 'desc' } },
-        }),
-        prisma.order.count({
-          where: { labelSent: false, confirmationStatus: 'confirmed' },
-        }),
-        prisma.order.count({
-          where: { labelSent: true, coliixRawState: null },
-        }),
-      ]);
-      // Synthetic buckets are ALWAYS surfaced (even at count 0) so the
-      // filter chip stays a stable option in the UI -- the operator
-      // expects to be able to pick "Not Shipped" at any time, including
-      // right after a sweep that emptied the bucket. Real wordings only
-      // appear once observed in the data because the chip would
-      // otherwise grow unboundedly.
-      return reply.send({
-        states: [
-          { value: 'Not Shipped', count: notShippedCount },
-          { value: 'Label Created', count: labelCreatedCount },
-          ...rows
-            .filter((r) => r.coliixRawState !== null)
-            .map((r) => ({ value: r.coliixRawState as string, count: r._count._all })),
-        ],
-      });
-    },
-  );
-
-  // ── Coliix status mapping (admin-editable) ────────────────────────────────
-  // GET lists every known wording with order counts + the bucket they
-  // currently sit in. PATCH writes the new mapping and re-buckets every
-  // order with that wording in one transaction. See coliixMapping.service.
-
-  app.get(
-    '/coliix/mappings',
-    { preHandler: [verifyJWT, requirePermission('integrations:view')] },
-    async (_req, reply) => {
-      const mappings = await coliixMapping.listMappings();
-      return reply.send({ mappings });
-    },
-  );
-
-  app.patch(
-    '/coliix/mappings/:wording',
-    { preHandler: [verifyJWT, requirePermission('integrations:manage')] },
-    async (req, reply) => {
-      const { wording: rawWording } = req.params as { wording: string };
-      // Wording is base64-url-encoded by the client because it can contain
-      // spaces, accents, and slashes that would otherwise need triple URI
-      // escaping. Decode here.
-      let wording: string;
-      try {
-        wording = Buffer.from(rawWording, 'base64url').toString('utf8');
-      } catch {
-        return reply.status(400).send({ error: 'Invalid wording encoding' });
-      }
-      if (!wording.trim()) {
-        return reply.status(400).send({ error: 'wording must not be empty' });
-      }
-      const body = UpdateMappingSchema.parse(req.body);
-      const result = await coliixMapping.updateMapping(
-        wording,
-        body.internalStatus,
-        req.user.sub,
-        body.note,
-      );
-      return reply.send(result);
-    },
-  );
-
-  // ── Coliix webhook — instant status updates ───────────────────────────────
-  // Coliix calls this URL (GET or POST) whenever a parcel state changes. The
-  // path-segment secret is how we authenticate — no header, no HMAC, so don't
-  // move it to a query string and don't ever log the full URL.
-  //
-  // We accept flexible field names since Coliix docs vary across environments,
-  // and the production dashboard documents the canonical names below:
-  //   tracking:  code (canonical) | tracking | tracking_code | trackingCode | ref
-  //   state:     state (canonical) | status | new_state
-  //   date:      datereported (canonical) | date | event_date
-  //   note:      note (canonical) | driver_note | comment
-  const coliixWebhookHandler = async (req: any, reply: any) => {
-    const { prisma } = await import('../../shared/prisma');
-    const source = {
-      ...(req.query ?? {}),
-      ...((req.body as Record<string, unknown>) ?? {}),
-    } as Record<string, unknown>;
-
-    // Parse early so the audit row records what we extracted (or didn't).
-    const tracking = String(
-      source.code ??           // Coliix's documented canonical name
-      source.tracking ??
-      source.tracking_code ??
-      source.trackingCode ??
-      source.ref ?? ''
-    ).trim();
-    const rawState = String(source.state ?? source.status ?? source.new_state ?? '').trim();
-    const driverNote =
-      typeof source.note === 'string'
-        ? source.note         // Coliix's canonical name
-        : typeof source.driver_note === 'string'
-        ? source.driver_note
-        : typeof source.comment === 'string'
-        ? source.comment
-        : null;
-    const eventDateStr =
-      typeof source.datereported === 'string'   // Coliix's canonical name
-        ? source.datereported
-        : typeof source.date === 'string'
-        ? source.date
-        : typeof source.event_date === 'string'
-        ? source.event_date
-        : null;
-    const eventDate = eventDateStr ? new Date(eventDateStr) : null;
-
-    // Audit-log every inbound hit to a dedicated table BEFORE branching, so
-    // the Health panel can show rejected calls (wrong secret, bad payload,
-    // unknown tracking) — not just successful ingests. Fire-and-forget on
-    // the write so a DB hiccup never fails the webhook itself; Coliix would
-    // retry into a perpetual loop.
-    const recordEvent = (
-      ok: boolean,
-      statusCode: number,
-      secretMatched: boolean,
-      reason: string | null,
-    ) => {
-      void prisma.webhookEventLog
-        .create({
-          data: {
-            provider: 'coliix',
-            ok,
-            secretMatched,
-            statusCode,
-            tracking: tracking || null,
-            rawState: rawState || null,
-            payload: source as object,
-            ip: typeof req.ip === 'string' ? req.ip : null,
-            reason,
-          },
-        })
-        .catch((err: unknown) => {
-          app.log.warn({ err }, '[coliix-webhook] audit insert failed');
-        });
-    };
-
-    // Always-on diagnostic log to fastify too — visible in the platform's
-    // log aggregator alongside the DB audit row.
-    app.log.info(
-      {
-        secretMasked: maskSecret(((req.params as any)?.secret) ?? ''),
-        method: req.method,
-        ip: req.ip,
-        contentType: req.headers?.['content-type'] ?? null,
-        userAgent: req.headers?.['user-agent'] ?? null,
-        query: req.query ?? null,
-        body: req.body ?? null,
-      },
-      '[coliix-webhook] inbound',
-    );
-
-    const { secret } = req.params as { secret: string };
-    const row = await prisma.shippingProvider.findFirst({
-      where: { name: 'coliix', webhookSecret: secret },
-      select: { id: true, isActive: true },
-    });
-    if (!row) {
-      app.log.warn(
-        { secretMasked: maskSecret(secret) },
-        '[coliix-webhook] rejected — secret does not match any Coliix provider row',
-      );
-      recordEvent(false, 404, false, 'Invalid webhook secret');
-      return reply.status(404).send({ error: 'Invalid webhook secret' });
-    }
-    if (!row.isActive) {
-      app.log.info('[coliix-webhook] integration disabled — accepted but ignored');
-      recordEvent(true, 200, true, 'Coliix integration disabled');
-      return reply.status(200).send({ ignored: true, reason: 'Coliix integration disabled' });
-    }
-
-    if (!tracking || !rawState) {
-      app.log.warn(
-        {
-          parsedTracking: tracking || null,
-          parsedRawState: rawState || null,
-          payloadKeys: Object.keys(source),
-        },
-        '[coliix-webhook] payload missing tracking or state — Coliix sent fields we do not recognize',
-      );
-      recordEvent(
-        false,
-        400,
-        true,
-        `Missing tracking or state — payload keys: ${Object.keys(source).join(', ') || '(empty)'}`,
-      );
-      return reply.status(400).send({
-        error: 'Missing tracking or state',
-        hint: 'Send tracking + state in JSON body, query string, or form-urlencoded. Accepted aliases: code|tracking|tracking_code|trackingCode|ref AND state|status|new_state.',
-        payloadKeys: Object.keys(source),
-      });
-    }
-
-    const result = await coliix.ingestStatus({
-      tracking,
-      rawState,
-      driverNote,
-      eventDate: eventDate && !Number.isNaN(eventDate.getTime()) ? eventDate : null,
-      source: 'webhook',
-    });
-
-    app.log.info({ tracking, rawState, result }, '[coliix-webhook] ingest result');
-
-    // Always 200 on matched events — even when the status didn't actually
-    // change — so Coliix doesn't hammer us with retries. Only unmatched
-    // tracking codes produce 404 so ops can notice the drift.
-    if (!result.matched) {
-      recordEvent(false, 404, true, result.reason ?? 'Tracking not found in CRM');
-      return reply.status(404).send({ received: true, ...result });
-    }
-    recordEvent(
-      true,
-      200,
-      true,
-      result.changed
-        ? `Status → ${result.newStatus}`
-        : (result.reason ?? 'Status unchanged'),
-    );
-    return reply.status(200).send({ received: true, ...result });
-  };
-
-  app.get('/coliix/webhook/:secret', coliixWebhookHandler);
-  app.post('/coliix/webhook/:secret', coliixWebhookHandler);
-
-  // ── Webhook (no auth — verified by HMAC signature) ────────────────────────
+  // ── YouCan webhook (HMAC-verified) ────────────────────────────────────────
 
   app.post('/youcan/webhook/:storeId', { config: { rawBody: true } }, async (req, reply) => {
     const { storeId } = req.params as { storeId: string };
@@ -535,7 +150,6 @@ export async function integrationsRoutes(app: FastifyInstance) {
     const store = await svc.getStore(storeId).catch(() => null);
     if (!store) return reply.status(404).send({ error: 'Store not found' });
 
-    // Verify signature if webhook secret exists
     if (store.isConnected) {
       const storeData = await import('../../shared/prisma').then(m =>
         m.prisma.store.findUnique({ where: { id: storeId }, select: { webhookSecret: true } })
@@ -549,7 +163,6 @@ export async function integrationsRoutes(app: FastifyInstance) {
       }
     }
 
-    // Process asynchronously
     const payload = (req.body as { data?: unknown })?.data ?? req.body;
     svc.processWebhookOrder(storeId, payload as any).catch((err) => {
       console.error(`[webhook] Error processing order for store ${storeId}:`, err);

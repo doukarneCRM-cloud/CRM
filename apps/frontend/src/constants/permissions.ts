@@ -16,7 +16,6 @@ export const PERMISSIONS = {
   SHIPPING_VIEW: 'shipping:view',
   SHIPPING_PUSH: 'shipping:push',
   SHIPPING_RETURN_VALIDATE: 'shipping:return_validate',
-  SHIPPING_GROUPS_MANAGE: 'shipping_groups:manage',
 
   // Products
   PRODUCTS_VIEW: 'products:view',

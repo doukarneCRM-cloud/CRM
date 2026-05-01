@@ -58,21 +58,14 @@ function safeRate(numerator: number, denominator: number): number {
 //   deliveryRate     = delivered / confirmed
 //   returnRate       = verifiedReturns / shipped (labelSent=true)
 //
-// "Shipped" = orders where the Coliix label was successfully created
-// (labelSent flag flips on a successful push to Coliix). Natural
-// denominator for "of the orders we sent out, how many came back?".
+// "Shipped" = orders where a carrier label was created (labelSent flips on
+// successful push). Natural denominator for "of the orders we sent out,
+// how many came back?".
 //
-// Returned numerator counts ONLY admin-verified outcomes —
-// `return_validated` (good return, restocked) and `return_refused`
-// (we rejected the return). Pending statuses (`returned` carrier-flag,
-// `attempted`, `lost`) are excluded: until a human verifies the package
-// at the back desk, the outcome isn't final, so we don't pollute the
-// dashboard rate with them. The Returns page still surfaces those
-// pending rows in its dedicated tab so nothing gets lost operationally.
-const RETURNED_STATUSES: ShippingStatus[] = [
-  ShippingStatus.return_validated,
-  ShippingStatus.return_refused,
-];
+// "Returned" = the carrier sent the parcel back. The verification outcome
+// (good vs damaged) lives on Order.returnOutcome but doesn't change whether
+// the order counts as returned for the rate — both outcomes are returns.
+const RETURNED_STATUSES: ShippingStatus[] = [ShippingStatus.returned];
 
 export async function computeKPIs(filters: OrderFilterParams): Promise<KPIResult> {
   // Per-metric date fields: each count answers "X happened in this window"
@@ -775,42 +768,23 @@ export async function computeStatusBreakdown(
 ): Promise<StatusBreakdown> {
   const where = buildOrderWhereClause(filters);
 
-  // Shipping breakdown is now keyed by Coliix's literal status (Ramassé,
-  // Livré, …) on orders that have actually been pushed to Coliix
-  // (labelSent: true). Orders we haven't shipped yet aren't in the
-  // shipping pipeline, and orders pushed but with no Coliix update yet
-  // fall into a synthetic 'Label Created' bucket so they aren't lost.
-  const [confirmationGroups, coliixGroups, pendingPushedCount, notShippedCount] =
-    await Promise.all([
-      prisma.order.groupBy({
-        by: ['confirmationStatus'],
-        where,
-        _count: { _all: true },
-      }),
-      prisma.order.groupBy({
-        by: ['coliixRawState'],
-        where: { ...where, labelSent: true, coliixRawState: { not: null } },
-        _count: { _all: true },
-      }),
-      prisma.order.count({
-        where: { ...where, labelSent: true, coliixRawState: null },
-      }),
-      // Confirmed orders the operator hasn't pushed to Coliix yet — the
-      // "ready-to-ship" pile. Surfacing it as a synthetic bucket on the
-      // shipping pipeline so it's visible at a glance and filter-able.
-      prisma.order.count({
-        where: { ...where, labelSent: false, confirmationStatus: 'confirmed' },
-      }),
-    ]);
+  const [confirmationGroups, shippingGroups] = await Promise.all([
+    prisma.order.groupBy({
+      by: ['confirmationStatus'],
+      where,
+      _count: { _all: true },
+    }),
+    prisma.order.groupBy({
+      by: ['shippingStatus'],
+      where,
+      _count: { _all: true },
+    }),
+  ]);
 
   const confirmation: Record<string, number> = {};
   for (const g of confirmationGroups) confirmation[g.confirmationStatus] = g._count._all;
   const shipping: Record<string, number> = {};
-  for (const g of coliixGroups) {
-    if (g.coliixRawState) shipping[g.coliixRawState] = g._count._all;
-  }
-  if (pendingPushedCount > 0) shipping['Label Created'] = pendingPushedCount;
-  if (notShippedCount > 0) shipping['Not Shipped'] = notShippedCount;
+  for (const g of shippingGroups) shipping[g.shippingStatus] = g._count._all;
 
   return { confirmation, shipping };
 }

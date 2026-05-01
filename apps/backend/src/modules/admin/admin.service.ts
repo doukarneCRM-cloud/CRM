@@ -43,9 +43,8 @@ export type ResetCRMSummary = Record<string, number>;
 //
 // Pass `keepUserId` to also wipe every other user account (keeping only
 // that one). Most user-FK rows are already gone after the body of the
-// transaction, but a few config tables — Broadcast, ShippingStatusGroup —
-// reference users and aren't business data, so we delete those too in
-// that mode.
+// transaction, but Broadcast still references users and isn't business
+// data, so we delete those too in that mode.
 export async function resetCRM(
   code: string,
   options: { keepUserId?: string } = {},
@@ -140,16 +139,13 @@ export async function resetCRM(
       summary.counter = (await tx.counter.deleteMany({})).count;
 
       // ─── Wipe other users (opt-in) ─────────────────────────────────────
-      // Most user-FK rows have already been deleted above. Two config
-      // tables reference users and aren't business data, so we drop them
-      // here before the users themselves: Broadcast (createdById is
-      // required, no SetNull) and ShippingStatusGroup (has a createdBy
-      // relation we'd rather not orphan). RefreshTokens cascade from
-      // User automatically, so we don't have to clear them explicitly.
+      // Most user-FK rows have already been deleted above. Broadcast
+      // references users with a required createdById (no SetNull), so
+      // drop those before the users themselves. RefreshTokens cascade
+      // from User automatically.
       if (keepUserId) {
         summary.broadcastRecipient = (await tx.broadcastRecipient.deleteMany({})).count;
         summary.broadcast = (await tx.broadcast.deleteMany({})).count;
-        summary.shippingStatusGroup = (await tx.shippingStatusGroup.deleteMany({})).count;
         summary.user = (await tx.user.deleteMany({
           where: { id: { not: keepUserId } },
         })).count;

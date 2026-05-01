@@ -10,32 +10,41 @@ datasource db {
 
 // ─── Enums (canonical — match spec exactly) ───────────────────────────────────
 
+// Confirmation pipeline — set by call-center agents on Order.confirmationStatus.
+// Each value has dedicated handling (timestamps, side-effects); see
+// orders.service.ts:updateOrderStatus for the canonical transition logic.
 enum ConfirmationStatus {
-  pending
-  awaiting
-  confirmed
-  cancelled
-  unreachable
-  callback
-  fake
-  out_of_stock
-  reported
+  pending // default — not actioned yet
+  confirmed // agent locked the sale; stock reserved, confirmedAt stamped
+  cancelled // agent dropped it (requires cancellationReason); stock restored
+  unreachable // client did not pick up; unreachableCount++; auto → cancelled at 9
+  callback // client asked to be called later (callbackAt required); blinks today
+  fake // fake / spam order
+  out_of_stock // a variant ran out; cascades to all pending orders sharing the variant
+  reported // client wants product on a future date (reportedAt required); blinks today
 }
 
+// Shipping pipeline — driven by the carrier (Coliix, etc.) once labelSent=true.
+// Mappings from raw carrier wordings live in a separate carrier-mappings layer;
+// this enum is the canonical bucket the rest of the CRM (KPIs, filters,
+// commissions) reads from.
 enum ShippingStatus {
-  not_shipped
-  label_created
-  picked_up
-  in_transit
-  out_for_delivery
-  delivered
-  attempted
-  returned
-  return_validated
-  return_refused
-  exchange
-  lost
-  destroyed
+  not_shipped // confirmed but no carrier label yet
+  pushed // sent to carrier, label ready, awaiting first pickup scan
+  picked_up // carrier collected the parcel
+  in_transit // moving between hubs
+  out_for_delivery // courier on the way to client
+  failed_delivery // delivery attempt failed (no answer / voicemail / refused at door); may retry
+  reported // client asked the courier to come back another day
+  delivered // terminal — deliveredAt stamped, commission triggered
+  returned // carrier sent the parcel back; admin verifies outcome (good/damaged)
+}
+
+// Returned-parcel verification outcome. Set by the warehouse when a returned
+// parcel is physically inspected. Drives whether stock is restocked.
+enum ReturnOutcome {
+  good // restock the variants
+  damaged // do not restock; counted as loss
 }
 
 enum OrderSource {
@@ -60,6 +69,43 @@ enum CustomerTag {
   normal
   vip
   blacklisted
+}
+
+// ─── Carrier integration enums ───────────────────────────────────────────────
+
+// Lifecycle of a single parcel. The carrier (Coliix) drives transitions
+// after the agent links the tracking code; only `pending` is a CRM-only
+// holding state for the brief window before linking. ShippingStatus on
+// Order is mirrored from this enum via mapColiixState.
+enum ShipmentState {
+  pending // CRM-only; agent hasn't entered tracking yet
+  pushed // tracking linked, awaiting first carrier scan
+  picked_up
+  in_transit
+  out_for_delivery
+  failed_delivery
+  reported // courier asked to come back another day
+  delivered // terminal
+  returned // terminal; verification handled at Order level
+}
+
+enum ShipmentEventSource {
+  webhook // primary path — carrier calls our URL
+  poll // fallback — our 60s tick polls the track API
+  manual // admin manually patched (escape hatch)
+}
+
+// Every failure path writes a row so the Errors tab can surface what
+// went wrong — no silent failures.
+enum ColiixErrorType {
+  webhook_invalid_secret
+  webhook_invalid_payload
+  webhook_unknown_tracking
+  mapping_unknown_wording
+  city_unknown
+  api_credential_invalid
+  api_timeout
+  api_unknown
 }
 
 // ─── RBAC ────────────────────────────────────────────────────────────────────
@@ -108,29 +154,28 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  role                Role                @relation(fields: [roleId], references: [id])
-  assignedOrders      Order[]             @relation("AgentOrders")
+  role                Role                  @relation(fields: [roleId], references: [id])
+  assignedOrders      Order[]               @relation("AgentOrders")
   orderLogs           OrderLog[]
   commissionRules     CommissionRule[]
-  weeklyAttendance    WeeklyAttendance[]  @relation("AttendanceRecorder")
-  salaryPayments      SalaryPayment[]     @relation("SalaryPayer")
+  weeklyAttendance    WeeklyAttendance[]    @relation("AttendanceRecorder")
+  salaryPayments      SalaryPayment[]       @relation("SalaryPayer")
   refreshTokens       RefreshToken[]
-  atelieEmployee      AtelieEmployee?     @relation("AtelieUser")
-  ownedTasks          AtelieTask[]        @relation("TaskOwner")
-  taskComments        AtelieTaskComment[] @relation("TaskCommenter")
-  expenses            Expense[]           @relation("ExpenseAuthor")
-  commissionPayments  CommissionPayment[] @relation("CommissionAgent")
-  recordedCommissions CommissionPayment[] @relation("CommissionRecorder")
-  verifiedReturns     Order[]             @relation("ReturnVerifier")
+  atelieEmployee      AtelieEmployee?       @relation("AtelieUser")
+  ownedTasks          AtelieTask[]          @relation("TaskOwner")
+  taskComments        AtelieTaskComment[]   @relation("TaskCommenter")
+  expenses            Expense[]             @relation("ExpenseAuthor")
+  commissionPayments  CommissionPayment[]   @relation("CommissionAgent")
+  recordedCommissions CommissionPayment[]   @relation("CommissionRecorder")
+  verifiedReturns     Order[]               @relation("ReturnVerifier")
   notifications       Notification[]
-  assignedProducts    Product[]           @relation("ProductAssignedAgent")
+  assignedProducts    Product[]             @relation("ProductAssignedAgent")
   whatsappSession     WhatsAppSession?
-  messageLogs         MessageLog[]        @relation("MessageLogAgent")
-  updatedTemplates    MessageTemplate[]   @relation("TemplateUpdater")
-  createdRules        AutomationRule[]    @relation("RuleAuthor")
-  assignedThreads     WhatsAppThread[]    @relation("ThreadAssignee")
-  whatsappMessages    WhatsAppMessage[]   @relation("MessageAuthor")
-  createdStatusGroups ShippingStatusGroup[] @relation("StatusGroupAuthor")
+  messageLogs         MessageLog[]          @relation("MessageLogAgent")
+  updatedTemplates    MessageTemplate[]     @relation("TemplateUpdater")
+  createdRules        AutomationRule[]      @relation("RuleAuthor")
+  assignedThreads     WhatsAppThread[]      @relation("ThreadAssignee")
+  whatsappMessages    WhatsAppMessage[]     @relation("MessageAuthor")
   broadcastsAuthored  Broadcast[]           @relation("BroadcastAuthor")
   broadcastsReceived  BroadcastRecipient[]  @relation("BroadcastTarget")
   approvedSamples     ProductTest[]         @relation("SampleApprover")
@@ -159,20 +204,20 @@ model Counter {
 // ─── Customers ───────────────────────────────────────────────────────────────
 
 model Customer {
-  id              String      @id @default(cuid())
-  fullName        String
-  phone           String      @unique // normalized +212XXXXXXXXX
-  phoneDisplay    String // 06XXXXXXXX
-  city            String
-  address         String?
-  tag             CustomerTag @default(normal)
-  notes           String?
+  id               String      @id @default(cuid())
+  fullName         String
+  phone            String      @unique // normalized +212XXXXXXXXX
+  phoneDisplay     String // 06XXXXXXXX
+  city             String
+  address          String?
+  tag              CustomerTag @default(normal)
+  notes            String?
   // Flipped when the customer replies STOP / توقف on WhatsApp. Dispatcher
   // blocks all outbound messages to opted-out customers.
-  whatsappOptOut  Boolean     @default(false)
+  whatsappOptOut   Boolean     @default(false)
   whatsappOptOutAt DateTime?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
 
   orders  Order[]
   threads WhatsAppThread[]
@@ -230,82 +275,34 @@ model ProductVariant {
 // ─── Stores (YouCan integration) ─────────────────────────────────────────────
 
 model Store {
-  id             String    @id @default(cuid())
-  name           String
-  slug           String? // YouCan store slug
+  id              String    @id @default(cuid())
+  name            String
+  slug            String? // YouCan store slug
   // OAuth tokens (credentials are global env vars, tokens are per-store)
-  accessToken    String?
-  refreshToken   String?
-  tokenExpiresAt DateTime?
+  accessToken     String?
+  refreshToken    String?
+  tokenExpiresAt  DateTime?
   // Webhook
-  webhookSecret  String?
-  webhookId      String? // resthook subscription id
+  webhookSecret   String?
+  webhookId       String? // resthook subscription id
   // Field mapping: JSON object mapping YouCan checkout fields → CRM fields
-  fieldMapping   Json?
+  fieldMapping    Json?
   // State
-  isActive       Boolean   @default(true)
-  isConnected    Boolean   @default(false)
+  isActive        Boolean   @default(true)
+  isConnected     Boolean   @default(false)
   // When false, the background poller skips this store and the order.create
   // webhook stops auto-importing — admin still has the manual "Import
   // orders" button. Defaults to false so freshly-linked stores don't pull
   // in any data until the admin explicitly opts in.
-  autoSyncEnabled Boolean  @default(false)
-  lastSyncAt     DateTime?
-  lastError      String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  autoSyncEnabled Boolean   @default(false)
+  lastSyncAt      DateTime?
+  lastError       String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   products   Product[]
   orders     Order[]
   importLogs ImportLog[]
-  // Coliix V2 carrier accounts scoped to this store (null = global)
-  carrierAccounts CarrierAccount[]
-}
-
-// ─── Shipping providers (Coliix, etc.) ───────────────────────────────────────
-// One row per integration. Seeded lazily on first access — see
-// integrations/providers.service.getOrCreate. API key is stored encrypted;
-// read via decryptSecret before handing to HTTP clients.
-model ShippingProvider {
-  id            String    @id @default(cuid())
-  name          String    @unique // "coliix"
-  apiBaseUrl    String
-  apiKey        String? // encrypted (AES-256-GCM blob)
-  webhookSecret String // random path-segment secret
-  isActive      Boolean   @default(false)
-  lastCheckedAt DateTime?
-  lastError     String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-}
-
-// ─── Webhook inbound audit ───────────────────────────────────────────────────
-// One row per inbound webhook hit, written BEFORE any validation so even
-// rejected calls (wrong secret, missing fields, unknown tracking) are
-// observable. Drives the "Webhook health" panel — without this the panel
-// only saw successful ingests via OrderLog and could not surface
-// configuration mistakes on the Coliix side.
-model WebhookEventLog {
-  id            String   @id @default(cuid())
-  provider      String // "coliix"
-  // ok = the request was accepted (200 / 404 with our standard "received"
-  // body); false when we returned 400 (bad payload) or 404 (bad secret).
-  ok            Boolean
-  secretMatched Boolean  @default(false)
-  statusCode    Int
-  // Parsed extracts so the admin UI can render the inbound at a glance.
-  tracking      String?
-  rawState      String?
-  // Full incoming payload (query + body, merged) and the IP that delivered
-  // it. Kept as JSON so any field the provider later starts sending is
-  // available without a schema change.
-  payload       Json?
-  ip            String?
-  reason        String? // why the row's ok=false, free-text
-  createdAt     DateTime @default(now())
-
-  @@index([provider, createdAt])
-  @@index([createdAt])
 }
 
 enum ImportLogLevel {
@@ -352,65 +349,58 @@ model Order {
   confirmationNote    String?
   shippingInstruction String?
   cancellationReason  String?
+  // ── Per-status timestamps ──────────────────────────────────────────────
+  // Each card answers "X today / this week" by the date the transition
+  // actually happened — not by createdAt. KPI cards filter on these
+  // columns via filterBuilder.buildOrderWhereClause(filters, { dateField }).
   callbackAt          DateTime?
-  // Per-metric timestamps so KPI cards can answer "confirmed today",
-  // "cancelled this week", etc. by the date the transition actually
-  // happened — instead of by createdAt (which described WHEN the
-  // order arrived, not when the agent decided). Set by the route that
-  // flips confirmationStatus; backfilled from OrderLog on migration.
+  reportedAt          DateTime?
   confirmedAt         DateTime?
   cancelledAt         DateTime?
   unreachableAt       DateTime?
-  coliixTrackingId    String?
-  youcanOrderId       String?            @unique
-  labelSent           Boolean            @default(false)
-  labelSentAt         DateTime?
-  storeId             String?
-  isArchived          Boolean            @default(false)
-  commissionAmount    Decimal?           @db.Decimal(12, 2)
-  commissionPaid      Boolean            @default(false)
-  commissionPaidAt    DateTime?
   deliveredAt         DateTime?
-  // Literal status string Coliix returned on the most recent webhook /
-  // poller hit. The UI prefers this over the mapped enum label so admins
-  // see exactly what Coliix is reporting ("Ramassé", "Attente De Ramassage",
-  // …) without the abstraction layer. Internal logic (analytics, filters,
-  // commission rules) still uses the shippingStatus enum above.
-  coliixRawState      String?
-  unreachableCount    Int                @default(0)
-  // Delivery-invoice reconciliation — has the carrier fee for this order been
-  // paid to Coliix? Flipped manually until the carrier API is integrated.
-  paidToCarrier       Boolean            @default(false)
-  paidToCarrierAt     DateTime?
-  // Physical return verification after Coliix bounce-back.
-  returnNote          String?
-  returnVerifiedAt    DateTime?
-  returnVerifiedById  String?
-  // Which external system currently owns the shipment (e.g. "coliix"). Set
-  // when the label is created; null for manual / not-yet-shipped orders.
-  trackingProvider    String?
-  // Poller throttle — last time we asked the provider for a status update.
-  lastTrackedAt       DateTime?
-  // When this order has been rolled into another (duplicate customer, unshipped),
-  // this points at the keeper. Set together with isArchived=true by mergeOrders.
-  // Kept as a FK so "how many orders get merged" is a one-query stat.
-  mergedIntoId        String?
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
+  labelSentAt         DateTime?
 
-  customer         Customer    @relation(fields: [customerId], references: [id])
-  agent            User?       @relation("AgentOrders", fields: [agentId], references: [id])
-  store            Store?      @relation(fields: [storeId], references: [id])
-  returnVerifiedBy User?       @relation("ReturnVerifier", fields: [returnVerifiedById], references: [id])
-  mergedInto       Order?      @relation("OrderMerges", fields: [mergedIntoId], references: [id])
-  mergedFrom       Order[]     @relation("OrderMerges")
+  // ── Counters & flags ───────────────────────────────────────────────────
+  unreachableCount Int     @default(0) // auto-cancels at 9
+  labelSent        Boolean @default(false)
+
+  // ── External / source tracking ─────────────────────────────────────────
+  youcanOrderId String? @unique
+  storeId       String?
+
+  // ── Lifecycle ──────────────────────────────────────────────────────────
+  isArchived   Boolean @default(false)
+  // Set together with isArchived=true by mergeOrders. Kept as a FK so
+  // "how many orders get merged" is a one-query stat.
+  mergedIntoId String?
+
+  // ── Commission ─────────────────────────────────────────────────────────
+  commissionAmount Decimal?  @db.Decimal(12, 2)
+  commissionPaid   Boolean   @default(false)
+  commissionPaidAt DateTime?
+
+  // ── Returns verification (set when shippingStatus = returned) ──────────
+  returnNote         String?
+  returnOutcome      ReturnOutcome?
+  returnVerifiedAt   DateTime?
+  returnVerifiedById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customer         Customer     @relation(fields: [customerId], references: [id])
+  agent            User?        @relation("AgentOrders", fields: [agentId], references: [id])
+  store            Store?       @relation(fields: [storeId], references: [id])
+  returnVerifiedBy User?        @relation("ReturnVerifier", fields: [returnVerifiedById], references: [id])
+  mergedInto       Order?       @relation("OrderMerges", fields: [mergedIntoId], references: [id])
+  mergedFrom       Order[]      @relation("OrderMerges")
   items            OrderItem[]
   logs             OrderLog[]
   messageLogs      MessageLog[]
-  // Coliix V2 — parallel to V1 fields above (coliixTrackingId, etc.). When
-  // shipments[] is non-empty the order is on V2; V1 fields stay null. New
-  // shipments only — V1 orders are not migrated.
-  shipments        Shipment[]
+  // Shipment is 1:1 with Order. The relation field is required on the
+  // back-relation side here; the actual FK lives on Shipment.orderId.
+  shipment         Shipment?
 
   @@index([confirmationStatus])
   @@index([shippingStatus])
@@ -424,11 +414,13 @@ model Order {
   @@index([agentId, confirmationStatus])
   @@index([agentId, commissionPaid])
   @@index([agentId, deliveredAt])
-  @@index([shippingStatus, paidToCarrier])
+  // Fast lookup of today's callbacks/reports for the call-center blink list.
+  @@index([callbackAt])
+  @@index([reportedAt])
 }
 
 model OrderItem {
-  id        String @id @default(cuid())
+  id        String  @id @default(cuid())
   orderId   String
   variantId String
   quantity  Int
@@ -678,33 +670,33 @@ enum SampleStatus {
 }
 
 model ProductTest {
-  id                    String       @id @default(cuid())
-  name                  String
-  productId             String?
-  videoUrl              String?
+  id           String       @id @default(cuid())
+  name         String
+  productId    String?
+  videoUrl     String?
   // Long-form description shown to admins/buyers — separate from internal
   // `notes` (which can stay private). HTML stripped on save in the service.
-  description           String?
+  description  String?
   // Sample lifecycle. `approved` is the gate that unlocks creating a
   // ProductionRun from this sample.
-  status                SampleStatus @default(draft)
-  approvedAt            DateTime?
-  approvedById          String?
+  status       SampleStatus @default(draft)
+  approvedAt   DateTime?
+  approvedById String?
 
   // Cost-calc inputs. Fees are per-piece overrides on the sample (a
   // YouCan / fulfillment fee can vary per garment). Markup feeds
   // `suggestedPrice`. The service recomputes `estimatedCostPerPiece` and
   // `suggestedPrice` on every save so they're always current.
-  laborMadPerPiece      Decimal?     @db.Decimal(12, 2)
-  confirmationFee       Decimal?     @db.Decimal(12, 2)
-  deliveryFee           Decimal?     @db.Decimal(12, 2)
-  markupPercent         Decimal?     @db.Decimal(5, 2)
-  suggestedPrice        Decimal?     @db.Decimal(12, 2)
+  laborMadPerPiece Decimal? @db.Decimal(12, 2)
+  confirmationFee  Decimal? @db.Decimal(12, 2)
+  deliveryFee      Decimal? @db.Decimal(12, 2)
+  markupPercent    Decimal? @db.Decimal(5, 2)
+  suggestedPrice   Decimal? @db.Decimal(12, 2)
 
-  estimatedCostPerPiece Decimal?     @db.Decimal(12, 2)
+  estimatedCostPerPiece Decimal? @db.Decimal(12, 2)
   notes                 String?
-  createdAt             DateTime     @default(now())
-  updatedAt             DateTime     @updatedAt
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   product     Product?               @relation(fields: [productId], references: [id])
   approvedBy  User?                  @relation("SampleApprover", fields: [approvedById], references: [id])
@@ -773,20 +765,20 @@ model ProductTestAccessory {
 }
 
 model ProductionRun {
-  id             String              @id @default(cuid())
-  reference      String              @unique
-  testId         String?
-  productId      String?
-  status         ProductionRunStatus @default(draft)
-  startDate      DateTime
-  endDate        DateTime?
-  expectedPieces Int                 @default(0)
-  actualPieces   Int                 @default(0)
-  materialsCost  Decimal             @default(0) @db.Decimal(12, 2)
-  laborCost      Decimal             @default(0) @db.Decimal(12, 2)
-  totalCost      Decimal             @default(0) @db.Decimal(12, 2)
-  costPerPiece   Decimal             @default(0) @db.Decimal(12, 2)
-  notes          String?
+  id               String              @id @default(cuid())
+  reference        String              @unique
+  testId           String?
+  productId        String?
+  status           ProductionRunStatus @default(draft)
+  startDate        DateTime
+  endDate          DateTime?
+  expectedPieces   Int                 @default(0)
+  actualPieces     Int                 @default(0)
+  materialsCost    Decimal             @default(0) @db.Decimal(12, 2)
+  laborCost        Decimal             @default(0) @db.Decimal(12, 2)
+  totalCost        Decimal             @default(0) @db.Decimal(12, 2)
+  costPerPiece     Decimal             @default(0) @db.Decimal(12, 2)
+  notes            String?
   // Cost-split context. When the run touches a week with peer runs, the
   // workshop's labor cost is divided between them per `laborAllocation`.
   // `manual` requires `laborManualShare` (0..100). Computed snapshot
@@ -794,8 +786,8 @@ model ProductionRun {
   weekId           String?
   laborAllocation  LaborAllocationMode @default(by_pieces)
   laborManualShare Decimal?            @db.Decimal(5, 2)
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
 
   test         ProductTest?            @relation(fields: [testId], references: [id])
   product      Product?                @relation(fields: [productId], references: [id])
@@ -1101,13 +1093,16 @@ enum AutomationTrigger {
   confirmation_confirmed
   confirmation_cancelled
   confirmation_unreachable
-  shipping_label_created
+  confirmation_callback
+  confirmation_reported
+  shipping_pushed
   shipping_picked_up
   shipping_in_transit
   shipping_out_for_delivery
+  shipping_failed_delivery
+  shipping_reported
   shipping_delivered
   shipping_returned
-  shipping_return_validated
   commission_paid
 }
 
@@ -1138,47 +1133,6 @@ enum WhatsAppMessageDirection {
   out
 }
 
-// Custom WhatsApp templates keyed on Coliix's literal status wordings —
-// lets the operator define an automation for any Coliix state (Ramassé,
-// Livré, Hub Casablanca, …) without us having to extend the
-// AutomationTrigger enum. Fired by the Coliix dispatcher whenever a
-// parcel's coliixRawState changes to the wording stored here.
-model ColiixStateTemplate {
-  id             String   @id @default(cuid())
-  coliixRawState String   @unique
-  enabled        Boolean  @default(false)
-  body           String
-  updatedById    String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  @@index([enabled])
-}
-
-// Admin-editable mapping from Coliix's literal wording to our internal
-// ShippingStatus enum. Replaces the hard-coded RULES table that used to
-// live in coliixStateMap.ts. internalStatus = null means "stay raw":
-// coliixRawState on the order still updates with the literal wording so
-// the timeline shows what Coliix said, but shippingStatus is left alone
-// so the wording never pollutes KPIs. mapColiixState reads this table
-// (cached in-memory with 60s TTL + explicit invalidation on save).
-//
-// Seeded by migration with parity to the previous hard-coded rules, plus
-// an auto-discover row per coliixRawState already observed on Order rows
-// so the editor lists everything in production from day one. Subsequent
-// ingestStatus calls upsert any newly seen wording with internalStatus
-// null, so the table grows naturally.
-model ColiixStatusMapping {
-  coliixWording  String          @id
-  internalStatus ShippingStatus?
-  note           String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  updatedById    String?
-
-  @@index([internalStatus])
-}
-
 model MessageTemplate {
   id          String            @id @default(cuid())
   trigger     AutomationTrigger @unique
@@ -1199,18 +1153,18 @@ model MessageTemplate {
 // (`overlap='all'`). Conditions are a whitelisted JSON shape evaluated by
 // conditionEvaluator.ts (no arbitrary code).
 model AutomationRule {
-  id          String            @id @default(cuid())
-  trigger     AutomationTrigger
-  name        String
-  priority    Int               @default(0)
-  enabled     Boolean           @default(true)
-  overlap     String            @default("first") // "first" | "all"
-  conditions  Json              @default("{}")
-  templateId  String
-  sendFromSystem Boolean        @default(false)
-  createdById String?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  id             String            @id @default(cuid())
+  trigger        AutomationTrigger
+  name           String
+  priority       Int               @default(0)
+  enabled        Boolean           @default(true)
+  overlap        String            @default("first") // "first" | "all"
+  conditions     Json              @default("{}")
+  templateId     String
+  sendFromSystem Boolean           @default(false)
+  createdById    String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
   template  MessageTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
   createdBy User?           @relation("RuleAuthor", fields: [createdById], references: [id])
@@ -1248,9 +1202,9 @@ model MessageLog {
   createdAt      DateTime          @default(now())
   sentAt         DateTime?
 
-  rule  AutomationRule?  @relation(fields: [ruleId], references: [id], onDelete: SetNull)
-  order Order?           @relation(fields: [orderId], references: [id])
-  agent User?            @relation("MessageLogAgent", fields: [agentId], references: [id])
+  rule  AutomationRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  order Order?          @relation(fields: [orderId], references: [id])
+  agent User?           @relation("MessageLogAgent", fields: [agentId], references: [id])
 
   messages WhatsAppMessage[]
 
@@ -1264,18 +1218,18 @@ model MessageLog {
 // direction='out' so the agent sees the full history inline with their
 // manual replies.
 model WhatsAppThread {
-  id               String               @id @default(cuid())
-  customerId       String?
-  assignedAgentId  String?
-  customerPhone    String
-  lastMessageAt    DateTime             @default(now())
-  unreadCount      Int                  @default(0)
-  status           WhatsAppThreadStatus @default(open)
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
+  id              String               @id @default(cuid())
+  customerId      String?
+  assignedAgentId String?
+  customerPhone   String
+  lastMessageAt   DateTime             @default(now())
+  unreadCount     Int                  @default(0)
+  status          WhatsAppThreadStatus @default(open)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
 
-  customer      Customer? @relation(fields: [customerId], references: [id])
-  assignedAgent User?     @relation("ThreadAssignee", fields: [assignedAgentId], references: [id])
+  customer      Customer?         @relation(fields: [customerId], references: [id])
+  assignedAgent User?             @relation("ThreadAssignee", fields: [assignedAgentId], references: [id])
   messages      WhatsAppMessage[]
 
   @@unique([customerPhone, assignedAgentId])
@@ -1284,12 +1238,12 @@ model WhatsAppThread {
 }
 
 model WhatsAppMessage {
-  id           String                    @id @default(cuid())
+  id           String                   @id @default(cuid())
   threadId     String
   direction    WhatsAppMessageDirection
   body         String
   mediaUrl     String?
-  mediaType    String?                   // 'image' | 'audio' | 'video' | 'sticker' | 'document'
+  mediaType    String? // 'image' | 'audio' | 'video' | 'sticker' | 'document'
   mediaMime    String?
   fromPhone    String
   toPhone      String
@@ -1297,7 +1251,7 @@ model WhatsAppMessage {
   messageLogId String?
   authorUserId String?
   readAt       DateTime?
-  createdAt    DateTime                  @default(now())
+  createdAt    DateTime                 @default(now())
 
   thread     WhatsAppThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
   messageLog MessageLog?    @relation(fields: [messageLogId], references: [id], onDelete: SetNull)
@@ -1305,27 +1259,6 @@ model WhatsAppMessage {
 
   @@index([threadId, createdAt])
   @@index([providerId])
-}
-
-// ─── Shipping status groups (Call Center pill grouping) ─────────────────────
-
-// Admin-managed buckets that roll up the long ShippingStatus enum into a
-// handful of named tabs ("Active", "Issues", "Delivered", …) on the Call
-// Center page. `statusKeys` holds the raw enum strings so adding a new
-// ShippingStatus value never requires a schema change. Statuses not claimed
-// by any group automatically surface in the frontend's "Other" tab.
-model ShippingStatusGroup {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  color       String?
-  statusKeys  String[]
-  position    Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  createdById String?
-  createdBy   User?    @relation("StatusGroupAuthor", fields: [createdById], references: [id])
-
-  @@index([position])
 }
 
 // ─── Broadcasts (admin push notifications) ──────────────────────────────────
@@ -1377,63 +1310,56 @@ model BroadcastRecipient {
   @@index([userId, ackedAt])
 }
 
-// ─── Coliix V2 — Carrier-agnostic shipment model ─────────────────────────────
-// Built parallel to the V1 ShippingProvider/Order coliix* fields. V1 stays
-// untouched; new orders that opt into V2 get a Shipment row instead of
-// flipping Order.labelSent. The Shipment is the unit of carrier work; events
-// are append-only so the timeline is forensically complete.
+// ─── Carrier integration (Coliix v1) ─────────────────────────────────────────
+// Single carrier today (Coliix) but the schema is multi-carrier from day 1
+// so a future provider can plug in without a migration. Per-hub accounts
+// because Coliix issues one API key per hub (Agadir today; Casablanca,
+// Marrakech, … if the user opens more).
 
-// Top-level carrier registry. Today this is just "coliix_v2"; the design
-// scales to more carriers without further schema work.
 model Carrier {
   id        String   @id @default(cuid())
-  code      String   @unique // "coliix_v2"
-  label     String              // "Coliix"
+  code      String   @unique // "coliix"
+  label     String // "Coliix"
   createdAt DateTime @default(now())
 
   accounts CarrierAccount[]
 }
 
-// One row per (carrier × hub). The user's screenshot showed a single API key
-// per hub on the Coliix side (Agadir / Casablanca) — V1 only modelled one,
-// which is why we built this multi-account from day one. Webhook secret is a
-// random path segment; rotated via UI.
+// One row per (carrier × hub). The agent picks a hub when linking a
+// tracking code if more than one is active. Single-hub setup auto-picks
+// the only active row.
 model CarrierAccount {
-  id             String   @id @default(cuid())
-  carrierId      String
-  storeId        String?              // null = global; set = scoped to a store
-  hubLabel       String               // "Agadir", "Casablanca", custom
-  apiBaseUrl     String               // e.g. https://my.coliix.com
-  apiKey         String               // AES-256-GCM blob (encryptSecret)
-  webhookSecret  String               // path segment
-  isActive       Boolean  @default(false)
-  lastHealthAt   DateTime?
-  lastError      String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id            String    @id @default(cuid())
+  carrierId     String
+  hubLabel      String // "Agadir", "Casablanca", custom
+  apiBaseUrl    String // https://my.coliix.com
+  apiKey        String // AES-256-GCM blob (encryptSecret)
+  webhookSecret String // 28-hex-char path segment
+  isActive      Boolean   @default(false)
+  // Last time the test endpoint was hit + the outcome. Drives the
+  // green/red dot on the Setup tab.
+  lastHealthAt  DateTime?
+  lastError     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  carrier   Carrier        @relation(fields: [carrierId], references: [id], onDelete: Cascade)
-  store     Store?         @relation(fields: [storeId], references: [id])
+  carrier   Carrier       @relation(fields: [carrierId], references: [id], onDelete: Cascade)
   shipments Shipment[]
   cities    CarrierCity[]
 
   @@unique([carrierId, hubLabel])
   @@index([carrierId, isActive])
-  @@index([storeId])
 }
 
-// "List Ville et zone" cached per account. Used to validate addresses BEFORE
-// pushing to Coliix — an unrecognised ville is the most common rejection
-// in V1, and we surface it earlier in V2.
+// "Cities + delivery fees" cached per account. Imported from CSV; admin
+// can edit a fee inline. Used to validate the city BEFORE linking a
+// tracking code (admin sees `city_unknown` error if the customer's city
+// isn't in this table) and to compute carrier cost on the dashboard.
 model CarrierCity {
   id            String   @id @default(cuid())
   accountId     String
   ville         String
   zone          String?
-  // Delivery fee in MAD shown to staff on shipment creation. Sourced from
-  // V1 `ShippingCity` (bridge endpoint) or admin-edited per account. Null =
-  // unknown — UI shows a warning so the operator types it manually before
-  // pushing the parcel.
   deliveryPrice Decimal? @db.Decimal(12, 2)
   refreshedAt   DateTime @default(now())
 
@@ -1443,80 +1369,54 @@ model CarrierCity {
   @@index([accountId, ville])
 }
 
-enum ShipmentState {
-  pending           // created in CRM, not pushed
-  push_failed       // push attempts exhausted
-  pushed            // tracking code returned, awaiting first scan
-  picked_up         // Ramassé
-  in_transit
-  out_for_delivery
-  delivered         // terminal
-  refused           // terminal
-  returned          // terminal
-  lost              // terminal
-  cancelled         // terminal (local-only — Coliix has no cancel API)
-}
-
-enum ShipmentEventSource {
-  webhook
-  poll
-  push
-  manual
-}
-
-// One per parcel. Order ↔ Shipment is 1..N (split parcels supported by design;
-// UI defaults to 1:1). trackingCode is unique because Coliix never reuses one.
-// idempotencyKey is the shipment id, surfaced in the push payload as a tag in
-// `note` so we can detect double-creates server-side.
+// One per parcel. Created at the moment the agent links a Coliix
+// tracking code to an order via the "Mark as Shipped" modal — we don't
+// push to Coliix's create API (the user creates the parcel directly in
+// Coliix's portal). idempotencyKey defaults to Order.reference so a
+// double-click on the modal cannot create two shipments.
 model Shipment {
-  id              String        @id @default(cuid())
-  orderId         String
-  accountId       String
-  trackingCode    String?       @unique
-  idempotencyKey  String        @unique
-  state           ShipmentState @default(pending)
-  rawState        String?
-  cod             Decimal       @db.Decimal(12, 2)
-  city            String
-  zone            String?
-  address         String
-  recipientName   String
-  recipientPhone  String
-  goodsLabel      String
-  goodsQty        Int
-  note            String?
-  labelPdfUrl     String?
-  pushAttempts    Int           @default(0)
-  lastPushError   String?
-  pushedAt        DateTime?
-  deliveredAt     DateTime?
-  returnedAt      DateTime?
-  // Adaptive polling — null = terminal, no more polls. Worker rewrites this
-  // each time it ingests an event.
-  nextPollAt      DateTime?
-  lastPolledAt    DateTime?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id             String        @id @default(cuid())
+  orderId        String        @unique
+  accountId      String
+  trackingCode   String        @unique // Coliix tracking, e.g. 4-CSA04261254261OH
+  idempotencyKey String        @unique // Order.reference, prevents double-link
+  state          ShipmentState @default(pushed)
+  rawState       String? // last raw wording observed from Coliix
+  cod            Decimal       @db.Decimal(12, 2) // total customer pays carrier
+  city           String
+  address        String
+  recipientName  String
+  recipientPhone String
+  goodsLabel     String // marchandise (built from order items)
+  goodsQty       Int
+  comment        String? // shipping instruction / driver note
+  pushedAt       DateTime      @default(now())
+  deliveredAt    DateTime?
+  returnedAt     DateTime?
+  // Adaptive polling — null = terminal, no more polls. Worker rewrites
+  // this each ingest. Webhook is primary; polling is a 60s fallback.
+  nextPollAt     DateTime?
+  lastPolledAt   DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
-  order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  account CarrierAccount @relation(fields: [accountId], references: [id])
+  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  account CarrierAccount  @relation(fields: [accountId], references: [id])
   events  ShipmentEvent[]
 
-  @@index([orderId])
-  @@index([accountId, state])
-  @@index([nextPollAt])
   @@index([state, updatedAt])
+  @@index([nextPollAt])
 }
 
-// Append-only event log. Every webhook hit, every poll diff, every push.
-// dedupeHash = sha256(code|state|datereported) — second-layer replay guard
-// after the Redis NX SET in the webhook handler.
+// Append-only log — every webhook hit, every poll diff, every manual
+// patch. dedupeHash = sha256(code|state|datereported), second-layer
+// replay guard after the Redis NX SET in the webhook handler.
 model ShipmentEvent {
   id          String              @id @default(cuid())
   shipmentId  String
   source      ShipmentEventSource
   rawState    String?
-  mappedState ShipmentState?
+  mappedState ShipmentState? // null when the wording is unknown — admin reviews
   driverNote  String?
   occurredAt  DateTime
   receivedAt  DateTime            @default(now())
@@ -1529,24 +1429,42 @@ model ShipmentEvent {
   @@index([shipmentId, occurredAt])
 }
 
-// V2 mapping table — parallel to ColiixStatusMapping (V1) but typed against
-// ShipmentState (the V2 enum) and scoped by carrier code so future carriers
-// share the table.
-model ColiixV2StatusMapping {
+// Admin-editable mapping from Coliix's literal wording to our internal
+// ShipmentState. internalState=null means "stay raw" — the wording is
+// stored on the shipment for visibility but the enum bucket is left
+// alone. Auto-discovered rows land here with internalState=null until
+// admin reviews them; saving a value re-buckets every historical
+// ShipmentEvent + Shipment that used that wording.
+model ColiixStatusMapping {
   id            String         @id @default(cuid())
-  carrierCode   String         // "coliix_v2"
-  rawWording    String
-  // Null = "stay raw" — store the rawState on the shipment but don't flip
-  // the enum bucket. Used for auto-discovered wordings until an admin
-  // reviews them. Without this, an unknown wording would silently
-  // downgrade the shipment to a default state on every poll.
+  rawWording    String         @unique
   internalState ShipmentState?
   isTerminal    Boolean        @default(false)
   note          String?
-  updatedAt     DateTime       @updatedAt
   updatedById   String?
   createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
-  @@unique([carrierCode, rawWording])
-  @@index([carrierCode, internalState])
+  @@index([internalState])
+}
+
+// Every failure path writes here. The Errors tab lists them with retry
+// + resolve actions; admins also see a red dot on the Integrations menu
+// when unresolved errors exist.
+model ColiixIntegrationError {
+  id           String          @id @default(cuid())
+  type         ColiixErrorType
+  shipmentId   String?
+  orderId      String?
+  accountId    String?
+  message      String
+  meta         Json?
+  resolved     Boolean         @default(false)
+  resolvedAt   DateTime?
+  resolvedById String?
+  createdAt    DateTime        @default(now())
+
+  @@index([type, resolved, createdAt])
+  @@index([shipmentId])
+  @@index([orderId])
 }

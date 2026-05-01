@@ -33,10 +33,3 @@ export const ImportOrdersSchema = z.object({
 });
 export type ImportOrdersInput = z.infer<typeof ImportOrdersSchema>;
 
-// Shipping providers (Coliix, etc.)
-export const UpdateProviderSchema = z.object({
-  apiBaseUrl: z.string().url().optional(),
-  apiKey: z.string().min(8).max(256).nullable().optional(), // null = clear, string = set
-  isActive: z.boolean().optional(),
-});
-export type UpdateProviderInput = z.infer<typeof UpdateProviderSchema>;

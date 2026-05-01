@@ -29,6 +29,7 @@ import {
   type AgentPendingOrder,
   type CommissionPayment,
 } from '@/services/moneyApi';
+import { getSocket } from '@/services/socket';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 
@@ -70,6 +71,25 @@ export function CommissionTab() {
       cancelled = true;
     };
   }, [reloadKey]);
+
+  // Live: every order:delivered (and order:updated for shipping changes)
+  // moves the per-agent commission totals. Refetch the agent rollup so
+  // the cards stay accurate without a manual refresh.
+  useEffect(() => {
+    let socket: ReturnType<typeof getSocket> | null = null;
+    try {
+      socket = getSocket();
+    } catch {
+      return;
+    }
+    const onChange = () => setReloadKey((k) => k + 1);
+    socket.on('order:delivered', onChange);
+    socket.on('order:updated', onChange);
+    return () => {
+      socket?.off('order:delivered', onChange);
+      socket?.off('order:updated', onChange);
+    };
+  }, []);
 
   const totals = useMemo(() => {
     return rows.reduce(

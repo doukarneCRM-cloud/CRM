@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { customersApi, type ClientListItem, type ClientsListFilters } from '@/services/ordersApi';
+import { getSocket } from '@/services/socket';
 
 interface UseClientsState {
   clients: ClientListItem[];
@@ -78,6 +79,29 @@ export function useClients() {
 
   useEffect(() => {
     void load();
+  }, [load]);
+
+  // Live: when any agent or admin creates / edits a customer, the backend
+  // emits `customer:created` / `customer:updated`. Refetch to keep filters,
+  // sort, and pagination consistent (a surgical insert would have to know
+  // whether the new row matches the active filters/page — refetch is
+  // simpler and the page is small).
+  useEffect(() => {
+    let socket: ReturnType<typeof getSocket> | null = null;
+    try {
+      socket = getSocket();
+    } catch {
+      return;
+    }
+    const handler = () => {
+      void load();
+    };
+    socket.on('customer:created', handler);
+    socket.on('customer:updated', handler);
+    return () => {
+      socket?.off('customer:created', handler);
+      socket?.off('customer:updated', handler);
+    };
   }, [load]);
 
   return {

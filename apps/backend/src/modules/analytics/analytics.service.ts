@@ -149,12 +149,10 @@ export interface DeliveryTabPayload {
   trend: DeliveryTrendPoint[];
 }
 
-// Verified-return statuses — matches kpiCalculator.RETURNED_STATUSES so the
-// Dashboard's "returned" count and the Analytics Delivery card report the
-// same number. Pending returns ('returned' carrier flag, 'attempted',
-// 'lost') are excluded by design until a human verifies the parcel; they
-// surface on the Returns page's dedicated "Pending" tab.
-const VERIFIED_RETURN_STATUSES = ['return_validated', 'return_refused'] as const;
+// Returned statuses — the carrier sent the parcel back. Verification outcome
+// (good/damaged) is a separate field on Order, not a status branch, so a
+// single bucket is enough here.
+const RETURNED_STATUSES = ['returned'] as const;
 
 async function computeDeliveryCore(filters: OrderFilterParams) {
   // Per-metric date fields. Each delivery metric dates against the column
@@ -175,7 +173,7 @@ async function computeDeliveryCore(filters: OrderFilterParams) {
       prisma.order.count({ where: { ...whereConfirmed, confirmationStatus: 'confirmed' } }),
       prisma.order.count({ where: { ...whereDelivered, shippingStatus: 'delivered' } }),
       prisma.order.count({
-        where: { ...whereReturned, shippingStatus: { in: [...VERIFIED_RETURN_STATUSES] } },
+        where: { ...whereReturned, shippingStatus: { in: [...RETURNED_STATUSES] } },
       }),
       prisma.order.count({
         where: {
@@ -230,16 +228,11 @@ export async function computeDeliveryTab(filters: OrderFilterParams): Promise<De
     await Promise.all([
       computeDeliveryCore(filters),
       computeDeliveryCore(mirrorRange(filters)),
-      // Pipeline shows the LIVE shipping state — only orders that have
-      // been pushed to Coliix (labelSent: true). Orders still pending in
-      // the CRM aren't in any shipping stage and were producing a phantom
-      // "Not Shipped" bucket that inflated the totals (97 displayed vs 67
-      // actually shipped). Buckets are Coliix's literal wording when
-      // available, "Label Created" for orders pushed but with no Coliix
-      // update yet.
+      // Pipeline = shipping stages of orders already pushed to a carrier
+      // (labelSent: true). Buckets are the canonical ShippingStatus enum.
       prisma.order.findMany({
         where: { ...where, labelSent: true },
-        select: { coliixRawState: true },
+        select: { shippingStatus: true },
       }),
       prisma.order.findMany({
         where: { ...where, labelSent: true },
@@ -276,21 +269,17 @@ export async function computeDeliveryTab(filters: OrderFilterParams): Promise<De
       prisma.order.findMany({
         where: {
           ...where,
-          shippingStatus: { in: ['delivered', 'returned', 'return_validated'] },
+          shippingStatus: { in: ['delivered', 'returned'] },
         },
         select: { shippingStatus: true, deliveredAt: true, updatedAt: true },
       }),
     ]);
 
-  // ── Pipeline buckets — keyed by Coliix's literal wording ───────────────
-  // Only includes orders actually pushed to Coliix (the query filters on
-  // labelSent: true). An order that's been pushed but for which no Coliix
-  // update has arrived yet falls into a synthetic 'Label Created' bucket
-  // so it isn't lost between push and first webhook. Sorted by count desc;
-  // ties broken alphabetically for stable rendering.
+  // ── Pipeline buckets — keyed by ShippingStatus enum ────────────────────
+  // Sorted by count desc; ties broken alphabetically for stable rendering.
   const countsByStatus = new Map<string, number>();
   for (const o of pipelineRows) {
-    const key = o.coliixRawState ?? 'Label Created';
+    const key = o.shippingStatus;
     countsByStatus.set(key, (countsByStatus.get(key) ?? 0) + 1);
   }
   const pipeline = Array.from(countsByStatus.entries())
@@ -313,7 +302,7 @@ export async function computeDeliveryTab(filters: OrderFilterParams): Promise<De
         entry.totalMs += row.deliveredAt.getTime() - row.labelSentAt.getTime();
         entry.sampleCount += 1;
       }
-    } else if (row.shippingStatus === 'returned' || row.shippingStatus === 'return_validated') {
+    } else if (row.shippingStatus === 'returned') {
       entry.returned += 1;
     }
     byCity.set(city, entry);
@@ -350,7 +339,7 @@ export async function computeDeliveryTab(filters: OrderFilterParams): Promise<De
       where: {
         ...where,
         agentId: { in: agentIds },
-        shippingStatus: { in: ['returned', 'return_validated'] },
+        shippingStatus: { in: ['returned'] },
       },
       _count: { _all: true },
     }),
@@ -419,10 +408,7 @@ export async function computeDeliveryTab(filters: OrderFilterParams): Promise<De
     if (row.order.shippingStatus === 'delivered') {
       entry.delivered += 1;
       entry.revenue += row.total;
-    } else if (
-      row.order.shippingStatus === 'returned' ||
-      row.order.shippingStatus === 'return_validated'
-    ) {
+    } else if (row.order.shippingStatus === 'returned') {
       entry.returned += 1;
     }
     const variantLabel = [row.variant.color, row.variant.size].filter(Boolean).join(' / ') || '—';
@@ -574,7 +560,6 @@ export interface ConfirmationTabPayload {
 
 const CONFIRMATION_ORDER: Array<
   | 'pending'
-  | 'awaiting'
   | 'confirmed'
   | 'cancelled'
   | 'unreachable'
@@ -584,7 +569,6 @@ const CONFIRMATION_ORDER: Array<
   | 'reported'
 > = [
   'pending',
-  'awaiting',
   'confirmed',
   'callback',
   'cancelled',
@@ -622,7 +606,7 @@ async function computeConfirmationCore(filters: OrderFilterParams) {
       prisma.order.count({ where: { ...whereCancelled, confirmationStatus: 'cancelled' } }),
       prisma.order.count({ where: { ...whereUnreachable, confirmationStatus: 'unreachable' } }),
       prisma.order.count({
-        where: { ...wherePending, confirmationStatus: { in: ['pending', 'awaiting', 'callback'] } },
+        where: { ...wherePending, confirmationStatus: { in: ['pending', 'callback'] } },
       }),
       prisma.order.count({ where: { ...mergedWhere, mergedIntoId: { not: null } } }),
       // First confirmation log per order in the activity window, used to

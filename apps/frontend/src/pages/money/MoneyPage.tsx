@@ -1,22 +1,20 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Receipt, Users, Truck } from 'lucide-react';
+import { Receipt, Users } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { ExpensesTab } from './tabs/ExpensesTab';
 import { CommissionTab } from './tabs/CommissionTab';
-import { DeliveryInvoiceTab } from './tabs/DeliveryInvoiceTab';
 
-type TabId = 'expenses' | 'commission' | 'delivery';
+type TabId = 'expenses' | 'commission';
 
 export default function MoneyPage() {
   const { t } = useTranslation();
   const [active, setActive] = useState<TabId>('expenses');
 
-  const tabs: Array<{ id: TabId; label: string; icon: typeof Truck; hint: string }> = useMemo(
+  const tabs: Array<{ id: TabId; label: string; icon: typeof Receipt; hint: string }> = useMemo(
     () => [
       { id: 'expenses',   label: t('money.tabs.expenses.label'),   icon: Receipt, hint: t('money.tabs.expenses.hint')   },
       { id: 'commission', label: t('money.tabs.commission.label'), icon: Users,   hint: t('money.tabs.commission.hint') },
-      { id: 'delivery',   label: t('money.tabs.delivery.label'),   icon: Truck,   hint: t('money.tabs.delivery.hint')   },
     ],
     [t],
   );
@@ -54,7 +52,6 @@ export default function MoneyPage() {
 
       {active === 'expenses' && <ExpensesTab />}
       {active === 'commission' && <CommissionTab />}
-      {active === 'delivery' && <DeliveryInvoiceTab />}
     </div>
   );
 }

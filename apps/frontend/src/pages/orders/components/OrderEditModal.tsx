@@ -14,6 +14,7 @@ import { apiErrorMessage } from '@/lib/apiError';
 import { ROUTES } from '@/constants/routes';
 import { PERMISSIONS } from '@/constants/permissions';
 import { useAuthStore } from '@/store/authStore';
+import { ShipmentTimeline } from './ShipmentTimeline';
 
 // ─── Local types ─────────────────────────────────────────────────────────────
 
@@ -660,23 +661,10 @@ export function OrderEditModal({ order, onClose, onSaved }: OrderEditModalProps)
                 <div className="h-3 w-px bg-gray-200" />
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-gray-400">{t('orders.edit.statusShipping')}</span>
-                  {order.coliixRawState ? (
-                    <span
-                      className="inline-flex items-center gap-1.5 rounded-badge bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-700"
-                      title={order.coliixRawState}
-                    >
-                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" />
-                      {order.coliixRawState}
-                    </span>
-                  ) : (
-                    <StatusBadge status={order.shippingStatus} />
-                  )}
+                  <StatusBadge status={order.shippingStatus} type="shipping" />
                 </div>
                 <div className="ml-auto flex items-center gap-2">
-                  {canVerifyReturns &&
-                    (['returned', 'attempted', 'lost'] as const).includes(
-                      order.shippingStatus as 'returned' | 'attempted' | 'lost',
-                    ) && (
+                  {canVerifyReturns && order.shippingStatus === 'returned' && (
                       <button
                         type="button"
                         onClick={() => navigate(`${ROUTES.RETURNS}?q=${encodeURIComponent(order.reference)}`)}
@@ -692,6 +680,24 @@ export function OrderEditModal({ order, onClose, onSaved }: OrderEditModalProps)
                   </span>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* ── Coliix shipment timeline (linked orders only) ──────────
+              Linking is now triggered from the table row via the Send
+              column, so the editor only renders the timeline when a
+              shipment already exists. Pre-shipped confirmed orders show
+              a pointer back to the row button. */}
+          {order && order.confirmationStatus === 'confirmed' && (
+            <div className="mt-4">
+              <SectionHeader label={t('orders.edit.shipmentSection')} />
+              {order.labelSent ? (
+                <ShipmentTimeline orderId={order.id} />
+              ) : (
+                <div className="rounded-card border border-dashed border-gray-200 bg-gray-50/60 p-3 text-xs text-gray-500">
+                  {t('orders.edit.shipmentNotLinkedRowHint')}
+                </div>
+              )}
             </div>
           )}
         </fieldset>

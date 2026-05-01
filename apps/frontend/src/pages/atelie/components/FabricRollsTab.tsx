@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, Plus, Trash2, Settings2 } from 'lucide-react
 import { useTranslation } from 'react-i18next';
 import { GlassCard, CRMButton } from '@/components/ui';
 import { atelieApi, type FabricTypeGroup } from '@/services/atelieApi';
+import { getSocket } from '@/services/socket';
 import { apiErrorMessage } from '@/lib/apiError';
 import { FabricRollFormModal } from './FabricRollFormModal';
 import { FabricTypeManagerModal } from './FabricTypeManagerModal';
@@ -28,6 +29,25 @@ export function FabricRollsTab() {
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  // Live: another supervisor adjusts a roll → reload the tree so remaining
+  // lengths stay accurate. The same `atelie:material:updated` event covers
+  // accessory adjustments; we filter so only fabric-related ones reload.
+  useEffect(() => {
+    let socket: ReturnType<typeof getSocket> | null = null;
+    try {
+      socket = getSocket();
+    } catch {
+      return;
+    }
+    const handler = () => {
+      void load();
+    };
+    socket.on('atelie:material:updated', handler);
+    return () => {
+      socket?.off('atelie:material:updated', handler);
+    };
   }, [load]);
 
   async function onAdjust(rollId: string, current: number) {

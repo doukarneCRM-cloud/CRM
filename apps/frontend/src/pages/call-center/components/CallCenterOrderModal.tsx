@@ -15,7 +15,6 @@ import { ordersApi, supportApi, customersApi, type PendingSibling } from '@/serv
 import type { Order, Product, ShippingCity } from '@/types/orders';
 import { cn } from '@/lib/cn';
 import { apiErrorMessage } from '@/lib/apiError';
-import { colourForColiixRawState } from '@/lib/coliixColour';
 import { useCallCenterStore } from '../callCenterStore';
 import { DuplicateOrdersDialog } from './DuplicateOrdersDialog';
 
@@ -143,7 +142,6 @@ export function CallCenterOrderModal() {
   const { t } = useTranslation();
   const selectedOrder = useCallCenterStore((s) => s.selectedOrder);
   const closeOrder = useCallCenterStore((s) => s.closeOrder);
-  const triggerRefresh = useCallCenterStore((s) => s.triggerRefresh);
   const dismissedDuplicateOrderIds = useCallCenterStore((s) => s.dismissedDuplicateOrderIds);
   const dismissDuplicatesFor = useCallCenterStore((s) => s.dismissDuplicatesFor);
 
@@ -440,7 +438,10 @@ export function CallCenterOrderModal() {
     setError(null);
     try {
       await persistDraft();
-      triggerRefresh();
+      // No triggerRefresh — the backend's order:updated socket event
+      // patches the row in place. Bumping the table's refresh key on
+      // top of that re-renders the list with stale state for a frame
+      // and resets selection / scroll.
       closeOrder();
     } catch (e) {
       setError(apiErrorMessage(e, t('callCenter.modal.failedToSave')));
@@ -468,7 +469,7 @@ export function CallCenterOrderModal() {
         : false;
       if (dirty) await persistDraft({ skipItems });
       await ordersApi.updateStatus(order.id, payload);
-      triggerRefresh();
+      // Surgical socket update handles the row patch; just close.
       closeOrder();
     } catch (e) {
       setError(apiErrorMessage(e, t('callCenter.modal.failedToUpdateStatus')));
@@ -581,21 +582,8 @@ export function CallCenterOrderModal() {
       <div className="flex flex-col gap-3">
         {/* Status strip */}
         <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge status={order.confirmationStatus} size="sm" showDot />
-          {order.coliixRawState ? (
-            <span
-              className="inline-flex items-center gap-1.5 rounded-badge bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-700"
-              title={order.coliixRawState}
-            >
-              <span
-                className="h-1.5 w-1.5 rounded-full"
-                style={{ backgroundColor: colourForColiixRawState(order.coliixRawState) }}
-              />
-              {order.coliixRawState}
-            </span>
-          ) : (
-            <StatusBadge status={order.shippingStatus} size="sm" showDot />
-          )}
+          <StatusBadge status={order.confirmationStatus} type="confirmation" size="sm" showDot />
+          <StatusBadge status={order.shippingStatus} type="shipping" size="sm" showDot />
           <span className={cn('rounded-badge px-2 py-0.5 text-[10px] font-semibold', tagBadge.className)}>
             {tagBadge.label}
           </span>
@@ -1182,10 +1170,10 @@ export function CallCenterOrderModal() {
         onMerged={() => {
           setShowDuplicates(false);
           setSiblings([]);
-          // Items on the keeper have changed server-side. Close and refresh so
-          // the agent re-opens the combined order with fresh state before
-          // confirming — prevents confirming with stale items in the form.
-          triggerRefresh();
+          // Items on the keeper changed server-side; the merge endpoint
+          // emits order:updated for the keeper + order:archived for the
+          // siblings. The table patches in place, so just close — the
+          // agent reopens the combined order with fresh state.
           closeOrder();
         }}
         onSkip={() => {

@@ -15,9 +15,6 @@ function pickFilters(query: Record<string, string | undefined>): OrderFilterPara
     cities: query.cities,
     confirmationStatuses: query.confirmationStatuses,
     shippingStatuses: query.shippingStatuses,
-    // Coliix-driven shipping filter shared across Orders / Dashboard /
-    // Analytics — single chip, single backend filter, applied uniformly.
-    coliixRawStates: query.coliixRawStates,
     sources: query.sources,
     dateFrom: query.dateFrom,
     dateTo: query.dateTo,

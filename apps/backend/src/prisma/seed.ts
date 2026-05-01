@@ -55,7 +55,6 @@ const ALL_PERMISSIONS = [
   { key: 'automation:manage', label: 'Manage Automation Templates' },
   { key: 'whatsapp:view', label: 'View WhatsApp Sessions' },
   { key: 'whatsapp:connect', label: 'Connect WhatsApp Sessions (QR)' },
-  { key: 'shipping_groups:manage', label: 'Manage Shipping Status Groups' },
   { key: 'broadcasts:manage', label: 'Manage Push Notifications' },
 ];
 

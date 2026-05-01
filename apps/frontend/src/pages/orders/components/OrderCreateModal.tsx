@@ -15,7 +15,10 @@ import type { Product, ShippingCity } from '@/types/orders';
 interface Props {
   open: boolean;
   onClose: () => void;
-  onCreated: () => void;
+  // Optional — the backend's order:created socket event already arrives at
+  // every list page and refetches. Pass this only when the caller needs an
+  // extra side-effect (e.g. tracking a one-off "created by me" highlight).
+  onCreated?: () => void;
 }
 
 interface DraftItem {
@@ -261,7 +264,7 @@ export function OrderCreateModal({ open, onClose, onCreated }: Props) {
           unitPrice: i.unitPrice,
         })),
       });
-      onCreated();
+      onCreated?.();
       onClose();
     } catch (err) {
       if (isAxiosError(err)) {

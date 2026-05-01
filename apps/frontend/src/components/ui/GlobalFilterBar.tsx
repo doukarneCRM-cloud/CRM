@@ -19,7 +19,6 @@ interface FilterChipConfig {
     | 'productIds'
     | 'confirmationStatuses'
     | 'shippingStatuses'
-    | 'coliixRawStates'
     | 'sources';
   label: string;
   options: FilterOption[];

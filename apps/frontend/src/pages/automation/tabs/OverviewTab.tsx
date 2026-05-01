@@ -75,21 +75,11 @@ export function OverviewTab() {
         return { ...prev, feed };
       });
     };
-    const onRateLimited = (payload: {
-      sessionId: string;
-      reason: string;
-      hourlyUsed?: number;
-      hourlyLimit?: number;
-    }) => {
-      pushToast({
-        kind: 'info',
-        title: t('automation.overview.rateLimitTitle', { reason: payload.reason }),
-        body: t('automation.overview.rateLimitBody', {
-          session: payload.sessionId.slice(0, 6),
-          used: payload.hourlyUsed ?? '',
-          limit: payload.hourlyLimit ?? '',
-        }),
-      });
+    // Rate-limit toast is owned by the global useOrderNotifications hook now
+    // (fires on every page, not just here). We still need to refresh the
+    // local feed so the affected message rows show their new "rate-limited"
+    // status without waiting for the next polling tick.
+    const onRateLimited = () => {
       void load();
     };
     socket.on('message_log:updated', onUpdate);

@@ -222,8 +222,12 @@ export async function autoAssign(orderId: string): Promise<AutoAssignResult> {
       }),
     ]);
 
-    emitToRoom('orders:all', 'order:assigned', { orderId, agentId: picked.id });
-    emitToRoom(`agent:${picked.id}`, 'order:assigned', { orderId });
+    emitToRoom('orders:all', 'order:assigned', {
+      orderId,
+      agentId: picked.id,
+      ts: Date.now(),
+    });
+    emitToRoom(`agent:${picked.id}`, 'order:assigned', { orderId, ts: Date.now() });
 
     return { assigned: true, agentId: picked.id, agentName: picked.name };
   } finally {
@@ -235,9 +239,19 @@ export async function autoAssign(orderId: string): Promise<AutoAssignResult> {
  * Dry-run simulation used by the assignment-rules page: pretends to assign N
  * orders without touching Redis or the DB, so the admin can preview the
  * rotation. Returns the sequence of agent names.
+ *
+ * If the rule is disabled or the eligible pool is empty, returns []. The UI
+ * already shows an empty-state for that — no point producing a fake sequence
+ * that wouldn't actually fire in production.
+ *
+ * Always simulates round-robin even when `strategy: by_product` is set.
+ * `by_product` needs an order context (its items) to project a winning agent;
+ * the simulator has none, so the honest fallback is the underlying RR rotation.
  */
 export async function simulateAssign(count: number): Promise<string[]> {
   const rule = await getAssignmentRule();
+  if (!rule.isActive) return [];
+
   const agents = await eligibleAgents(rule.eligibleAgentIds);
   if (agents.length === 0) return [];
 

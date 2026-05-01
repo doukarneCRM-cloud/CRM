@@ -6,11 +6,6 @@ export interface OrderFilterParams {
   cities?: string | string[];
   confirmationStatuses?: string | string[];
   shippingStatuses?: string | string[];
-  // New: filter by Coliix's literal status wording (the user-facing label
-  // that drives the shipping pipeline + admin chip dropdown). Distinct
-  // from shippingStatuses, which is our internal enum and stays for
-  // backward-compat with anywhere that still binds to the enum.
-  coliixRawStates?: string | string[];
   sources?: string | string[];
   dateFrom?: string;
   dateTo?: string;
@@ -32,6 +27,8 @@ export type OrderDateField =
   | 'confirmedAt'
   | 'cancelledAt'
   | 'unreachableAt'
+  | 'callbackAt'
+  | 'reportedAt'
   | 'labelSentAt'
   | 'deliveredAt'
   | 'returnVerifiedAt'
@@ -90,49 +87,6 @@ export function buildOrderWhereClause(
     where.shippingStatus = { in: shippingStatuses };
   }
 
-  // Coliix literal-state filter — drives the user-facing chip dropdown.
-  // Compared as plain strings since coliixRawState is a free-form column.
-  // Two synthetic buckets carry meaning the column itself can't express:
-  //   - "Not Shipped" → confirmed orders that haven't been pushed to
-  //                     Coliix yet (labelSent=false, confirmed). Operator
-  //                     wants to see these in the shipping pipeline so a
-  //                     "ready-to-ship" pile is visible at a glance.
-  //   - "Label Created" → pushed to Coliix but no tracking event back yet
-  //                       (labelSent=true, coliixRawState=null).
-  // Anything else is matched as the literal coliixRawState wording.
-  const coliixRawStates = toArray(params.coliixRawStates);
-  if (coliixRawStates.length > 0) {
-    const NOT_SHIPPED = 'Not Shipped';
-    const LABEL_CREATED = 'Label Created';
-    const includeNotShipped = coliixRawStates.includes(NOT_SHIPPED);
-    const includeLabelCreated = coliixRawStates.includes(LABEL_CREATED);
-    const realStates = coliixRawStates.filter(
-      (s) => s !== NOT_SHIPPED && s !== LABEL_CREATED,
-    );
-
-    const orClauses: Prisma.OrderWhereInput[] = [];
-    if (realStates.length > 0) {
-      orClauses.push({ coliixRawState: { in: realStates } });
-    }
-    if (includeNotShipped) {
-      orClauses.push({ labelSent: false, confirmationStatus: 'confirmed' });
-    }
-    if (includeLabelCreated) {
-      orClauses.push({ labelSent: true, coliixRawState: null });
-    }
-
-    if (orClauses.length === 1) {
-      Object.assign(where, orClauses[0]);
-    } else if (orClauses.length > 1) {
-      // Wrap in AND so a later `where.OR` (search clause) doesn't clobber
-      // this one — Prisma supports nested logical ops via `AND`.
-      where.AND = [
-        ...(Array.isArray(where.AND) ? where.AND : []),
-        { OR: orClauses },
-      ];
-    }
-  }
-
   // Source filter
   const sources = toArray(params.sources) as OrderSource[];
   if (sources.length > 0) {
@@ -169,7 +123,6 @@ export function buildOrderWhereClause(
     const q = params.search.trim();
     where.OR = [
       { reference: { contains: q, mode: 'insensitive' } },
-      { coliixTrackingId: { contains: q, mode: 'insensitive' } },
       { customer: { fullName: { contains: q, mode: 'insensitive' } } },
       { customer: { phone: { contains: q, mode: 'insensitive' } } },
       { customer: { phoneDisplay: { contains: q, mode: 'insensitive' } } },

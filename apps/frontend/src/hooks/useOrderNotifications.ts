@@ -32,6 +32,21 @@ interface NotificationNewPayload {
   product?: { name: string; extraCount: number } | null;
 }
 
+interface ColiixErrorPayload {
+  id: string;
+  type: string;
+  message: string;
+  resolved?: boolean;
+  ts?: number;
+}
+
+interface WhatsAppRateLimitedPayload {
+  sessionId: string;
+  reason?: string;
+  hourlyUsed?: number;
+  hourlyLimit?: number;
+}
+
 /**
  * Wire order socket events to the toast + sound layer.
  *
@@ -179,15 +194,58 @@ export function useOrderNotifications() {
       });
     };
 
+    // Coliix integration error — admins/supervisors need to triage before more
+    // pile up. Resolved-on-emit (rare; happens if a webhook re-fires after the
+    // admin already cleared it) doesn't toast.
+    const recentColiixError = new Map<string, number>();
+    const handleColiixError = (payload: ColiixErrorPayload) => {
+      if (!isAdmin) return;
+      if (payload.resolved) return;
+      if (withinDedupe({ current: recentColiixError } as MutableRefObject<Map<string, number>>, payload.id)) return;
+
+      pushToast({
+        kind: 'error',
+        title: 'Coliix integration error',
+        body: payload.message,
+        href: '/integrations',
+      });
+    };
+
+    // WhatsApp rate-limit hit. Only admins see — agents would just be confused
+    // by a session-level limit they didn't trigger. The OverviewTab also shows
+    // an inline banner; the toast is for when the admin is on a different
+    // page (call center, dashboard, anywhere) and would otherwise miss it.
+    const recentRateLimited = new Map<string, number>();
+    const handleRateLimited = (payload: WhatsAppRateLimitedPayload) => {
+      if (!isAdmin) return;
+      if (withinDedupe({ current: recentRateLimited } as MutableRefObject<Map<string, number>>, payload.sessionId, 60_000)) {
+        return;
+      }
+      const counts =
+        payload.hourlyUsed != null && payload.hourlyLimit != null
+          ? `${payload.hourlyUsed}/${payload.hourlyLimit} this hour`
+          : null;
+      pushToast({
+        kind: 'error',
+        title: 'WhatsApp rate-limited',
+        body: [payload.reason, counts].filter(Boolean).join(' · ') || undefined,
+        href: '/automation',
+      });
+    };
+
     socket.on('order:assigned', handleAssigned);
     socket.on('order:confirmed', handleConfirmed);
     socket.on('order:delivered', handleDelivered);
     socket.on('notification:new', handleNotification);
+    socket.on('coliix:error', handleColiixError);
+    socket.on('whatsapp:rate_limited', handleRateLimited);
     return () => {
       socket.off('order:assigned', handleAssigned);
       socket.off('order:confirmed', handleConfirmed);
       socket.off('order:delivered', handleDelivered);
       socket.off('notification:new', handleNotification);
+      socket.off('coliix:error', handleColiixError);
+      socket.off('whatsapp:rate_limited', handleRateLimited);
     };
   }, [isAuthenticated, user, pushToast]);
 }

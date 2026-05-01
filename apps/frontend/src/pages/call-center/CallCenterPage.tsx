@@ -5,7 +5,6 @@ import { PERMISSIONS } from '@/constants/permissions';
 import { AgentKpiCards } from './components/AgentKpiCards';
 import { CallCenterTable } from './components/CallCenterTable';
 import { CallCenterOrderModal } from './components/CallCenterOrderModal';
-import { useCallCenterStore } from './callCenterStore';
 import { OrderCreateModal } from '../orders/components/OrderCreateModal';
 import { BroadcastTopBar } from '@/components/broadcasts/BroadcastTopBar';
 
@@ -13,7 +12,6 @@ export default function CallCenterPage() {
   const { t } = useTranslation();
   const { hasPermission } = useAuthStore();
   const canCreate = hasPermission(PERMISSIONS.ORDERS_CREATE);
-  const triggerRefresh = useCallCenterStore((s) => s.triggerRefresh);
   const [createOpen, setCreateOpen] = useState(false);
 
   return (
@@ -32,10 +30,11 @@ export default function CallCenterPage() {
       <CallCenterTable onCreate={canCreate ? () => setCreateOpen(true) : undefined} />
       <CallCenterOrderModal />
 
+      {/* No onCreated handler — the order:created socket event arrives at
+          CallCenterTable's listener and refetches the visible page. */}
       <OrderCreateModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        onCreated={triggerRefresh}
       />
     </div>
   );

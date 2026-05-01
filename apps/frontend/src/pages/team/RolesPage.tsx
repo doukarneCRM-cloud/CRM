@@ -5,6 +5,7 @@ import { CRMButton } from '@/components/ui/CRMButton';
 import { useAuthStore } from '@/store/authStore';
 import { PERMISSIONS } from '@/constants/permissions';
 import { teamApi, type RoleDetail, type PermissionOption } from '@/services/teamApi';
+import { getSocket } from '@/services/socket';
 
 import { TeamTabs } from './components/TeamTabs';
 import { RolePermissionCard } from './components/RolePermissionCard';
@@ -33,6 +34,26 @@ export default function RolesPage() {
 
   useEffect(() => {
     void load();
+  }, [load]);
+
+  // Live: when any admin creates / updates a role (or its permissions),
+  // every open Roles page mirrors the change.
+  useEffect(() => {
+    let socket: ReturnType<typeof getSocket> | null = null;
+    try {
+      socket = getSocket();
+    } catch {
+      return;
+    }
+    const refresh = () => {
+      void load();
+    };
+    socket.on('role:created', refresh);
+    socket.on('role:updated', refresh);
+    return () => {
+      socket?.off('role:created', refresh);
+      socket?.off('role:updated', refresh);
+    };
   }, [load]);
 
   return (

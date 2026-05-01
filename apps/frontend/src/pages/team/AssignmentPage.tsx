@@ -12,6 +12,7 @@ import {
   type TeamUser,
 } from '@/services/teamApi';
 import { cn } from '@/lib/cn';
+import { getSocket } from '@/services/socket';
 
 import { TeamTabs } from './components/TeamTabs';
 import { CommissionTable } from './components/CommissionTable';
@@ -70,6 +71,31 @@ export default function AssignmentPage() {
 
   useEffect(() => {
     void load();
+  }, [load]);
+
+  // Live: another admin tweaks the rule, or a user/role changes (which
+  // affects the eligible-agent picker), or commission rates move. Reload
+  // so this admin's view stays consistent with the database.
+  useEffect(() => {
+    let socket: ReturnType<typeof getSocket> | null = null;
+    try {
+      socket = getSocket();
+    } catch {
+      return;
+    }
+    const refresh = () => {
+      void load();
+    };
+    socket.on('assignment_rule:updated', refresh);
+    socket.on('user:created', refresh);
+    socket.on('user:updated', refresh);
+    socket.on('role:updated', refresh);
+    return () => {
+      socket?.off('assignment_rule:updated', refresh);
+      socket?.off('user:created', refresh);
+      socket?.off('user:updated', refresh);
+      socket?.off('role:updated', refresh);
+    };
   }, [load]);
 
   const patchRule = async (patch: Partial<AssignmentRuleState>) => {
@@ -361,7 +387,11 @@ export default function AssignmentPage() {
           {simulationResult && (
             <div className="mt-4 flex flex-wrap gap-2">
               {simulationResult.length === 0 ? (
-                <p className="text-xs text-gray-500">{t('team.assignment.simulator.empty')}</p>
+                <p className="text-xs text-gray-500">
+                  {!rule.isActive
+                    ? t('team.assignment.simulator.disabled')
+                    : t('team.assignment.simulator.empty')}
+                </p>
               ) : (
                 simulationResult.map((name, i) => (
                   <div

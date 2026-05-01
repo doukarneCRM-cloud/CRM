@@ -23,10 +23,6 @@ import {
   listPaymentHistory,
   deletePayment,
 } from './commission.service';
-import {
-  listDeliveryInvoice,
-  setOrderCarrierPaid,
-} from './deliveryInvoice.service';
 import { uploadMoneyFile } from './money.upload';
 
 // ─── Schemas ────────────────────────────────────────────────────────────────
@@ -53,11 +49,6 @@ const RecordPaymentSchema = z.object({
   fileUrl: z.string().nullable().optional(),
   periodFrom: z.string().nullable().optional(),
   periodTo: z.string().nullable().optional(),
-});
-
-const SetCarrierPaidSchema = z.object({
-  orderIds: z.array(z.string().min(1)).min(1),
-  paid: z.boolean(),
 });
 
 function replyError(reply: FastifyReply, err: unknown): FastifyReply {
@@ -216,43 +207,4 @@ export async function moneyRoutes(app: FastifyInstance) {
     async (request, reply) => uploadMoneyFile('commission', request, reply),
   );
 
-  // ── Delivery Invoice ──────────────────────────────────────────────────
-
-  app.get(
-    '/delivery-invoice',
-    { preHandler: [verifyJWT, requirePermission('money:view')] },
-    async (request, reply) => {
-      const q = request.query as Record<string, string | undefined>;
-      const payload = await listDeliveryInvoice({
-        dateFrom: q.dateFrom,
-        dateTo: q.dateTo,
-        paidOnly: (q.paidOnly as 'paid' | 'unpaid' | 'all' | undefined) ?? 'all',
-        search: q.search,
-      });
-      return reply.send(payload);
-    },
-  );
-
-  app.post(
-    '/delivery-invoice/mark-paid',
-    { preHandler: [verifyJWT, requirePermission('money:manage')] },
-    async (request, reply) => {
-      const parsed = SetCarrierPaidSchema.safeParse(request.body);
-      if (!parsed.success) {
-        return reply.status(400).send({
-          error: { code: 'VALIDATION_ERROR', message: 'Invalid payload', statusCode: 400, issues: parsed.error.issues },
-        });
-      }
-      try {
-        const result = await setOrderCarrierPaid(
-          parsed.data.orderIds,
-          parsed.data.paid,
-          request.user.sub,
-        );
-        return reply.send(result);
-      } catch (err) {
-        return replyError(reply, err);
-      }
-    },
-  );
 }

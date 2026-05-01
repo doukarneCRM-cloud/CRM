@@ -42,6 +42,7 @@ export const UpdateOrderSchema = z.object({
   shippingInstruction: z.string().max(500).nullable().optional(),
   cancellationReason: z.string().max(500).nullable().optional(),
   callbackAt: z.string().datetime().nullable().optional(),
+  reportedAt: z.string().datetime().nullable().optional(),
   // Full items replacement — when provided, old items are discarded, old stock
   // is restored, and new items + their stock deductions are applied atomically.
   items: z.array(CreateOrderItemSchema).min(1).optional(),
@@ -51,13 +52,33 @@ export const UpdateOrderSchema = z.object({
 export const UpdateStatusSchema = z
   .object({
     confirmationStatus: z
-      .enum(['pending', 'awaiting', 'confirmed', 'cancelled', 'unreachable', 'callback', 'fake', 'out_of_stock', 'reported'])
+      .enum([
+        'pending',
+        'confirmed',
+        'cancelled',
+        'unreachable',
+        'callback',
+        'fake',
+        'out_of_stock',
+        'reported',
+      ])
       .optional(),
     shippingStatus: z
-      .enum(['not_shipped', 'label_created', 'picked_up', 'in_transit', 'out_for_delivery', 'delivered', 'attempted', 'returned', 'return_validated', 'return_refused', 'exchange', 'lost', 'destroyed'])
+      .enum([
+        'not_shipped',
+        'pushed',
+        'picked_up',
+        'in_transit',
+        'out_for_delivery',
+        'failed_delivery',
+        'reported',
+        'delivered',
+        'returned',
+      ])
       .optional(),
     note: z.string().max(500).optional(),
     callbackAt: z.string().datetime().optional(),
+    reportedAt: z.string().datetime().optional(),
     cancellationReason: z.string().max(500).optional(),
   })
   .refine((d) => d.confirmationStatus || d.shippingStatus, {
@@ -101,10 +122,6 @@ export const OrderQuerySchema = z.object({
   cities: z.string().optional(),
   confirmationStatuses: z.string().optional(),
   shippingStatuses: z.string().optional(),
-  // Comma-separated Coliix literal status wordings (e.g. "Ramassé,Livré").
-  // Drives the shipping chip on the Orders page now that the dropdown
-  // reflects Coliix's actual reports instead of our internal enum.
-  coliixRawStates: z.string().optional(),
   sources: z.string().optional(),
   dateFrom: z.string().optional(),
   dateTo: z.string().optional(),

@@ -5,6 +5,7 @@ import { CRMButton } from '@/components/ui/CRMButton';
 import { useAuthStore } from '@/store/authStore';
 import { PERMISSIONS } from '@/constants/permissions';
 import { broadcastsApi, type BroadcastListRow } from '@/services/broadcastsApi';
+import { getSocket } from '@/services/socket';
 
 import { TeamTabs } from './components/TeamTabs';
 import { BroadcastFormModal } from './components/BroadcastFormModal';
@@ -35,6 +36,29 @@ export default function BroadcastsPage() {
 
   useEffect(() => {
     void load();
+  }, [load]);
+
+  // Live tail — when any admin creates / closes a broadcast, refresh the
+  // table so the active list reflects current state without a manual reload.
+  // Refetch (not surgical) is fine here: broadcast rows are tiny and the
+  // events fire rarely; a per-event surgical patch would add complexity for
+  // negligible gain.
+  useEffect(() => {
+    let socket: ReturnType<typeof getSocket> | null = null;
+    try {
+      socket = getSocket();
+    } catch {
+      return;
+    }
+    const refresh = () => {
+      void load();
+    };
+    socket.on('broadcast:new', refresh);
+    socket.on('broadcast:closed', refresh);
+    return () => {
+      socket?.off('broadcast:new', refresh);
+      socket?.off('broadcast:closed', refresh);
+    };
   }, [load]);
 
   const handleDeactivate = async (id: string) => {

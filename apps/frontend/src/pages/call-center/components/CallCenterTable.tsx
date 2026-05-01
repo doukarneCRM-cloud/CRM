@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useCallback, useRef, type MouseEvent } fr
 import { useTranslation } from 'react-i18next';
 import {
   History, MessageCircle, Send, Package, Phone, StickyNote, PhoneOff, Truck, Search, X,
-  Copy, Check, Plus, Settings,
+  Copy, Check, Plus,
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { CRMButton } from '@/components/ui/CRMButton';
@@ -21,14 +21,10 @@ import {
 import type { Order } from '@/types/orders';
 import { cn } from '@/lib/cn';
 import { formatRef, formatDate } from '@/lib/orderFormat';
-import { colourForColiixRawState } from '@/lib/coliixColour';
 import { useClickOutside } from '@/hooks/useClickOutside';
 import { useCallCenterStore } from '../callCenterStore';
 import { OrderLogsModal } from '@/pages/orders/components/OrderLogsModal';
 import { CustomerHistoryModal } from '@/pages/orders/components/CustomerHistoryModal';
-import { useShippingStatusGroups } from '../hooks/useShippingStatusGroups';
-import { ManageStatusGroupsModal } from './ManageStatusGroupsModal';
-import { PERMISSIONS } from '@/constants/permissions';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -218,27 +214,9 @@ function ConfirmationPill({ order, onOpenModal, onRefresh }: ConfirmationPillPro
 }
 
 // ─── Pill: shipping status (read-only display in call center) ────────────────
-// Mirrors the Coliix tracking page: prefer Coliix's own wording (Ramassé,
-// Livré, Mise en distribution…) with a per-state colour, and fall back to
-// the internal enum only for orders that have never been pushed to Coliix.
 
 function ShippingPill({ order }: { order: Order }) {
   const { t } = useTranslation();
-  if (order.coliixRawState) {
-    const colour = colourForColiixRawState(order.coliixRawState);
-    return (
-      <span
-        className="inline-flex items-center gap-1.5 rounded-badge bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-700"
-        title={t('callCenter.row.shippingTooltip', { label: order.coliixRawState })}
-      >
-        <span
-          className="h-1.5 w-1.5 rounded-full"
-          style={{ backgroundColor: colour }}
-        />
-        {order.coliixRawState}
-      </span>
-    );
-  }
   const cfg = SHIPPING_STATUS_COLORS[order.shippingStatus as ShippingStatus];
   if (!cfg) return null;
   return (
@@ -729,39 +707,18 @@ interface FilterPillsProps {
   onChange: (status: string | null) => void;
 }
 
-// Sentinel for the auto-generated "Other" tab — anything not claimed by a
-// user-defined group lands here. Picked to never collide with a real group id.
-const OTHER_GROUP_ID = '__other__';
-
 function FilterPills({ section, orders, selected, onChange }: FilterPillsProps) {
   const { t } = useTranslation();
   const colors = section === 'confirmation' ? CONFIRMATION_STATUS_COLORS : SHIPPING_STATUS_COLORS;
-  const hasPermission = useAuthStore((s) => s.hasPermission);
-  const canManageGroups = hasPermission(PERMISSIONS.SHIPPING_GROUPS_MANAGE);
-
-  // Groups only apply on the shipping tab. The hook still runs on confirmation
-  // (cheap idempotent fetch) but we ignore the result to keep code branches
-  // tight.
-  const { groups } = useShippingStatusGroups();
-  // Live in the store so the row table can scope itself to the active
-  // group (clicking an empty group used to leave the table showing
-  // every order from other groups).
-  const activeGroupId = useCallCenterStore((s) => s.shippingGroupId);
-  const setActiveGroupId = useCallCenterStore((s) => s.setShippingGroupId);
-  const [manageOpen, setManageOpen] = useState(false);
 
   const counts = useMemo(() => {
     const map = new Map<string, number>();
     for (const o of orders) {
-      // Shipping pillar keys are now Coliix's literal wordings — that's
-      // what status groups store and what the user sees on the row.
-      // Confirmation pillar still uses the internal enum (not Coliix-driven).
-      // Orders not yet pushed to Coliix have null coliixRawState; bucket
-      // them under a synthetic key so they still appear under "Other".
+      // Shipping pillar keys are now Coliix's literal wordings — what the
+      // mapping system buckets them into. Confirmation pillar still uses
+      // the internal enum (not Coliix-driven).
       const key =
-        section === 'confirmation'
-          ? o.confirmationStatus
-          : (o.coliixRawState ?? (o.labelSent ? 'Label Created' : 'Not Shipped'));
+        section === 'confirmation' ? o.confirmationStatus : o.shippingStatus;
       map.set(key, (map.get(key) ?? 0) + 1);
     }
     return map;
@@ -778,243 +735,65 @@ function FilterPills({ section, orders, selected, onChange }: FilterPillsProps) 
     );
   }, [orders, section]);
 
-  // Statuses NOT claimed by any group, projected against the live `counts`
-  // map. Drives the "Other" tab + restricts pill visibility when it's
-  // active. Source of "all known shipping keys" is now the live counts
-  // map (Coliix wordings present on orders) since there's no fixed enum
-  // catalogue any more.
-  const orphanStatuses = useMemo(() => {
-    if (section !== 'shipping') return new Set<string>();
-    const claimed = new Set<string>();
-    for (const g of groups) for (const k of g.statusKeys) claimed.add(k);
-    const orphans = new Set<string>();
-    for (const [k, n] of counts.entries()) {
-      if (!claimed.has(k) && n > 0) orphans.add(k);
-    }
-    return orphans;
-  }, [groups, counts, section]);
-
-  // Decide which status keys the pill row should show given the active tab.
-  // For shipping the source of truth is `counts` (= Coliix wordings present
-  // on orders). Confirmation still walks the enum via `colors` for stable
-  // ordering.
+  // Confirmation walks the enum via `colors` for stable ordering. Shipping
+  // walks the live counts map (= shipping enum buckets currently present).
   const visibleStatusKeys = useMemo(() => {
     if (section === 'confirmation') {
       return Object.keys(colors).filter((k) => (counts.get(k) ?? 0) > 0);
     }
-    // Shipping section
-    if (groups.length === 0 || activeGroupId === null) {
-      // "All" tab OR no groups defined → every shipping wording with count > 0.
-      return Array.from(counts.keys()).filter((k) => (counts.get(k) ?? 0) > 0);
-    }
-    if (activeGroupId === OTHER_GROUP_ID) {
-      return [...orphanStatuses];
-    }
-    const grp = groups.find((g) => g.id === activeGroupId);
-    if (!grp) return Array.from(counts.keys()).filter((k) => (counts.get(k) ?? 0) > 0);
-    return grp.statusKeys.filter((k) => (counts.get(k) ?? 0) > 0);
-  }, [section, groups, activeGroupId, colors, counts, orphanStatuses]);
-
-  // Group-tab strip is shipping-only and only when at least one group exists.
-  const showGroupTabs = section === 'shipping' && groups.length > 0;
-
-  // Per-tab order count, used as a secondary number badge on each tab.
-  const groupCounts = useMemo(() => {
-    if (!showGroupTabs) return new Map<string, number>();
-    const map = new Map<string, number>();
-    for (const g of groups) {
-      let total = 0;
-      for (const k of g.statusKeys) total += counts.get(k) ?? 0;
-      map.set(g.id, total);
-    }
-    let otherTotal = 0;
-    for (const k of orphanStatuses) otherTotal += counts.get(k) ?? 0;
-    map.set(OTHER_GROUP_ID, otherTotal);
-    return map;
-  }, [groups, counts, showGroupTabs, orphanStatuses]);
-
-  // Switching group resets the status-pill selection so the visible list
-  // stays in sync with what's on screen.
-  const switchGroup = (id: string | null) => {
-    setActiveGroupId(id);
-    onChange(null);
-  };
+    return Array.from(counts.keys()).filter((k) => (counts.get(k) ?? 0) > 0);
+  }, [section, colors, counts]);
 
   return (
-    <div className="space-y-2">
-      {showGroupTabs && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <GroupTabButton
-            label={t('callCenter.groups.all')}
-            count={orders.length}
-            active={activeGroupId === null}
-            onClick={() => switchGroup(null)}
-          />
-          {groups.map((g) => (
-            <GroupTabButton
-              key={g.id}
-              label={g.name}
-              count={groupCounts.get(g.id) ?? 0}
-              active={activeGroupId === g.id}
-              color={g.color}
-              onClick={() => switchGroup(g.id)}
-            />
-          ))}
-          {orphanStatuses.size > 0 && (
-            <GroupTabButton
-              label={t('callCenter.groups.other')}
-              count={groupCounts.get(OTHER_GROUP_ID) ?? 0}
-              active={activeGroupId === OTHER_GROUP_ID}
-              onClick={() => switchGroup(OTHER_GROUP_ID)}
-            />
-          )}
-          {canManageGroups && (
-            <button
-              type="button"
-              onClick={() => setManageOpen(true)}
-              className="ml-auto inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white/70 px-2 py-1 text-[11px] font-semibold text-gray-500 hover:border-primary/40 hover:text-primary"
-              title={t('callCenter.groups.manage') as string}
-            >
-              <Settings size={12} />
-              {t('callCenter.groups.manage')}
-            </button>
-          )}
-        </div>
-      )}
-
-      <div className="flex flex-wrap items-center gap-1.5">
-        {/* Hide the inner "All" pill when a group tab is active — the
-            group tab itself already plays that role for its bucket and
-            two stacked "All"s read as redundant ("All 24" sitting under
-            "En Route 2" was confusing). When no group is selected, or
-            on the confirmation tab where group tabs don't apply, keep
-            it so the agent can still clear a status filter. */}
-        {!(section === 'shipping' && showGroupTabs && activeGroupId !== null) && (
-          <button
-            type="button"
-            onClick={() => onChange(null)}
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-badge px-2.5 py-1 text-[11px] font-semibold transition',
-              selected === null
-                ? 'bg-primary text-white shadow-sm'
-                : 'bg-white/70 text-gray-600 hover:bg-white',
-            )}
-          >
-            {t('callCenter.all')}
-            <span className="rounded-full bg-black/10 px-1.5 text-[10px] font-bold">
-              {orders.length}
-            </span>
-          </button>
-        )}
-        {visibleStatusKeys.map((status) => {
-          const count = counts.get(status) ?? 0;
-          if (count === 0) return null;
-          const active = selected === status;
-          const showTodayBadge = status === 'callback' && callbackTodayCount > 0;
-          // Shipping section uses Coliix's own wordings ("Expédié",
-          // "Ramassé", …) which aren't in the internal enum, so
-          // getStatusConfig falls back to gray for all of them. Look
-          // up the per-state colour so pills are visually distinct
-          // and match the row badges + the order-log timeline.
-          const isColiixPill =
-            section === 'shipping' && status !== 'Label Created' && status !== 'Not Shipped';
-          const coliixColour = isColiixPill ? colourForColiixRawState(status) : null;
-          const cfg = getStatusConfig(status);
-          return (
-            <button
-              key={status}
-              type="button"
-              onClick={() => onChange(active ? null : status)}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-badge px-2.5 py-1 text-[11px] font-semibold transition',
-                isColiixPill
-                  ? cn(
-                      'bg-gray-100 text-gray-700',
-                      active ? 'shadow-sm ring-2' : 'opacity-70 hover:opacity-100',
-                    )
-                  : active
-                  ? cn(cfg.bg, cfg.text, 'ring-2 ring-primary/40 shadow-sm')
-                  : cn(cfg.bg, cfg.text, 'opacity-70 hover:opacity-100'),
-              )}
-              style={isColiixPill && active && coliixColour
-                ? { boxShadow: `0 0 0 2px ${coliixColour}66` }
-                : undefined}
-              title={showTodayBadge ? t('callCenter.toCallToday', { count: callbackTodayCount }) : undefined}
-            >
-              <span
-                className={cn('h-1.5 w-1.5 rounded-full', !isColiixPill && cfg.dot)}
-                style={isColiixPill && coliixColour ? { backgroundColor: coliixColour } : undefined}
-              />
-              {isColiixPill ? status : cfg.label}
-              <span className="rounded-full bg-white/60 px-1.5 text-[10px] font-bold">
-                {count}
-              </span>
-              {showTodayBadge && (
-                <span className="callback-today-blink inline-flex items-center gap-0.5 rounded-full bg-sky-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
-                  <Phone size={8} /> {t('callCenter.todayBadge', { count: callbackTodayCount })}
-                </span>
-              )}
-            </button>
-          );
-        })}
-        {section === 'shipping' && !showGroupTabs && canManageGroups && (
-          // No groups yet → tuck the gear at the end of the pill row so admins
-          // still have a discoverable entry point.
-          <button
-            type="button"
-            onClick={() => setManageOpen(true)}
-            className="ml-auto inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white/70 px-2 py-1 text-[11px] font-semibold text-gray-500 hover:border-primary/40 hover:text-primary"
-            title={t('callCenter.groups.manage') as string}
-          >
-            <Settings size={12} />
-            {t('callCenter.groups.manage')}
-          </button>
-        )}
-      </div>
-
-      {manageOpen && (
-        <ManageStatusGroupsModal open={manageOpen} onClose={() => setManageOpen(false)} />
-      )}
-    </div>
-  );
-}
-
-interface GroupTabButtonProps {
-  label: string;
-  count: number;
-  active: boolean;
-  color?: string | null;
-  onClick: () => void;
-}
-
-function GroupTabButton({ label, count, active, color, onClick }: GroupTabButtonProps) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'inline-flex shrink-0 items-center gap-1.5 rounded-badge px-3 py-1.5 text-xs font-semibold transition',
-        active
-          ? 'bg-primary text-white shadow-sm'
-          : 'bg-white/70 text-gray-600 hover:bg-white',
-      )}
-    >
-      {color && (
-        <span
-          className="h-2 w-2 rounded-full ring-1 ring-white/40"
-          style={{ backgroundColor: color }}
-        />
-      )}
-      {label}
-      <span
+    <div className="flex flex-wrap items-center gap-1.5">
+      <button
+        type="button"
+        onClick={() => onChange(null)}
         className={cn(
-          'rounded-full px-1.5 text-[10px] font-bold',
-          active ? 'bg-white/20 text-white' : 'bg-black/10 text-gray-600',
+          'inline-flex items-center gap-1.5 rounded-badge px-2.5 py-1 text-[11px] font-semibold transition',
+          selected === null
+            ? 'bg-primary text-white shadow-sm'
+            : 'bg-white/70 text-gray-600 hover:bg-white',
         )}
       >
-        {count}
-      </span>
-    </button>
+        {t('callCenter.all')}
+        <span className="rounded-full bg-black/10 px-1.5 text-[10px] font-bold">
+          {orders.length}
+        </span>
+      </button>
+      {visibleStatusKeys.map((status) => {
+        const count = counts.get(status) ?? 0;
+        if (count === 0) return null;
+        const active = selected === status;
+        const showTodayBadge = status === 'callback' && callbackTodayCount > 0;
+        const cfg = getStatusConfig(status, section);
+        return (
+          <button
+            key={status}
+            type="button"
+            onClick={() => onChange(active ? null : status)}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-badge px-2.5 py-1 text-[11px] font-semibold transition',
+              active
+                ? cn(cfg.bg, cfg.text, 'ring-2 ring-primary/40 shadow-sm')
+                : cn(cfg.bg, cfg.text, 'opacity-70 hover:opacity-100'),
+            )}
+            title={showTodayBadge ? t('callCenter.toCallToday', { count: callbackTodayCount }) : undefined}
+          >
+            <span className={cn('h-1.5 w-1.5 rounded-full', cfg.dot)} />
+            {cfg.label}
+            <span className="rounded-full bg-white/60 px-1.5 text-[10px] font-bold">
+              {count}
+            </span>
+            {showTodayBadge && (
+              <span className="callback-today-blink inline-flex items-center gap-0.5 rounded-full bg-sky-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                <Phone size={8} /> {t('callCenter.todayBadge', { count: callbackTodayCount })}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -1038,12 +817,6 @@ export function CallCenterTable({ onCreate }: { onCreate?: () => void } = {}) {
   const setConfirmationFilter = useCallCenterStore((s) => s.setConfirmationFilter);
   const shippingFilter = useCallCenterStore((s) => s.shippingFilter);
   const setShippingFilter = useCallCenterStore((s) => s.setShippingFilter);
-  const shippingGroupId = useCallCenterStore((s) => s.shippingGroupId);
-  // Read the active group's status keys here too so the row table can scope
-  // itself to "orders whose Coliix wording belongs to this group". Without
-  // this scope the table kept showing orders from other groups when the
-  // agent clicked an empty group.
-  const { groups: shippingGroups } = useShippingStatusGroups();
   const [search, setSearch] = useState('');
 
   const fetchOrders = useCallback(async () => {
@@ -1137,7 +910,6 @@ export function CallCenterTable({ onCreate }: { onCreate?: () => void } = {}) {
         o.customer.fullName,
         o.customer.phoneDisplay,
         o.customer.city,
-        o.coliixTrackingId ?? '',
       ];
       return fields.some((f) => f.toLowerCase().includes(q));
     });
@@ -1176,37 +948,13 @@ export function CallCenterTable({ onCreate }: { onCreate?: () => void } = {}) {
     [confirmationOrders, confirmationFilter],
   );
 
-  // Two-stage filter on the Shipping tab:
-  //   1. If a group is active, scope to orders whose Coliix wording is
-  //      claimed by that group (or, for the synthetic "Other" group, NOT
-  //      claimed by any group). Empty group → empty table — clicking an
-  //      empty group used to bleed orders from other groups through.
-  //   2. If a specific status pill is active, narrow further to that
-  //      exact wording. Pills are keyed on Coliix's literal wording with
-  //      synthetic 'Label Created' / 'Not Shipped' buckets for pre-Coliix
-  //      orders — same key calc as the counts map.
-  const filteredShipping = useMemo(() => {
-    const keyOf = (o: typeof shippingOrders[number]) =>
-      o.coliixRawState ?? (o.labelSent ? 'Label Created' : 'Not Shipped');
-
-    let pool = shippingOrders;
-    if (shippingGroupId !== null && shippingGroups.length > 0) {
-      if (shippingGroupId === '__other__') {
-        const claimed = new Set<string>();
-        for (const g of shippingGroups) for (const k of g.statusKeys) claimed.add(k);
-        pool = pool.filter((o) => !claimed.has(keyOf(o)));
-      } else {
-        const grp = shippingGroups.find((g) => g.id === shippingGroupId);
-        if (grp) {
-          const allowed = new Set(grp.statusKeys);
-          pool = pool.filter((o) => allowed.has(keyOf(o)));
-        }
-      }
-    }
-
-    if (!shippingFilter) return pool;
-    return pool.filter((o) => keyOf(o) === shippingFilter);
-  }, [shippingOrders, shippingFilter, shippingGroupId, shippingGroups]);
+  const filteredShipping = useMemo(
+    () =>
+      shippingFilter
+        ? shippingOrders.filter((o) => o.shippingStatus === shippingFilter)
+        : shippingOrders,
+    [shippingOrders, shippingFilter],
+  );
 
   if (loading) {
     return (

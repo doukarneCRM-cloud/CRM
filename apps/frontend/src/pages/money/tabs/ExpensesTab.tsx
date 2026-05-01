@@ -27,6 +27,7 @@ import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/store/authStore';
 import { PERMISSIONS } from '@/constants/permissions';
 import { moneyApi, type Expense } from '@/services/moneyApi';
+import { getSocket } from '@/services/socket';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 
@@ -108,6 +109,26 @@ export function ExpensesTab() {
   useEffect(() => {
     setPage(1);
   }, [debounced, dateRange.from, dateRange.to]);
+
+  // Live: another admin creates / edits / deletes an expense → bump
+  // reloadKey so the list and totals refresh under our feet.
+  useEffect(() => {
+    let socket: ReturnType<typeof getSocket> | null = null;
+    try {
+      socket = getSocket();
+    } catch {
+      return;
+    }
+    const onExpense = () => setReloadKey((k) => k + 1);
+    socket.on('expense:created', onExpense);
+    socket.on('expense:updated', onExpense);
+    socket.on('expense:deleted', onExpense);
+    return () => {
+      socket?.off('expense:created', onExpense);
+      socket?.off('expense:updated', onExpense);
+      socket?.off('expense:deleted', onExpense);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;

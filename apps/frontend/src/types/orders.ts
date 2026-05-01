@@ -76,13 +76,9 @@ export interface Order {
   shippingInstruction: string | null;
   cancellationReason: string | null;
   callbackAt: string | null;
-  coliixTrackingId: string | null;
-  // Literal status string Coliix returned on its most recent webhook /
-  // poller hit. UI prefers this over the enum-based label so admins see
-  // exactly what Coliix is reporting ("Ramassé", "Attente De Ramassage",
-  // …). Null until the first Coliix update lands.
-  coliixRawState: string | null;
+  reportedAt: string | null;
   labelSent: boolean;
+  labelSentAt: string | null;
   isArchived: boolean;
   unreachableCount: number;
   createdAt: string;
@@ -91,6 +87,15 @@ export interface Order {
   agent: OrderAgent | null;
   items: OrderItem[];
   logs?: OrderLog[];
+  // Carrier shipment, when one has been linked. The Orders table reads
+  // rawState here to render the carrier's literal wording alongside the
+  // enum badge — operators care about Coliix's exact text, multiple
+  // wordings can collapse into the same enum bucket.
+  shipment?: {
+    rawState: string | null;
+    state: string;
+    trackingCode: string | null;
+  } | null;
   /**
    * Derived server-side: true when any item's variant.stock is below the
    * requested quantity. Under the new stock policy, pending orders that run
@@ -125,7 +130,6 @@ export interface OrderFilters {
   search?: string;
   confirmationStatuses?: string;
   shippingStatuses?: string;
-  coliixRawStates?: string;
   agentIds?: string;
   cities?: string;
   productIds?: string;

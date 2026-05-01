@@ -1,23 +1,25 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { UserPlus, ArchiveX, X, GitMerge, Plus, Send, Search } from 'lucide-react';
+import { UserPlus, ArchiveX, X, GitMerge, Plus, Search } from 'lucide-react';
 import { GlobalFilterBar, type FilterChipConfig } from '@/components/ui/GlobalFilterBar';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { useAuthStore } from '@/store/authStore';
 import { ordersApi, supportApi } from '@/services/ordersApi';
-import { coliixApi, type ExportResult } from '@/services/providersApi';
-import { coliixV2Api } from '@/services/coliixV2Api';
+import { coliixApi } from '@/services/coliixApi';
 import {
   CONFIRMATION_STATUS_OPTIONS,
+  SHIPPING_STATUS_OPTIONS,
   SOURCE_OPTIONS,
 } from '@/constants/statusColors';
 import { PERMISSIONS } from '@/constants/permissions';
 import type { Order, Product, AgentOption } from '@/types/orders';
 import { cn } from '@/lib/cn';
+import { getSocket } from '@/services/socket';
+import { useToastStore } from '@/store/toastStore';
 
 import { useOrders } from './hooks/useOrders';
 import { OrderSummaryCards } from './components/OrderSummaryCards';
-import { OrdersTable } from './components/OrdersTable';
+import { OrdersTable, type OrderColiixError } from './components/OrdersTable';
 import { OrderEditModal } from './components/OrderEditModal';
 import { OrderPreviewModal } from './components/OrderPreviewModal';
 import { OrderLogsModal } from './components/OrderLogsModal';
@@ -25,24 +27,20 @@ import { CustomerHistoryModal } from './components/CustomerHistoryModal';
 import { AgentPickerModal } from './components/AgentPickerModal';
 import { MergeDuplicatesModal } from './components/MergeDuplicatesModal';
 import { OrderCreateModal } from './components/OrderCreateModal';
-import { ColiixExportResultModal } from './components/ColiixExportResultModal';
 
 // ─── Bulk action bar ──────────────────────────────────────────────────────────
 
 interface BulkBarProps {
   count: number;
   canAssign: boolean;
-  canShip: boolean;
   onAssign: () => void;
   onUnassign: () => void;
   onArchive: () => void;
-  onSendColiix: () => void;
   onClear: () => void;
   loading: boolean;
-  shipping: boolean;
 }
 
-function BulkBar({ count, canAssign, canShip, onAssign, onUnassign, onArchive, onSendColiix, onClear, loading, shipping }: BulkBarProps) {
+function BulkBar({ count, canAssign, onAssign, onUnassign, onArchive, onClear, loading }: BulkBarProps) {
   const { t } = useTranslation();
   return (
     <div className="slide-up fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
@@ -78,17 +76,6 @@ function BulkBar({ count, canAssign, canShip, onAssign, onUnassign, onArchive, o
             {t('orders.bulkUnassign')}
           </CRMButton>
         )}
-        {canShip && (
-          <CRMButton
-            variant="primary"
-            size="sm"
-            leftIcon={<Send size={13} />}
-            onClick={onSendColiix}
-            loading={shipping}
-          >
-            {t('orders.bulkSendColiix')}
-          </CRMButton>
-        )}
         <CRMButton
           variant="danger"
           size="sm"
@@ -118,7 +105,6 @@ export default function OrdersPage() {
   const canDelete = hasPermission(PERMISSIONS.ORDERS_DELETE);
   const canCreate = hasPermission(PERMISSIONS.ORDERS_CREATE);
   const canImport = hasPermission(PERMISSIONS.INTEGRATIONS_MANAGE);
-  const canShip = hasPermission(PERMISSIONS.SHIPPING_PUSH);
 
   const {
     orders,
@@ -150,15 +136,18 @@ export default function OrdersPage() {
   const [mergeOpen, setMergeOpen] = useState(false);
   const [duplicateCount, setDuplicateCount] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
+  // Per-order spinner state for the row-level "Send to Coliix" button.
+  // We let multiple sends fire concurrently — Bull serialises the
+  // backend side, the UI just shows which rows are in flight.
+  const [sendingIds, setSendingIds] = useState<string[]>([]);
+  // Latest unresolved Coliix error per orderId. The Send column reads
+  // from here to render the red retry-flavoured button + hover tooltip.
+  const [coliixErrorByOrder, setColiixErrorByOrder] = useState<Record<string, OrderColiixError>>({});
+  const toast = useToastStore((s) => s.push);
 
-  // Product + agent + Coliix-state filter options — loaded once so the
-  // filter chips can populate. Coliix states are pulled from a dedicated
-  // endpoint that returns the distinct wordings present on orders so the
-  // dropdown reflects what's actually in the data (Ramassé, Livré, …)
-  // instead of our internal enum.
+  // Product + agent filter options — loaded once for the filter chips.
   const [products, setProducts] = useState<Product[]>([]);
   const [agents, setAgents] = useState<AgentOption[]>([]);
-  const [coliixStates, setColiixStates] = useState<Array<{ value: string; count: number }>>([]);
   useEffect(() => {
     let cancelled = false;
     supportApi
@@ -177,15 +166,72 @@ export default function OrdersPage() {
       .catch(() => {
         if (!cancelled) setAgents([]);
       });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Initial pull of unresolved Coliix errors → keep one row per orderId
+  // (most recent wins). After mount we don't refetch — coliix:error and
+  // coliix:error:resolved patch the map surgically.
+  useEffect(() => {
+    let cancelled = false;
     coliixApi
-      .states()
-      .then((res) => {
-        if (!cancelled) setColiixStates(res);
+      .listErrors({ resolved: false, pageSize: 100 })
+      .then((result) => {
+        if (cancelled) return;
+        const map: Record<string, OrderColiixError> = {};
+        for (const e of result.data) {
+          if (!e.orderId) continue;
+          if (!map[e.orderId]) {
+            map[e.orderId] = { id: e.id, type: e.type, message: e.message };
+          }
+        }
+        setColiixErrorByOrder(map);
       })
       .catch(() => {
-        if (!cancelled) setColiixStates([]);
+        /* permission or network — leave map empty */
       });
     return () => { cancelled = true; };
+  }, []);
+
+  // Live patches: new error arrives → add; resolved → drop. No full refetch
+  // anymore (the old "refetch on every order:updated" caused a /coliix/errors
+  // round-trip on every status change in the system).
+  useEffect(() => {
+    let socket: ReturnType<typeof getSocket> | null = null;
+    try {
+      socket = getSocket();
+    } catch {
+      return;
+    }
+
+    const onError = (payload: unknown) => {
+      const e = payload as { id?: string; orderId?: string | null; type?: string; message?: string; resolved?: boolean } | undefined;
+      if (!e?.id || !e.orderId || e.resolved) return;
+      setColiixErrorByOrder((prev) => ({
+        ...prev,
+        [e.orderId!]: { id: e.id!, type: e.type ?? '', message: e.message ?? '' },
+      }));
+    };
+
+    const onResolved = (payload: unknown) => {
+      const id = (payload as { id?: string })?.id;
+      if (!id) return;
+      setColiixErrorByOrder((prev) => {
+        // Drop the entry whose error id matches.
+        const next: Record<string, OrderColiixError> = {};
+        for (const [k, v] of Object.entries(prev)) {
+          if (v.id !== id) next[k] = v;
+        }
+        return next;
+      });
+    };
+
+    socket.on('coliix:error', onError);
+    socket.on('coliix:error:resolved', onResolved);
+    return () => {
+      socket?.off('coliix:error', onError);
+      socket?.off('coliix:error:resolved', onResolved);
+    };
   }, []);
 
   const filterConfigs = useMemo<FilterChipConfig[]>(() => {
@@ -195,20 +241,10 @@ export default function OrdersPage() {
         label: t('orders.filterConfirmation'),
         options: CONFIRMATION_STATUS_OPTIONS,
       },
-      // Shipping filter — driven by Coliix's literal status values (Ramassé,
-      // Livré, Attente De Ramassage, …) instead of our internal enum.
-      // Falls back to a single placeholder when no orders have ever been
-      // pushed to Coliix yet so the chip still appears.
       {
-        key: 'coliixRawStates',
+        key: 'shippingStatuses',
         label: t('orders.filterShipping'),
-        options:
-          coliixStates.length > 0
-            ? coliixStates.map((s) => ({
-                value: s.value,
-                label: `${s.value} (${s.count})`,
-              }))
-            : [],
+        options: SHIPPING_STATUS_OPTIONS,
       },
       {
         key: 'sources',
@@ -232,14 +268,7 @@ export default function OrdersPage() {
       });
     }
     return [...base, ...extras];
-  }, [products, agents, coliixStates, t]);
-
-  // Coliix export state
-  const [sendingIds, setSendingIds] = useState<string[]>([]);
-  const [coliixShipping, setColiixShipping] = useState(false);
-  const [coliixResult, setColiixResult] = useState<
-    { results: ExportResult[]; summary: { total: number; ok: number; failed: number } } | null
-  >(null);
+  }, [products, agents, t]);
 
   // ── Poll duplicate count so the banner stays in sync with live order changes
   useEffect(() => {
@@ -300,6 +329,37 @@ export default function OrdersPage() {
     setHistoryCustomerId(order.customer.id);
   }, []);
 
+  // Direct one-click "Send to Coliix": no modal, no extra steps. The
+  // backend POSTs to Coliix's add-parcel API, gets the tracking code
+  // back, persists the Shipment row, and emits order:updated so the
+  // row patches in place to its new "Sent" badge.
+  const handleSendColiix = useCallback(
+    async (order: Order) => {
+      setSendingIds((prev) => (prev.includes(order.id) ? prev : [...prev, order.id]));
+      try {
+        const res = await coliixApi.createShipment(order.id);
+        toast({
+          kind: 'success',
+          title: t('orders.sendSuccessTitle', { reference: order.reference }),
+          body: t('orders.sendSuccessBody', { tracking: res.trackingCode }),
+          durationMs: 6000,
+        });
+      } catch (err: unknown) {
+        const e = err as { response?: { data?: { error?: { message?: string; code?: string } } } };
+        const message = e.response?.data?.error?.message ?? t('orders.sendErrFallback');
+        toast({
+          kind: 'error',
+          title: t('orders.sendErrTitle', { reference: order.reference }),
+          body: message,
+          durationMs: 12_000,
+        });
+      } finally {
+        setSendingIds((prev) => prev.filter((id) => id !== order.id));
+      }
+    },
+    [t, toast],
+  );
+
   // ── Bulk actions ──────────────────────────────────────────────────────────
 
   const handleBulkAssign = useCallback(() => {
@@ -335,111 +395,6 @@ export default function OrdersPage() {
       setBulkLoading(false);
     }
   }, [selectedIds, setSelectedIds, refresh, t]);
-
-  // ── Coliix export ─────────────────────────────────────────────────────────
-
-  // V2 push: API returns immediately after queuing the worker job. Tracking
-  // code is filled in async (within seconds) — the orders list refresh + the
-  // shipment:updated socket event surface it. We adapt V2's response shape
-  // to V1's ExportResult so the existing result modal stays unchanged.
-  //
-  // already_sent → ask the operator whether to push a duplicate parcel
-  // (legitimate use case: replacement, customer re-ordered same items).
-  const handleSendColiix = useCallback(
-    async (order: Order) => {
-      if (!canShip) return;
-      setSendingIds((prev) => [...prev, order.id]);
-      const attempt = async (force: boolean) => {
-        const r = await coliixV2Api.createShipment(order.id, force ? { force: true } : undefined);
-        const adapted: ExportResult = {
-          orderId: order.id,
-          reference: order.reference,
-          ok: true,
-          // V2 worker fills the Coliix code asynchronously — surface the
-          // shipment id here as a placeholder so the modal renders cleanly.
-          tracking: r.shipmentId,
-        };
-        setColiixResult({
-          results: [adapted],
-          summary: { total: 1, ok: 1, failed: 0 },
-        });
-        refresh();
-      };
-      try {
-        await attempt(false);
-      } catch (e: any) {
-        const code = e?.response?.data?.code;
-        const message =
-          e?.response?.data?.error ??
-          e?.response?.data?.message ??
-          e?.message ??
-          t('orders.exportFailed');
-        if (code === 'already_sent') {
-          const ok = window.confirm(
-            `${message}\n\nPush a NEW parcel anyway?\n\nThe old parcel stays at Coliix; this creates a second one with a fresh tracking code (use for replacements / re-orders).`,
-          );
-          if (ok) {
-            try {
-              await attempt(true);
-              return;
-            } catch (e2: any) {
-              const m2 = e2?.response?.data?.error ?? e2?.message ?? message;
-              setColiixResult({
-                results: [{ orderId: order.id, reference: order.reference, ok: false, error: String(m2) }],
-                summary: { total: 1, ok: 0, failed: 1 },
-              });
-              return;
-            }
-          }
-        }
-        setColiixResult({
-          results: [{ orderId: order.id, reference: order.reference, ok: false, error: String(message) }],
-          summary: { total: 1, ok: 0, failed: 1 },
-        });
-      } finally {
-        setSendingIds((prev) => prev.filter((id) => id !== order.id));
-      }
-    },
-    [canShip, refresh, t],
-  );
-
-  const handleBulkSendColiix = useCallback(async () => {
-    if (!canShip || selectedIds.length === 0) return;
-    if (!window.confirm(t('orders.confirmSendColiix', { count: selectedIds.length }))) return;
-    setColiixShipping(true);
-    setSendingIds(selectedIds);
-    try {
-      const response = await coliixV2Api.bulkShipments(selectedIds);
-      // Adapt V2 result to V1 ExportResult shape (orderId, reference, ok, tracking?, error?).
-      // We don't have references in V2's response, so look them up from the
-      // orders cache; fall back to '—' if missing.
-      const results: ExportResult[] = response.results.map((row) => {
-        const o = orders.find((x) => x.id === row.orderId);
-        return {
-          orderId: row.orderId,
-          reference: o?.reference ?? '—',
-          ok: row.ok,
-          tracking: row.shipmentId,
-          error: row.error,
-        };
-      });
-      setColiixResult({
-        results,
-        summary: { total: response.total, ok: response.ok, failed: response.failed },
-      });
-      setSelectedIds([]);
-      refresh();
-    } catch (e: any) {
-      const message = e?.response?.data?.error?.message ?? t('orders.bulkExportFailed');
-      setColiixResult({
-        results: selectedIds.map((id) => ({ orderId: id, reference: t('orders.unknownReference'), ok: false, error: String(message) })),
-        summary: { total: selectedIds.length, ok: 0, failed: selectedIds.length },
-      });
-    } finally {
-      setColiixShipping(false);
-      setSendingIds([]);
-    }
-  }, [canShip, selectedIds, setSelectedIds, refresh, t, orders]);
 
   const showBulkBar = selectedIds.length > 0;
 
@@ -542,8 +497,10 @@ export default function OrdersPage() {
         onViewCustomer={handleViewCustomer}
         onRefresh={refresh}
         canImport={canImport}
-        onSendColiix={canShip ? handleSendColiix : undefined}
+        // Direct fire — Coliix add-parcel runs server-side, no modal.
+        onSendColiix={handleSendColiix}
         sendingIds={sendingIds}
+        coliixErrorByOrder={coliixErrorByOrder}
       />
 
       {/* ── Bulk action bar ─────────────────────────────────────────────────── */}
@@ -551,23 +508,13 @@ export default function OrdersPage() {
         <BulkBar
           count={selectedIds.length}
           canAssign={canAssign}
-          canShip={canShip}
           onAssign={handleBulkAssign}
           onUnassign={handleBulkUnassign}
           onArchive={handleBulkArchive}
-          onSendColiix={handleBulkSendColiix}
           onClear={() => setSelectedIds([])}
           loading={bulkLoading}
-          shipping={coliixShipping}
         />
       )}
-
-      <ColiixExportResultModal
-        open={!!coliixResult}
-        onClose={() => setColiixResult(null)}
-        results={coliixResult?.results ?? []}
-        summary={coliixResult?.summary ?? { total: 0, ok: 0, failed: 0 }}
-      />
 
       {/* ── Modals ─────────────────────────────────────────────────────────── */}
 
@@ -612,7 +559,6 @@ export default function OrdersPage() {
       <OrderCreateModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        onCreated={refresh}
       />
 
       {/* Single order assign */}
@@ -651,6 +597,7 @@ export default function OrdersPage() {
           }}
         />
       )}
+
     </div>
   );
 }

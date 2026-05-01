@@ -75,51 +75,6 @@ export interface RecordPaymentInput {
   periodTo?: string | null;
 }
 
-// ─── Delivery Invoice ───────────────────────────────────────────────────────
-
-export interface DeliveryInvoiceOrder {
-  id: string;
-  reference: string;
-  deliveredAt: string | null;
-  trackingId: string | null;
-  customer: { fullName: string; phone: string; city: string };
-  orderTotal: number;   // What the customer paid (order.total)
-  shippingFee: number;  // Coliix fee (what they keep)
-  netPayout: number;    // orderTotal − shippingFee (what we should receive)
-  paidToCarrier: boolean;
-  paidToCarrierAt: string | null;
-}
-
-export interface DeliveryInvoiceMonth {
-  period: string;
-  label: string;
-  orderCount: number;
-  paidCount: number;
-  unpaidCount: number;
-  totalFees: number;
-  paidFees: number;
-  unpaidFees: number;
-  totalPayout: number;
-  paidPayout: number;
-  unpaidPayout: number;
-  orders: DeliveryInvoiceOrder[];
-}
-
-export interface DeliveryInvoicePayload {
-  months: DeliveryInvoiceMonth[];
-  totals: {
-    orders: number;
-    paid: number;
-    unpaid: number;
-    totalFees: number;
-    paidFees: number;
-    unpaidFees: number;
-    totalPayout: number;
-    paidPayout: number;
-    unpaidPayout: number;
-  };
-}
-
 // ─── API ────────────────────────────────────────────────────────────────────
 
 export const moneyApi = {
@@ -182,17 +137,4 @@ export const moneyApi = {
       })
       .then((r) => r.data);
   },
-
-  // Delivery invoice
-  listDeliveryInvoice: (params: {
-    dateFrom?: string;
-    dateTo?: string;
-    paidOnly?: 'all' | 'paid' | 'unpaid';
-    search?: string;
-  }) => api.get<DeliveryInvoicePayload>('/money/delivery-invoice', { params }).then((r) => r.data),
-
-  setCarrierPaid: (orderIds: string[], paid: boolean) =>
-    api
-      .post<{ updated: number }>('/money/delivery-invoice/mark-paid', { orderIds, paid })
-      .then((r) => r.data),
 };

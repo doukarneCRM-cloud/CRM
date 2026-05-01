@@ -20,7 +20,7 @@ import {
 } from './returns.service';
 
 const VerifySchema = z.object({
-  outcome: z.enum(['good', 'damaged', 'wrong']),
+  outcome: z.enum(['good', 'damaged']),
   note: z.string().max(1000).nullable().optional(),
 });
 

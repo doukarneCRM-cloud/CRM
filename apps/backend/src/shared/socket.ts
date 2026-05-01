@@ -36,6 +36,70 @@ export function emitToAll(event: string, data: unknown) {
   getIO().emit(event, data);
 }
 
+// ─── Live-update helpers (consistent payload shape) ──────────────────────────
+//
+// Existing event names + the same `orderId` field stay (so older consumers
+// keep working). What's new:
+//
+//   - `kpi`: a transition hint ('confirmed' | 'delivered' | …). KPI cards
+//     bind to this directly so a single transition can tick the right
+//     counter incrementally — no /dashboard refetch on every order change.
+//
+//   - `ts`: monotonic emit timestamp. Frontends can drop stale events that
+//     arrive out-of-order (rare but possible).
+//
+// `kpi:refresh` is gone — every dashboard/KPI card now binds to the same
+// `order:updated` / `order:created` / `order:archived` events that drive the
+// row patch, and uses the `kpi` hint to decide which counter to tick.
+
+export type OrderKpiHint =
+  | 'created'
+  | 'confirmed'
+  | 'delivered'
+  | 'cancelled'
+  | 'archived'
+  | 'shipped'
+  | 'returned'
+  | 'reassigned';
+
+export function emitOrderUpdated(
+  orderId: string,
+  options: { kpi?: OrderKpiHint; agentId?: string | null; previousAgentId?: string | null } = {},
+): void {
+  const payload = {
+    orderId,
+    ts: Date.now(),
+    ...(options.kpi ? { kpi: options.kpi } : {}),
+  };
+  emitToRoom('orders:all', 'order:updated', payload);
+  // Per-agent rooms — both the new owner and (if applicable) the previous
+  // owner need to see the change so their personal queues drop / pick up
+  // the row. Agent-scoped pages bind to agent:<sub> in addition to orders:all.
+  if (options.agentId) {
+    emitToRoom(`agent:${options.agentId}`, 'order:updated', payload);
+  }
+  if (options.previousAgentId && options.previousAgentId !== options.agentId) {
+    emitToRoom(`agent:${options.previousAgentId}`, 'order:updated', payload);
+  }
+}
+
+export function emitOrderArchived(orderId: string): void {
+  emitToRoom('orders:all', 'order:archived', {
+    orderId,
+    ts: Date.now(),
+    kpi: 'archived' as const,
+  });
+}
+
+export function emitOrderCreated(orderId: string, reference: string): void {
+  emitToRoom('orders:all', 'order:created', {
+    orderId,
+    reference,
+    ts: Date.now(),
+    kpi: 'created' as const,
+  });
+}
+
 // ─── Initialize and attach to Fastify's HTTP server ──────────────────────────
 export function initSocket(app: FastifyInstance) {
   io = new Server(app.server, {

@@ -43,7 +43,7 @@ export async function triggerOutOfStock(variantId: string): Promise<void> {
     emitToRoom('orders:all', 'order:stock_warning', {
       orderId: o.id,
       variantId,
+      ts: Date.now(),
     });
   }
-  emitToRoom('dashboard', 'kpi:refresh', {});
 }

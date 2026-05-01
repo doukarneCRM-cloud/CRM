@@ -1,6 +1,11 @@
 import { Prisma } from '@prisma/client';
 import { prisma, type OrderPayload } from '../../shared/prisma';
-import { emitToRoom } from '../../shared/socket';
+import {
+  emitToRoom,
+  emitOrderUpdated,
+  emitOrderCreated,
+  emitOrderArchived,
+} from '../../shared/socket';
 import {
   createNotification,
   createAdminNotification,
@@ -200,6 +205,7 @@ const ORDER_FULL_INCLUDE = {
       createdAt: true,
     },
   },
+  shipment: { select: { rawState: true, state: true, trackingCode: true } },
 } as const;
 
 // Derived "stock short" flag. True when any item on the order references a
@@ -242,6 +248,11 @@ export async function getOrders(query: OrderQueryInput) {
           },
         },
         agent: { select: { id: true, name: true } },
+        // Surface the carrier's literal wording on every row. Multiple
+        // Coliix wordings can map to the same enum bucket (e.g. several
+        // wordings → 'pushed'); the table renders rawState alongside
+        // the enum so the operator sees exactly what Coliix said.
+        shipment: { select: { rawState: true, state: true, trackingCode: true } },
         items: {
           select: {
             id: true,
@@ -365,10 +376,16 @@ export async function createOrder(input: CreateOrderInput, actor: JwtPayload) {
   // instead of being thrown into the round-robin pool. Admin / supervisor
   // creates without `agentId` keep the existing auto-assign behavior so
   // they can still create unassigned orders that get routed by the engine.
+  //
+  // Only admin/supervisor may target a different agent via `input.agentId`
+  // — without this gate, a regular agent could POST `{ agentId: someoneElseId }`
+  // and bypass their self-assign (the frontend hides the picker but the API
+  // is the trust boundary).
   const isAdminLike =
     actor.roleName === 'admin' || actor.roleName === 'supervisor';
-  const effectiveAgentId: string | null | undefined =
-    input.agentId ?? (isAdminLike ? null : actor.sub);
+  const effectiveAgentId: string | null | undefined = isAdminLike
+    ? input.agentId ?? null
+    : actor.sub;
 
   // Retry on reference collisions — the Counter can drift below reality
   // after imports / manual INSERTs / partial resets. First collision runs
@@ -469,8 +486,7 @@ export async function createOrder(input: CreateOrderInput, actor: JwtPayload) {
   // No out-of-stock cascade at creation — stock hasn't moved yet. That fires
   // from updateOrderStatus when the order actually gets confirmed.
 
-  emitToRoom('orders:all', 'order:created', { orderId: order.id, reference: order.reference });
-  emitToRoom('dashboard', 'kpi:refresh', {});
+  emitOrderCreated(order.id, order.reference);
 
   // Auto-assign only when the order is still unassigned (admin created
   // without picking an agent). When an agent self-creates, effectiveAgentId
@@ -650,8 +666,7 @@ export async function updateOrder(id: string, input: UpdateOrderInput, actor: Jw
     await Promise.all(touched.map((variantId) => triggerOutOfStock(variantId)));
   }
 
-  emitToRoom('orders:all', 'order:updated', { orderId: id });
-  emitToRoom('dashboard', 'kpi:refresh', {});
+  emitOrderUpdated(id, { agentId: updated.agent?.id ?? null });
 
   return withStockWarning(updated);
 }
@@ -677,8 +692,7 @@ export async function archiveOrder(id: string, actor: JwtPayload) {
     }),
   ]);
 
-  emitToRoom('orders:all', 'order:archived', { orderId: id });
-  emitToRoom('dashboard', 'kpi:refresh', {});
+  emitOrderArchived(id);
 }
 
 // ─── Service: Status Engine ───────────────────────────────────────────────────
@@ -936,11 +950,23 @@ export async function updateOrderStatus(id: string, input: UpdateStatusInput, ac
 
   const updatedOrder = await prisma.order.findUnique({ where: { id }, include: ORDER_FULL_INCLUDE });
 
-  emitToRoom('orders:all', 'order:updated', { orderId: id });
-  if (order.agent?.id) {
-    emitToRoom(`agent:${order.agent.id}`, 'order:updated', { orderId: id });
-  }
-  emitToRoom('dashboard', 'kpi:refresh', {});
+  // Pick the most-specific KPI hint so dashboard cards can tick the right
+  // counter without a refetch. Order matters — delivered is more specific
+  // than confirmed (delivery implies confirmation already happened).
+  const kpiHint =
+    becomingDelivered
+      ? ('delivered' as const)
+      : input.confirmationStatus === 'confirmed' && order.confirmationStatus !== 'confirmed'
+      ? ('confirmed' as const)
+      : input.confirmationStatus === 'cancelled' && order.confirmationStatus !== 'cancelled'
+      ? ('cancelled' as const)
+      : input.shippingStatus === 'returned' && order.shippingStatus !== 'returned'
+      ? ('returned' as const)
+      : input.shippingStatus && input.shippingStatus !== order.shippingStatus
+      ? ('shipped' as const)
+      : undefined;
+
+  emitOrderUpdated(id, { kpi: kpiHint, agentId: order.agent?.id ?? null });
 
   // Automation — enqueues a WhatsApp message if the matching template is enabled.
   // Fire-and-forget; dispatcher handles its own errors and idempotency.
@@ -1054,10 +1080,6 @@ export async function assignOrder(id: string, input: AssignOrderInput, actor: Jw
       href: '/call-center',
       orderId: id,
     });
-    // Old agent lost this order — notify them so their pipeline refreshes
-    if (previousAgentId && previousAgentId !== input.agentId) {
-      emitToRoom(`agent:${previousAgentId}`, 'order:updated', { orderId: id });
-    }
   } else {
     await prisma.$transaction([
       prisma.order.update({ where: { id }, data: { agentId: null, assignedAt: null } }),
@@ -1071,13 +1093,15 @@ export async function assignOrder(id: string, input: AssignOrderInput, actor: Jw
         },
       }),
     ]);
-    if (previousAgentId) {
-      emitToRoom(`agent:${previousAgentId}`, 'order:updated', { orderId: id });
-    }
   }
 
-  emitToRoom('orders:all', 'order:updated', { orderId: id });
-  emitToRoom('dashboard', 'kpi:refresh', {});
+  // One emit reaches both old and new agent rooms so pipelines pick up /
+  // drop the row — emitOrderUpdated handles the fan-out.
+  emitOrderUpdated(id, {
+    kpi: 'reassigned',
+    agentId: input.agentId,
+    previousAgentId,
+  });
 }
 
 // ─── Service: Summary (for orders page KPI cards) ────────────────────────────
@@ -1182,8 +1206,10 @@ export async function bulkAction(input: BulkActionInput, actor: JwtPayload) {
     results.push(...chunkResults);
   }
 
-  emitToRoom('orders:all', 'order:bulk_updated', { count: input.orderIds.length });
-  emitToRoom('dashboard', 'kpi:refresh', {});
+  emitToRoom('orders:all', 'order:bulk_updated', {
+    count: input.orderIds.length,
+    ts: Date.now(),
+  });
 
   const succeeded = results.filter((r) => r.status === 'fulfilled').length;
   const failed = results.filter((r) => r.status === 'rejected').length;
@@ -1403,11 +1429,10 @@ export async function mergeOrders(input: MergeOrdersInput, actor: JwtPayload) {
     });
   });
 
-  emitToRoom('orders:all', 'order:updated', { orderId: keeper.id });
+  emitOrderUpdated(keeper.id, { agentId: keeper.agentId ?? null });
   for (const id of input.mergeOrderIds) {
-    emitToRoom('orders:all', 'order:archived', { orderId: id });
+    emitOrderArchived(id);
   }
-  emitToRoom('dashboard', 'kpi:refresh', {});
 
   const result = await prisma.order.findUnique({
     where: { id: keeper.id },

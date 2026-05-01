@@ -1,8 +1,9 @@
-// ─── Canonical status types — match backend enums exactly ────────────────────
+// Canonical status types — must mirror the backend Prisma enums in
+// `apps/backend/prisma/schema.prisma`. If you add/remove a value here,
+// update the schema and re-run migrations.
 
 export type ConfirmationStatus =
   | 'pending'
-  | 'awaiting'
   | 'confirmed'
   | 'cancelled'
   | 'unreachable'
@@ -13,20 +14,18 @@ export type ConfirmationStatus =
 
 export type ShippingStatus =
   | 'not_shipped'
-  | 'label_created'
+  | 'pushed'
   | 'picked_up'
   | 'in_transit'
   | 'out_for_delivery'
+  | 'failed_delivery'
+  | 'reported'
   | 'delivered'
-  | 'attempted'
-  | 'returned'
-  | 'return_validated'
-  | 'return_refused'
-  | 'exchange'
-  | 'lost'
-  | 'destroyed';
+  | 'returned';
 
 export type OrderStatus = ConfirmationStatus | ShippingStatus;
+
+export type ReturnOutcome = 'good' | 'damaged';
 
 export interface StatusConfig {
   label: string;
@@ -41,12 +40,6 @@ export const CONFIRMATION_STATUS_COLORS: Record<ConfirmationStatus, StatusConfig
     bg: 'bg-indigo-100',
     text: 'text-indigo-700',
     dot: 'bg-indigo-500',
-  },
-  awaiting: {
-    label: 'Awaiting',
-    bg: 'bg-blue-100',
-    text: 'text-blue-700',
-    dot: 'bg-blue-500',
   },
   confirmed: {
     label: 'Confirmed',
@@ -92,6 +85,9 @@ export const CONFIRMATION_STATUS_COLORS: Record<ConfirmationStatus, StatusConfig
   },
 };
 
+// Note: shipping `reported` shares its name with confirmation `reported` because
+// the wire-level enums are the same string. The dictionaries below use distinct
+// labels and colors so the UI badges always look different.
 export const SHIPPING_STATUS_COLORS: Record<ShippingStatus, StatusConfig> = {
   not_shipped: {
     label: 'Not Shipped',
@@ -99,8 +95,8 @@ export const SHIPPING_STATUS_COLORS: Record<ShippingStatus, StatusConfig> = {
     text: 'text-gray-500',
     dot: 'bg-gray-400',
   },
-  label_created: {
-    label: 'Label Created',
+  pushed: {
+    label: 'Pushed',
     bg: 'bg-sky-100',
     text: 'text-sky-700',
     dot: 'bg-sky-500',
@@ -123,17 +119,23 @@ export const SHIPPING_STATUS_COLORS: Record<ShippingStatus, StatusConfig> = {
     text: 'text-blue-700',
     dot: 'bg-blue-500',
   },
+  failed_delivery: {
+    label: 'Failed Delivery',
+    bg: 'bg-yellow-100',
+    text: 'text-yellow-800',
+    dot: 'bg-yellow-500',
+  },
+  reported: {
+    label: 'Delivery Postponed',
+    bg: 'bg-fuchsia-100',
+    text: 'text-fuchsia-700',
+    dot: 'bg-fuchsia-500',
+  },
   delivered: {
     label: 'Delivered',
     bg: 'bg-green-100',
     text: 'text-green-800',
     dot: 'bg-green-600',
-  },
-  attempted: {
-    label: 'Attempted',
-    bg: 'bg-yellow-100',
-    text: 'text-yellow-700',
-    dot: 'bg-yellow-500',
   },
   returned: {
     label: 'Returned',
@@ -141,46 +143,28 @@ export const SHIPPING_STATUS_COLORS: Record<ShippingStatus, StatusConfig> = {
     text: 'text-red-700',
     dot: 'bg-red-500',
   },
-  return_validated: {
-    label: 'Return Validated',
-    bg: 'bg-emerald-100',
-    text: 'text-emerald-700',
-    dot: 'bg-emerald-500',
-  },
-  return_refused: {
-    label: 'Return Refused',
-    bg: 'bg-rose-100',
-    text: 'text-rose-700',
-    dot: 'bg-rose-500',
-  },
-  exchange: {
-    label: 'Exchange',
-    bg: 'bg-teal-100',
-    text: 'text-teal-700',
-    dot: 'bg-teal-500',
-  },
-  lost: {
-    label: 'Lost',
-    bg: 'bg-stone-200',
-    text: 'text-stone-700',
-    dot: 'bg-stone-500',
-  },
-  destroyed: {
-    label: 'Destroyed',
-    bg: 'bg-zinc-800',
-    text: 'text-white',
-    dot: 'bg-zinc-300',
-  },
 };
 
-export const ALL_STATUS_COLORS: Record<OrderStatus, StatusConfig> = {
-  ...CONFIRMATION_STATUS_COLORS,
+// Confirmation values win on key collision (e.g. shipping `reported` is
+// shadowed). Do not rely on ALL_STATUS_COLORS for shipping `reported` — read
+// from SHIPPING_STATUS_COLORS directly when the context is shipping.
+export const ALL_STATUS_COLORS: Record<string, StatusConfig> = {
   ...SHIPPING_STATUS_COLORS,
+  ...CONFIRMATION_STATUS_COLORS,
 };
 
-export function getStatusConfig(status: string): StatusConfig {
+export function getStatusConfig(
+  status: string,
+  type: 'confirmation' | 'shipping' | 'auto' = 'auto',
+): StatusConfig {
+  if (type === 'shipping' && status in SHIPPING_STATUS_COLORS) {
+    return SHIPPING_STATUS_COLORS[status as ShippingStatus];
+  }
+  if (type === 'confirmation' && status in CONFIRMATION_STATUS_COLORS) {
+    return CONFIRMATION_STATUS_COLORS[status as ConfirmationStatus];
+  }
   return (
-    ALL_STATUS_COLORS[status as OrderStatus] ?? {
+    ALL_STATUS_COLORS[status] ?? {
       label: status.replace(/_/g, ' '),
       bg: 'bg-gray-100',
       text: 'text-gray-600',
@@ -189,8 +173,7 @@ export function getStatusConfig(status: string): StatusConfig {
   );
 }
 
-// ─── Filter options for GlobalFilterBar ───────────────────────────────────────
-
+// Filter dropdown options for GlobalFilterBar — preserve declaration order.
 export const CONFIRMATION_STATUS_OPTIONS = (
   Object.keys(CONFIRMATION_STATUS_COLORS) as ConfirmationStatus[]
 ).map((key) => ({
@@ -210,4 +193,9 @@ export const SOURCE_OPTIONS = [
   { value: 'whatsapp', label: 'WhatsApp' },
   { value: 'instagram', label: 'Instagram' },
   { value: 'manual', label: 'Manual' },
+];
+
+export const RETURN_OUTCOME_OPTIONS: { value: ReturnOutcome; label: string }[] = [
+  { value: 'good', label: 'Good (restock)' },
+  { value: 'damaged', label: 'Damaged (loss)' },
 ];

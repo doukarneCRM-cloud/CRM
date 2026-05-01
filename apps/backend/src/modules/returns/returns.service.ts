@@ -1,167 +1,46 @@
 /**
- * Physical Return Verification. Lists orders the carrier bounced back, lets
- * the warehouse look them up by tracking ID (scan) or free text, and verifies
- * the physical package.
+ * Physical Return Verification.
  *
- * Outcomes:
- *  - `good`    → shippingStatus='return_validated'. Variants are restocked so
- *                the SKUs can be re-shipped to another client.
- *  - `damaged` → shippingStatus='return_refused'. Not restocked.
- *  - `wrong`   → shippingStatus='return_refused'. Not restocked.
+ * Returned parcels (shippingStatus = 'returned') sit on the warehouse desk
+ * until someone opens them. Verification picks one of two outcomes via
+ * the `returnOutcome` field on Order:
+ *
+ *   - `good`    → variants are restocked (saleable again)
+ *   - `damaged` → not restocked (counted as loss)
+ *
+ * The shippingStatus stays 'returned' either way — the rate-level KPIs
+ * don't care about the outcome, only operational reports do.
  */
 
-import { Prisma } from '@prisma/client';
+import { Prisma, type ReturnOutcome } from '@prisma/client';
 import { prisma } from '../../shared/prisma';
-import { emitToRoom, emitToUser } from '../../shared/socket';
+import { emitToUser, emitOrderUpdated } from '../../shared/socket';
 import { buildOrderWhereClause, type OrderFilterParams } from '../../utils/filterBuilder';
 
-export type VerifyOutcome = 'good' | 'damaged' | 'wrong';
-
-// These are the "bounced back" statuses — everything the warehouse still
-// needs to physically verify.
-const PENDING_STATUSES = ['returned', 'attempted', 'lost'] as const;
-
-// Statuses that are ALREADY verified — shown on the "Verified" tab for history.
-const VERIFIED_STATUSES = ['return_validated', 'return_refused'] as const;
+export type VerifyOutcome = ReturnOutcome; // 'good' | 'damaged'
 
 export interface ListParams extends OrderFilterParams {
   page?: number;
   pageSize?: number;
   scope?: 'pending' | 'verified' | 'all';
-  // search inherited from OrderFilterParams
 }
 
-export async function listReturns(params: ListParams) {
-  const page = Math.max(1, Number(params.page ?? 1));
-  const pageSize = Math.min(100, Math.max(1, Number(params.pageSize ?? 25)));
-  const scope = params.scope ?? 'pending';
-
-  const statuses =
-    scope === 'pending'
-      ? PENDING_STATUSES
-      : scope === 'verified'
-        ? VERIFIED_STATUSES
-        : [...PENDING_STATUSES, ...VERIFIED_STATUSES];
-
-  // Honour the dashboard-style filters (date range, agent, source, etc.) so
-  // the Returns list shrinks to the same scope as the headline KPIs above
-  // it. buildOrderWhereClause already defaults isArchived to false, which
-  // matches what we want here.
-  const baseWhere = buildOrderWhereClause(params);
-  const where: Prisma.OrderWhereInput = {
-    ...baseWhere,
-    shippingStatus: { in: statuses as unknown as Prisma.EnumShippingStatusFilter['in'] },
-  };
-
-  const [rows, total] = await Promise.all([
-    prisma.order.findMany({
-      where,
-      orderBy: { updatedAt: 'desc' },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      select: {
-        id: true,
-        reference: true,
-        shippingStatus: true,
-        total: true,
-        coliixTrackingId: true,
-        returnNote: true,
-        returnVerifiedAt: true,
-        returnVerifiedBy: { select: { id: true, name: true } },
-        updatedAt: true,
-        deliveredAt: true,
-        customer: { select: { fullName: true, phone: true, phoneDisplay: true, city: true, address: true } },
-        items: {
-          select: {
-            id: true,
-            quantity: true,
-            variant: {
-              select: {
-                id: true,
-                sku: true,
-                color: true,
-                size: true,
-                stock: true,
-                product: { select: { id: true, name: true, imageUrl: true } },
-              },
-            },
-          },
-        },
-      },
-    }),
-    prisma.order.count({ where }),
-  ]);
-
-  return {
-    data: rows,
-    pagination: {
-      page,
-      pageSize,
-      total,
-      totalPages: Math.max(1, Math.ceil(total / pageSize)),
-    },
-  };
-}
-
-/**
- * Page-level stats for the Returns section. Matches the dashboard's
- * `returnRate` formula (`returned / (delivered + returned)`) so the
- * warehouse view and the leadership dashboard always agree on the headline
- * number — it's the first thing an agent cross-checks.
- */
-export async function getReturnStats(filters: OrderFilterParams = {}) {
-  // Respect the dashboard's date-range / agent / source filters so this
-  // page agrees with the rest of the app instead of always reporting
-  // all-time totals — the previous behaviour broke trust whenever an
-  // operator switched the global date range and the headline numbers
-  // didn't move.
-  const where = buildOrderWhereClause(filters);
-  const [deliveredCount, pendingCount, verifiedGoodCount, verifiedRefusedCount] = await Promise.all([
-    prisma.order.count({ where: { ...where, shippingStatus: 'delivered' } }),
-    prisma.order.count({
-      where: {
-        ...where,
-        shippingStatus: { in: PENDING_STATUSES as unknown as Prisma.EnumShippingStatusFilter['in'] },
-      },
-    }),
-    prisma.order.count({ where: { ...where, shippingStatus: 'return_validated' } }),
-    prisma.order.count({ where: { ...where, shippingStatus: 'return_refused' } }),
-  ]);
-
-  const returnedTotal = pendingCount + verifiedGoodCount + verifiedRefusedCount;
-  const verifiedTotal = verifiedGoodCount + verifiedRefusedCount;
-  const rateDenominator = deliveredCount + returnedTotal;
-
-  return {
-    // Headline number that matches the dashboard card.
-    returnRate: rateDenominator > 0 ? returnedTotal / rateDenominator : 0,
-    returnedTotal,
-    deliveredCount,
-    pendingCount,
-    verifiedTotal,
-    // Share of returns actually verified — lets the warehouse gauge backlog.
-    verifiedRate: returnedTotal > 0 ? verifiedTotal / returnedTotal : 0,
-  };
-}
-
-/**
- * Scan lookup — resolves a single order by tracking ID or reference so the
- * scanner modal can open the verify drawer instantly.
- */
-// Match the listReturns projection exactly — the VerifyModal reads the same
-// fields whether the order came from the list or from a scan.
-const RETURN_SCAN_SELECT = {
+// Projection shared by the list endpoint and the scan lookup so the verify
+// drawer always reads the same fields.
+const RETURN_ORDER_SELECT = {
   id: true,
   reference: true,
   shippingStatus: true,
+  returnOutcome: true,
   total: true,
-  coliixTrackingId: true,
   returnNote: true,
   returnVerifiedAt: true,
   returnVerifiedBy: { select: { id: true, name: true } },
   updatedAt: true,
   deliveredAt: true,
-  customer: { select: { fullName: true, phone: true, phoneDisplay: true, city: true, address: true } },
+  customer: {
+    select: { fullName: true, phone: true, phoneDisplay: true, city: true, address: true },
+  },
   items: {
     select: {
       id: true,
@@ -180,6 +59,79 @@ const RETURN_SCAN_SELECT = {
   },
 } as const;
 
+function whereForScope(scope: 'pending' | 'verified' | 'all'): Prisma.OrderWhereInput {
+  if (scope === 'pending') return { shippingStatus: 'returned', returnOutcome: null };
+  if (scope === 'verified') return { shippingStatus: 'returned', returnOutcome: { not: null } };
+  return { shippingStatus: 'returned' };
+}
+
+export async function listReturns(params: ListParams) {
+  const page = Math.max(1, Number(params.page ?? 1));
+  const pageSize = Math.min(100, Math.max(1, Number(params.pageSize ?? 25)));
+  const scope = params.scope ?? 'pending';
+
+  // Honour the dashboard-style filters (date range, agent, source, etc.) so
+  // the Returns list shrinks to the same scope as the headline KPIs.
+  const baseWhere = buildOrderWhereClause(params);
+  const where: Prisma.OrderWhereInput = { ...baseWhere, ...whereForScope(scope) };
+
+  const [rows, total] = await Promise.all([
+    prisma.order.findMany({
+      where,
+      orderBy: { updatedAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      select: RETURN_ORDER_SELECT,
+    }),
+    prisma.order.count({ where }),
+  ]);
+
+  return {
+    data: rows,
+    pagination: {
+      page,
+      pageSize,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    },
+  };
+}
+
+/**
+ * Page-level stats for the Returns section. Matches the dashboard's
+ * `returnRate` formula (`returned / (delivered + returned)`).
+ */
+export async function getReturnStats(filters: OrderFilterParams = {}) {
+  const where = buildOrderWhereClause(filters);
+  const [deliveredCount, pendingCount, verifiedGoodCount, verifiedDamagedCount] = await Promise.all([
+    prisma.order.count({ where: { ...where, shippingStatus: 'delivered' } }),
+    prisma.order.count({ where: { ...where, shippingStatus: 'returned', returnOutcome: null } }),
+    prisma.order.count({ where: { ...where, shippingStatus: 'returned', returnOutcome: 'good' } }),
+    prisma.order.count({
+      where: { ...where, shippingStatus: 'returned', returnOutcome: 'damaged' },
+    }),
+  ]);
+
+  const returnedTotal = pendingCount + verifiedGoodCount + verifiedDamagedCount;
+  const verifiedTotal = verifiedGoodCount + verifiedDamagedCount;
+  const rateDenominator = deliveredCount + returnedTotal;
+
+  return {
+    returnRate: rateDenominator > 0 ? returnedTotal / rateDenominator : 0,
+    returnedTotal,
+    deliveredCount,
+    pendingCount,
+    verifiedTotal,
+    verifiedGoodCount,
+    verifiedDamagedCount,
+    // Share of returns actually verified — backlog gauge for the warehouse.
+    verifiedRate: returnedTotal > 0 ? verifiedTotal / returnedTotal : 0,
+  };
+}
+
+/**
+ * Scan lookup — resolves a single order by reference for the scanner modal.
+ */
 export async function findByScan(query: string) {
   const q = query.trim();
   if (!q) return null;
@@ -187,23 +139,17 @@ export async function findByScan(query: string) {
     where: {
       isArchived: false,
       OR: [
-        { coliixTrackingId: q },
         { reference: q },
-        { coliixTrackingId: { contains: q, mode: 'insensitive' } },
         { reference: { contains: q, mode: 'insensitive' } },
       ],
     },
-    select: RETURN_SCAN_SELECT,
+    select: RETURN_ORDER_SELECT,
   });
 }
 
 /**
- * Phone→laptop scan pipeline. The agent scans a parcel barcode on their
- * phone; we resolve it here and emit either `return:scanned` (with the full
- * order payload) or `return:scan_failed` (with the raw code so the phone
- * can show a "not found" toast) to the agent's own user room. Only that
- * user's sockets receive the event — a second agent scanning at the same
- * time doesn't collide.
+ * Phone→laptop scan pipeline. Emits to the actor's user room so concurrent
+ * scans by other agents don't collide.
  */
 export async function pushScanToUser(userId: string, code: string) {
   const order = await findByScan(code);
@@ -225,14 +171,13 @@ export async function verifyReturn(
   input: VerifyInput,
   actor: { id: string; name: string },
 ) {
-  const newStatus = input.outcome === 'good' ? 'return_validated' : 'return_refused';
-
   const updated = await prisma.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
       where: { id: orderId },
       select: {
         id: true,
         shippingStatus: true,
+        returnOutcome: true,
         items: { select: { variantId: true, quantity: true } },
       },
     });
@@ -242,8 +187,20 @@ export async function verifyReturn(
         code: 'NOT_FOUND',
       });
     }
+    if (order.shippingStatus !== 'returned') {
+      throw Object.assign(new Error('Order is not in Returned state'), {
+        statusCode: 400,
+        code: 'INVALID_STATE',
+      });
+    }
+    if (order.returnOutcome) {
+      throw Object.assign(new Error('Return already verified'), {
+        statusCode: 409,
+        code: 'ALREADY_VERIFIED',
+      });
+    }
 
-    // Only restock on "good" — variants physically came back saleable.
+    // Restock only on "good" — variants physically came back saleable.
     if (input.outcome === 'good') {
       for (const item of order.items) {
         await tx.productVariant.update({
@@ -256,7 +213,7 @@ export async function verifyReturn(
     const result = await tx.order.update({
       where: { id: orderId },
       data: {
-        shippingStatus: newStatus,
+        returnOutcome: input.outcome,
         returnNote: input.note?.trim() || null,
         returnVerifiedAt: new Date(),
         returnVerifiedById: actor.id,
@@ -265,6 +222,7 @@ export async function verifyReturn(
         id: true,
         reference: true,
         shippingStatus: true,
+        returnOutcome: true,
         returnNote: true,
         returnVerifiedAt: true,
         returnVerifiedBy: { select: { id: true, name: true } },
@@ -277,10 +235,8 @@ export async function verifyReturn(
         type: 'shipping',
         action:
           input.outcome === 'good'
-            ? `Physical return validated & restocked by ${actor.name}`
-            : input.outcome === 'damaged'
-              ? `Physical return refused (damaged) by ${actor.name}`
-              : `Physical return refused (wrong item) by ${actor.name}`,
+            ? `Return verified — good (restocked) by ${actor.name}`
+            : `Return verified — damaged (loss) by ${actor.name}`,
         performedBy: actor.name,
         userId: actor.id,
         meta: { outcome: input.outcome, note: input.note ?? null },
@@ -290,8 +246,7 @@ export async function verifyReturn(
     return result;
   });
 
-  emitToRoom('orders:all', 'order:updated', { orderId });
-  emitToRoom('dashboard', 'kpi:refresh', {});
+  emitOrderUpdated(orderId, { kpi: 'returned' });
 
   return updated;
 }

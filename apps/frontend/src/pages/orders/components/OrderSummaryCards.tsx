@@ -121,12 +121,21 @@ export function OrderSummaryCards({ className }: OrderSummaryCardsProps) {
     fetchSummary();
   }, [fetchSummary]);
 
-  // Refresh on kpi:refresh socket event
+  // Live refresh — bound to the same scoped order events that drive the
+  // table. No coarse "kpi:refresh" hammer; each event names what changed.
   useEffect(() => {
     try {
       const socket = getSocket();
-      socket.on('kpi:refresh', fetchSummary);
-      return () => { socket.off('kpi:refresh', fetchSummary); };
+      socket.on('order:created', fetchSummary);
+      socket.on('order:updated', fetchSummary);
+      socket.on('order:archived', fetchSummary);
+      socket.on('order:bulk_updated', fetchSummary);
+      return () => {
+        socket.off('order:created', fetchSummary);
+        socket.off('order:updated', fetchSummary);
+        socket.off('order:archived', fetchSummary);
+        socket.off('order:bulk_updated', fetchSummary);
+      };
     } catch {
       // socket not ready
     }

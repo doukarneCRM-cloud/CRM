@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../../shared/prisma';
-import { getOnlineUserIds } from '../../shared/socket';
+import { getOnlineUserIds, emitToRoom } from '../../shared/socket';
 import { invalidateRbacForUser, invalidateRbacForUsers } from '../../shared/redis';
 import {
   computeAgentStatsByIds,
@@ -167,7 +167,7 @@ export async function createUser(input: CreateUserInput) {
   }
 
   const passwordHash = await bcrypt.hash(input.password, 12);
-  return prisma.user.create({
+  const created = await prisma.user.create({
     data: {
       name: input.name,
       email: input.email,
@@ -179,6 +179,11 @@ export async function createUser(input: CreateUserInput) {
     },
     select: USER_SELECT,
   });
+  // Live notify the admin/team page so the new agent appears in everyone's
+  // user list without a manual reload. Room `admin` covers admins +
+  // supervisors who can view the team page.
+  emitToRoom('admin', 'user:created', { id: created.id, ts: Date.now() });
+  return created;
 }
 
 export async function updateUser(id: string, input: UpdateUserInput) {
@@ -224,6 +229,7 @@ export async function updateUser(id: string, input: UpdateUserInput) {
     });
   }
 
+  emitToRoom('admin', 'user:updated', { id, ts: Date.now() });
   return updated;
 }
 
@@ -295,6 +301,7 @@ export async function createRole(input: CreateRoleInput) {
     data: { name: input.name, label: input.label },
   });
   await syncRolePermissions(role.id, input.permissionKeys);
+  emitToRoom('admin', 'role:created', { id: role.id, ts: Date.now() });
   return (await listRoles()).find((r) => r.id === role.id);
 }
 
@@ -317,6 +324,7 @@ export async function updateRole(id: string, input: UpdateRoleInput) {
   if (input.permissionKeys) {
     await syncRolePermissions(id, input.permissionKeys);
   }
+  emitToRoom('admin', 'role:updated', { id, ts: Date.now() });
   return (await listRoles()).find((r) => r.id === id);
 }
 
@@ -510,6 +518,9 @@ export async function updateAssignmentRule(
   }
   if (writes.length) await prisma.$transaction(writes);
 
+  // Live notify other open Assignment pages — multiple admins may have
+  // it open simultaneously and they should see each other's tweaks.
+  emitToRoom('admin', 'assignment_rule:updated', { ts: Date.now() });
   return getAssignmentRule();
 }
 

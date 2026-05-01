@@ -8,6 +8,7 @@ import {
   type AttendanceRow,
   type DayState,
 } from '@/services/atelieApi';
+import { getSocket } from '@/services/socket';
 import { mondayOfWeekUTC, addWeeks, formatWeekRange } from '../utils/weekMath';
 import { EmployeeFormModal } from './EmployeeFormModal';
 import { EmployeeKpiModal } from './EmployeeKpiModal';
@@ -88,6 +89,27 @@ export function AttendanceGrid() {
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  // Live sync — when another supervisor toggles a cell, the backend emits
+  // `atelie:attendance:updated`. Reload the current week so the grid + the
+  // payable sum reflect the change. Per-cell surgical patches would be more
+  // surgical but the grid is small (≤ 30 employees × 7 days) and reloads
+  // are cheap enough that the simpler approach is the right call.
+  useEffect(() => {
+    let socket: ReturnType<typeof getSocket> | null = null;
+    try {
+      socket = getSocket();
+    } catch {
+      return;
+    }
+    const handler = () => {
+      void load();
+    };
+    socket.on('atelie:attendance:updated', handler);
+    return () => {
+      socket?.off('atelie:attendance:updated', handler);
+    };
   }, [load]);
 
   async function toggleCell(row: AttendanceRow, dayIndex: number) {

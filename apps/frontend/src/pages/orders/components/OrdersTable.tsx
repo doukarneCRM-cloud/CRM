@@ -10,7 +10,7 @@ import {
 import {
   ChevronLeft, ChevronRight, ChevronDown, Edit2, Archive, Eye,
   UserPlus, MessageCircle, History, Send, MapPin, User,
-  DownloadCloud, Check, Loader2, PhoneOff,
+  DownloadCloud, Check, Loader2, PhoneOff, AlertCircle,
 } from 'lucide-react';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { OrderSourceIcon } from '@/components/ui/OrderSourceIcon';
@@ -142,6 +142,17 @@ interface TableCallbacks {
   onSendColiix?: (order: Order) => void;
 }
 
+// One unresolved Coliix error per order, keyed by orderId. Surfaced as a
+// red "retry" badge on the Send column so the agent can spot the problem
+// and retry once it's fixed (added city, mapped wording, etc.).
+export interface OrderColiixError {
+  // The id is kept so the OrdersPage can drop the entry surgically when
+  // the matching coliix:error:resolved event arrives.
+  id: string;
+  type: string;
+  message: string;
+}
+
 interface OrdersTableProps extends TableCallbacks {
   orders: Order[];
   loading: boolean;
@@ -158,6 +169,10 @@ interface OrdersTableProps extends TableCallbacks {
   canImport: boolean;
   // Order ids currently being exported to Coliix (disables the button, shows spinner)
   sendingIds?: string[];
+  // Latest unresolved Coliix error per order (built page-side from the
+  // /coliix/errors endpoint). Used to render the retry hint on the
+  // Send column.
+  coliixErrorByOrder?: Record<string, OrderColiixError>;
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -183,6 +198,7 @@ export function OrdersTable({
   canImport,
   onSendColiix,
   sendingIds,
+  coliixErrorByOrder,
 }: OrdersTableProps) {
   const { t } = useTranslation();
   // Track selection state as Set for O(1) lookup
@@ -477,26 +493,31 @@ export function OrdersTable({
                 has reported one, fall back to the mapped enum label for
                 orders that haven't gone through Coliix yet (e.g. brand new
                 pending orders that have never been pushed). */}
-            <div className="flex items-center gap-1">
-              <span className="w-[14px] shrink-0 text-[9px] font-bold uppercase text-gray-300">S</span>
-              {row.original.coliixRawState ? (
-                <span
-                  className="inline-flex items-center gap-1.5 rounded-badge bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-700"
-                  title={row.original.coliixRawState}
+            <div className="flex flex-col gap-0.5">
+              <div className="flex items-center gap-1">
+                <span className="w-[14px] shrink-0 text-[9px] font-bold uppercase text-gray-300">S</span>
+                <StatusBadge status={row.original.shippingStatus} type="shipping" size="sm" showDot />
+                <button
+                  onClick={() => onViewLogs(row.original, 'all')}
+                  title={t('orders.viewHistory')}
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-gray-900 transition-colors hover:bg-gray-100 hover:text-gray-700"
                 >
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" />
-                  {row.original.coliixRawState}
+                  <History size={11} />
+                </button>
+              </div>
+              {/* Coliix's literal wording, when a shipment is linked.
+                  Surfaces the exact text Coliix sent so the operator can
+                  spot mismatches between several wordings that collapse
+                  to the same enum bucket — and so any error / pending
+                  mapping is impossible to miss. */}
+              {row.original.shipment?.rawState && (
+                <span
+                  className="ml-[18px] truncate text-[10px] italic text-gray-500"
+                  title={row.original.shipment.rawState}
+                >
+                  Coliix: {row.original.shipment.rawState}
                 </span>
-              ) : (
-                <StatusBadge status={row.original.shippingStatus} size="sm" showDot />
               )}
-              <button
-                onClick={() => onViewLogs(row.original, 'all')}
-                title={t('orders.viewHistory')}
-                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-gray-900 transition-colors hover:bg-gray-100 hover:text-gray-700"
-              >
-                <History size={11} />
-              </button>
             </div>
           </div>
           );
@@ -551,23 +572,53 @@ export function OrdersTable({
       {
         id: 'coliix',
         header: t('orders.columns.coliix'),
-        size: 80,
+        size: 110,
         cell: ({ row }) => {
           const order = row.original;
+          // Already linked → green checkmark. The shipment timeline
+          // lives in the order's edit modal.
           if (order.labelSent) {
             return (
               <span
                 className="flex items-center gap-1 text-xs font-semibold text-green-600"
-                title={order.coliixTrackingId ? t('orders.coliixTrackingTooltip', { tracking: order.coliixTrackingId }) : t('orders.coliixSentTooltip')}
+                title={t('orders.coliixSentTooltip') as string}
               >
                 <Check size={10} /> {t('orders.sent')}
               </span>
             );
           }
+          // Only confirmed orders can be pushed.
           if (order.confirmationStatus !== 'confirmed') {
-            return <span className="text-xs text-gray-200" title={t('orders.onlyConfirmedCanSend')}>—</span>;
+            return (
+              <span className="text-xs text-gray-200" title={t('orders.onlyConfirmedCanSend')}>
+                —
+              </span>
+            );
           }
           const sending = sendingSet.has(order.id);
+          // Unresolved error linked to this order? Render a retry-flavoured
+          // button — same trigger as a fresh send, but visually it tells
+          // the agent "this failed, fix the underlying problem and try
+          // again". The native title attribute is the simplest cross-
+          // browser tooltip — text wraps on hover with no extra deps.
+          const err = coliixErrorByOrder?.[order.id];
+          if (err) {
+            return (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSendColiix?.(order);
+                }}
+                disabled={sending || !onSendColiix}
+                title={`${err.type}: ${err.message}`}
+                className="flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700 transition-colors hover:border-red-400 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {sending ? <Loader2 size={10} className="animate-spin" /> : <AlertCircle size={10} />}
+                {sending ? t('orders.sending') : t('orders.retrySend')}
+              </button>
+            );
+          }
           return (
             <button
               type="button"
@@ -577,7 +628,7 @@ export function OrdersTable({
               }}
               disabled={sending || !onSendColiix}
               className="flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-500 transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
-              title={t('orders.sendingTooltip')}
+              title={t('orders.sendingTooltip') as string}
             >
               {sending ? <Loader2 size={10} className="animate-spin" /> : <Send size={10} />}
               {sending ? t('orders.sending') : t('orders.send')}

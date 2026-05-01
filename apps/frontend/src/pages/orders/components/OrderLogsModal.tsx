@@ -7,7 +7,7 @@ import type { OrderLog } from '@/types/orders';
 import { cn } from '@/lib/cn';
 import { useAuthStore } from '@/store/authStore';
 import { PERMISSIONS } from '@/constants/permissions';
-import { colourForColiixRawState } from '@/lib/coliixColour';
+import { colourForShippingStatus } from '@/lib/shippingColour';
 
 // ─── Log type config ──────────────────────────────────────────────────────────
 
@@ -113,7 +113,7 @@ function LogEntry({ log, isLast }: { log: OrderLog; isLast: boolean }) {
 function ColiixTimelineEntry({ log, isLast }: { log: OrderLog; isLast: boolean }) {
   const rawState = extractColiixRawState(log);
   const displayState = rawState ?? log.action;
-  const colour = rawState ? colourForColiixRawState(rawState) : '#9CA3AF';
+  const colour = colourForShippingStatus(rawState);
   const meta = log.meta as Record<string, unknown> | null;
   const driverNote =
     meta && typeof meta.driverNote === 'string' && meta.driverNote.trim()

@@ -11,7 +11,6 @@ import {
   type ShippingStatus,
 } from '@/constants/statusColors';
 import { cn } from '@/lib/cn';
-import { colourForColiixRawState } from '@/lib/coliixColour';
 import { useCallCenterStore, type PipelineSection } from '../callCenterStore';
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
@@ -138,17 +137,22 @@ export function AgentKpiCards({ className }: AgentKpiCardsProps) {
     fetchAll();
   }, [fetchAll]);
 
-  // Live refresh on any KPI change (agent-scoped events fired from backend)
+  // Live refresh on any order event that could affect this agent's pipeline
+  // or commission. We don't bind to a global "kpi:refresh" hammer any more —
+  // each event names what changed, and the backend fans out to agent:<id>
+  // rooms so other agents' edits don't trigger this agent's refetch storm.
   useEffect(() => {
     try {
       const socket = getSocket();
-      socket.on('kpi:refresh', fetchAll);
+      socket.on('order:created', fetchAll);
       socket.on('order:assigned', fetchAll);
       socket.on('order:updated', fetchAll);
+      socket.on('order:archived', fetchAll);
       return () => {
-        socket.off('kpi:refresh', fetchAll);
+        socket.off('order:created', fetchAll);
         socket.off('order:assigned', fetchAll);
         socket.off('order:updated', fetchAll);
+        socket.off('order:archived', fetchAll);
       };
     } catch {
       // socket not ready yet
@@ -247,37 +251,21 @@ export function AgentKpiCards({ className }: AgentKpiCardsProps) {
         ) : (
           <div className="grid grid-cols-2 gap-1.5">
             {shippingEntries.map(([status, count]) => {
-              // Backend keys this by Coliix's literal wording (Expédié,
-              // Ramassé, Livré, …) plus a synthetic 'Label Created' for
-              // pushed orders with no Coliix update yet. The internal
-              // ShippingStatus enum no longer covers any of these, so the
-              // old `if (!cfg) return null` was hiding every chip on a
-              // 24-order shipping pipeline. Render Coliix wordings with
-              // the per-state palette and only fall through to the
-              // internal enum for the synthetic 'Label Created' bucket.
-              const cfg = SHIPPING_STATUS_COLORS[status as ShippingStatus];
-              if (cfg) {
-                return (
-                  <StatusChip
-                    key={status}
-                    label={cfg.label}
-                    count={count}
-                    bg={cfg.bg}
-                    text={cfg.text}
-                    dot={cfg.dot}
-                    onClick={() => jumpToPipeline('shipping', status)}
-                  />
-                );
-              }
+              const cfg =
+                SHIPPING_STATUS_COLORS[status as ShippingStatus] ?? {
+                  label: status.replace(/_/g, ' '),
+                  bg: 'bg-gray-100',
+                  text: 'text-gray-700',
+                  dot: 'bg-gray-400',
+                };
               return (
                 <StatusChip
                   key={status}
-                  label={status}
+                  label={cfg.label}
                   count={count}
-                  bg="bg-gray-100"
-                  text="text-gray-700"
-                  dot=""
-                  dotColour={colourForColiixRawState(status)}
+                  bg={cfg.bg}
+                  text={cfg.text}
+                  dot={cfg.dot}
                   onClick={() => jumpToPipeline('shipping', status)}
                 />
               );

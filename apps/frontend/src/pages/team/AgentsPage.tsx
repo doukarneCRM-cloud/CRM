@@ -7,6 +7,7 @@ import { PillTabGroup } from '@/components/ui/PillTab';
 import { useAuthStore } from '@/store/authStore';
 import { PERMISSIONS } from '@/constants/permissions';
 import { teamApi, type TeamUser, type RoleDetail } from '@/services/teamApi';
+import { getSocket } from '@/services/socket';
 
 import { TeamTabs } from './components/TeamTabs';
 import { AgentCard } from './components/AgentCard';
@@ -42,6 +43,35 @@ export default function AgentsPage() {
 
   useEffect(() => {
     void load();
+  }, [load]);
+
+  // Live: when any admin creates / updates a user (or role labels move,
+  // which also changes how cards render), reload. Also tick on
+  // user:online/offline so the presence dot stays current.
+  useEffect(() => {
+    let socket: ReturnType<typeof getSocket> | null = null;
+    try {
+      socket = getSocket();
+    } catch {
+      return;
+    }
+    const refreshAll = () => {
+      void load();
+    };
+    socket.on('user:created', refreshAll);
+    socket.on('user:updated', refreshAll);
+    socket.on('role:created', refreshAll);
+    socket.on('role:updated', refreshAll);
+    socket.on('user:online', refreshAll);
+    socket.on('user:offline', refreshAll);
+    return () => {
+      socket?.off('user:created', refreshAll);
+      socket?.off('user:updated', refreshAll);
+      socket?.off('role:created', refreshAll);
+      socket?.off('role:updated', refreshAll);
+      socket?.off('user:online', refreshAll);
+      socket?.off('user:offline', refreshAll);
+    };
   }, [load]);
 
   const counts = useMemo(() => {

@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '../../shared/prisma';
 import { parsePagination, paginatedResponse } from '../../utils/pagination';
 import { normalizePhone } from '../../utils/phoneNormalize';
+import { emitToRoom } from '../../shared/socket';
 import type { CreateCustomerInput, UpdateCustomerInput, CustomerQueryInput, HistoryQueryInput } from './customers.schema';
 
 // ─── List ─────────────────────────────────────────────────────────────────────
@@ -87,7 +88,7 @@ export async function createCustomer(input: CreateCustomerInput) {
     };
   }
 
-  return prisma.customer.create({
+  const created = await prisma.customer.create({
     data: {
       fullName: input.fullName,
       phone: normalized,
@@ -98,6 +99,11 @@ export async function createCustomer(input: CreateCustomerInput) {
       tag: input.tag,
     },
   });
+  // Live notify every connected user — the Clients page is shared,
+  // and other admins / agents need to see the new row appear without
+  // having to manually refresh.
+  emitToRoom('orders:all', 'customer:created', { id: created.id, ts: Date.now() });
+  return created;
 }
 
 // ─── Update ──────────────────────────────────────────────────────────────────
@@ -126,7 +132,9 @@ export async function updateCustomer(id: string, input: UpdateCustomerInput) {
     data.phoneDisplay = display;
   }
 
-  return prisma.customer.update({ where: { id }, data });
+  const updated = await prisma.customer.update({ where: { id }, data });
+  emitToRoom('orders:all', 'customer:updated', { id, ts: Date.now() });
+  return updated;
 }
 
 // ─── Order History ────────────────────────────────────────────────────────────

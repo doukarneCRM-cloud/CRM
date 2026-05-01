@@ -1,22 +1,50 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Clock, CheckCircle2, Activity } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { GlassCard } from '@/components/ui';
 import { ROUTES } from '@/constants/routes';
 import { productionApi, type ProductionRun } from '@/services/productionApi';
+import { getSocket } from '@/services/socket';
 
 export default function ProductionDashboardPage() {
   const { t } = useTranslation();
   const [runs, setRuns] = useState<ProductionRun[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    productionApi
+  const load = useCallback(() => {
+    return productionApi
       .listRuns()
       .then(setRuns)
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  // Live: when a stage transition fires (`production:stage`) the cost +
+  // status counters need to refresh. Refetch is fine — the runs list is
+  // small and the event is rare. Also bind to `production:run:updated`
+  // (currently emitted nowhere — hook left in for the new emit added
+  // alongside this; safe no-op until then).
+  useEffect(() => {
+    let socket: ReturnType<typeof getSocket> | null = null;
+    try {
+      socket = getSocket();
+    } catch {
+      return;
+    }
+    const handler = () => {
+      void load();
+    };
+    socket.on('production:stage', handler);
+    socket.on('production:run:updated', handler);
+    return () => {
+      socket?.off('production:stage', handler);
+      socket?.off('production:run:updated', handler);
+    };
+  }, [load]);
 
   const active = runs.filter((r) => r.status === 'active');
   const draft = runs.filter((r) => r.status === 'draft');

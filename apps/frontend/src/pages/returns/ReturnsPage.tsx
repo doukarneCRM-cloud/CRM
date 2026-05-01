@@ -109,9 +109,15 @@ export default function ReturnsPage() {
     };
   }, [reloadKey]);
 
-  // Phone→laptop scan bridge. When the agent scans a parcel on their phone,
-  // backend pushes the resolved order to this same user's sockets and we
-  // auto-open the VerifyModal so they can act immediately.
+  // Phone→laptop scan bridge + cross-user list sync.
+  //
+  // Phone→laptop: agent scans on their phone, backend pushes the resolved
+  //   order to this user's room → auto-open VerifyModal.
+  //
+  // Cross-user: when any other agent verifies a return on their machine,
+  //   the order's status flips → emitOrderUpdated fires `order:updated`.
+  //   We bump reloadKey so this user's list + stats reflect the change
+  //   without a manual refresh. Bumping is fine here (page is small).
   useEffect(() => {
     const socket = getSocket();
     const onScanned = (order: ReturnOrder) => {
@@ -121,11 +127,16 @@ export default function ReturnsPage() {
     const onScanFailed = (payload: { code: string }) => {
       setError(t('returns.noMatchCode', { code: payload.code }));
     };
+    const onOrderUpdated = () => {
+      setReloadKey((k) => k + 1);
+    };
     socket.on('return:scanned', onScanned);
     socket.on('return:scan_failed', onScanFailed);
+    socket.on('order:updated', onOrderUpdated);
     return () => {
       socket.off('return:scanned', onScanned);
       socket.off('return:scan_failed', onScanFailed);
+      socket.off('order:updated', onOrderUpdated);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

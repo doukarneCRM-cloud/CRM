@@ -12,7 +12,6 @@ export function useAnalyticsFilters(): AnalyticsFilters {
   const productIds = useFilterStore((s) => s.productIds);
   const confirmationStatuses = useFilterStore((s) => s.confirmationStatuses);
   const shippingStatuses = useFilterStore((s) => s.shippingStatuses);
-  const coliixRawStates = useFilterStore((s) => s.coliixRawStates);
   const sources = useFilterStore((s) => s.sources);
   const dateRange = useFilterStore((s) => s.dateRange);
 
@@ -25,7 +24,6 @@ export function useAnalyticsFilters(): AnalyticsFilters {
         ? confirmationStatuses.join(',')
         : undefined,
       shippingStatuses: shippingStatuses.length ? shippingStatuses.join(',') : undefined,
-      coliixRawStates: coliixRawStates.length ? coliixRawStates.join(',') : undefined,
       sources: sources.length ? sources.join(',') : undefined,
       dateFrom: dateRange.from ?? undefined,
       dateTo: dateRange.to ?? undefined,
@@ -36,7 +34,6 @@ export function useAnalyticsFilters(): AnalyticsFilters {
       productIds,
       confirmationStatuses,
       shippingStatuses,
-      coliixRawStates,
       sources,
       dateRange.from,
       dateRange.to,

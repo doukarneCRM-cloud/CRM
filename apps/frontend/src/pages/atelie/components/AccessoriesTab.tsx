@@ -3,6 +3,7 @@ import { Plus, Pencil, Trash2, ArrowUpDown, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { GlassCard, CRMButton, CRMSelect } from '@/components/ui';
 import { atelieApi, type Material, type MaterialCategory } from '@/services/atelieApi';
+import { getSocket } from '@/services/socket';
 import { MaterialFormModal } from './MaterialFormModal';
 import { MovementModal } from './MovementModal';
 
@@ -48,6 +49,24 @@ export function AccessoriesTab() {
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  // Live: any material movement / adjustment fires `atelie:material:updated`.
+  // Reload the visible list so stock counts + low-stock badges stay current.
+  useEffect(() => {
+    let socket: ReturnType<typeof getSocket> | null = null;
+    try {
+      socket = getSocket();
+    } catch {
+      return;
+    }
+    const handler = () => {
+      void load();
+    };
+    socket.on('atelie:material:updated', handler);
+    return () => {
+      socket?.off('atelie:material:updated', handler);
+    };
   }, [load]);
 
   async function deactivate(m: Material) {

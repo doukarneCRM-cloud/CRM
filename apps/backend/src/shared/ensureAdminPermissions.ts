@@ -57,7 +57,6 @@ const CANONICAL_PERMISSIONS: Array<{ key: string; label: string }> = [
   { key: 'automation:monitor', label: 'Monitor Automation (admin overview, live feed)' },
   { key: 'whatsapp:view', label: 'View WhatsApp Sessions' },
   { key: 'whatsapp:connect', label: 'Connect WhatsApp Sessions (QR)' },
-  { key: 'shipping_groups:manage', label: 'Manage Shipping Status Groups' },
   { key: 'broadcasts:manage', label: 'Manage Push Notifications' },
 ];
 

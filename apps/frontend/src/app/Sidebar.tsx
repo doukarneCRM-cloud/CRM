@@ -26,6 +26,7 @@ import { useAuthStore } from '@/store/authStore';
 import { BrandLogo } from '@/components/ui/BrandLogo';
 import { authService } from '@/services/api';
 import { resolveImageUrl } from '@/lib/imageUrl';
+import { useNavBadges, type NavBadges } from '@/hooks/useNavBadges';
 
 // ─── Nav item config ──────────────────────────────────────────────────────────
 // labelKey is an i18n key under `nav.*`; resolved at render via t().
@@ -38,6 +39,11 @@ interface NavItem {
   // Used by the Automation entry so an agent with only `whatsapp:connect`
   // (no `automation:view`) still sees the menu and can reach the Sessions tab.
   permission?: string | readonly string[];
+  // Badge counter — picks the matching field from the NavBadges payload.
+  // Undefined or 0 hides the badge entirely.
+  badgeKey?: keyof NavBadges;
+  // 'red' (urgent) or 'gray' (info). Defaults to 'gray' when absent.
+  badgeTone?: 'red' | 'gray';
 }
 
 interface NavSection {
@@ -49,21 +55,21 @@ const NAV_SECTIONS: NavSection[] = [
   {
     items: [
       { labelKey: 'nav.dashboard', icon: LayoutDashboard, to: ROUTES.DASHBOARD, permission: PERMISSIONS.DASHBOARD_VIEW },
-      { labelKey: 'nav.orders', icon: Package, to: ROUTES.ORDERS, permission: PERMISSIONS.ORDERS_VIEW },
-      { labelKey: 'nav.callCenter', icon: Phone, to: ROUTES.CALL_CENTER, permission: PERMISSIONS.CALL_CENTER_VIEW },
+      { labelKey: 'nav.orders', icon: Package, to: ROUTES.ORDERS, permission: PERMISSIONS.ORDERS_VIEW, badgeKey: 'ordersPending', badgeTone: 'gray' },
+      { labelKey: 'nav.callCenter', icon: Phone, to: ROUTES.CALL_CENTER, permission: PERMISSIONS.CALL_CENTER_VIEW, badgeKey: 'callbacksToday', badgeTone: 'red' },
       { labelKey: 'nav.products', icon: ShoppingBag, to: ROUTES.PRODUCTS_LIST, permission: PERMISSIONS.PRODUCTS_VIEW },
       { labelKey: 'nav.clients', icon: Users, to: ROUTES.CLIENTS, permission: PERMISSIONS.CLIENTS_VIEW },
       { labelKey: 'nav.team', icon: User, to: ROUTES.TEAM_AGENTS, permission: PERMISSIONS.TEAM_VIEW },
       { labelKey: 'nav.analytics', icon: BarChart3, to: ROUTES.ANALYTICS, permission: PERMISSIONS.ANALYTICS_VIEW },
       { labelKey: 'nav.money', icon: Wallet, to: ROUTES.MONEY, permission: PERMISSIONS.MONEY_VIEW },
-      { labelKey: 'nav.returns', icon: PackageSearch, to: ROUTES.RETURNS, permission: PERMISSIONS.RETURNS_VERIFY },
-      { labelKey: 'nav.integrations', icon: Link2, to: ROUTES.INTEGRATIONS_STORE, permission: PERMISSIONS.INTEGRATIONS_VIEW },
+      { labelKey: 'nav.returns', icon: PackageSearch, to: ROUTES.RETURNS, permission: PERMISSIONS.RETURNS_VERIFY, badgeKey: 'returnsToVerify', badgeTone: 'gray' },
+      { labelKey: 'nav.integrations', icon: Link2, to: ROUTES.INTEGRATIONS_STORE, permission: PERMISSIONS.INTEGRATIONS_VIEW, badgeKey: 'coliixErrors', badgeTone: 'red' },
     ],
   },
   {
     dividerBefore: true,
     items: [
-      { labelKey: 'nav.atelie', icon: Factory, to: ROUTES.ATELIE_EMPLOYEES, permission: PERMISSIONS.ATELIE_VIEW },
+      { labelKey: 'nav.atelie', icon: Factory, to: ROUTES.ATELIE_EMPLOYEES, permission: PERMISSIONS.ATELIE_VIEW, badgeKey: 'atelieTasks', badgeTone: 'gray' },
       { labelKey: 'nav.production', icon: Scissors, to: ROUTES.PRODUCTION_DASHBOARD, permission: PERMISSIONS.PRODUCTION_VIEW },
     ],
   },
@@ -81,13 +87,17 @@ const NAV_SECTIONS: NavSection[] = [
 function SidebarNavItem({
   item,
   collapsed,
+  badgeCount,
 }: {
   item: NavItem;
   collapsed: boolean;
+  badgeCount?: number;
 }) {
   const Icon = item.icon;
   const { t } = useTranslation();
   const label = t(item.labelKey);
+  const showBadge = badgeCount !== undefined && badgeCount > 0;
+  const badgeTone = item.badgeTone ?? 'gray';
 
   return (
     <div className="group relative">
@@ -103,13 +113,41 @@ function SidebarNavItem({
           )
         }
       >
-        <Icon size={18} className="shrink-0" />
+        <span className="relative shrink-0">
+          <Icon size={18} />
+          {/* Mini-dot — only when the rail is collapsed (the numeric pill
+              below sits next to the label in the expanded view). */}
+          {collapsed && showBadge && (
+            <span
+              className={cn(
+                'absolute -right-1 -top-1 hidden h-2 w-2 rounded-full ring-2 ring-white md:block',
+                badgeTone === 'red' ? 'bg-red-500' : 'bg-gray-400',
+              )}
+            />
+          )}
+        </span>
         <span className={cn('truncate', collapsed && 'md:hidden')}>{label}</span>
+        {/* Numeric pill — visible in the expanded rail and on mobile.
+            Hidden on collapsed md+ since the dot above replaces it. */}
+        {showBadge && (
+          <span
+            className={cn(
+              'ml-auto rounded-full px-1.5 py-px text-[10px] font-bold',
+              collapsed && 'md:hidden',
+              badgeTone === 'red'
+                ? 'bg-red-100 text-red-700'
+                : 'bg-gray-100 text-gray-600',
+            )}
+          >
+            {badgeCount > 99 ? '99+' : badgeCount}
+          </span>
+        )}
       </NavLink>
 
       {collapsed && (
         <div className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 hidden -translate-y-1/2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 md:block">
           {label}
+          {showBadge && <span className="ml-1.5 text-white/70">· {badgeCount}</span>}
           <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 border-4 border-transparent border-r-gray-900" />
         </div>
       )}
@@ -130,6 +168,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
   const { user, hasPermission, logout, refreshToken } = useAuthStore();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const badges = useNavBadges();
 
   const handleLogout = async () => {
     try {
@@ -209,7 +248,12 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
                     return item.permission.some((p) => hasPermission(p));
                   })
                   .map((item) => (
-                    <SidebarNavItem key={item.to} item={item} collapsed={collapsed} />
+                    <SidebarNavItem
+                      key={item.to}
+                      item={item}
+                      collapsed={collapsed}
+                      badgeCount={item.badgeKey ? badges[item.badgeKey] : undefined}
+                    />
                   ))}
               </div>
             </div>

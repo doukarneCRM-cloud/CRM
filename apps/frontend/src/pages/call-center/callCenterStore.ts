@@ -15,13 +15,6 @@ interface CallCenterState {
   activeTab: PipelineSection;
   confirmationFilter: string | null;
   shippingFilter: string | null;
-  // Which shipping status group the agent is currently viewing on the
-  // Shipping tab. null = "All" group (every shipping wording on the
-  // pipeline). The sentinel '__other__' is the "Other" group (orphans).
-  // Lifted out of FilterPills so the row table can scope itself to the
-  // active group's statusKeys — clicking an empty group used to leave
-  // the table showing every order from other groups.
-  shippingGroupId: string | null;
 }
 
 interface CallCenterActions {
@@ -32,7 +25,6 @@ interface CallCenterActions {
   setActiveTab: (tab: PipelineSection) => void;
   setConfirmationFilter: (status: string | null) => void;
   setShippingFilter: (status: string | null) => void;
-  setShippingGroupId: (id: string | null) => void;
   applyPipelineFilter: (section: PipelineSection, status: string | null) => void;
 }
 
@@ -43,7 +35,6 @@ export const useCallCenterStore = create<CallCenterState & CallCenterActions>((s
   activeTab: 'confirmation',
   confirmationFilter: null,
   shippingFilter: null,
-  shippingGroupId: null,
 
   openOrder: (order) => set({ selectedOrder: order }),
   closeOrder: () => set({ selectedOrder: null }),
@@ -55,7 +46,6 @@ export const useCallCenterStore = create<CallCenterState & CallCenterActions>((s
   setActiveTab: (tab) => set({ activeTab: tab }),
   setConfirmationFilter: (status) => set({ confirmationFilter: status }),
   setShippingFilter: (status) => set({ shippingFilter: status }),
-  setShippingGroupId: (id) => set({ shippingGroupId: id, shippingFilter: null }),
   applyPipelineFilter: (section, status) =>
     set(
       section === 'confirmation'

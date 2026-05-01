@@ -25,14 +25,9 @@ import { customersRoutes } from './modules/customers/customers.routes';
 import { productsRoutes } from './modules/products/products.routes';
 import { teamRoutes } from './modules/team/team.routes';
 import { integrationsRoutes } from './modules/integrations/integrations.routes';
-import { coliixV2Routes } from './modules/integrations/coliixV2/coliixV2.routes';
-import { startColiixV2Poller } from './modules/integrations/coliixV2/poll.worker';
 import { startOrderPoller } from './modules/integrations/orderPoller';
 import { backfillStripDescriptionsOnce } from './jobs/backfillStripDescriptions';
-import { listProvidersPublic } from './modules/integrations/providers.service';
-import { startColiixTracker } from './modules/integrations/coliixTracker';
 import { shippingCitiesRoutes } from './modules/shippingCities/shippingCities.routes';
-import { shippingStatusGroupsRoutes } from './modules/shippingStatusGroups/shippingStatusGroups.routes';
 import { broadcastsRoutes } from './modules/broadcasts/broadcasts.routes';
 import { atelieRoutes } from './modules/atelie/atelie.routes';
 import { atelieStockRoutes } from './modules/atelieStock/atelieStock.routes';
@@ -49,6 +44,8 @@ import { automationRoutes } from './modules/automation/automation.routes';
 import { whatsappRoutes } from './modules/whatsapp/whatsapp.routes';
 import { inboxRoutes } from './modules/whatsapp/inbox.routes';
 import { adminRoutes } from './modules/admin/admin.routes';
+import { dashboardRoutes } from './modules/dashboard/dashboard.routes';
+import { coliixRoutes } from './modules/integrations/coliix/coliix.routes';
 import { ensureDefaultTemplates } from './modules/automation/automation.service';
 import { ensureFallbackRules } from './modules/automation/rules.service';
 import { ensureAdminPermissions } from './shared/ensureAdminPermissions';
@@ -56,7 +53,8 @@ import { startAttendanceCron } from './modules/atelie/weeklyAttendanceCron';
 // Bull workers — side-effect imports register .process() handlers.
 import './jobs/callbackAlert.job';
 import './jobs/whatsappSend.job';
-import './jobs/registerColiixV2Workers';
+import './modules/integrations/coliix/ingest.worker';
+import { startColiixPoller } from './modules/integrations/coliix/poll.worker';
 import { simulateAssign } from './utils/autoAssign';
 import {
   computeKPIsWithComparison,
@@ -101,25 +99,17 @@ app.register(rateLimit, {
   max: 200,
   timeWindow: '1 minute',
   keyGenerator: (req) => req.ip,
-  // Inbound webhooks bypass the rate limit:
-  //   - WhatsApp (Evolution) bursts dozens of events while a session is
-  //     negotiating
-  //   - Coliix can fire one event per parcel state change; a delivery wave
-  //     across many parcels would otherwise share the global 200/min cap
-  //     with regular API traffic and start 429-ing legitimate webhook hits
+  // Inbound webhooks bypass the rate limit (WhatsApp bursts during session
+  // negotiation; Coliix can fire one webhook per parcel state change; YouCan
+  // pushes order events).
   allowList: (req) =>
     req.url.startsWith('/api/v1/whatsapp/webhook') ||
-    req.url.startsWith('/api/v1/integrations/coliix/webhook') ||
-    req.url.startsWith('/api/v1/coliixv2/webhook'),
+    req.url.startsWith('/api/v1/integrations/youcan/webhook') ||
+    req.url.startsWith('/api/v1/coliix/webhook'),
 });
 
-// Parse application/x-www-form-urlencoded bodies. Coliix posts webhook
-// callbacks with that content-type (matches the convention they use on
-// their own API — see coliixClient.postForm). Without this plugin
-// Fastify rejects the request with 415 Unsupported Media Type before
-// the route handler runs — no audit row is written, so the operator's
-// "Webhook Health" panel reads "Never" even when Coliix IS calling us.
-// JSON and text/plain are handled by Fastify's built-in parsers.
+// Parse application/x-www-form-urlencoded bodies (used by some webhook
+// providers). JSON and text/plain are handled by Fastify's built-in parsers.
 app.register(formbody);
 
 // Multipart (file uploads) — 50 MB per file to cover WhatsApp voice notes,
@@ -258,16 +248,81 @@ app.register(teamRoutes, { prefix: '/api/v1' });
 // Integrations (YouCan stores, imports, webhooks)
 app.register(integrationsRoutes, { prefix: '/api/v1/integrations' });
 
-// Coliix V2 — parallel integration alongside V1. Public webhook +
-// authenticated admin/shipment endpoints.
-app.register(coliixV2Routes, { prefix: '/api/v1/coliixv2' });
-
 // Assignment rule simulator — "what if 5 orders arrived now?"
 app.get('/api/v1/assignment-rules/simulate', { preHandler: [verifyJWT] }, async (request, reply) => {
   const q = request.query as { count?: string };
   const count = Math.max(1, Math.min(50, Number(q.count ?? 5)));
   const sequence = await simulateAssign(count);
   return reply.send({ count, sequence });
+});
+
+// Sidebar badge counts — single round-trip on mount + ticked locally on
+// scoped socket events. Only returns counts for nav items the caller can
+// see; everything else is undefined so the frontend renders no badge.
+//
+// Call once per page load; the frontend updates the in-memory map in
+// reaction to order:* / coliix:error / return:scanned events instead of
+// repolling. (See useNavBadges in the frontend.)
+app.get('/api/v1/nav/badges', { preHandler: [verifyJWT] }, async (request, reply) => {
+  const user = request.user;
+  const roleName = user.roleName.toLowerCase();
+  const isAdmin = roleName === 'admin' || roleName === 'supervisor';
+
+  // Permissions cached on the JWT — re-resolve via the DB role.
+  const role = await prisma.role.findUnique({
+    where: { id: user.roleId },
+    select: { permissions: { select: { permission: { select: { key: true } } } } },
+  });
+  const perms = new Set(role?.permissions.map((p) => p.permission.key) ?? []);
+  const can = (key: string) => perms.has(key);
+
+  const out: Record<string, number> = {};
+
+  // Orders pending — agents see only their own queue; admins see all.
+  if (can('orders:view') || can('call_center:view')) {
+    out.ordersPending = await prisma.order.count({
+      where: {
+        confirmationStatus: 'pending',
+        isArchived: false,
+        ...(isAdmin ? {} : { agentId: user.sub }),
+      },
+    });
+  }
+
+  // Callbacks needing a call today / overdue.
+  if (can('call_center:view') || can('orders:view')) {
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+    out.callbacksToday = await prisma.order.count({
+      where: {
+        confirmationStatus: 'callback',
+        isArchived: false,
+        callbackAt: { lte: todayEnd },
+        ...(isAdmin ? {} : { agentId: user.sub }),
+      },
+    });
+  }
+
+  // Returns awaiting verification.
+  if (can('returns:verify')) {
+    out.returnsToVerify = await prisma.order.count({
+      where: { shippingStatus: 'returned', returnVerifiedAt: null, isArchived: false },
+    });
+  }
+
+  // Coliix unresolved errors — admin only.
+  if (can('integrations:view')) {
+    out.coliixErrors = await prisma.coliixIntegrationError.count({ where: { resolved: false } });
+  }
+
+  // My open Atelie tasks (assigned to me, not done).
+  if (can('atelie:view')) {
+    out.atelieTasks = await prisma.atelieTask.count({
+      where: { ownerId: user.sub, status: { not: 'done' } },
+    });
+  }
+
+  return reply.send(out);
 });
 
 // Online users — returns names so the presence strip can render them without
@@ -373,7 +428,6 @@ app.get('/api/v1/kpi/dashboard', { preHandler: [verifyJWT] }, async (request, re
     cities: q.cities,
     confirmationStatuses: q.confirmationStatuses,
     shippingStatuses: q.shippingStatuses,
-    coliixRawStates: q.coliixRawStates,
     sources: q.sources,
     dateFrom: q.dateFrom,
     dateTo: q.dateTo,
@@ -410,7 +464,6 @@ app.get('/api/v1/kpi/dashboard', { preHandler: [verifyJWT] }, async (request, re
 // Shipping cities (CRUD + CSV import). Lists active cities by default so the
 // legacy `/shipping-cities` callers keep working unchanged.
 app.register(shippingCitiesRoutes, { prefix: '/api/v1/shipping-cities' });
-app.register(shippingStatusGroupsRoutes, { prefix: '/api/v1/shipping-status-groups' });
 app.register(broadcastsRoutes, { prefix: '/api/v1/broadcasts' });
 
 // Atelie — Employees, Attendance, Salary (Phase 14.A)
@@ -454,6 +507,15 @@ app.register(inboxRoutes, { prefix: '/api/v1/whatsapp/inbox' });
 // Admin — destructive ops (full CRM reset). Behind RBAC + typed code gate.
 app.register(adminRoutes, { prefix: '/api/v1/admin' });
 
+// Dashboard — per-card endpoints driving the dashboard page (one endpoint
+// per card so the frontend can refetch only the affected card on a socket
+// event, no full-page refresh).
+app.register(dashboardRoutes, { prefix: '/api/v1/dashboard' });
+
+// Coliix carrier integration — accounts (hubs), cities, mappings,
+// shipments, webhook receiver, and the errors log.
+app.register(coliixRoutes, { prefix: '/api/v1/coliix' });
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 const PORT = Number(process.env.PORT ?? 3001);
 
@@ -476,19 +538,12 @@ async function start() {
       app.log.warn({ err }, '[backfill] strip-html boot job crashed');
     });
 
-    // Seed known shipping providers (Coliix, …) so the Integrations page has
-    // rows to render from the first boot. No-op if rows already exist.
-    listProvidersPublic().catch((err) => {
-      app.log.warn({ err }, 'Failed to seed shipping providers');
+    // Coliix polling fallback — webhooks are primary, this is the safety
+    // net. Picks up shipments whose nextPollAt is past + non-terminal,
+    // calls Coliix's track API, ingests via the same pipeline as webhooks.
+    startColiixPoller().catch((err) => {
+      app.log.warn({ err }, 'Failed to start Coliix poller');
     });
-
-    // Fallback tracker — webhooks are the primary (instant) path; this sweeps
-    // in-flight orders every 5 min in case a webhook is dropped.
-    startColiixTracker();
-
-    // Coliix V2 fallback poller — same idea, scoped to the new Shipment table.
-    // Runs every 60s with adaptive cadence per parcel state.
-    startColiixV2Poller();
 
     // Seed the current week's attendance rows for every active employee on
     // boot + hourly (covers Monday rollover without a separate scheduler).

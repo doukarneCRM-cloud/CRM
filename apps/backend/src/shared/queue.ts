@@ -1,7 +1,8 @@
 /**
  * Bull queue setup.
  * Queues are defined here and shared across the app.
- * Workers are in src/jobs/ and registered in the server bootstrap.
+ * Workers are in src/jobs/ or src/modules/.../*.worker.ts and are
+ * registered in the server bootstrap as side-effect imports.
  *
  * NOTE: Bull requires Redis. All queues connect to the same Redis instance.
  */
@@ -21,15 +22,11 @@ function createQueue<T = unknown>(name: string) {
   });
 }
 
-// ─── Queue definitions ────────────────────────────────────────────────────────
+// ─── Queue payload shapes ────────────────────────────────────────────────────
 
 export interface YoucanSyncJobData {
   storeId: string;
   since?: string;
-}
-
-export interface ColiixPushJobData {
-  orderId: string;
 }
 
 export interface CallbackAlertJobData {
@@ -44,45 +41,46 @@ export interface WhatsAppSendJobData {
   messageLogId: string;
 }
 
-// ── Coliix V2 ────────────────────────────────────────────────────────────────
-// Shipment-id keyed jobs. We use the shipmentId as the Bull jobId on push
-// so double-enqueues are dedup'd by Bull itself.
-export interface ColiixV2PushJobData {
-  shipmentId: string;
-}
+// Coliix integration ─────────────────────────────────────────────────────────
+// Webhook handler validates + enqueues; the ingest worker does the slow
+// work (DB writes, socket emits) so the webhook responds in <50ms — Coliix
+// otherwise considers the call failed and retries.
 
-export interface ColiixV2IngestJobData {
+export interface ColiixIngestJobData {
   accountId: string;
   tracking: string;
   rawState: string;
   driverNote: string | null;
-  eventDateIso: string | null; // ISO; null = use receivedAt
+  // ISO; null means "use receivedAt as occurredAt".
+  eventDateIso: string | null;
+  // sha256(tracking|rawState|datereported) — second-layer replay guard
+  // after the Redis NX SET in the webhook handler.
+  dedupeHash: string;
   payload: Record<string, unknown>;
 }
 
-export interface ColiixV2PollTickJobData {
-  // Empty — the worker picks its own batch from Shipment.nextPollAt.
+// Polling fallback — single tick that picks up everything due. The cursor
+// field is reserved for future batching but unused in v1.
+export interface ColiixPollTickJobData {
   cursor?: string;
 }
 
+// ─── Queues ──────────────────────────────────────────────────────────────────
+
 export const youcanSyncQueue = createQueue<YoucanSyncJobData>('youcan:sync');
-export const coliixPushQueue = createQueue<ColiixPushJobData>('coliix:push');
 export const callbackAlertQueue = createQueue<CallbackAlertJobData>('callback:alert');
 export const whatsappQueue = createQueue<WhatsAppSendJobData>('whatsapp:send');
+export const coliixIngestQueue = createQueue<ColiixIngestJobData>('coliix:ingest');
+export const coliixPollQueue = createQueue<ColiixPollTickJobData>('coliix:poll');
 
-export const coliixV2PushQueue = createQueue<ColiixV2PushJobData>('coliix-v2:push');
-export const coliixV2IngestQueue = createQueue<ColiixV2IngestJobData>('coliix-v2:ingest');
-export const coliixV2PollQueue = createQueue<ColiixV2PollTickJobData>('coliix-v2:poll');
+// ─── Graceful shutdown ───────────────────────────────────────────────────────
 
-// ─── Graceful shutdown ────────────────────────────────────────────────────────
 export async function closeQueues() {
   await Promise.all([
     youcanSyncQueue.close(),
-    coliixPushQueue.close(),
     callbackAlertQueue.close(),
     whatsappQueue.close(),
-    coliixV2PushQueue.close(),
-    coliixV2IngestQueue.close(),
-    coliixV2PollQueue.close(),
+    coliixIngestQueue.close(),
+    coliixPollQueue.close(),
   ]);
 }

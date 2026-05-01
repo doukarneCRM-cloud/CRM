@@ -6,6 +6,7 @@
 
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../shared/prisma';
+import { emitToRoom } from '../../shared/socket';
 
 export interface ListExpensesParams {
   page?: number;
@@ -78,7 +79,7 @@ export async function listExpenses(params: ListExpensesParams) {
 }
 
 export async function createExpense(input: CreateExpenseInput, userId?: string) {
-  return prisma.expense.create({
+  const created = await prisma.expense.create({
     data: {
       description: input.description.trim(),
       amount: input.amount,
@@ -88,6 +89,9 @@ export async function createExpense(input: CreateExpenseInput, userId?: string) 
     },
     include: { addedBy: { select: { id: true, name: true } } },
   });
+  // Notify admin/supervisor rooms — Money page is admin-only.
+  emitToRoom('admin', 'expense:created', { id: created.id, ts: Date.now() });
+  return created;
 }
 
 export async function updateExpense(id: string, input: UpdateExpenseInput) {
@@ -96,14 +100,17 @@ export async function updateExpense(id: string, input: UpdateExpenseInput) {
   if (input.amount !== undefined) data.amount = input.amount;
   if (input.date !== undefined) data.date = new Date(input.date);
   if (input.fileUrl !== undefined) data.fileUrl = input.fileUrl;
-  return prisma.expense.update({
+  const updated = await prisma.expense.update({
     where: { id },
     data,
     include: { addedBy: { select: { id: true, name: true } } },
   });
+  emitToRoom('admin', 'expense:updated', { id, ts: Date.now() });
+  return updated;
 }
 
 export async function deleteExpense(id: string) {
   await prisma.expense.delete({ where: { id } });
+  emitToRoom('admin', 'expense:deleted', { id, ts: Date.now() });
   return { ok: true };
 }
