@@ -92,15 +92,13 @@ export function useDashboardCard<T>(
     let socket: ReturnType<typeof getSocket> | null = null;
     try {
       socket = getSocket();
-      const handler = (ev: string) => () => {
-        console.log('[Dashboard]', ev, '→ refetch (debounced)');
+      const handler = () => () => {
         scheduleRefetch();
       };
       const onReconnect = () => {
-        console.log('[Dashboard] socket connect → refetch');
         scheduleRefetch();
       };
-      const handlers = events.map((ev) => [ev, handler(ev)] as const);
+      const handlers = events.map((ev) => [ev, handler()] as const);
       for (const [ev, h] of handlers) socket.on(ev, h);
       socket.on('connect', onReconnect);
       return () => {

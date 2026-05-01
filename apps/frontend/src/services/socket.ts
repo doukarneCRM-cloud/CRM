@@ -111,15 +111,20 @@ export function getSocket(): Socket {
 }
 
 export function connectSocket(): Socket {
+  // Reuse any existing instance — connected, connecting, or even temporarily
+  // disconnected (Socket.IO auto-reconnects on the same instance, preserving
+  // every listener React components attached via socket.on(...)).
+  //
+  // The previous "disconnect + null + recreate" branch was the silent killer
+  // of live updates: under StrictMode + multiple consumers calling
+  // connectSocket() during initial mount, the in-flight socket got replaced
+  // multiple times, so listeners attached on early instances were thrown
+  // away with them. The dashboard cards subscribed to `order:updated` etc.,
+  // but the FINAL surviving instance had zero handlers. Token refresh now
+  // goes through reauthSocket() which mutates `socket.auth` in place.
+  if (socket) return socket;
+
   const { accessToken } = useAuthStore.getState();
-
-  if (socket?.connected) return socket;
-
-  // Disconnect existing stale socket
-  if (socket) {
-    socket.disconnect();
-    socket = null;
-  }
 
   socket = io(SOCKET_URL, {
     auth: { token: accessToken },

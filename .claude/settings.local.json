@@ -69,7 +69,8 @@
       "Bash(curl -s \"http://localhost:5173/src/hooks/useOrderNotifications.ts\")",
       "Bash(curl -s \"http://localhost:5173/src/services/socket.ts\")",
       "Bash(curl -s \"http://localhost:5173/src/services/api.ts\")",
-      "Bash(curl -s \"http://localhost:5173/src/pages/dashboard/hooks/useDashboardCard.ts\")"
+      "Bash(curl -s \"http://localhost:5173/src/pages/dashboard/hooks/useDashboardCard.ts\")",
+      "mcp__Claude_Preview__preview_start"
     ]
   }
 }

@@ -849,22 +849,16 @@ export function CallCenterTable({ onCreate }: { onCreate?: () => void } = {}) {
       const patchOne = async (payload: unknown) => {
         const orderId = (payload as { orderId?: string })?.orderId;
         if (!orderId) return;
-        console.log('[CC] patch order', orderId);
         try {
           const fresh = await ordersApi.getById(orderId);
           setOrders((prev) => {
             const idx = prev.findIndex((o) => o.id === orderId);
-            if (idx === -1) {
-              console.log('[CC] order not in current view, skipping', orderId);
-              return prev;
-            }
+            if (idx === -1) return prev;
             const next = prev.slice();
             next[idx] = { ...next[idx], ...fresh };
-            console.log('[CC] patched', orderId, 'new status:', fresh.confirmationStatus, fresh.shippingStatus);
             return next;
           });
-        } catch (e) {
-          console.warn('[CC] getById failed for', orderId, e);
+        } catch {
           setOrders((prev) => prev.filter((o) => o.id !== orderId));
         }
       };
