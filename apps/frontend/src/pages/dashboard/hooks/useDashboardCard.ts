@@ -62,6 +62,18 @@ export function useDashboardCard<T>(
     }
   }, []);
 
+  // Debounce socket-triggered refetches: 11 dashboard cards each refetching
+  // on the same `order:updated` event would cascade ~11 simultaneous network
+  // calls + 11 re-renders, locking the main thread for ~400ms. With a 250ms
+  // window only one refetch per card runs even if 5 events arrive in a burst.
+  const debouncedRefetch = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleRefetch = useCallback(() => {
+    if (debouncedRefetch.current) clearTimeout(debouncedRefetch.current);
+    debouncedRefetch.current = setTimeout(() => {
+      void refetch();
+    }, 250);
+  }, [refetch]);
+
   // Initial load + reload whenever filter deps change. Stringify to dodge
   // referential-equality re-runs on otherwise-identical filter objects.
   const depKey = JSON.stringify(deps);
@@ -81,12 +93,12 @@ export function useDashboardCard<T>(
     try {
       socket = getSocket();
       const handler = (ev: string) => () => {
-        console.log('[Dashboard]', ev, '→ refetch');
-        refetch();
+        console.log('[Dashboard]', ev, '→ refetch (debounced)');
+        scheduleRefetch();
       };
       const onReconnect = () => {
         console.log('[Dashboard] socket connect → refetch');
-        refetch();
+        scheduleRefetch();
       };
       const handlers = events.map((ev) => [ev, handler(ev)] as const);
       for (const [ev, h] of handlers) socket.on(ev, h);
@@ -94,6 +106,7 @@ export function useDashboardCard<T>(
       return () => {
         for (const [ev, h] of handlers) socket?.off(ev, h);
         socket?.off('connect', onReconnect);
+        if (debouncedRefetch.current) clearTimeout(debouncedRefetch.current);
       };
     } catch {
       // socket not ready — initial load already populated.
