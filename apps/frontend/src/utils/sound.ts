@@ -114,8 +114,15 @@ function playTones(tones: ToneSpec[]) {
   if (!prefs.enabled) return;
   const audio = getCtx();
   if (!audio) return;
-  if (audio.state === 'suspended') {
+  // Browser autoplay policy: scheduling oscillators on a suspended
+  // AudioContext logs a "not allowed to start" warning every single time.
+  // The unlock listener (registered in attachUnlockListeners) flips it to
+  // 'running' on the next click/key — until then we silently skip. Missing
+  // a sound for events that arrive in the first few hundred ms after page
+  // load is a fair price for a clean console.
+  if (audio.state !== 'running') {
     audio.resume().catch(() => {});
+    return;
   }
   const now = audio.currentTime;
   const master = prefs.volume;
