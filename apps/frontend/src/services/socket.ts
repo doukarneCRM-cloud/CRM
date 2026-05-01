@@ -1,7 +1,9 @@
 import { io, type Socket } from 'socket.io-client';
 import { useAuthStore } from '@/store/authStore';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL ?? 'http://localhost:3001';
+// Default port aligned with the backend (we moved off 3001 because Hyper-V
+// reserves it on Windows). The .env override still wins if present.
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL ?? 'http://localhost:4000';
 
 // Presence is tied to real input activity, not just "tab open with a live
 // socket". After IDLE_THRESHOLD_MS without mouse / scroll / key / touch
