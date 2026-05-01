@@ -3,7 +3,9 @@ import { useAuthStore } from '@/store/authStore';
 import { reauthSocket } from '@/services/socket';
 import type { RefreshResponse } from '@/types/auth';
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
+// Default port aligned with the backend (we moved off 3001 because Hyper-V
+// reserves it on Windows). The .env override still wins if present.
+const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
 // ─── Axios instance ───────────────────────────────────────────────────────────
 export const api: AxiosInstance = axios.create({

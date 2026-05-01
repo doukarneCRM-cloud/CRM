@@ -24,7 +24,7 @@ interface Props {
   onChanged: () => void;
 }
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
+const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
 export function TaskDetailModal({ open, taskId, onClose, onChanged }: Props) {
   const { t } = useTranslation();

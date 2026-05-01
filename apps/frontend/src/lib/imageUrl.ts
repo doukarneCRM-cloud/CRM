@@ -1,4 +1,4 @@
-const BACKEND_ORIGIN = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
+const BACKEND_ORIGIN = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
 // Prepends the backend origin when the URL is a server-relative upload path.
 // External URLs (http/https) and empty values pass through unchanged.

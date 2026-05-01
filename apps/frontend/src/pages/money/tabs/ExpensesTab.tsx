@@ -29,7 +29,7 @@ import { PERMISSIONS } from '@/constants/permissions';
 import { moneyApi, type Expense } from '@/services/moneyApi';
 import { getSocket } from '@/services/socket';
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
+const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 
 function fmtMAD(n: number): string {
   return `${n.toLocaleString('fr-MA', { maximumFractionDigits: 2 })} MAD`;
