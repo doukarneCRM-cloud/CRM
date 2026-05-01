@@ -76,12 +76,14 @@ export function useDashboardCard<T>(
     let socket: ReturnType<typeof getSocket> | null = null;
     try {
       socket = getSocket();
-      const handler = () => {
+      const handler = (ev: string) => () => {
+        console.log('[Dashboard]', ev, '→ refetch');
         refetch();
       };
-      for (const ev of events) socket.on(ev, handler);
+      const handlers = events.map((ev) => [ev, handler(ev)] as const);
+      for (const [ev, h] of handlers) socket.on(ev, h);
       return () => {
-        for (const ev of events) socket?.off(ev, handler);
+        for (const [ev, h] of handlers) socket?.off(ev, h);
       };
     } catch {
       // socket not ready — initial load already populated.
