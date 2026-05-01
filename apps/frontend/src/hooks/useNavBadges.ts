@@ -160,6 +160,11 @@ export function useNavBadges(): NavBadges {
     socket.on('task:created', scheduleRefetch);
     socket.on('task:updated', scheduleRefetch);
     socket.on('task:deleted', scheduleRefetch);
+    // Recovery on (re)connect — events emitted while the socket was
+    // disconnected (token refresh, network blip) would leave the badges
+    // out of sync. A full refetch on connect makes sure we're consistent.
+    const onReconnect = () => void refetch();
+    socket.on('connect', onReconnect);
 
     return () => {
       socket?.off('order:created', onOrderCreated);
@@ -171,6 +176,7 @@ export function useNavBadges(): NavBadges {
       socket?.off('task:created', scheduleRefetch);
       socket?.off('task:updated', scheduleRefetch);
       socket?.off('task:deleted', scheduleRefetch);
+      socket?.off('connect', onReconnect);
       // Drop any pending debounced refetch — without this, a no-hint event
       // arriving just before a logout / unmount fires `refetch()` after the
       // hook is gone, calling setBadges on an unmounted component.

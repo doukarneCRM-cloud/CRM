@@ -883,6 +883,9 @@ export function CallCenterTable({ onCreate }: { onCreate?: () => void } = {}) {
       socket.on('order:archived', dropOne);
       socket.on('order:created', fullRefresh);
       socket.on('order:bulk_updated', fullRefresh);
+      // Recovery on (re)connect after a token refresh / network blip — any
+      // emit that fired while the socket was disconnected lands in the void.
+      socket.on('connect', fullRefresh);
 
       return () => {
         socket.off('order:updated', patchOne);
@@ -891,6 +894,7 @@ export function CallCenterTable({ onCreate }: { onCreate?: () => void } = {}) {
         socket.off('order:archived', dropOne);
         socket.off('order:created', fullRefresh);
         socket.off('order:bulk_updated', fullRefresh);
+        socket.off('connect', fullRefresh);
       };
     } catch {
       // socket not ready

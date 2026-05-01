@@ -177,6 +177,9 @@ export function useOrders(): UseOrdersReturn {
       socket.on('order:archived', dropOne);
       socket.on('order:created', fullRefresh);
       socket.on('order:bulk_updated', fullRefresh);
+      // Recovery on (re)connect — events emitted while the socket was
+      // disconnected (token refresh, network blip) would otherwise be missed.
+      socket.on('connect', fullRefresh);
 
       return () => {
         socket?.off('order:updated', patchOne);
@@ -184,6 +187,7 @@ export function useOrders(): UseOrdersReturn {
         socket?.off('order:archived', dropOne);
         socket?.off('order:created', fullRefresh);
         socket?.off('order:bulk_updated', fullRefresh);
+        socket?.off('connect', fullRefresh);
       };
     } catch {
       // Socket not initialized yet — no-op

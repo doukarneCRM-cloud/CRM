@@ -130,11 +130,16 @@ export function OrderSummaryCards({ className }: OrderSummaryCardsProps) {
       socket.on('order:updated', fetchSummary);
       socket.on('order:archived', fetchSummary);
       socket.on('order:bulk_updated', fetchSummary);
+      // Recovery on (re)connect — any emit that fired while the socket was
+      // disconnected (token refresh, network blip) would otherwise leave
+      // the card stale.
+      socket.on('connect', fetchSummary);
       return () => {
         socket.off('order:created', fetchSummary);
         socket.off('order:updated', fetchSummary);
         socket.off('order:archived', fetchSummary);
         socket.off('order:bulk_updated', fetchSummary);
+        socket.off('connect', fetchSummary);
       };
     } catch {
       // socket not ready

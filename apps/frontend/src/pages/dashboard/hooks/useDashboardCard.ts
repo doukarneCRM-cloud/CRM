@@ -71,6 +71,10 @@ export function useDashboardCard<T>(
   }, [depKey, refetch]);
 
   // Socket subscriptions — fire surgically on the events the caller picked.
+  // Plus a refetch on every (re)connect so we recover from any window where
+  // the socket was disconnected (token refresh, network blip, server restart).
+  // Without this, events emitted while the socket is reauthing land in the
+  // void and the card stays stale until the next manual reload.
   useEffect(() => {
     if (events.length === 0) return;
     let socket: ReturnType<typeof getSocket> | null = null;
@@ -80,10 +84,16 @@ export function useDashboardCard<T>(
         console.log('[Dashboard]', ev, '→ refetch');
         refetch();
       };
+      const onReconnect = () => {
+        console.log('[Dashboard] socket connect → refetch');
+        refetch();
+      };
       const handlers = events.map((ev) => [ev, handler(ev)] as const);
       for (const [ev, h] of handlers) socket.on(ev, h);
+      socket.on('connect', onReconnect);
       return () => {
         for (const [ev, h] of handlers) socket?.off(ev, h);
+        socket?.off('connect', onReconnect);
       };
     } catch {
       // socket not ready — initial load already populated.

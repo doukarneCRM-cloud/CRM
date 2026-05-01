@@ -153,6 +153,8 @@ export function AgentKpiCards({ className }: AgentKpiCardsProps) {
       // operations precisely so this card doesn't refetch 50 times.
       socket.on('order:bulk_updated', fetchAll);
       socket.on('order:bulk_assigned', fetchAll);
+      // Recovery on (re)connect after a token refresh / network blip.
+      socket.on('connect', fetchAll);
       return () => {
         socket.off('order:created', fetchAll);
         socket.off('order:assigned', fetchAll);
@@ -160,6 +162,7 @@ export function AgentKpiCards({ className }: AgentKpiCardsProps) {
         socket.off('order:archived', fetchAll);
         socket.off('order:bulk_updated', fetchAll);
         socket.off('order:bulk_assigned', fetchAll);
+        socket.off('connect', fetchAll);
       };
     } catch {
       // socket not ready yet
