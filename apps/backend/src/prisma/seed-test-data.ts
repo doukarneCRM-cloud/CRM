@@ -46,9 +46,12 @@ const PRODUCTS = [
 const AGENTS = [
   { email: 'fatima@anaqatoki.ma',  name: 'Fatima El Idrissi'  },
   { email: 'youssef@anaqatoki.ma', name: 'Youssef Benali'      },
-  { email: 'amina@anaqatoki.ma',   name: 'Amina Tahiri'        },
-  { email: 'karim@anaqatoki.ma',   name: 'Karim Boukhari'      },
 ];
+
+// Older test seeds created amina+karim — when we re-seed, deactivate
+// them rather than delete (their order history may have been mutated by
+// the user). They no longer get new orders assigned to them.
+const RETIRED_TEST_AGENT_EMAILS = ['amina@anaqatoki.ma', 'karim@anaqatoki.ma'];
 
 const CUSTOMER_FIRST_NAMES = [
   'Mohamed', 'Aicha', 'Omar', 'Salma', 'Hassan', 'Zineb', 'Said', 'Nadia',
@@ -61,28 +64,44 @@ const CUSTOMER_LAST_NAMES = [
 
 const SOURCES: OrderSource[] = ['youcan', 'whatsapp', 'instagram', 'manual'];
 
-// Distribution targets for the 80 generated orders. Counts sum to 80.
-const CONFIRMATION_DISTRIBUTION: Array<[ConfirmationStatus, number]> = [
-  ['confirmed',    44], // 55% — most orders end up confirmed
-  ['pending',      10], // 12% — fresh, agent hasn't acted yet
-  ['callback',      6], // 7%  — client asked to be called back
-  ['cancelled',     6], // 7%  — agent cancelled
-  ['unreachable',   5], // 6%  — couldn't reach the client
-  ['reported',      4], // 5%  — client wants on a future date
-  ['out_of_stock',  3], // 4%  — variant ran out
-  ['fake',          2], // 3%  — spam / fake
+// Per-agent order allocation. Each of 2 agents gets 50 orders broken
+// down explicitly — replaces the old distribution-shuffle logic. Total
+// across both agents: 100 orders.
+//
+// Per agent (50):
+//   25 confirmed:
+//      5 delivered          (terminal happy path)
+//     10 shipped/in-flight  (mix of in_transit/picked_up/out_for_delivery)
+//     10 confirmed-other    (not_shipped, pushed, returned, failed, reported)
+//   25 other confirmation   (pending/callback/cancelled/unreachable/...)
+
+const PER_AGENT = 50;
+const CONFIRMED_PER_AGENT = 25;
+const NON_CONFIRMED_PER_AGENT = 25;
+
+// Within the 25 confirmed orders for each agent, exactly this shipping
+// breakdown — sums to 25.
+const PER_AGENT_SHIPPING: Array<[ShippingStatus, number]> = [
+  ['delivered',         5],   // user spec: 5 delivered
+  ['in_transit',        4],   // user spec: 10 shipped (in-flight) ↓
+  ['picked_up',         3],
+  ['out_for_delivery',  3],   // 4+3+3 = 10 ✓
+  ['not_shipped',       4],   // user spec: 10 "other status" on confirmed ↓
+  ['pushed',            3],
+  ['returned',          2],
+  ['failed_delivery',   1],
+  ['reported',          0],   // 4+3+2+1+0 = 10 ✓
 ];
 
-// Of the 44 confirmed orders, where are they in the shipping pipeline?
-const SHIPPING_DISTRIBUTION: Array<[ShippingStatus, number]> = [
-  ['delivered',         22], // half delivered
-  ['in_transit',         5],
-  ['out_for_delivery',   3],
-  ['picked_up',          3],
-  ['returned',           5], // some bounced back
-  ['failed_delivery',    3],
-  ['reported',           2], // courier asked to come back later
-  ['not_shipped',        1], // confirmed but agent hasn't pushed yet
+// Within the 25 non-confirmed for each agent — sums to 25.
+const PER_AGENT_NON_CONFIRMED: Array<[ConfirmationStatus, number]> = [
+  ['pending',      6],
+  ['callback',     5],
+  ['unreachable',  4],
+  ['cancelled',    4],
+  ['reported',     3],
+  ['out_of_stock', 2],
+  ['fake',         1],
 ];
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -103,26 +122,6 @@ function daysAgo(days: number, hour = randInt(8, 22), minute = randInt(0, 59)): 
   d.setDate(d.getDate() - days);
   d.setHours(hour, minute, 0, 0);
   return d;
-}
-
-function pickByDistribution<T>(dist: Array<[T, number]>, total: number): T[] {
-  const out: T[] = [];
-  let sum = 0;
-  for (const [v, n] of dist) {
-    for (let i = 0; i < n; i++) out.push(v);
-    sum += n;
-  }
-  if (sum !== total) {
-    // Pad with the most common bucket if rounding doesn't match.
-    while (out.length < total) out.push(dist[0][0]);
-    while (out.length > total) out.pop();
-  }
-  // Shuffle so distribution is mixed across days/agents, not clumped.
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [out[i], out[j]] = [out[j], out[i]];
-  }
-  return out;
 }
 
 function nextRef(year: number, seq: number): string {
@@ -166,6 +165,36 @@ async function wipePrevious() {
     await prisma.product.deleteMany({ where: { id: { in: pids } } });
   }
   console.log(`🧹 Wiped ${testCustomers.length} test customers + ${testProducts.length} test products`);
+
+  // Retire old test agents from previous seeds (amina, karim) — leave the
+  // user rows in place since their commission/order history may still be
+  // referenced, just deactivate so they no longer take new assignments
+  // and disappear from the active agent picker.
+  const retired = await prisma.user.updateMany({
+    where: { email: { in: RETIRED_TEST_AGENT_EMAILS } },
+    data: { isActive: false },
+  });
+  if (retired.count > 0) {
+    console.log(`🪦 Deactivated ${retired.count} retired test agents (${RETIRED_TEST_AGENT_EMAILS.join(', ')})`);
+  }
+}
+
+// ─── Commission rules — flat 10 MAD per delivered ───────────────────────────
+//
+// Two CommissionRule rows per agent (type 'onConfirm' = 0, 'onDeliver' = 10).
+// commission.service.ts adds them together to derive perOrderRate. Wiping
+// existing rules first keeps the seed idempotent across re-runs.
+async function setupCommissionRules(agents: { id: string; name: string }[]) {
+  for (const a of agents) {
+    await prisma.commissionRule.deleteMany({ where: { agentId: a.id } });
+    await prisma.commissionRule.createMany({
+      data: [
+        { agentId: a.id, type: 'onConfirm', value: 0 },
+        { agentId: a.id, type: 'onDeliver', value: 10 },
+      ],
+    });
+  }
+  console.log(`✅ Commission rules set: 10 MAD per delivered for ${agents.length} agents`);
 }
 
 // ─── Seed building blocks ───────────────────────────────────────────────────
@@ -327,9 +356,10 @@ async function createOrder(args: SeedOrderArgs) {
     ? new Date((labelSentAt ?? transitionAt).getTime() + randInt(24, 72) * 3600 * 1000)
     : null;
 
-  // Commission: 30% of delivered orders get marked paid; the rest sit in
-  // the pending pool the "Commission unpaid" card surfaces.
-  const commissionAmount = isDelivered ? Math.round(itemTotal * 0.05) : null;
+  // Commission: flat 10 MAD per delivered order (matches the per-agent
+  // CommissionRule we set in setupCommissionRules). 30% pre-paid so the
+  // "Commission unpaid" card has both buckets to display.
+  const commissionAmount = isDelivered ? 10 : null;
   const commissionPaid = isDelivered && Math.random() < 0.3;
 
   await prisma.order.create({
@@ -389,73 +419,79 @@ async function seedOrders(
   agents: { id: string; name: string }[],
   products: { id: string; basePrice: number; variants: { id: string; price: number }[] }[],
 ) {
-  const TOTAL = 80;
-  const confirmationPlan = pickByDistribution(CONFIRMATION_DISTRIBUTION, TOTAL);
-  const shippingPlan = pickByDistribution(SHIPPING_DISTRIBUTION, 44); // only confirmed get shipped
-  let shippingIdx = 0;
+  if (agents.length < 2) throw new Error('Need at least 2 agents for the per-agent split');
 
   const year = new Date().getFullYear();
-  let seq = 1;
+  // Start sequence ABOVE the highest existing reference so we never
+  // collide with manual orders the user created between seed runs.
+  // Old refs are like 'ORD-26-00012' — we strip prefix + parse.
+  const maxRef = await prisma.order.findFirst({
+    where: { reference: { startsWith: `ORD-${String(year).slice(-2)}-` } },
+    orderBy: { reference: 'desc' },
+    select: { reference: true },
+  });
+  const seqStart = maxRef
+    ? Number(maxRef.reference.split('-').pop() ?? 0) + 1
+    : 1;
+  let seq = seqStart;
+  let custIdx = 0;
+  let totalCreated = 0;
+  console.log(`   (sequence starts at ${seqStart} to avoid colliding with existing orders)`);
 
-  // Spread orders across the last 14 days so the trend chart fills out.
-  for (let i = 0; i < TOTAL; i++) {
-    const customer = customers[i % customers.length];
-    const agent = i % 12 === 0 ? null : agents[i % agents.length]; // ~8% unassigned
-    const product = rand(products);
-    const confirmation = confirmationPlan[i];
-    const shipping: ShippingStatus =
-      confirmation === 'confirmed' ? shippingPlan[shippingIdx++] ?? 'not_shipped' : 'not_shipped';
-    const daysSince = randInt(0, 13);
-    const source = rand(SOURCES);
+  // Per-agent: deterministic 50 orders each — 25 confirmed + 25 not.
+  for (const agent of agents) {
+    // Build the explicit shipping plan for the 25 confirmed orders.
+    const shippingPlan: ShippingStatus[] = [];
+    for (const [s, n] of PER_AGENT_SHIPPING) for (let i = 0; i < n; i++) shippingPlan.push(s);
+    // Shuffle so the dashboard daily-trend chart isn't lumpy by status.
+    for (let i = shippingPlan.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shippingPlan[i], shippingPlan[j]] = [shippingPlan[j], shippingPlan[i]];
+    }
 
-    await createOrder({
-      customer,
-      agent,
-      product,
-      confirmation,
-      shipping,
-      reference: nextRef(year, seq++),
-      daysSinceCreated: daysSince,
-      source,
-    });
+    const nonConfirmedPlan: ConfirmationStatus[] = [];
+    for (const [c, n] of PER_AGENT_NON_CONFIRMED) for (let i = 0; i < n; i++) nonConfirmedPlan.push(c);
+    for (let i = nonConfirmedPlan.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [nonConfirmedPlan[i], nonConfirmedPlan[j]] = [nonConfirmedPlan[j], nonConfirmedPlan[i]];
+    }
+
+    // 25 confirmed orders.
+    for (let i = 0; i < CONFIRMED_PER_AGENT; i++) {
+      const shipping = shippingPlan[i] ?? 'not_shipped';
+      await createOrder({
+        customer: customers[custIdx++ % customers.length],
+        agent,
+        product: rand(products),
+        confirmation: 'confirmed',
+        shipping,
+        reference: nextRef(year, seq++),
+        daysSinceCreated: randInt(0, 13),
+        source: rand(SOURCES),
+      });
+      totalCreated++;
+    }
+
+    // 25 non-confirmed orders.
+    for (let i = 0; i < NON_CONFIRMED_PER_AGENT; i++) {
+      const confirmation = nonConfirmedPlan[i] ?? 'pending';
+      await createOrder({
+        customer: customers[custIdx++ % customers.length],
+        agent,
+        product: rand(products),
+        confirmation,
+        shipping: 'not_shipped',
+        reference: nextRef(year, seq++),
+        daysSinceCreated: randInt(0, 13),
+        source: rand(SOURCES),
+      });
+      totalCreated++;
+    }
+
+    console.log(`   • ${agent.name}: ${PER_AGENT} orders (${CONFIRMED_PER_AGENT} confirmed)`);
   }
 
-  // Plus 4 extra "merged duplicates" so the merged-orders card has volume.
-  // Pattern: create a keeper + 1 archived merged-into-keeper. Both share
-  // the same customer phone so they look like a real duplicate scenario.
-  for (let i = 0; i < 4; i++) {
-    const customer = customers[(TOTAL + i) % customers.length];
-    const agent = agents[i % agents.length];
-    const product = rand(products);
-    const keeperRef = nextRef(year, seq++);
-    const dupRef = nextRef(year, seq++);
-
-    await createOrder({
-      customer,
-      agent,
-      product,
-      confirmation: 'pending',
-      shipping: 'not_shipped',
-      reference: keeperRef,
-      daysSinceCreated: randInt(0, 7),
-      source: rand(SOURCES),
-    });
-    const keeper = await prisma.order.findUnique({ where: { reference: keeperRef } });
-    if (!keeper) continue;
-    await createOrder({
-      customer,
-      agent,
-      product,
-      confirmation: 'pending',
-      shipping: 'not_shipped',
-      reference: dupRef,
-      daysSinceCreated: randInt(0, 6),
-      source: rand(SOURCES),
-      mergedIntoId: keeper.id,
-    });
-  }
-
-  console.log(`✅ ${TOTAL} orders + 4 merged duplicates`);
+  console.log(`✅ ${totalCreated} orders across ${agents.length} agents`);
 }
 
 // ─── Main ───────────────────────────────────────────────────────────────────
@@ -466,6 +502,7 @@ async function main() {
   await wipePrevious();
   await ensureCities();
   const agents = await ensureAgents();
+  await setupCommissionRules(agents);
   const products = await seedProducts();
   const customers = await seedCustomers(50);
   await seedOrders(customers, agents, products);
