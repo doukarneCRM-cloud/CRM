@@ -36,13 +36,15 @@ const CRMInput = forwardRef<HTMLInputElement, CRMInputProps>(
             id={inputId}
             className={cn(
               'w-full rounded-input border bg-white py-2.5 text-sm text-gray-900 placeholder-gray-400',
-              'transition-colors duration-150',
-              'focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary',
+              'transition-all duration-150',
+              // Brand-coloured focus ring + lavender border so inputs match
+              // the rest of the lavender-accent UI surface.
+              'focus:outline-none focus:ring-2 focus:ring-tone-lavender-100 focus:border-tone-lavender-300',
               'disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400',
               leftIcon ? 'pl-10 pr-4' : 'px-4',
               rightElement ? 'pr-10' : '',
               error
-                ? 'border-red-400 focus:border-red-400 focus:ring-red-200'
+                ? 'border-tone-rose-300 focus:border-tone-rose-300 focus:ring-tone-rose-100'
                 : 'border-gray-200',
               className,
             )}
@@ -54,7 +56,7 @@ const CRMInput = forwardRef<HTMLInputElement, CRMInputProps>(
           )}
         </div>
 
-        {error && <p className="text-xs font-medium text-red-500">{error}</p>}
+        {error && <p className="text-xs font-medium text-tone-rose-500">{error}</p>}
         {hint && !error && <p className="text-xs text-gray-400">{hint}</p>}
       </div>
     );

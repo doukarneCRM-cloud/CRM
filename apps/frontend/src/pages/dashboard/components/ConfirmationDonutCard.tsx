@@ -52,11 +52,11 @@ export function ConfirmationDonutCard() {
   const total = slices.reduce((s, p) => s + p.value, 0);
 
   return (
-    <GlassCard className="flex flex-col gap-3 p-4">
+    <GlassCard className="flex flex-col gap-4 p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-bold text-gray-900">{t('dashboard.charts.donutTitle')}</h3>
+        <h3 className="text-base font-bold text-gray-900">{t('dashboard.charts.donutTitle')}</h3>
         <select
-          className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 focus:border-primary focus:outline-none"
+          className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 focus:border-tone-lavender-300 focus:outline-none focus:ring-2 focus:ring-tone-lavender-100"
           value={donutAgentId ?? ''}
           onChange={(e) => setDonutAgentId(e.target.value || null)}
         >

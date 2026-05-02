@@ -38,7 +38,7 @@ export function AgentPipelineTable() {
 
   return (
     <GlassCard className="flex flex-col gap-3 p-4">
-      <h3 className="text-sm font-bold text-gray-900">{t('dashboard.pipeline.agentsTitle')}</h3>
+      <h3 className="text-base font-bold text-gray-900">{t('dashboard.pipeline.agentsTitle')}</h3>
       {loading ? (
         <div className="skeleton h-32 w-full rounded-md" />
       ) : rows.length === 0 ? (

@@ -16,10 +16,12 @@ import { useDashboardCard, useDashboardFilters } from '../hooks/useDashboardCard
 
 const EVENTS = ['order:created', 'order:confirmed', 'order:delivered', 'order:archived'];
 
+// Coordinated with the dashboard tone palette so the bar series read
+// against the same lavender / sky / mint hues as the surrounding KPI cards.
 const COLOURS = {
-  orders: '#A78BFA',     // violet-400
-  confirmed: '#60A5FA',  // blue-400
-  delivered: '#34D399',  // emerald-400
+  orders: '#7C5CFF',     // tone-lavender-500
+  confirmed: '#3D8BFF',  // tone-sky-500
+  delivered: '#2EBE6D',  // tone-mint-500
 };
 
 interface TooltipRow {
@@ -82,9 +84,9 @@ export function DailyTrendChart() {
   );
 
   return (
-    <GlassCard className="flex flex-col gap-3 p-4">
+    <GlassCard className="flex flex-col gap-3 p-5">
       <div className="flex items-baseline justify-between">
-        <h3 className="text-sm font-bold text-gray-900">{t('dashboard.charts.trendTitle')}</h3>
+        <h3 className="text-base font-bold text-gray-900">{t('dashboard.charts.trendTitle')}</h3>
         <span className="text-[11px] text-gray-400">{t('dashboard.charts.trendSubtitle')}</span>
       </div>
       <div className="h-72">

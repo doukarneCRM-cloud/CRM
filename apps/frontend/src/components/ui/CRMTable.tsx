@@ -214,14 +214,14 @@ function CRMTable<TData extends object>({
       <div className="hidden overflow-x-auto md:block">
         <table className="w-full min-w-[640px] border-collapse text-sm">
           {/* Sticky header */}
-          <thead className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm">
+          <thead className="sticky top-0 z-10 bg-gray-50/80 backdrop-blur-sm">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id} className="border-b border-gray-100">
                 {headerGroup.headers.map((header) => (
                   <th
                     key={header.id}
                     style={{ width: header.getSize() }}
-                    className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500"
+                    className="whitespace-nowrap px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-500"
                   >
                     {header.isPlaceholder
                       ? null
@@ -244,8 +244,8 @@ function CRMTable<TData extends object>({
                 <tr
                   key={row.id}
                   className={cn(
-                    'border-b border-gray-50 transition-colors hover:bg-accent/50',
-                    row.getIsSelected() && 'bg-accent/70',
+                    'border-b border-gray-50 transition-colors hover:bg-tone-lavender-50/60',
+                    row.getIsSelected() && 'bg-tone-lavender-50',
                   )}
                 >
                   {row.getVisibleCells().map((cell) => (
@@ -272,7 +272,7 @@ function CRMTable<TData extends object>({
               onChange={(e) =>
                 setPagination((p) => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))
               }
-              className="appearance-none rounded-lg border border-gray-200 bg-white py-1 pl-3 pr-7 text-sm text-gray-700 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
+              className="appearance-none rounded-lg border border-gray-200 bg-white py-1 pl-3 pr-7 text-sm text-gray-700 focus:border-tone-lavender-300 focus:outline-none focus:ring-2 focus:ring-tone-lavender-100"
             >
               {PAGE_SIZES.map((size) => (
                 <option key={size} value={size}>
@@ -305,14 +305,14 @@ function CRMTable<TData extends object>({
             <button
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:border-tone-lavender-300 hover:text-tone-lavender-500 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ChevronLeft size={14} />
             </button>
             <button
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:border-tone-lavender-300 hover:text-tone-lavender-500 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ChevronRight size={14} />
             </button>
