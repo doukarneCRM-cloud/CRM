@@ -219,18 +219,34 @@ function ShippingPill({ order }: { order: Order }) {
   const { t } = useTranslation();
   const cfg = SHIPPING_STATUS_COLORS[order.shippingStatus as ShippingStatus];
   if (!cfg) return null;
+  // Show the raw Coliix wording underneath when a shipment is linked.
+  // Several Coliix wordings can collapse to the same CRM enum bucket
+  // (e.g. "Attente De Ramassage", "Ramassé", and "En transit" can all
+  // map to picked_up depending on the mapping), so the agent needs the
+  // exact text to know which step Coliix actually reports.
+  const rawState = order.shipment?.rawState;
   return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 rounded-badge px-2.5 py-1 text-[11px] font-semibold',
-        cfg.bg,
-        cfg.text,
+    <div className="flex flex-col items-start gap-0.5">
+      <span
+        className={cn(
+          'inline-flex items-center gap-1.5 rounded-badge px-2.5 py-1 text-[11px] font-semibold',
+          cfg.bg,
+          cfg.text,
+        )}
+        title={t('callCenter.row.shippingTooltip', { label: cfg.label })}
+      >
+        <span className={cn('h-1.5 w-1.5 rounded-full', cfg.dot)} />
+        {cfg.label}
+      </span>
+      {rawState && (
+        <span
+          className="truncate text-[10px] italic text-gray-500"
+          title={rawState}
+        >
+          Coliix: {rawState}
+        </span>
       )}
-      title={t('callCenter.row.shippingTooltip', { label: cfg.label })}
-    >
-      <span className={cn('h-1.5 w-1.5 rounded-full', cfg.dot)} />
-      {cfg.label}
-    </span>
+    </div>
   );
 }
 
