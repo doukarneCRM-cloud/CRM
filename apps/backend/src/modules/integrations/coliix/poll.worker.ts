@@ -72,10 +72,13 @@ function normaliseColiixTime(s: string): string {
   return s.replace(/\s+:/, ':');
 }
 
-function pickLatest(list: ColiixHistoryEntry[]): ColiixHistoryEntry | null {
-  // Coliix delivers chronological order (oldest → newest), so the last
-  // index is the latest. Defensive: prefer the entry with the largest
-  // parseable time in case the order ever flips.
+// Unused now — parseAllTrackEntries iterates every entry. Kept commented
+// out as a reference: Coliix delivers chronological order (oldest → newest)
+// so list[list.length - 1] would be the latest if a single-entry path ever
+// becomes useful again.
+// @ts-expect-error - retained for documentation, not in current code path.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _pickLatest_unused(list: ColiixHistoryEntry[]): ColiixHistoryEntry | null {
   if (list.length === 0) return null;
   let latest = list[list.length - 1];
   let latestT = -Infinity;
@@ -110,29 +113,32 @@ function entryToParsed(entry: ColiixHistoryEntry): ParsedTrack | null {
   };
 }
 
-function parseTrackResponse(
+// Parse EVERY history entry Coliix returned, in chronological order, so
+// the polling worker can ingest each one — not just the latest. Gives a
+// complete timeline even when several states elapse between two polls.
+function parseAllTrackEntries(
   body: TrackResult | undefined | null,
   envelope?: Record<string, unknown>,
-): ParsedTrack | null {
-  // ① Coliix's actual shape: msg is a history array on the envelope root.
+): ParsedTrack[] {
+  const out: ParsedTrack[] = [];
+  const collect = (list: ColiixHistoryEntry[]) => {
+    for (const entry of list) {
+      const p = entryToParsed(entry);
+      if (p) out.push(p);
+    }
+  };
   const msgFromEnvelope = envelope && Array.isArray(envelope.msg) ? envelope.msg : null;
-  if (msgFromEnvelope) {
-    const latest = pickLatest(msgFromEnvelope as ColiixHistoryEntry[]);
-    if (latest) return entryToParsed(latest);
+  if (msgFromEnvelope) collect(msgFromEnvelope as ColiixHistoryEntry[]);
+  if (out.length === 0 && body) {
+    const history = Array.isArray(body.history) ? (body.history as ColiixHistoryEntry[]) : null;
+    if (history) collect(history);
   }
-  if (!body) return null;
-  // ② Documented shape: data.history with {state, datereported}
-  const history = Array.isArray(body.history) ? (body.history as ColiixHistoryEntry[]) : null;
-  if (history && history.length > 0) {
-    const latest = pickLatest(history);
-    if (latest) return entryToParsed(latest);
-  }
-  // ③ Flat shape: top-level state.
-  if (typeof body.state === 'string' && body.state.trim()) {
-    return { state: body.state.trim(), datereported: null, note: null };
-  }
-  return null;
+  return out;
 }
+
+// Old single-entry parser removed — parseAllTrackEntries above replaces it.
+// Both webhook + poll paths now ingest every history entry returned and
+// rely on the dedupe hash to avoid double-inserting events we already saw.
 
 function errorTypeFor(err: unknown): 'api_credential_invalid' | 'api_timeout' | 'api_unknown' {
   if (err instanceof ColiixApiError) {
@@ -198,20 +204,17 @@ coliixPollQueue.process(1, async (_job) => {
           apiKey,
           tracking: s.trackingCode,
         });
-        // The Coliix accounts we've probed put history on `msg` at the
-        // envelope root, not under `data`. parseTrackResponse handles
-        // both shapes — we pass the whole envelope as a fallback. If
-        // status:false (e.g. "Colis introuvable"), parsing returns null
-        // and we silently back off.
-        const parsed = parseTrackResponse(
+        // Ingest EVERY history entry Coliix returned, not just the latest.
+        // The dedupe hash on each (tracking|state|date) makes re-ingest a
+        // no-op for entries we've already saved, so this is idempotent.
+        // Without this loop, two state transitions between polls would
+        // skip the intermediate one — e.g. picked_up → out_for_delivery
+        // would never appear because only out_for_delivery is the latest.
+        const all = parseAllTrackEntries(
           response.data as TrackResult | undefined,
           response as unknown as Record<string, unknown>,
         );
-        if (!parsed) {
-          // Tracked OK but Coliix had nothing new. Bump lastPolledAt and
-          // push nextPollAt out by the backoff so we don't re-poll
-          // immediately when the row's adaptive cadence happened to be
-          // shorter than the empty response.
+        if (all.length === 0) {
           await prisma.shipment.update({
             where: { id: s.id },
             data: {
@@ -222,15 +225,17 @@ coliixPollQueue.process(1, async (_job) => {
           continue;
         }
 
-        await ingestEvent({
-          source: 'poll',
-          tracking: s.trackingCode,
-          rawState: parsed.state,
-          driverNote: parsed.note,
-          eventDate: parsed.datereported ? new Date(parsed.datereported) : null,
-          dedupeHash: dedupeHashFor(s.trackingCode, parsed.state, parsed.datereported ?? ''),
-          payload: response.data ?? {},
-        });
+        for (const parsed of all) {
+          await ingestEvent({
+            source: 'poll',
+            tracking: s.trackingCode,
+            rawState: parsed.state,
+            driverNote: parsed.note,
+            eventDate: parsed.datereported ? new Date(parsed.datereported) : null,
+            dedupeHash: dedupeHashFor(s.trackingCode, parsed.state, parsed.datereported ?? ''),
+            payload: response.data ?? {},
+          });
+        }
         polled++;
       } catch (err) {
         errors++;

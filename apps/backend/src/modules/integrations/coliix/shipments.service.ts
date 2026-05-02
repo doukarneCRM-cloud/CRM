@@ -437,6 +437,102 @@ export interface ShipmentDetail {
   account: { id: string; hubLabel: string };
 }
 
+/**
+ * Force a fresh track call to Coliix for this shipment, ingest whatever
+ * history Coliix returns, and return the updated detail. Used by the
+ * "Refresh" button on the order's shipment timeline so the operator
+ * doesn't have to wait up to 60s for the next poll tick.
+ *
+ * Returns null if the order has no shipment yet (caller renders the
+ * "Send to Coliix" CTA instead).
+ */
+export async function trackNow(orderId: string): Promise<ShipmentDetail | null> {
+  const ship = await prisma.shipment.findUnique({
+    where: { orderId },
+    select: {
+      id: true,
+      trackingCode: true,
+      accountId: true,
+      account: { select: { apiBaseUrl: true } },
+    },
+  });
+  if (!ship) return null;
+
+  // Lazy-import to dodge the cycle the worker file would otherwise
+  // create with this service through the events.service ingest path.
+  const { track } = await import('./coliix.client');
+  const { getDecryptedApiKey } = await import('./accounts.service');
+  const { ingestEvent } = await import('./events.service');
+  const { logError } = await import('./errors.service');
+  const crypto = await import('node:crypto');
+
+  let apiKey: string;
+  try {
+    apiKey = await getDecryptedApiKey(ship.accountId);
+  } catch {
+    return getShipmentDetail(orderId);
+  }
+
+  try {
+    const response = await track({
+      baseUrl: ship.account.apiBaseUrl,
+      apiKey,
+      tracking: ship.trackingCode,
+    });
+    // Coliix track responses keep the chronological history on the
+    // envelope's `msg` array. We replay every entry through the same
+    // ingest pipeline the webhook + poll worker use, so per-event
+    // ShipmentEvent rows + state transitions land identically. Dedupe
+    // hashes prevent double-ingesting events we've already seen.
+    const envelope = response as unknown as Record<string, unknown>;
+    const msg = Array.isArray(envelope?.msg) ? (envelope.msg as Array<Record<string, unknown>>) : [];
+    for (const entry of msg) {
+      const rawState = String(entry.status ?? entry.state ?? entry.etat ?? '').trim();
+      if (!rawState) continue;
+      const time = String(entry.time ?? entry.date ?? entry.datereported ?? '');
+      const normalisedTime = time.replace(/\s+:/, ':');
+      const occurredAt = normalisedTime ? new Date(normalisedTime) : null;
+      const note = (entry.note ?? entry.comment ?? entry.driverNote ?? null) as string | null;
+      const dedupeHash = crypto
+        .createHash('sha256')
+        .update(`${ship.trackingCode}|${rawState}|${normalisedTime}`)
+        .digest('hex');
+
+      try {
+        await ingestEvent({
+          source: 'poll',
+          tracking: ship.trackingCode,
+          rawState,
+          driverNote: note,
+          eventDate: occurredAt && !Number.isNaN(occurredAt.getTime()) ? occurredAt : null,
+          dedupeHash,
+          payload: entry,
+        });
+      } catch {
+        // ingestEvent already logs its own errors — swallow per-entry
+        // failures so one malformed history row doesn't abort the rest.
+      }
+    }
+    // Mark the shipment as freshly polled regardless of ingest count
+    // (no events = nothing changed, but we still touched Coliix).
+    await prisma.shipment.update({
+      where: { id: ship.id },
+      data: { lastPolledAt: new Date() },
+    });
+  } catch (err) {
+    await logError({
+      type: 'api_unknown',
+      message: err instanceof Error ? err.message : String(err),
+      shipmentId: ship.id,
+      orderId,
+      accountId: ship.accountId,
+      meta: { trigger: 'manual_track_now' },
+    });
+  }
+
+  return getShipmentDetail(orderId);
+}
+
 export async function getShipmentDetail(orderId: string): Promise<ShipmentDetail | null> {
   const shipment = await prisma.shipment.findUnique({
     where: { orderId },

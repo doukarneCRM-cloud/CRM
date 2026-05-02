@@ -377,6 +377,24 @@ export async function coliixRoutes(app: FastifyInstance) {
     },
   );
 
+  // Force a fresh track call to Coliix for this order's shipment + ingest
+  // every history entry the response contains. Used by the timeline's
+  // "Refresh" button so the operator gets the full history immediately
+  // instead of waiting for the next 60s poll tick.
+  app.post<{ Params: { orderId: string } }>(
+    '/shipments/:orderId/track',
+    { preHandler: [verifyJWT, requirePermission('shipping:view')] },
+    async (req, reply) => {
+      const detail = await shipments.trackNow(req.params.orderId);
+      if (!detail) {
+        return reply.status(404).send({
+          error: { code: 'NOT_FOUND', message: 'No shipment for this order' },
+        });
+      }
+      return reply.send(detail);
+    },
+  );
+
   // Debug — call Coliix track for a tracking code and return the raw
   // body. Used during integration setup to see exactly what Coliix sends
   // so the parser can be tuned. Hidden behind integrations:manage.

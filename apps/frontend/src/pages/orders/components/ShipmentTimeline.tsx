@@ -83,9 +83,23 @@ export function ShipmentTimeline({ orderId }: Props) {
     toast({ kind: 'success', title: t('coliix.timeline.copied') });
   };
 
-  const onRefreshClick = () => {
+  // The Refresh button used to just re-read our local DB, which is useless
+  // when Coliix has new history that hasn't been polled yet (the worker runs
+  // every 60s). Now it actually calls Coliix's track API on the backend,
+  // ingests every history entry, and returns the updated detail — so the
+  // operator gets the full timeline immediately.
+  const onRefreshClick = async () => {
     setRefreshing(true);
-    refresh();
+    try {
+      const detail = await coliixApi.trackNow(orderId);
+      setShipment(detail);
+    } catch {
+      // Backend logs its own ColiixIntegrationError. Fall back to a local
+      // refetch so the button still updates *something*.
+      refresh();
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   if (loading) {

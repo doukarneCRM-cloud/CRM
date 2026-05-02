@@ -287,6 +287,13 @@ export const coliixApi = {
       .then((r) => r.data),
   getShipment: (orderId: string) =>
     api.get<ShipmentDetail>(`/coliix/shipments/${orderId}`).then((r) => r.data),
+  // Force a fresh track call to Coliix and ingest the response — returns the
+  // updated detail with whatever new history entries Coliix had. Used by the
+  // timeline's Refresh button to skip the 60s polling cadence.
+  trackNow: (orderId: string) =>
+    // Empty `{}` body — Fastify's JSON parser rejects an empty payload when
+    // Content-Type is application/json (which axios sets by default).
+    api.post<ShipmentDetail>(`/coliix/shipments/${orderId}/track`, {}).then((r) => r.data),
 
   // Errors
   listErrors: (params: {
