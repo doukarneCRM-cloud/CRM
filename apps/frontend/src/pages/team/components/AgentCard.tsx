@@ -13,12 +13,14 @@ interface Props {
   onChanged?: () => void;
 }
 
+// Role badges drawn from the dashboard tone palette so the team page reads
+// as one set with the rest of the UI.
 const ROLE_COLORS: Record<string, string> = {
-  admin:      'bg-purple-100 text-purple-700',
-  supervisor: 'bg-blue-100 text-blue-700',
-  agent:      'bg-emerald-100 text-emerald-700',
-  shipping:   'bg-amber-100 text-amber-700',
-  atelie:     'bg-pink-100 text-pink-700',
+  admin:      'bg-tone-lavender-100 text-tone-lavender-500',
+  supervisor: 'bg-tone-sky-100 text-tone-sky-500',
+  agent:      'bg-tone-mint-100 text-tone-mint-500',
+  shipping:   'bg-tone-amber-100 text-tone-amber-500',
+  atelie:     'bg-tone-rose-100 text-tone-rose-500',
 };
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -157,7 +159,7 @@ export function AgentCard({ user, canEdit, onEdit, onToggleActive, onChanged }: 
           <button
             onClick={handlePayout}
             disabled={payingOut}
-            className="mt-2 flex w-full items-center justify-center gap-1 rounded-btn bg-primary px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2 flex w-full items-center justify-center gap-1 rounded-btn bg-gradient-to-br from-tone-lavender-500 to-[#5E3FE6] px-3 py-1.5 text-[11px] font-semibold text-white shadow-[0_3px_10px_rgba(124,92,255,0.30)] transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {payingOut
               ? t('team.agentCard.commission.processing')
@@ -251,14 +253,14 @@ function PerformanceChart({ points }: { points: TeamUser['performance7d'] }) {
       {points.map((p, i) => {
         const heightPct = (p.orders / max) * 100;
         const intensity = p.orders === 0 ? 'bg-gray-100'
-          : p.orders >= max * 0.66 ? 'bg-primary'
-          : p.orders >= max * 0.33 ? 'bg-primary/70'
-          : 'bg-primary/40';
+          : p.orders >= max * 0.66 ? 'bg-tone-lavender-500'
+          : p.orders >= max * 0.33 ? 'bg-tone-lavender-300'
+          : 'bg-tone-lavender-100';
         return (
           <div key={p.date} className="flex flex-1 flex-col items-center gap-1">
             <div className="relative flex h-10 w-full items-end">
               {p.orders > 0 && (
-                <span className="absolute -top-0.5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-primary">
+                <span className="absolute -top-0.5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-tone-lavender-500">
                   {p.orders}
                 </span>
               )}

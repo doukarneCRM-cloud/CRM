@@ -8,12 +8,23 @@ const config: Config = {
         sans: ['Poppins', 'sans-serif'],
       },
       colors: {
+        // Brand primary — lavender from the dashboard tone palette. Repaints
+        // every `bg-primary` / `text-primary` / `border-primary` /
+        // `hover:bg-primary` etc. across the codebase to the lavender brand
+        // accent in a single token change. Was previously a near-black
+        // monochrome (#18181B) — kept as `primary-ink` for the few spots
+        // that genuinely want the dark colour (sidebar dark active pill).
         primary: {
+          DEFAULT: '#7C5CFF',
+          light: '#9B7FFF',
+          dark: '#5E3FE6',
+        },
+        ink: {
           DEFAULT: '#18181B',
           light: '#27272A',
           dark: '#09090B',
         },
-        accent: '#F4F4F5',
+        accent: '#F4F0FF',
         // Warm earthy accent — used by the Orders KPI cards. Lifts the
         // dashboard out of the cool-blue/indigo palette without fighting the
         // monochrome primary. 500 is the readable mid-tone, 50 the chip bg.
