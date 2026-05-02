@@ -98,19 +98,13 @@ function SidebarNavItem({
             'relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-all duration-150',
             collapsed && 'md:justify-center md:px-2',
             isActive
-              ? 'bg-gray-900 text-white shadow-[0_4px_14px_rgba(24,24,27,0.18)]'
-              : 'text-gray-500 hover:bg-tone-lavender-50 hover:text-gray-900',
+              ? 'bg-gradient-to-r from-tone-lavender-500 to-[#5E3FE6] text-white shadow-[0_4px_14px_rgba(124,92,255,0.35)]'
+              : 'text-gray-500 hover:bg-tone-lavender-50 hover:text-tone-lavender-500',
           )
         }
       >
         {({ isActive }) => (
           <>
-            {/* Tiny accent dot on the left when active — borrowed from the
-                Panze reference. Only renders when expanded (it would be
-                clipped on a 64px collapsed rail). */}
-            {isActive && !collapsed && (
-              <span className="absolute -left-3 top-1/2 hidden h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-tone-lavender-500 md:block" />
-            )}
             <Icon size={18} className="shrink-0" strokeWidth={isActive ? 2.4 : 2} />
             <span className={cn('truncate', collapsed && 'md:hidden')}>{label}</span>
           </>
