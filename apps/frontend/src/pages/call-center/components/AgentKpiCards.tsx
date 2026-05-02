@@ -197,15 +197,15 @@ export function AgentKpiCards({ className }: AgentKpiCardsProps) {
   return (
     <div className={cn('grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4', className)}>
       {/* 1 — Today's Orders */}
-      <GlassCard className="flex flex-col gap-3">
+      <GlassCard tone="lavender" className="flex flex-col gap-3">
         <CardHeader
           title={t('callCenter.kpi.todaysOrders')}
           icon={CalendarDays}
-          iconBg="bg-primary/10"
-          iconColor="text-primary"
+          iconBg="bg-tone-lavender-100"
+          iconColor="text-tone-lavender-500"
         />
         <div className="flex items-end gap-1.5">
-          <span className="text-3xl font-bold leading-none text-gray-900">
+          <span className="text-[34px] font-bold leading-none tracking-tight text-gray-900">
             {pipeline?.todayCount ?? 0}
           </span>
           <span className="mb-0.5 text-sm font-medium text-gray-400">{t('callCenter.kpi.assigned')}</span>
@@ -214,12 +214,12 @@ export function AgentKpiCards({ className }: AgentKpiCardsProps) {
       </GlassCard>
 
       {/* 2 — Confirmation Pipeline */}
-      <GlassCard className="flex flex-col gap-3">
+      <GlassCard tone="mint" className="flex flex-col gap-3">
         <CardHeader
           title={t('callCenter.kpi.confirmationPipeline')}
           icon={CheckCircle2}
-          iconBg="bg-blue-50"
-          iconColor="text-blue-600"
+          iconBg="bg-tone-mint-100"
+          iconColor="text-tone-mint-500"
         />
         {confirmationEntries.length === 0 ? (
           <div className="flex flex-1 items-center text-xs text-gray-400">
@@ -247,12 +247,12 @@ export function AgentKpiCards({ className }: AgentKpiCardsProps) {
       </GlassCard>
 
       {/* 3 — Shipping Pipeline */}
-      <GlassCard className="flex flex-col gap-3">
+      <GlassCard tone="sky" className="flex flex-col gap-3">
         <CardHeader
           title={t('callCenter.kpi.shippingPipeline')}
           icon={Truck}
-          iconBg="bg-purple-50"
-          iconColor="text-purple-600"
+          iconBg="bg-tone-sky-100"
+          iconColor="text-tone-sky-500"
         />
         {shippingEntries.length === 0 ? (
           <div className="flex flex-1 items-center text-xs text-gray-400">
@@ -285,15 +285,15 @@ export function AgentKpiCards({ className }: AgentKpiCardsProps) {
       </GlassCard>
 
       {/* 4 — Commission (all-time earnings) */}
-      <GlassCard className="flex flex-col gap-3">
+      <GlassCard tone="amber" className="flex flex-col gap-3">
         <CardHeader
           title={t('callCenter.kpi.commission')}
           icon={Coins}
-          iconBg="bg-amber-50"
-          iconColor="text-amber-600"
+          iconBg="bg-tone-amber-100"
+          iconColor="text-tone-amber-500"
         />
         <div className="flex items-end gap-1.5">
-          <span className="text-3xl font-bold leading-none text-amber-700">
+          <span className="text-[34px] font-bold leading-none tracking-tight text-tone-amber-500">
             {total.toLocaleString('fr-MA')}
           </span>
           <span className="mb-0.5 text-sm font-medium text-gray-400">MAD</span>

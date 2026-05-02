@@ -73,7 +73,7 @@ export function ProfitTab() {
           value={fmt(Math.round(kpis?.revenue ?? 0))}
           unit={t('analytics.common.mad')}
           icon={Banknote}
-          iconColor="#16A34A"
+          tone="mint"
           percentageChange={kpis?.percentageChanges.revenue}
         />
         <KPICard
@@ -81,7 +81,7 @@ export function ProfitTab() {
           value={fmt(Math.round(kpis?.cogs ?? 0))}
           unit={t('analytics.common.mad')}
           icon={PackageMinus}
-          iconColor="#F59E0B"
+          tone="amber"
           percentageChange={kpis?.percentageChanges.cogs}
         />
         <KPICard
@@ -89,7 +89,7 @@ export function ProfitTab() {
           value={fmt(Math.round(kpis?.shippingFees ?? 0))}
           unit={t('analytics.common.mad')}
           icon={Truck}
-          iconColor="#0EA5E9"
+          tone="sky"
           percentageChange={kpis?.percentageChanges.shippingFees}
         />
         <KPICard
@@ -97,7 +97,7 @@ export function ProfitTab() {
           value={fmt(Math.round(kpis?.expenses ?? 0))}
           unit={t('analytics.common.mad')}
           icon={Receipt}
-          iconColor="#9CA3AF"
+          tone="lavender"
           percentageChange={kpis?.percentageChanges.expenses}
         />
         <KPICard
@@ -105,7 +105,7 @@ export function ProfitTab() {
           value={fmt(Math.round(kpis?.profit ?? 0))}
           unit={t('analytics.common.mad')}
           icon={PiggyBank}
-          iconColor="#18181B"
+          tone="lavender"
           percentageChange={kpis?.percentageChanges.profit}
         />
         <KPICard
@@ -113,7 +113,7 @@ export function ProfitTab() {
           value={kpis ? kpis.margin.toFixed(1) : '0'}
           unit="%"
           icon={Percent}
-          iconColor="#22C55E"
+          tone="mint"
           percentageChange={kpis?.percentageChanges.margin}
         />
       </div>

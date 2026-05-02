@@ -196,21 +196,21 @@ export default function ReturnsPage() {
               : t('returns.kpi.matchesDashboard')
           }
           icon={Undo2}
-          iconColor="#F43F5E"
+          tone="rose"
         />
         <KPICard
           title={t('returns.kpi.pending')}
           value={stats ? stats.pendingCount.toString() : '—'}
           subtitle={t('returns.kpi.pendingSubtitle')}
           icon={Clock}
-          iconColor="#F59E0B"
+          tone="amber"
         />
         <KPICard
           title={t('returns.kpi.verified')}
           value={stats ? stats.verifiedTotal.toString() : '—'}
           subtitle={stats ? t('returns.kpi.verifiedSubtitle', { rate: formatPct(stats.verifiedRate) }) : undefined}
           icon={CheckCircle2}
-          iconColor="#10B981"
+          tone="mint"
         />
       </div>
 

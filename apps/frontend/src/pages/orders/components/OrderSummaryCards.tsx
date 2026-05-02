@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Clock, CheckCircle, Truck, PackageCheck, DollarSign,
 } from 'lucide-react';
-import { GlassCard } from '@/components/ui/GlassCard';
+import { GlassCard, type GlassTone } from '@/components/ui/GlassCard';
 import { ordersApi } from '@/services/ordersApi';
 import { getSocket } from '@/services/socket';
 import { useFilterStore } from '@/store/filterStore';
@@ -28,36 +28,49 @@ interface SummaryCardProps {
   title: string;
   value: number;
   icon: React.ElementType;
-  iconBg: string;
-  iconColor: string;
+  tone: GlassTone;
   subtitle?: React.ReactNode;
-  valueColor?: string;
   unit?: string;
 }
+
+const cardIconBg: Record<GlassTone, string> = {
+  lavender: 'bg-tone-lavender-100',
+  peach:    'bg-tone-peach-100',
+  mint:     'bg-tone-mint-100',
+  sky:      'bg-tone-sky-100',
+  rose:     'bg-tone-rose-100',
+  amber:    'bg-tone-amber-100',
+};
+const cardIconColor: Record<GlassTone, string> = {
+  lavender: 'text-tone-lavender-500',
+  peach:    'text-tone-peach-500',
+  mint:     'text-tone-mint-500',
+  sky:      'text-tone-sky-500',
+  rose:     'text-tone-rose-500',
+  amber:    'text-tone-amber-500',
+};
 
 function SummaryCard({
   title,
   value,
   icon: Icon,
-  iconBg,
-  iconColor,
+  tone,
   subtitle,
-  valueColor = 'text-gray-900',
   unit,
 }: SummaryCardProps) {
   return (
-    <GlassCard className="flex flex-col gap-3">
+    <GlassCard tone={tone} className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+        <span className={cn('text-[11px] font-semibold uppercase tracking-wider', cardIconColor[tone])}>
           {title}
         </span>
-        <div className={cn('flex h-9 w-9 items-center justify-center rounded-xl', iconBg)}>
-          <Icon size={18} className={iconColor} />
+        <div className={cn('flex h-9 w-9 items-center justify-center rounded-xl', cardIconBg[tone])}>
+          <Icon size={16} className={cardIconColor[tone]} strokeWidth={2.4} />
         </div>
       </div>
 
       <div className="flex items-end gap-1.5">
-        <span className={cn('text-3xl font-bold leading-none', valueColor)}>
+        <span className="text-[34px] font-bold leading-none tracking-tight text-gray-900">
           {typeof value === 'number' && unit === 'MAD'
             ? value.toLocaleString('fr-MA')
             : value.toLocaleString()}
@@ -173,15 +186,14 @@ export function OrderSummaryCards({ className }: OrderSummaryCardsProps) {
         title={t('orders.summary.pending')}
         value={s.pending.total}
         icon={Clock}
-        iconBg="bg-gray-100"
-        iconColor="text-gray-600"
+        tone="amber"
         subtitle={
           <div className="flex items-center gap-3">
             <span className="text-gray-500">
               {t('orders.summary.assigned', { count: s.pending.assigned })}
             </span>
             {s.pending.unassigned > 0 && (
-              <span className="rounded-badge bg-orange-100 px-2 py-0.5 font-semibold text-orange-700">
+              <span className="rounded-badge bg-tone-rose-100 px-2 py-0.5 font-semibold text-tone-rose-500">
                 {t('orders.summary.free', { count: s.pending.unassigned })}
               </span>
             )}
@@ -194,8 +206,7 @@ export function OrderSummaryCards({ className }: OrderSummaryCardsProps) {
         title={t('orders.summary.confirmed')}
         value={s.confirmed.total}
         icon={CheckCircle}
-        iconBg="bg-gray-100"
-        iconColor="text-gray-600"
+        tone="mint"
         subtitle={<span className="text-gray-400">{t('orders.summary.readyForShipping')}</span>}
       />
 
@@ -204,8 +215,7 @@ export function OrderSummaryCards({ className }: OrderSummaryCardsProps) {
         title={t('orders.summary.outForDelivery')}
         value={s.outForDelivery.total}
         icon={Truck}
-        iconBg="bg-gray-100"
-        iconColor="text-gray-600"
+        tone="sky"
         subtitle={<span className="text-gray-400">{t('orders.summary.inTransitToday')}</span>}
       />
 
@@ -214,8 +224,7 @@ export function OrderSummaryCards({ className }: OrderSummaryCardsProps) {
         title={t('orders.summary.delivered')}
         value={s.delivered.total}
         icon={PackageCheck}
-        iconBg="bg-gray-100"
-        iconColor="text-gray-600"
+        tone="lavender"
         subtitle={<span className="text-gray-400">{t('orders.summary.successfullyDelivered')}</span>}
       />
 
@@ -225,8 +234,7 @@ export function OrderSummaryCards({ className }: OrderSummaryCardsProps) {
         value={s.delivered.revenue}
         unit="MAD"
         icon={DollarSign}
-        iconBg="bg-gray-100"
-        iconColor="text-gray-600"
+        tone="peach"
         subtitle={<span className="text-gray-400">{t('orders.summary.fromDelivered')}</span>}
       />
     </div>

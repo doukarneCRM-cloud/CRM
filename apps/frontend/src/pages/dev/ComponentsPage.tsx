@@ -179,7 +179,7 @@ export default function ComponentsPage() {
               value={1523}
               percentageChange={-2.1}
               icon={Package}
-              iconColor="#22C55E"
+              tone="mint"
               sparklineData={sparkline}
             />
             <KPICard

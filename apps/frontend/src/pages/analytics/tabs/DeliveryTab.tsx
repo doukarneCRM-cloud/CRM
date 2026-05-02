@@ -108,28 +108,28 @@ export function DeliveryTab() {
           title={t('analytics.delivery.kpi.shipped')}
           value={fmt(kpis?.shipped ?? 0)}
           icon={Truck}
-          iconColor="#0EA5E9"
+          tone="sky"
           percentageChange={kpis?.percentageChanges.shipped}
         />
         <KPICard
           title={t('analytics.delivery.kpi.delivered')}
           value={fmt(kpis?.delivered ?? 0)}
           icon={PackageCheck}
-          iconColor="#16A34A"
+          tone="mint"
           percentageChange={kpis?.percentageChanges.delivered}
         />
         <KPICard
           title={t('analytics.delivery.kpi.returned')}
           value={fmt(kpis?.returned ?? 0)}
           icon={PackageX}
-          iconColor="#F43F5E"
+          tone="rose"
           percentageChange={kpis?.percentageChanges.returned}
         />
         <KPICard
           title={t('analytics.delivery.kpi.deliveryRate')}
           value={kpis ? kpis.deliveryRate.toFixed(1) : '0.0'}
           unit="%"
-          iconColor="#22C55E"
+          tone="mint"
           percentageChange={kpis?.percentageChanges.deliveryRate}
         />
         <KPICard
@@ -137,7 +137,7 @@ export function DeliveryTab() {
           value={kpis ? kpis.avgDeliveryDays.toFixed(1) : '0'}
           unit={t('analytics.delivery.kpi.avgDeliveryUnit')}
           icon={Timer}
-          iconColor="#8B5CF6"
+          tone="lavender"
           percentageChange={kpis?.percentageChanges.avgDeliveryDays}
         />
         <KPICard
@@ -145,7 +145,7 @@ export function DeliveryTab() {
           value={fmt(kpis?.revenue ?? 0)}
           unit={t('analytics.common.mad')}
           icon={Banknote}
-          iconColor="#18181B"
+          tone="lavender"
           percentageChange={kpis?.percentageChanges.revenue}
         />
       </div>

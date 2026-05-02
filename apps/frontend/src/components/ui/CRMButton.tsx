@@ -11,14 +11,19 @@ interface CRMButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantMap = {
+  // Primary action — lavender brand gradient with a soft elevated shadow.
+  // Picks the brand colour from the new tone palette so primary CTAs pop
+  // off the white-glass cards consistently across every page.
   primary:
-    'bg-primary text-white hover:bg-primary-dark active:scale-95 shadow-sm disabled:bg-gray-300',
+    'bg-gradient-to-br from-tone-lavender-500 to-[#5E3FE6] text-white hover:brightness-110 active:scale-[0.97] shadow-[0_4px_14px_rgba(124,92,255,0.35)] hover:shadow-[0_6px_18px_rgba(124,92,255,0.45)] disabled:bg-gray-300 disabled:from-gray-300 disabled:to-gray-300 disabled:shadow-none',
+  // Secondary — subtle outlined chip on white that lifts on hover.
   secondary:
-    'border border-primary text-primary hover:bg-accent active:scale-95 bg-transparent disabled:border-gray-200 disabled:text-gray-400',
+    'border border-gray-200 bg-white text-gray-700 hover:border-tone-lavender-300 hover:text-tone-lavender-500 active:scale-[0.97] disabled:border-gray-100 disabled:text-gray-400',
+  // Ghost — text-only, picks lavender on hover so it feels brand-coherent.
   ghost:
-    'text-primary hover:bg-accent active:scale-95 bg-transparent disabled:text-gray-400',
+    'text-gray-600 hover:bg-tone-lavender-50 hover:text-tone-lavender-500 active:scale-[0.97] bg-transparent disabled:text-gray-400',
   danger:
-    'bg-red-500 text-white hover:bg-red-600 active:scale-95 shadow-sm disabled:bg-gray-300',
+    'bg-tone-rose-500 text-white hover:brightness-110 active:scale-[0.97] shadow-[0_4px_14px_rgba(242,82,120,0.35)] disabled:bg-gray-300',
 };
 
 const sizeMap = {

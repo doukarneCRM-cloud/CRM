@@ -520,17 +520,26 @@ function Stat({
   value: number;
   tone?: 'gray' | 'red' | 'green';
 }) {
-  const colors = {
-    gray: 'text-gray-900',
-    red: 'text-red-600',
-    green: 'text-emerald-600',
+  // Soft pastel tile keyed to severity. Matches the dashboard tone palette
+  // — gray = neutral count, red = unresolved alarm, green = resolved/OK.
+  const styles = {
+    gray:  'bg-gradient-to-br from-tone-lavender-50 to-white border-tone-lavender-100 text-tone-lavender-500',
+    red:   'bg-gradient-to-br from-tone-rose-50 to-white border-tone-rose-100 text-tone-rose-500',
+    green: 'bg-gradient-to-br from-tone-mint-50 to-white border-tone-mint-100 text-tone-mint-500',
+  } as const;
+  const valueColors = {
+    gray:  'text-gray-900',
+    red:   'text-tone-rose-500',
+    green: 'text-tone-mint-500',
   } as const;
   return (
-    <div className="rounded-card border border-gray-100 bg-white px-3 py-2">
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+    <div className={`rounded-card border px-4 py-3 ${styles[tone]}`}>
+      <div className="text-[10px] font-semibold uppercase tracking-wider">
         {label}
       </div>
-      <div className={`text-xl font-bold ${colors[tone]}`}>{value.toLocaleString()}</div>
+      <div className={`mt-1 text-2xl font-bold tracking-tight ${valueColors[tone]}`}>
+        {value.toLocaleString()}
+      </div>
     </div>
   );
 }

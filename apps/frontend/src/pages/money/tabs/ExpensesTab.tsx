@@ -185,19 +185,19 @@ export function ExpensesTab() {
           title={t('money.expenses.kpi.total')}
           value={fmtMAD(data.totalAmount)}
           icon={DollarSign}
-          iconColor="#EF4444"
+          tone="rose"
         />
         <KPICard
           title={t('money.expenses.kpi.entries')}
           value={data.total.toLocaleString('fr-MA')}
           icon={Receipt}
-          iconColor="#6366F1"
+          tone="lavender"
         />
         <KPICard
           title={t('money.expenses.kpi.avg')}
           value={fmtMAD(data.total > 0 ? data.totalAmount / data.total : 0)}
           icon={Calendar}
-          iconColor="#10B981"
+          tone="mint"
         />
       </div>
 

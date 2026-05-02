@@ -82,34 +82,34 @@ export function ConfirmationTab() {
           title={t('analytics.confirmation.kpi.totalOrders')}
           value={fmt(kpis?.totalOrders ?? 0)}
           icon={PhoneCall}
-          iconColor="#0EA5E9"
+          tone="sky"
           percentageChange={kpis?.percentageChanges.totalOrders}
         />
         <KPICard
           title={t('analytics.confirmation.kpi.confirmed')}
           value={fmt(kpis?.confirmed ?? 0)}
           icon={CheckCircle2}
-          iconColor="#16A34A"
+          tone="mint"
           percentageChange={kpis?.percentageChanges.confirmed}
         />
         <KPICard
           title={t('analytics.confirmation.kpi.cancelled')}
           value={fmt(kpis?.cancelled ?? 0)}
           icon={XCircle}
-          iconColor="#9CA3AF"
+          tone="lavender"
           percentageChange={kpis?.percentageChanges.cancelled}
         />
         <KPICard
           title={t('analytics.confirmation.kpi.unreachable')}
           value={fmt(kpis?.unreachable ?? 0)}
           icon={PhoneOff}
-          iconColor="#EF4444"
+          tone="rose"
         />
         <KPICard
           title={t('analytics.confirmation.kpi.merged')}
           value={`${fmt(kpis?.merged ?? 0)} · ${kpis ? kpis.mergedRate.toFixed(1) : '0.0'}%`}
           icon={GitMerge}
-          iconColor="#F59E0B"
+          tone="amber"
           percentageChange={kpis?.percentageChanges.merged}
         />
         <KPICard
@@ -117,7 +117,7 @@ export function ConfirmationTab() {
           value={kpis ? kpis.confirmationRate.toFixed(1) : '0.0'}
           unit="%"
           icon={Hourglass}
-          iconColor="#22C55E"
+          tone="mint"
           percentageChange={kpis?.percentageChanges.confirmationRate}
         />
         <KPICard
@@ -125,7 +125,7 @@ export function ConfirmationTab() {
           value={kpis ? kpis.avgConfirmationHours.toFixed(1) : '0'}
           unit="h"
           icon={Timer}
-          iconColor="#8B5CF6"
+          tone="lavender"
           percentageChange={kpis?.percentageChanges.avgConfirmationHours}
         />
       </div>

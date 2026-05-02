@@ -116,25 +116,25 @@ export function CommissionTab() {
           title={t('money.commission.kpi.owed')}
           value={fmtMAD(totals.pending)}
           icon={Clock}
-          iconColor="#F59E0B"
+          tone="amber"
         />
         <KPICard
           title={t('money.commission.kpi.paid')}
           value={fmtMAD(totals.paid)}
           icon={Check}
-          iconColor="#10B981"
+          tone="mint"
         />
         <KPICard
           title={t('money.commission.kpi.delivered')}
           value={totals.delivered.toLocaleString('fr-MA')}
           icon={Package}
-          iconColor="#6366F1"
+          tone="sky"
         />
         <KPICard
           title={t('money.commission.kpi.agents')}
           value={rows.length.toString()}
           icon={Users}
-          iconColor="#8B5CF6"
+          tone="lavender"
         />
       </div>
 
