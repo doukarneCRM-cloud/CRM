@@ -95,16 +95,26 @@ function SidebarNavItem({
         to={item.to}
         className={({ isActive }) =>
           cn(
-            'flex items-center gap-3 rounded-btn px-3 py-2.5 text-sm font-medium transition-all duration-150',
+            'relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-all duration-150',
             collapsed && 'md:justify-center md:px-2',
             isActive
-              ? 'bg-primary text-white shadow-sm'
-              : 'text-gray-500 hover:bg-accent hover:text-primary',
+              ? 'bg-gray-900 text-white shadow-[0_4px_14px_rgba(24,24,27,0.18)]'
+              : 'text-gray-500 hover:bg-tone-lavender-50 hover:text-gray-900',
           )
         }
       >
-        <Icon size={18} className="shrink-0" />
-        <span className={cn('truncate', collapsed && 'md:hidden')}>{label}</span>
+        {({ isActive }) => (
+          <>
+            {/* Tiny accent dot on the left when active — borrowed from the
+                Panze reference. Only renders when expanded (it would be
+                clipped on a 64px collapsed rail). */}
+            {isActive && !collapsed && (
+              <span className="absolute -left-3 top-1/2 hidden h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-tone-lavender-500 md:block" />
+            )}
+            <Icon size={18} className="shrink-0" strokeWidth={isActive ? 2.4 : 2} />
+            <span className={cn('truncate', collapsed && 'md:hidden')}>{label}</span>
+          </>
+        )}
       </NavLink>
 
       {collapsed && (
@@ -177,10 +187,10 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
               (the wide wordmark won't fit a 64px rail). */}
           <div
             className={cn(
-              'hidden h-9 w-9 shrink-0 items-center justify-center rounded-btn text-base font-bold text-white shadow-card',
+              'hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl text-base font-bold text-white shadow-[0_4px_14px_rgba(124,92,255,0.4)]',
               collapsed && 'md:flex',
             )}
-            style={{ background: 'linear-gradient(135deg, #18181B 0%, #27272A 100%)' }}
+            style={{ background: 'linear-gradient(135deg, #7C5CFF 0%, #5E3FE6 100%)' }}
           >
             A
           </div>

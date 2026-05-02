@@ -28,6 +28,20 @@ const config: Config = {
           700: '#7A5311',
           DEFAULT: '#B8801F',
         },
+        // Coordinated pastel tones for KPI / category / chart cards. Each
+        // tone has a card-bg (50), icon-bg (100), accent (500), and a
+        // chart-stop (300). Cards read as one coherent set instead of
+        // one-off colors. Lavender = brand signal; peach = warm/orders;
+        // mint = success; sky = info/customer; rose = alert/return;
+        // amber = pending/attention.
+        tone: {
+          lavender: { 50: '#F4F0FF', 100: '#EAE2FF', 300: '#B19BFF', 500: '#7C5CFF' },
+          peach:    { 50: '#FFF1EA', 100: '#FFE0D0', 300: '#FFA67E', 500: '#F37944' },
+          mint:     { 50: '#EAF8F0', 100: '#D2F0E0', 300: '#7DD8A4', 500: '#2EBE6D' },
+          sky:      { 50: '#E8F4FF', 100: '#CFE6FF', 300: '#7EB7FF', 500: '#3D8BFF' },
+          rose:     { 50: '#FFEDF1', 100: '#FFD3DD', 300: '#FF8DA5', 500: '#F25278' },
+          amber:    { 50: '#FFF6E0', 100: '#FFE7AC', 300: '#FFC95A', 500: '#E8A317' },
+        },
         surface: 'rgba(255,255,255,0.85)',
         bg: '#F8F9FA',
         status: {

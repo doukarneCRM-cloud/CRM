@@ -16,13 +16,17 @@ export function MergedCard() {
   );
 
   return (
-    <GlassCard className="flex flex-col gap-2 p-4">
-      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-amber-600">
-        <GitMerge size={14} />
-        {t('dashboard.cards.merged')}
+    <GlassCard tone="amber" className="flex flex-col gap-3 p-5">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-tone-amber-500">
+          {t('dashboard.cards.merged')}
+        </span>
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-tone-amber-100">
+          <GitMerge size={16} className="text-tone-amber-500" strokeWidth={2.4} />
+        </div>
       </div>
       <div className="flex items-baseline gap-2">
-        <span className="text-3xl font-bold text-gray-900">
+        <span className="text-[34px] font-bold leading-none tracking-tight text-gray-900">
           {loading ? '…' : (data?.rate ?? 0).toFixed(1)}
         </span>
         <span className="text-sm font-semibold text-gray-400">%</span>
