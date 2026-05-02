@@ -38,14 +38,46 @@ async function releaseLock(token: string): Promise<void> {
   });
 }
 
-// ─── Round-robin cursor ──────────────────────────────────────────────────────
+// ─── Round-robin cursor (single Redis hash, atomic reads/writes) ────────────
+//
+// Stored as one hash so cursor + streak update together. Two separate keys
+// — the previous design — could be partially written if the process died
+// between SETs, leaving a cursor pointing at an agent whose streak was
+// already counted twice.
 
-const CURSOR_KEY = 'assignment:round_robin:cursor';
-const STREAK_KEY = 'assignment:round_robin:streak';
+const STATE_KEY = 'assignment:round_robin:state';
+const STATE_FIELD_CURSOR = 'cursor';
+const STATE_FIELD_STREAK = 'streak';
 
 interface Candidate {
   id: string;
   name: string;
+}
+
+interface RrState {
+  cursorId: string | null;
+  streak: number;
+}
+
+async function readRrState(): Promise<RrState> {
+  const [cursor, streak] = await redis.hmget(
+    STATE_KEY,
+    STATE_FIELD_CURSOR,
+    STATE_FIELD_STREAK,
+  );
+  return {
+    cursorId: cursor ?? null,
+    streak: Number(streak ?? 0),
+  };
+}
+
+async function writeRrState(state: RrState): Promise<void> {
+  // hset writes both fields in one round-trip — atomic from any concurrent
+  // reader's view because we're already inside the assignment lock.
+  await redis.hset(STATE_KEY, {
+    [STATE_FIELD_CURSOR]: state.cursorId ?? '',
+    [STATE_FIELD_STREAK]: String(state.streak),
+  });
 }
 
 /**
@@ -106,35 +138,96 @@ async function eligibleAgents(allowlist: string[] = []): Promise<Candidate[]> {
 }
 
 /**
- * Round-robin with bounceCount: the cursor stays on the same agent until
- * they've received `bounceCount` orders, then rotates to the next one.
+ * Today-window over which "fair share" is measured. Resetting nightly is the
+ * intuitive boundary — admins read the morning standings to verify yesterday
+ * was even, and any drift from offline/manual assignments doesn't compound
+ * across days.
  */
-async function pickRoundRobin(agents: Candidate[], bounceCount: number): Promise<Candidate> {
-  const cursorStr = await redis.get(CURSOR_KEY);
-  const streakStr = await redis.get(STREAK_KEY);
+function startOfToday(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
 
-  let cursorId = cursorStr;
-  let streak = Number(streakStr ?? 0);
+/**
+ * Round-robin with drift correction. The previous pure-cursor implementation
+ * silently went off-count in two real-world scenarios:
+ *
+ *   1. An eligible agent went offline mid-rotation → dropped out of the
+ *      pool → cursor landed on someone else → coming back gave them a
+ *      fresh streak of `bounceCount`, so the day's total per-agent count
+ *      drifted from the configured share.
+ *   2. Manual / bulk / YouCan-import assignments bypass autoAssign. The
+ *      cursor never saw them, so the per-agent count the admin actually
+ *      reads on the dashboard drifted from the cursor's idea of fairness.
+ *
+ * Fix:
+ *   - Default behaviour stays pure round-robin: the cursor agent receives
+ *     `bounceCount` in a row, then rotation. This is what the admin sees
+ *     in the simulator and the natural mental model ("2 per agent in turn").
+ *   - On every rotation, before committing the next pick, check today's
+ *     counts. If an eligible agent is more than `bounceCount` behind the
+ *     leader (i.e. they fell off and came back), jump the cursor to them
+ *     and reset the streak. This catches the offline / manual-injection
+ *     drift without disrupting the steady-state rotation.
+ */
+async function pickRoundRobin(
+  agents: Candidate[],
+  bounceCount: number,
+): Promise<Candidate> {
+  const state = await readRrState();
+  const cursorIdx = state.cursorId
+    ? agents.findIndex((a) => a.id === state.cursorId)
+    : -1;
 
-  const cursorIdx = cursorId ? agents.findIndex((a) => a.id === cursorId) : -1;
-  let idx = cursorIdx >= 0 ? cursorIdx : 0;
-
-  // Rotate if current agent reached the bounce
-  if (cursorIdx >= 0 && streak >= bounceCount) {
-    idx = (cursorIdx + 1) % agents.length;
-    streak = 0;
-  } else if (cursorIdx < 0) {
-    // First-ever run, or the previous cursor agent is no longer eligible
-    idx = 0;
-    streak = 0;
+  // Stay on the cursor agent until they reach the bounce. Pure round-robin
+  // for the steady state — matches the simulator and the admin's intuition.
+  if (cursorIdx >= 0 && state.streak < bounceCount) {
+    const picked = agents[cursorIdx];
+    await writeRrState({ cursorId: picked.id, streak: state.streak + 1 });
+    return picked;
   }
 
-  const picked = agents[idx];
-  streak += 1;
+  // Rotation point — cursor either expired (streak hit bounceCount) or the
+  // cursor agent is no longer eligible. Decide the next victim with two
+  // pieces of information: the natural next index after the cursor, AND
+  // today's per-agent counts (drift detection).
+  const sinceTs = startOfToday();
+  const grouped = await prisma.order.groupBy({
+    by: ['agentId'],
+    where: {
+      agentId: { in: agents.map((a) => a.id) },
+      assignedAt: { gte: sinceTs },
+      isArchived: false,
+    },
+    _count: { _all: true },
+  });
+  const todayCount = new Map<string, number>();
+  for (const row of grouped) {
+    if (row.agentId) todayCount.set(row.agentId, row._count._all);
+  }
+  const counts = agents.map((a) => todayCount.get(a.id) ?? 0);
+  const maxCount = Math.max(...counts, 0);
+  const minCount = Math.min(...counts, maxCount);
 
-  await redis.set(CURSOR_KEY, picked.id);
-  await redis.set(STREAK_KEY, String(streak));
+  // Drift-correction: if the gap between most-loaded and least-loaded is
+  // more than bounceCount, there's an agent who's been left behind (offline
+  // earlier, or manual assignments piled up on someone else). Jump the
+  // cursor to the most-behind agent rather than the natural next index.
+  if (maxCount - minCount > bounceCount) {
+    const behindIdx = agents.findIndex(
+      (a) => (todayCount.get(a.id) ?? 0) === minCount,
+    );
+    const picked = agents[behindIdx];
+    await writeRrState({ cursorId: picked.id, streak: 1 });
+    return picked;
+  }
 
+  // Normal rotation: take the next agent after the cursor (wrap around).
+  // First-ever run has cursorIdx === -1, so we land on agents[0].
+  const nextIdx = cursorIdx >= 0 ? (cursorIdx + 1) % agents.length : 0;
+  const picked = agents[nextIdx];
+  await writeRrState({ cursorId: picked.id, streak: 1 });
   return picked;
 }
 
@@ -236,17 +329,16 @@ export async function autoAssign(orderId: string): Promise<AutoAssignResult> {
 }
 
 /**
- * Dry-run simulation used by the assignment-rules page: pretends to assign N
- * orders without touching Redis or the DB, so the admin can preview the
- * rotation. Returns the sequence of agent names.
+ * Dry-run simulation used by the assignment-rules page. Mirrors the
+ * load-aware logic in `pickRoundRobin` but operates on an in-memory count
+ * map instead of hitting the DB and Redis — so the preview the admin sees
+ * matches the production rotation tick-for-tick (assuming all agents start
+ * the day at zero).
  *
- * If the rule is disabled or the eligible pool is empty, returns []. The UI
- * already shows an empty-state for that — no point producing a fake sequence
- * that wouldn't actually fire in production.
- *
- * Always simulates round-robin even when `strategy: by_product` is set.
- * `by_product` needs an order context (its items) to project a winning agent;
- * the simulator has none, so the honest fallback is the underlying RR rotation.
+ * Returns [] when the rule is disabled or no eligible agents exist; the UI
+ * already shows a friendly empty-state for both. Always runs the round-
+ * robin path even when `strategy: by_product` is set — by_product needs
+ * an order context that the simulator can't fabricate.
  */
 export async function simulateAssign(count: number): Promise<string[]> {
   const rule = await getAssignmentRule();
@@ -256,15 +348,24 @@ export async function simulateAssign(count: number): Promise<string[]> {
   if (agents.length === 0) return [];
 
   const result: string[] = [];
-  let idx = 0;
+  let cursorId: string | null = null;
   let streak = 0;
+
   for (let i = 0; i < count; i += 1) {
-    if (streak >= rule.bounceCount) {
-      idx = (idx + 1) % agents.length;
-      streak = 0;
+    const cursorIdx = cursorId
+      ? agents.findIndex((a) => a.id === cursorId)
+      : -1;
+    let picked: Candidate;
+    if (cursorIdx >= 0 && streak < rule.bounceCount) {
+      picked = agents[cursorIdx];
+      streak += 1;
+    } else {
+      const next = cursorIdx >= 0 ? (cursorIdx + 1) % agents.length : 0;
+      picked = agents[next];
+      streak = 1;
     }
-    result.push(agents[idx].name);
-    streak += 1;
+    cursorId = picked.id;
+    result.push(picked.name);
   }
   return result;
 }
