@@ -37,12 +37,14 @@ const PAGE_TITLE_KEYS: Record<string, string> = {
   [ROUTES.SETTINGS]: 'nav.settings',
 };
 
+// Coordinated avatar colors picked from the dashboard tone palette so the
+// online-presence strip reads as one set with the rest of the UI.
 const AVATAR_COLORS = [
-  'bg-indigo-100 text-indigo-700',
-  'bg-emerald-100 text-emerald-700',
-  'bg-amber-100 text-amber-700',
-  'bg-violet-100 text-violet-700',
-  'bg-teal-100 text-teal-700',
+  'bg-tone-lavender-100 text-tone-lavender-500',
+  'bg-tone-mint-100 text-tone-mint-500',
+  'bg-tone-amber-100 text-tone-amber-500',
+  'bg-tone-peach-100 text-tone-peach-500',
+  'bg-tone-sky-100 text-tone-sky-500',
 ];
 
 interface AgentPillData {
@@ -314,7 +316,7 @@ function UserDropdown() {
       <div ref={ref} className="relative">
         <button
           onClick={() => setOpen((v) => !v)}
-          className="flex items-center gap-2.5 rounded-btn px-3 py-1.5 transition-colors hover:bg-gray-100"
+          className="flex items-center gap-2.5 rounded-btn px-3 py-1.5 transition-colors hover:bg-tone-lavender-50"
         >
           {avatarSrc ? (
             <img
@@ -426,7 +428,7 @@ export function TopBar({ onMobileMenuOpen }: TopBarProps) {
       <div className="flex min-w-0 flex-[2] basis-0 items-center gap-2 sm:gap-3">
         <button
           onClick={onMobileMenuOpen}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-btn text-gray-500 hover:bg-gray-100 hover:text-gray-900 md:hidden"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-btn text-gray-500 hover:bg-tone-lavender-50 hover:text-tone-lavender-500 md:hidden"
           aria-label={t('common.openMenu')}
         >
           <Menu size={20} />

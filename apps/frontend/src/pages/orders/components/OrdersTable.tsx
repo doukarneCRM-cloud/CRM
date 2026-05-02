@@ -729,7 +729,7 @@ export function OrdersTable({
                 key={row.id}
                 className={cn(
                   'rounded-card border bg-white shadow-card transition-shadow',
-                  isSelected ? 'border-primary/50 bg-accent/30 shadow-hover' : 'border-gray-100',
+                  isSelected ? 'border-tone-lavender-300 bg-tone-lavender-50/60 shadow-hover' : 'border-gray-100',
                 )}
               >
                 {/* ── Header: checkbox + ref/date/agent + actions ── */}
@@ -864,9 +864,9 @@ export function OrdersTable({
                         key={cell.id}
                         className={cn(
                           'border-y border-gray-100 px-3 py-2.5 align-top text-gray-700 transition-colors',
-                          'group-hover:border-gray-200 group-hover:bg-gray-50/60',
+                          'group-hover:border-tone-lavender-100 group-hover:bg-tone-lavender-50/40',
                           isSelected
-                            ? 'bg-accent/60'
+                            ? 'bg-tone-lavender-50'
                             : 'bg-white',
                           idx === 0 && 'rounded-l-xl border-l',
                           idx === arr.length - 1 && 'rounded-r-xl border-r',

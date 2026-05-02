@@ -124,13 +124,13 @@ export function NotificationPanel() {
     <div ref={ref} className="relative">
       <button
         onClick={handleToggle}
-        className="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
+        className="flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-tone-lavender-50 hover:text-tone-lavender-500"
         aria-label={t('shared.notifications.ariaLabel')}
       >
         <Bell size={16} />
       </button>
       {unread > 0 && (
-        <span className="pointer-events-none absolute right-0 top-0 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+        <span className="pointer-events-none absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-tone-rose-500 px-1 text-[9px] font-bold text-white shadow-[0_2px_6px_rgba(242,82,120,0.4)] ring-2 ring-white">
           {unread > 99 ? '99+' : unread}
         </span>
       )}
@@ -200,7 +200,7 @@ export function NotificationPanel() {
                           <p className="mt-1 text-[10px] text-gray-400">{timeAgo(n.createdAt, t)}</p>
                         </div>
                         {!n.readAt && (
-                          <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-red-500" />
+                          <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-tone-rose-500" />
                         )}
                       </button>
                     </li>

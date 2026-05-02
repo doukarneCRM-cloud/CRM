@@ -71,8 +71,8 @@ function FilterChip({
         className={cn(
           'flex shrink-0 items-center gap-1.5 rounded-badge px-3 py-1.5 text-sm font-medium transition-all',
           count > 0
-            ? 'bg-primary text-white'
-            : 'border border-gray-200 bg-white text-gray-600 hover:border-primary hover:text-primary',
+            ? 'bg-gradient-to-br from-tone-lavender-500 to-[#5E3FE6] text-white shadow-[0_3px_10px_rgba(124,92,255,0.30)]'
+            : 'border border-gray-200 bg-white text-gray-600 hover:border-tone-lavender-300 hover:text-tone-lavender-500',
         )}
       >
         {config.label}
@@ -101,12 +101,12 @@ function FilterChip({
                     className={cn(
                       'flex cursor-pointer items-center justify-between px-3 py-2 text-sm transition-colors',
                       isSelected
-                        ? 'bg-accent font-medium text-primary'
+                        ? 'bg-tone-lavender-50 font-medium text-tone-lavender-500'
                         : 'text-gray-700 hover:bg-gray-50',
                     )}
                   >
                     <span>{opt.label}</span>
-                    {isSelected && <Check size={13} className="text-primary" />}
+                    {isSelected && <Check size={13} className="text-tone-lavender-500" />}
                   </li>
                 );
               })}
@@ -163,7 +163,7 @@ const GlobalFilterBar = ({
         <SlidersHorizontal size={15} />
         <span className="text-sm font-medium">{t('shared.filterBar.filters')}</span>
         {count > 0 && (
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-tone-lavender-500 text-[10px] font-bold text-white">
             {count}
           </span>
         )}

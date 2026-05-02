@@ -125,11 +125,11 @@ const CRMSelect = ({
         onClick={() => !disabled && setOpen((v) => !v)}
         className={cn(
           'flex w-full items-center justify-between rounded-input border bg-white px-4 py-2.5 text-sm transition-colors',
-          'focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary',
+          'focus:outline-none focus:ring-2 focus:ring-tone-lavender-100 focus:border-tone-lavender-300',
           'disabled:cursor-not-allowed disabled:bg-gray-50',
           selectedValues.length > 0 ? 'text-gray-900' : 'text-gray-400',
           error ? 'border-red-400' : 'border-gray-200',
-          open && 'border-primary ring-2 ring-primary/30',
+          open && 'border-tone-lavender-300 ring-2 ring-tone-lavender-100',
         )}
       >
         <span className="truncate">{displayLabel()}</span>
@@ -188,7 +188,7 @@ const CRMSelect = ({
                     className={cn(
                       'flex cursor-pointer items-center justify-between px-4 py-2.5 text-sm transition-colors',
                       isSelected
-                        ? 'bg-accent text-primary font-medium'
+                        ? 'bg-tone-lavender-50 text-tone-lavender-500 font-medium'
                         : 'text-gray-700 hover:bg-gray-50',
                     )}
                   >
