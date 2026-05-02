@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
+import { Readable } from 'node:stream';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../../shared/prisma';
 import {
@@ -231,14 +232,22 @@ export async function authRoutes(app: FastifyInstance) {
       return errorReply(reply, 400, 'UNSUPPORTED_FORMAT', 'Only PNG, JPEG, WebP, or GIF images are allowed');
     }
     try {
-      const { url } = await uploadFile({
-        folder: 'avatars',
-        mimeType: file.mimetype,
-        stream: file.file,
-      });
+      // Buffer the upload first so we can detect a truncated stream BEFORE
+      // committing the (partial) bytes to storage. Otherwise oversized files
+      // get persisted to R2/disk and we only return 413 after the wasteful
+      // write completes.
+      const chunks: Buffer[] = [];
+      for await (const chunk of file.file) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
       if (file.file.truncated) {
         return errorReply(reply, 413, 'FILE_TOO_LARGE', 'Image exceeds the 8 MB limit');
       }
+      const { url } = await uploadFile({
+        folder: 'avatars',
+        mimeType: file.mimetype,
+        stream: Readable.from(Buffer.concat(chunks)),
+      });
       await prisma.user.update({ where: { id: request.user.sub }, data: { avatarUrl: url } });
       const user = await loadUserWithPermissions(request.user.sub);
       if (!user) return errorReply(reply, 404, 'NOT_FOUND', 'User not found');

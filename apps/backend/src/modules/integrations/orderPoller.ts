@@ -105,7 +105,12 @@ async function pollStore(
               },
             },
           })
-          .catch(() => {});
+          .catch((logErr) => {
+            console.error(
+              '[poller] failed to write ImportLog row for failed order',
+              { storeId, youcanOrderId: yo.id, originalError: msg, logErr },
+            );
+          });
         if (placedValid) {
           if (!earliestFailedAt || placedAt < earliestFailedAt) {
             earliestFailedAt = placedAt;
@@ -176,7 +181,14 @@ async function pollStore(
           meta: { source: 'poller', cutoffAdvancedTo: nextCutoff.toISOString() },
         },
       })
-      .catch(() => {});
+      .catch((logErr) => {
+        console.error('[poller] failed to write poll-cycle ImportLog row', {
+          storeId,
+          imported,
+          errors,
+          logErr,
+        });
+      });
   }
 
   return { imported, skipped, errors };
@@ -201,8 +213,13 @@ async function pollOnce() {
           store.fieldMapping as Record<string, string> | null,
           store.lastSyncAt,
         );
-      } catch {
+      } catch (err) {
         // Skip this store on transient failures; next tick will retry.
+        // Log so a persistent failure is at least visible in container logs.
+        console.error('[poller] pollStore threw — skipping store this tick', {
+          storeId: store.id,
+          err,
+        });
       }
     }
   } finally {
