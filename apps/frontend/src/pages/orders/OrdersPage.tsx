@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { UserPlus, ArchiveX, X, GitMerge, Plus, Search } from 'lucide-react';
+import { UserPlus, ArchiveX, X, GitMerge, Plus, Search, Send } from 'lucide-react';
 import { GlobalFilterBar, type FilterChipConfig } from '@/components/ui/GlobalFilterBar';
 import { CRMButton } from '@/components/ui/CRMButton';
 import { useAuthStore } from '@/store/authStore';
@@ -33,14 +33,26 @@ import { OrderCreateModal } from './components/OrderCreateModal';
 interface BulkBarProps {
   count: number;
   canAssign: boolean;
+  canSendColiix: boolean;
   onAssign: () => void;
   onUnassign: () => void;
+  onSendColiix: () => void;
   onArchive: () => void;
   onClear: () => void;
   loading: boolean;
 }
 
-function BulkBar({ count, canAssign, onAssign, onUnassign, onArchive, onClear, loading }: BulkBarProps) {
+function BulkBar({
+  count,
+  canAssign,
+  canSendColiix,
+  onAssign,
+  onUnassign,
+  onSendColiix,
+  onArchive,
+  onClear,
+  loading,
+}: BulkBarProps) {
   const { t } = useTranslation();
   return (
     <div className="slide-up fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
@@ -76,6 +88,17 @@ function BulkBar({ count, canAssign, onAssign, onUnassign, onArchive, onClear, l
             {t('orders.bulkUnassign')}
           </CRMButton>
         )}
+        {canSendColiix && (
+          <CRMButton
+            variant="secondary"
+            size="sm"
+            leftIcon={<Send size={13} />}
+            onClick={onSendColiix}
+            loading={loading}
+          >
+            {t('orders.bulkSendColiix')}
+          </CRMButton>
+        )}
         <CRMButton
           variant="danger"
           size="sm"
@@ -105,6 +128,7 @@ export default function OrdersPage() {
   const canDelete = hasPermission(PERMISSIONS.ORDERS_DELETE);
   const canCreate = hasPermission(PERMISSIONS.ORDERS_CREATE);
   const canImport = hasPermission(PERMISSIONS.INTEGRATIONS_MANAGE);
+  const canSendColiix = hasPermission(PERMISSIONS.SHIPPING_PUSH);
 
   const {
     orders,
@@ -381,6 +405,52 @@ export default function OrdersPage() {
     }
   }, [selectedIds, setSelectedIds, refresh]);
 
+  // Bulk "Send to Coliix": fans the per-order createShipment call across
+  // every selected row with bounded concurrency (3 in flight at once) so a
+  // 50-order selection finishes in seconds without saturating Coliix's
+  // API. Each call is independent — failures don't block successes — and
+  // the final summary toast tells the agent how many landed and how many
+  // need a retry. The per-row error indicator (coliixErrorByOrder) still
+  // surfaces on each failed row via the existing socket-driven refresh.
+  const handleBulkSendColiix = useCallback(async () => {
+    if (selectedIds.length === 0) return;
+    if (!window.confirm(t('orders.confirmSendColiix', { count: selectedIds.length }))) return;
+    setBulkLoading(true);
+    setSendingIds((prev) => Array.from(new Set([...prev, ...selectedIds])));
+    let ok = 0;
+    let failed = 0;
+    const queue = [...selectedIds];
+    const concurrency = 3;
+    const workers = Array.from({ length: Math.min(concurrency, queue.length) }, async () => {
+      while (queue.length) {
+        const id = queue.shift();
+        if (!id) break;
+        try {
+          await coliixApi.createShipment(id);
+          ok += 1;
+        } catch {
+          failed += 1;
+        }
+      }
+    });
+    try {
+      await Promise.all(workers);
+      toast({
+        kind: failed === 0 ? 'success' : 'error',
+        title:
+          failed === 0
+            ? t('orders.bulkSendOkTitle', { count: ok })
+            : t('orders.bulkSendPartialTitle', { ok, failed }),
+        durationMs: 8000,
+      });
+      setSelectedIds([]);
+      refresh();
+    } finally {
+      setSendingIds((prev) => prev.filter((id) => !selectedIds.includes(id)));
+      setBulkLoading(false);
+    }
+  }, [selectedIds, setSelectedIds, refresh, t, toast]);
+
   const handleBulkArchive = useCallback(async () => {
     if (selectedIds.length === 0) return;
     if (!window.confirm(t('orders.confirmArchiveMany', { count: selectedIds.length }))) return;
@@ -508,8 +578,10 @@ export default function OrdersPage() {
         <BulkBar
           count={selectedIds.length}
           canAssign={canAssign}
+          canSendColiix={canSendColiix}
           onAssign={handleBulkAssign}
           onUnassign={handleBulkUnassign}
+          onSendColiix={handleBulkSendColiix}
           onArchive={handleBulkArchive}
           onClear={() => setSelectedIds([])}
           loading={bulkLoading}
