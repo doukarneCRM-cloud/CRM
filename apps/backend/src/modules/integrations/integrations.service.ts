@@ -18,7 +18,7 @@ import {
   type YoucanOrder,
   type YoucanCheckoutFieldConfig,
 } from '../../shared/youcanClient';
-import { emitToAll } from '../../shared/socket';
+import { emitOrderCreated } from '../../shared/socket';
 import { createAdminNotification } from '../notifications/notifications.service';
 import {
   generateReference,
@@ -1228,8 +1228,13 @@ export async function importSingleOrder(
     };
   }
 
-  // Notify connected clients so tables refresh live
-  emitToAll('order:created', { source: 'youcan', youcanRef: yo.ref });
+  // Notify connected clients so tables refresh live. The shared helper
+  // emits the canonical { orderId, reference, ts, kpi } payload to the
+  // `orders:all` room, which the Orders page's surgical-insert handler
+  // depends on. The previous emit had only { source, youcanRef } so the
+  // frontend couldn't fetch + insert the new row, and YouCan-imported
+  // orders required a manual page refresh to appear.
+  emitOrderCreated(created.id, created.reference);
 
   // Admin-facing notification (bell panel + toast)
   void createAdminNotification({
