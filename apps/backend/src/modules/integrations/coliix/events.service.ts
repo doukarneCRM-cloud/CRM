@@ -208,17 +208,32 @@ export async function ingestEvent(input: IngestEventInput): Promise<IngestResult
           orderUpdate.deliveredAt = occurredAt;
         }
         await tx.order.update({ where: { id: shipment.orderId }, data: orderUpdate });
+      }
 
+      // OrderLog: append on every NEW Coliix wording, not just on internal
+      // bucket changes. Coliix often emits multiple sub-statuses that fold
+      // into the same CRM bucket (e.g. "Nouveau Colis" → "Attente De
+      // Ramassage" both map to `pushed`). Operators want each transition
+      // visible in the order timeline. Format: "<crm_label> : <coliix_wording>"
+      // — the colon style the team requested over the previous parens form.
+      const wordingChanged = input.rawState !== shipment.rawState;
+      if (wordingChanged) {
+        // Use the resulting state's label so the prefix matches what the
+        // shipping status badge will show after this event lands.
+        const labelState: ShipmentState = newState ?? shipment.state;
         await tx.orderLog.create({
           data: {
             orderId: shipment.orderId,
             type: 'shipping',
-            action: `${STATE_LABEL[newState!]} (${input.rawState})`,
+            action: `${STATE_LABEL[labelState]} : ${input.rawState}`,
             performedBy: input.source === 'webhook' ? 'Coliix webhook' : input.source,
             meta: {
               source: input.source,
               rawState: input.rawState,
               mappedState: newState,
+              previousRawState: shipment.rawState,
+              previousState: shipment.state,
+              stateChanged: willChangeState,
               eventDate: occurredAt.toISOString(),
             } as never,
           },
