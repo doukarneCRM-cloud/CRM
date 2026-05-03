@@ -230,6 +230,12 @@ export async function importCitiesCsv(
     }
   }
 
+  // Mirror every CarrierCity row into the global ShippingCity table so the
+  // call-center modal's city dropdown — which reads ShippingCity — picks
+  // up cities the agent imported via the Coliix integration without
+  // needing a second CSV upload elsewhere.
+  await syncCarrierCitiesToShipping();
+
   return {
     accountId,
     imported,
@@ -289,6 +295,7 @@ export async function updateCity(id: string, input: UpdateCityInput) {
   if (input.deliveryPrice !== undefined) data.deliveryPrice = input.deliveryPrice;
   data.refreshedAt = new Date();
   const row = await prisma.carrierCity.update({ where: { id }, data });
+  await syncCarrierCitiesToShipping();
   return {
     ...row,
     deliveryPrice: row.deliveryPrice === null ? null : Number(row.deliveryPrice),
@@ -297,6 +304,43 @@ export async function updateCity(id: string, input: UpdateCityInput) {
 
 export async function deleteCity(id: string) {
   await prisma.carrierCity.delete({ where: { id } });
+  await syncCarrierCitiesToShipping();
+}
+
+/**
+ * Reconcile the global ShippingCity table from every CarrierCity row
+ * currently in the DB (across all carrier accounts). Each unique `ville`
+ * (case-insensitive) becomes a ShippingCity row; the highest delivery
+ * price wins when the same city appears under multiple accounts so we
+ * never accidentally underprice. Rows already in ShippingCity that no
+ * longer have any CarrierCity backing are left alone — agents may have
+ * priced them manually for a non-Coliix carrier, and we should not
+ * delete that work.
+ */
+export async function syncCarrierCitiesToShipping() {
+  const rows = await prisma.carrierCity.findMany({
+    select: { ville: true, zone: true, deliveryPrice: true },
+  });
+
+  const byKey = new Map<string, { name: string; price: number; zone: string | null }>();
+  for (const r of rows) {
+    const key = r.ville.toLowerCase();
+    const incoming = {
+      name: r.ville,
+      price: r.deliveryPrice ? Number(r.deliveryPrice) : 0,
+      zone: r.zone ?? null,
+    };
+    const prev = byKey.get(key);
+    if (!prev || incoming.price > prev.price) byKey.set(key, incoming);
+  }
+
+  for (const row of byKey.values()) {
+    await prisma.shippingCity.upsert({
+      where: { name: row.name },
+      create: { name: row.name, price: row.price, zone: row.zone, isActive: true },
+      update: { price: row.price, zone: row.zone, isActive: true },
+    });
+  }
 }
 
 /**

@@ -46,6 +46,7 @@ import { inboxRoutes } from './modules/whatsapp/inbox.routes';
 import { adminRoutes } from './modules/admin/admin.routes';
 import { dashboardRoutes } from './modules/dashboard/dashboard.routes';
 import { coliixRoutes } from './modules/integrations/coliix/coliix.routes';
+import { syncCarrierCitiesToShipping } from './modules/integrations/coliix/cities.service';
 import { ensureDefaultTemplates } from './modules/automation/automation.service';
 import { ensureFallbackRules } from './modules/automation/rules.service';
 import { ensureAdminPermissions } from './shared/ensureAdminPermissions';
@@ -495,6 +496,13 @@ async function start() {
     // auto-run on Railway deploys) and busts the RBAC cache for admin users.
     ensureAdminPermissions().catch((err) => {
       app.log.warn({ err }, 'Failed to sync admin permissions');
+    });
+
+    // Mirror existing CarrierCity rows into ShippingCity on boot so DBs that
+    // imported their Coliix CSV before the sync wiring landed get backfilled
+    // automatically — no manual re-upload required.
+    syncCarrierCitiesToShipping().catch((err) => {
+      app.log.warn({ err }, 'Failed to sync Coliix cities to ShippingCity');
     });
 
     console.log(`🚀 Backend on http://localhost:${PORT}`);
