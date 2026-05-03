@@ -49,12 +49,20 @@ export function useDashboardCard<T>(
   const [loading, setLoading] = useState(true);
   const loaderRef = useRef(loader);
   loaderRef.current = loader;
+  // Track whether we've ever loaded data successfully. The loading skeleton
+  // should only appear before the first successful fetch — every subsequent
+  // refetch (filter change, socket event, manual) keeps the previous data
+  // visible while the new data is in flight, then swaps silently. Without
+  // this, a single new order across the team would flash 11 dashboard
+  // skeletons every few seconds.
+  const hasDataRef = useRef(false);
 
   const refetch = useCallback(async () => {
-    setLoading(true);
+    if (!hasDataRef.current) setLoading(true);
     try {
       const fresh = await loaderRef.current();
       setData(fresh);
+      hasDataRef.current = true;
     } catch {
       // ignore — leave stale data on screen
     } finally {

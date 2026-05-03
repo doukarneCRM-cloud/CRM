@@ -41,6 +41,13 @@ export function useOrders(): UseOrdersReturn {
 
   // Stable ref for fetch to avoid stale closure in socket handler
   const fetchRef = useRef<() => void>(() => {});
+  // Refs for page/pageSize so the order:created socket handler reads the
+  // current values without forcing the effect to re-subscribe on every
+  // pagination change.
+  const pageRef = useRef(page);
+  const pageSizeRef = useRef(pageSize);
+  pageRef.current = page;
+  pageSizeRef.current = pageSize;
 
   const fetch = useCallback(async () => {
     setLoading(true);
@@ -128,9 +135,11 @@ export function useOrders(): UseOrdersReturn {
   //                         no longer matches, or it dropped off-page),
   //                         silently skip. Pagination, scroll, selection,
   //                         and any open modal are preserved.
-  //   - order:created     → still refetch (a new order may need to appear
-  //                         in the current view; surgical insert is hard
-  //                         because we don't know if it matches filters).
+  //   - order:created     → fetch only the new order, prepend it on page 1
+  //                         (trim to pageSize to keep length stable), bump
+  //                         the total counter on other pages. No full
+  //                         refresh — keeps scroll, selection, and any
+  //                         open modal intact.
   //   - order:archived    → drop the row in-place from current state.
   //   - order:bulk_updated → still refetch (could affect many rows; cheap
   //                          enough since it's an admin action).
@@ -170,12 +179,50 @@ export function useOrders(): UseOrdersReturn {
         setOrders((prev) => prev.filter((o) => o.id !== orderId));
       };
 
+      // Surgical insert on order:created — no full refresh. Off-page-1
+      // viewers just see the total counter increment so pagination stays
+      // accurate; their visible rows are untouched.
+      const insertOne = async (payload: unknown) => {
+        const orderId = (payload as { orderId?: string })?.orderId;
+        if (!orderId) return;
+        // Other pages: just bump the count so pagination is correct.
+        if (pageRef.current !== 1) {
+          setPagination((p) => ({
+            ...p,
+            total: p.total + 1,
+            totalPages: Math.max(1, Math.ceil((p.total + 1) / (p.pageSize || 25))),
+          }));
+          return;
+        }
+        try {
+          const fresh = await ordersApi.getById(orderId);
+          setOrders((prev) => {
+            // Skip if the row is already there — guards against a race
+            // with a manual refresh in flight.
+            if (prev.some((o) => o.id === orderId)) return prev;
+            const next = [fresh, ...prev];
+            // Trim to pageSize so the table doesn't grow unbounded.
+            if (next.length > pageSizeRef.current) next.length = pageSizeRef.current;
+            return next;
+          });
+          setPagination((p) => ({
+            ...p,
+            total: p.total + 1,
+            totalPages: Math.max(1, Math.ceil((p.total + 1) / (p.pageSize || 25))),
+          }));
+        } catch {
+          // Order may not match the current filters server-side, or was
+          // already deleted between emit + fetch. Silently skip — better
+          // than a full reflow that loses the user's place.
+        }
+      };
+
       const fullRefresh = () => fetchRef.current();
 
       socket.on('order:updated', patchOne);
       socket.on('order:stock_warning', patchOne);
       socket.on('order:archived', dropOne);
-      socket.on('order:created', fullRefresh);
+      socket.on('order:created', insertOne);
       socket.on('order:bulk_updated', fullRefresh);
       // Recovery on (re)connect — events emitted while the socket was
       // disconnected (token refresh, network blip) would otherwise be missed.
@@ -185,7 +232,7 @@ export function useOrders(): UseOrdersReturn {
         socket?.off('order:updated', patchOne);
         socket?.off('order:stock_warning', patchOne);
         socket?.off('order:archived', dropOne);
-        socket?.off('order:created', fullRefresh);
+        socket?.off('order:created', insertOne);
         socket?.off('order:bulk_updated', fullRefresh);
         socket?.off('connect', fullRefresh);
       };
