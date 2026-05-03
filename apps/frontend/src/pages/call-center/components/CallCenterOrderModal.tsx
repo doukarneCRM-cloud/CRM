@@ -253,6 +253,20 @@ export function CallCenterOrderModal() {
     return cities.some((c) => c.name.toLowerCase() === form.customerCity.toLowerCase());
   }, [form?.customerCity, cities]);
 
+  // Always surface the order's current city in the dropdown — even when it's
+  // not in the Coliix list (or differs in capitalization). Otherwise the
+  // field shows the placeholder while the saved value silently sticks
+  // around in form state, leaving agents confused. The warning below still
+  // fires when cityValid === false; the agent picks a valid city to clear it.
+  const cityOptions = useMemo(() => {
+    const opts = cities.map((c) => ({ value: c.name, label: c.name }));
+    const current = form?.customerCity?.trim();
+    if (current && !opts.some((o) => o.value.toLowerCase() === current.toLowerCase())) {
+      opts.unshift({ value: current, label: current });
+    }
+    return opts;
+  }, [cities, form?.customerCity]);
+
   const phoneValid = useMemo(() => {
     if (!form) return null;
     return MA_PHONE_RE.test(form.customerPhone.replace(/\s/g, ''));
@@ -685,7 +699,7 @@ export function CallCenterOrderModal() {
                   </div>
                   <CRMSelect
                     label={t('callCenter.modal.city')}
-                    options={cities.map((c) => ({ value: c.name, label: c.name }))}
+                    options={cityOptions}
                     value={form.customerCity}
                     onChange={(v) => patch({ customerCity: v as string })}
                     searchable
