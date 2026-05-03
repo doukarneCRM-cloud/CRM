@@ -18,6 +18,7 @@ import { emitToRoom, emitOrderUpdated } from '../../../shared/socket';
 import * as cities from './cities.service';
 import { addParcel, extractTracking, ColiixApiError } from './coliix.client';
 import { logError } from './errors.service';
+import { pollOneShipment } from './poll.worker';
 
 // True when Coliix accepted the request — the envelope's status is
 // either true (boolean) or 200 (legacy number).
@@ -404,6 +405,23 @@ export async function createShipment(input: CreateShipmentInput): Promise<Create
     state: 'pushed',
     ts: Date.now(),
   });
+
+  // ── 8. Immediate first poll ──────────────────────────────────────────
+  // Fire one targeted poll a few seconds after the parcel lands at
+  // Coliix's side so "Nouveau Colis" (the first wording Coliix emits
+  // after addParcel) shows up in the timeline within seconds rather
+  // than waiting for the next polling tick. Operators routinely advance
+  // the parcel to "Attente De Ramassage" by creating the label
+  // immediately afterwards — without this trigger, the intermediate
+  // "Nouveau Colis" wording is overwritten in Coliix's tracking
+  // response before our first scheduled poll arrives, and the order
+  // timeline silently loses it. Fire-and-forget; pollOneShipment owns
+  // its own error logging.
+  setTimeout(() => {
+    pollOneShipment(result.id).catch(() => {
+      /* swallowed inside pollOneShipment via logError */
+    });
+  }, 3000);
 
   return { shipmentId: result.id, trackingCode: result.trackingCode };
 }

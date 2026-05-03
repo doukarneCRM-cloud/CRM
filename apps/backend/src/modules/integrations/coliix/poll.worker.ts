@@ -154,6 +154,76 @@ function errorTypeFor(err: unknown): 'api_credential_invalid' | 'api_timeout' | 
   return 'api_unknown';
 }
 
+// ─── Single-shipment poll ───────────────────────────────────────────────────
+//
+// Pull the latest tracking history for ONE shipment and ingest every entry.
+// Used by the post-push trigger to capture "Nouveau Colis" within ~3s of
+// the operator clicking Send, instead of waiting for the next polling
+// tick. Idempotent: identical entries are dropped by the dedupe hash on
+// the way in.
+
+export async function pollOneShipment(shipmentId: string): Promise<void> {
+  const s = await prisma.shipment.findUnique({
+    where: { id: shipmentId },
+    select: {
+      id: true,
+      trackingCode: true,
+      accountId: true,
+      state: true,
+      account: { select: { apiBaseUrl: true } },
+    },
+  });
+  if (!s) return;
+  if (s.state === 'delivered' || s.state === 'returned' || s.state === 'pending') {
+    return;
+  }
+
+  let apiKey: string;
+  try {
+    apiKey = await getDecryptedApiKey(s.accountId);
+  } catch {
+    return;
+  }
+
+  try {
+    const response = await track({
+      baseUrl: s.account.apiBaseUrl,
+      apiKey,
+      tracking: s.trackingCode,
+    });
+    const all = parseAllTrackEntries(
+      response.data as TrackResult | undefined,
+      response as unknown as Record<string, unknown>,
+    );
+    if (all.length === 0) {
+      await prisma.shipment.update({
+        where: { id: s.id },
+        data: { lastPolledAt: new Date() },
+      });
+      return;
+    }
+    for (const parsed of all) {
+      await ingestEvent({
+        source: 'poll',
+        tracking: s.trackingCode,
+        rawState: parsed.state,
+        driverNote: parsed.note,
+        eventDate: parsed.datereported ? new Date(parsed.datereported) : null,
+        dedupeHash: dedupeHashFor(s.trackingCode, parsed.state, parsed.datereported ?? ''),
+        payload: response.data ?? {},
+      });
+    }
+  } catch (err) {
+    await logError({
+      type: errorTypeFor(err),
+      message: err instanceof Error ? err.message : String(err),
+      shipmentId: s.id,
+      accountId: s.accountId,
+      meta: { tracking: s.trackingCode, trigger: 'pollOneShipment' },
+    });
+  }
+}
+
 // ─── Worker ─────────────────────────────────────────────────────────────────
 
 coliixPollQueue.process(1, async (_job) => {
