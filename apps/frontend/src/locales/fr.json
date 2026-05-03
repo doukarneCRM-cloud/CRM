@@ -1266,9 +1266,14 @@
       "columns": {
         "date": "Date",
         "description": "Description",
+        "source": "Source",
         "amount": "Montant",
         "file": "Fichier",
         "recordedBy": "Enregistré par"
+      },
+      "sources": {
+        "manual": "Manuel",
+        "facebook": "Facebook"
       },
       "view": "Voir",
       "editAria": "Modifier",
@@ -2802,7 +2807,55 @@
       "subtitle": "Services externes qui alimentent la synchro des produits, l'import des commandes et la livraison.",
       "tabs": {
         "youcan": "YouCan",
-        "coliix": "Coliix"
+        "coliix": "Coliix",
+        "facebook": "Facebook Ads"
+      }
+    },
+    "facebook": {
+      "title": "Facebook Ads",
+      "connect": "Connecter un compte publicitaire",
+      "connectedCount_one": "{{count}} compte publicitaire connecté",
+      "connectedCount_other": "{{count}} comptes publicitaires connectés",
+      "connected_one": "{{count}} compte lié",
+      "connected_other": "{{count}} comptes liés",
+      "connectFailed": "Échec de la connexion — réessayez",
+      "popupBlocked": "Popup bloquée. Autorisez les popups et réessayez.",
+      "oauthFailed": "Autorisation Facebook échouée",
+      "empty": "Aucun compte Facebook Ads connecté",
+      "emptyHint": "Cliquez sur Connecter pour autoriser Meta et choisir les comptes à suivre.",
+      "lastSync": "Dernière synchro : {{time}}",
+      "neverSynced": "Jamais synchronisé",
+      "syncNow": "Synchroniser",
+      "syncOk": "Synchronisé — {{spendDays}} jour(s), {{campaigns}} campagne(s)",
+      "syncWithErrors": "Synchro terminée avec des erreurs",
+      "pause": "Pause",
+      "resume": "Reprendre",
+      "confirmDelete": "Déconnecter {{name}} ? Les dépenses passées restent dans Argent.",
+      "spend": {
+        "title30d": "30 derniers jours",
+        "empty": "Aucune dépense enregistrée."
+      },
+      "campaigns": {
+        "title": "Campagnes & Adsets",
+        "tabCampaigns": "Campagnes ({{count}})",
+        "tabAdsets": "Adsets ({{count}})",
+        "colName": "Nom",
+        "colCampaign": "Campagne",
+        "colAdset": "Adset",
+        "colStatus": "Statut",
+        "col7d": "Dépense (7j)",
+        "empty": "Aucune campagne — synchro en attente ?",
+        "emptyAdsets": "Aucun adset."
+      },
+      "invoices": {
+        "title": "Factures",
+        "subtitle": "Lecture seule — récupérées depuis Meta Business Manager",
+        "colPeriod": "Période",
+        "colStatus": "Statut",
+        "colAmount": "Montant",
+        "colPdf": "PDF",
+        "open": "Ouvrir",
+        "empty": "Pas encore de facture — Meta facture mensuellement."
       }
     },
     "oauth": {

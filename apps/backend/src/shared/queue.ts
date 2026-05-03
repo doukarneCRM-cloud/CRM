@@ -65,6 +65,14 @@ export interface ColiixPollTickJobData {
   cursor?: string;
 }
 
+// Facebook Ads integration ──────────────────────────────────────────────────
+// Single-account sync job. Fired by the hourly tick + on-demand right
+// after an OAuth connect so spend lands within seconds rather than
+// after the next scheduled poll.
+export interface FacebookSyncJobData {
+  accountId: string;
+}
+
 // ─── Queues ──────────────────────────────────────────────────────────────────
 
 export const youcanSyncQueue = createQueue<YoucanSyncJobData>('youcan:sync');
@@ -72,6 +80,7 @@ export const callbackAlertQueue = createQueue<CallbackAlertJobData>('callback:al
 export const whatsappQueue = createQueue<WhatsAppSendJobData>('whatsapp:send');
 export const coliixIngestQueue = createQueue<ColiixIngestJobData>('coliix:ingest');
 export const coliixPollQueue = createQueue<ColiixPollTickJobData>('coliix:poll');
+export const facebookSyncQueue = createQueue<FacebookSyncJobData>('facebook:sync');
 
 // ─── Graceful shutdown ───────────────────────────────────────────────────────
 
@@ -82,5 +91,6 @@ export async function closeQueues() {
     whatsappQueue.close(),
     coliixIngestQueue.close(),
     coliixPollQueue.close(),
+    facebookSyncQueue.close(),
   ]);
 }

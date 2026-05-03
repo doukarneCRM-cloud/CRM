@@ -8,6 +8,10 @@ export interface Expense {
   amount: number;
   date: string;
   fileUrl: string | null;
+  // "manual" for typed-in expenses; "facebook" / "tiktok" / "google" for
+  // ad-platform integrations (read-only on the UI — auto-managed by the
+  // sync worker; deleting them is OK but they re-create on next sync).
+  source: string;
   addedById: string | null;
   addedBy: { id: string; name: string } | null;
   createdAt: string;

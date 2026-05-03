@@ -1266,9 +1266,14 @@
       "columns": {
         "date": "Date",
         "description": "Description",
+        "source": "Source",
         "amount": "Amount",
         "file": "File",
         "recordedBy": "Recorded by"
+      },
+      "sources": {
+        "manual": "Manual",
+        "facebook": "Facebook"
       },
       "view": "View",
       "editAria": "Edit",
@@ -2802,7 +2807,55 @@
       "subtitle": "External services that power product sync, order import, and shipping.",
       "tabs": {
         "youcan": "YouCan",
-        "coliix": "Coliix"
+        "coliix": "Coliix",
+        "facebook": "Facebook Ads"
+      }
+    },
+    "facebook": {
+      "title": "Facebook Ads",
+      "connect": "Connect ad account",
+      "connectedCount_one": "{{count}} ad account connected",
+      "connectedCount_other": "{{count}} ad accounts connected",
+      "connected_one": "{{count}} ad account linked",
+      "connected_other": "{{count}} ad accounts linked",
+      "connectFailed": "Failed to connect — try again",
+      "popupBlocked": "Popup blocked. Allow popups and retry.",
+      "oauthFailed": "Facebook authorization failed",
+      "empty": "No Facebook ad account connected yet",
+      "emptyHint": "Click Connect to authorize Meta and pick the accounts to track.",
+      "lastSync": "Last sync: {{time}}",
+      "neverSynced": "Never synced",
+      "syncNow": "Sync now",
+      "syncOk": "Synced — {{spendDays}} day(s), {{campaigns}} campaign(s)",
+      "syncWithErrors": "Sync finished with errors",
+      "pause": "Pause",
+      "resume": "Resume",
+      "confirmDelete": "Disconnect {{name}}? Past expenses stay on the Money page.",
+      "spend": {
+        "title30d": "Last 30 days",
+        "empty": "No spend recorded yet."
+      },
+      "campaigns": {
+        "title": "Campaigns & Adsets",
+        "tabCampaigns": "Campaigns ({{count}})",
+        "tabAdsets": "Adsets ({{count}})",
+        "colName": "Name",
+        "colCampaign": "Campaign",
+        "colAdset": "Adset",
+        "colStatus": "Status",
+        "col7d": "Spend (7d)",
+        "empty": "No campaigns yet — sync just ran?",
+        "emptyAdsets": "No adsets yet."
+      },
+      "invoices": {
+        "title": "Invoices",
+        "subtitle": "Read-only — pulled from Meta Business Manager",
+        "colPeriod": "Period",
+        "colStatus": "Status",
+        "colAmount": "Amount",
+        "colPdf": "PDF",
+        "open": "Open",
+        "empty": "No invoices yet — Meta bills monthly."
       }
     },
     "oauth": {

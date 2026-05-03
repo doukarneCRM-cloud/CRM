@@ -1017,14 +1017,22 @@ model Expense {
   amount      Decimal  @db.Decimal(12, 2)
   date        DateTime // user-selected date of the expense (not createdAt)
   fileUrl     String? // optional invoice / screenshot upload
+  // Where this row originated. "manual" = typed by an admin in the
+  // Expenses tab; "facebook" / "tiktok" / "google" = auto-imported from
+  // an ad-platform integration (one row per account per day). Lets the
+  // Expenses tab filter / colour-code automated rows differently and
+  // prevents the integration sync from clobbering manual entries.
+  source      String   @default("manual")
   addedById   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   addedBy    User?       @relation("ExpenseAuthor", fields: [addedById], references: [id])
   fabricRoll FabricRoll?
+  adSpendDay AdSpendDay?
 
   @@index([date])
+  @@index([source])
 }
 
 // ─── Money — Commission payments ─────────────────────────────────────────────
@@ -1467,4 +1475,112 @@ model ColiixIntegrationError {
   @@index([type, resolved, createdAt])
   @@index([shipmentId])
   @@index([orderId])
+}
+
+// ─── Ad platforms (Facebook today; TikTok / Google later) ───────────────────
+//
+// One row per connected ad account. Tokens are stored AES-256-GCM encrypted
+// at rest (see shared/encryption). `provider` is future-proofed so a single
+// schema covers TikTok / Google Ads when those land — same shape, different
+// API client.
+model AdAccount {
+  id             String    @id @default(cuid())
+  provider       String    @default("facebook") // facebook | tiktok | google
+  externalId     String // Meta's `act_<id>`
+  name           String
+  // Optional Meta Business Manager id — needed to fetch business invoices
+  // (those live at the business level, not the ad account level).
+  businessId     String?
+  accessToken    String? // long-lived token, encrypted
+  tokenExpiresAt DateTime?
+  isActive       Boolean   @default(true)
+  isConnected    Boolean   @default(false)
+  lastSyncAt     DateTime?
+  lastError      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  spendDays AdSpendDay[]
+  campaigns AdCampaign[]
+  invoices  AdInvoice[]
+
+  @@unique([provider, externalId])
+  @@index([provider, isActive])
+}
+
+// One row per ad account per day. The integration sync upserts on
+// (accountId, date) so re-running it for the same day updates spend in
+// place rather than duplicating. `expenseId` links to the auto-created
+// Expense row so deleting / disconnecting can cascade-clean the Money
+// page if the operator wants.
+model AdSpendDay {
+  id        String   @id @default(cuid())
+  accountId String
+  date      DateTime @db.Date
+  spend     Decimal  @db.Decimal(12, 2)
+  currency  String
+  expenseId String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  account AdAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  expense Expense?  @relation(fields: [expenseId], references: [id], onDelete: SetNull)
+
+  @@unique([accountId, date])
+  @@index([date])
+}
+
+model AdCampaign {
+  id          String  @id @default(cuid())
+  accountId   String
+  externalId  String
+  name        String
+  status      String // ACTIVE | PAUSED | ARCHIVED | DELETED
+  spendCached Decimal @default(0) @db.Decimal(12, 2)
+  // Last 7-day spend cached so the table renders without a per-row API call.
+  // Refreshed every sync. Currency is whatever the parent ad account uses.
+  refreshedAt DateTime @default(now())
+
+  account AdAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  adsets  AdAdset[]
+
+  @@unique([accountId, externalId])
+  @@index([accountId, status])
+}
+
+model AdAdset {
+  id          String  @id @default(cuid())
+  campaignId  String
+  externalId  String
+  name        String
+  status      String
+  spendCached Decimal @default(0) @db.Decimal(12, 2)
+  refreshedAt DateTime @default(now())
+
+  campaign AdCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, externalId])
+  @@index([campaignId, status])
+}
+
+// Read-only mirror of Meta Business Manager invoices. We don't push, we
+// just surface them in the Facebook tab so the operator doesn't have to
+// log into Meta's billing portal to see what's been billed.
+model AdInvoice {
+  id          String   @id @default(cuid())
+  accountId   String
+  externalId  String // Meta billing line id
+  periodStart DateTime
+  periodEnd   DateTime
+  amount      Decimal  @db.Decimal(12, 2)
+  currency    String
+  status      String // PAID | PENDING | OVERDUE
+  pdfUrl      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  account AdAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, externalId])
+  @@index([periodEnd])
 }

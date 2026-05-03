@@ -47,6 +47,8 @@ import { adminRoutes } from './modules/admin/admin.routes';
 import { dashboardRoutes } from './modules/dashboard/dashboard.routes';
 import { coliixRoutes } from './modules/integrations/coliix/coliix.routes';
 import { syncCarrierCitiesToShipping } from './modules/integrations/coliix/cities.service';
+import { facebookRoutes } from './modules/integrations/facebook/facebook.routes';
+import { startFacebookPoller } from './modules/integrations/facebook/poll.worker';
 import { ensureDefaultTemplates } from './modules/automation/automation.service';
 import { ensureFallbackRules } from './modules/automation/rules.service';
 import { ensureAdminPermissions } from './shared/ensureAdminPermissions';
@@ -448,6 +450,10 @@ app.register(dashboardRoutes, { prefix: '/api/v1/dashboard' });
 // shipments, webhook receiver, and the errors log.
 app.register(coliixRoutes, { prefix: '/api/v1/coliix' });
 
+// Facebook Ads — connect ad accounts (OAuth), pull daily spend, mirror
+// it into Money / Expenses, and surface campaigns / adsets / invoices.
+app.register(facebookRoutes, { prefix: '/api/v1/integrations/facebook' });
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 const PORT = Number(process.env.PORT ?? 3001);
 
@@ -475,6 +481,13 @@ async function start() {
     // calls Coliix's track API, ingests via the same pipeline as webhooks.
     startColiixPoller().catch((err) => {
       app.log.warn({ err }, 'Failed to start Coliix poller');
+    });
+
+    // Facebook Ads — hourly tick that fans out a per-account sync job,
+    // pulling yesterday's spend + refreshing campaigns / adsets / invoices.
+    // Manual "Sync now" actions enqueue ad-hoc jobs through the same queue.
+    startFacebookPoller().catch((err) => {
+      app.log.warn({ err }, 'Failed to start Facebook ads poller');
     });
 
     // Seed the current week's attendance rows for every active employee on

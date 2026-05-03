@@ -271,6 +271,7 @@ export function ExpensesTab() {
                 <tr className="text-left text-[10px] uppercase tracking-wide text-gray-400">
                   <th className="py-2 pr-2">{t('money.expenses.columns.date')}</th>
                   <th className="py-2 pr-2">{t('money.expenses.columns.description')}</th>
+                  <th className="py-2 pr-2">{t('money.expenses.columns.source')}</th>
                   <th className="py-2 pr-2 text-right">{t('money.expenses.columns.amount')}</th>
                   <th className="py-2 pr-2">{t('money.expenses.columns.file')}</th>
                   <th className="py-2 pr-2">{t('money.expenses.columns.recordedBy')}</th>
@@ -282,6 +283,21 @@ export function ExpensesTab() {
                   <tr key={e.id} className="border-t border-gray-50 hover:bg-accent/40">
                     <td className="py-2.5 pr-2 whitespace-nowrap text-gray-600">{fmtDate(e.date)}</td>
                     <td className="py-2.5 pr-2 text-gray-900">{e.description}</td>
+                    <td className="py-2.5 pr-2">
+                      {e.source === 'facebook' ? (
+                        <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold bg-[#E7F3FF] text-[#1877F2]">
+                          {t('money.expenses.sources.facebook')}
+                        </span>
+                      ) : e.source && e.source !== 'manual' ? (
+                        <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-600">
+                          {e.source}
+                        </span>
+                      ) : (
+                        <span className="rounded bg-gray-50 px-1.5 py-0.5 text-[10px] font-medium text-gray-400">
+                          {t('money.expenses.sources.manual')}
+                        </span>
+                      )}
+                    </td>
                     <td className="py-2.5 pr-2 text-right font-semibold text-gray-900">
                       {fmtMAD(e.amount)}
                     </td>
