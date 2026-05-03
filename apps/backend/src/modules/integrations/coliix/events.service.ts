@@ -77,18 +77,22 @@ const TERMINAL_STATES = new Set<ShipmentState>(['delivered', 'returned']);
 
 function nextPollFor(state: ShipmentState): Date | null {
   if (TERMINAL_STATES.has(state)) return null;
-  const minutesAhead = (
+  // Cadence in SECONDS. `pushed` and `out_for_delivery` are the "operator
+  // is watching the dashboard" states — short cadence keeps the timeline
+  // fresh for accounts without a working webhook configured. Other states
+  // are slower since updates are sparse.
+  const secondsAhead = (
     {
-      pending: 15,
-      pushed: 5,
-      picked_up: 30,
-      in_transit: 60,
-      out_for_delivery: 10,
-      failed_delivery: 60,
-      reported: 240, // 4h — courier explicitly asked to come back later
+      pending: 15 * 60,
+      pushed: 60, // 1 min — covers Nouveau Colis → Attente De Ramassage flips
+      picked_up: 30 * 60,
+      in_transit: 60 * 60,
+      out_for_delivery: 5 * 60,
+      failed_delivery: 60 * 60,
+      reported: 240 * 60, // 4h — courier explicitly asked to come back later
     } as Record<ShipmentState, number>
-  )[state] ?? 60;
-  return new Date(Date.now() + minutesAhead * 60_000);
+  )[state] ?? 60 * 60;
+  return new Date(Date.now() + secondsAhead * 1000);
 }
 
 // ─── Public entry point ─────────────────────────────────────────────────────

@@ -330,9 +330,13 @@ export async function createShipment(input: CreateShipmentInput): Promise<Create
   }
 
   const now = new Date();
-  // Initial nextPollAt — short interval so the polling fallback picks
-  // up the first state quickly if the webhook gets dropped at link time.
-  const nextPollAt = new Date(now.getTime() + 5 * 60_000);
+  // Initial nextPollAt — 30s. We want to capture Coliix's first status
+  // ("Nouveau Colis") before the operator manually advances it to
+  // "Attente De Ramassage" by creating the label, otherwise the
+  // intermediate wording is lost from the timeline. Webhook-configured
+  // accounts get the update instantly anyway; this cadence is the
+  // fallback for the first minute of a parcel's life.
+  const nextPollAt = new Date(now.getTime() + 30_000);
 
   // ── 6. Persist Shipment + flip Order.labelSent atomically ────────────
   const result = await prisma.$transaction(async (tx) => {

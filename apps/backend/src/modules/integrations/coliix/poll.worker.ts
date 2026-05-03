@@ -25,7 +25,13 @@ import { getDecryptedApiKey } from './accounts.service';
 import { logError } from './errors.service';
 
 const POLL_BATCH_SIZE = 50;
-const POLL_TICK_INTERVAL_MS = 60_000;
+// Tick every 30s. Combined with pushed-state cadence of 60s and an
+// initial nextPollAt of 30s after shipment creation, the worst-case
+// delay between push and "Nouveau Colis" appearing in the timeline
+// drops from ~6 min to ~30-60s — small enough that the operator can
+// create the label in Coliix UI without us missing the intermediate
+// state. Webhooks remain the instant path; this is fallback only.
+const POLL_TICK_INTERVAL_MS = 30_000;
 // Cooldown after a per-shipment failure so we don't hammer Coliix when
 // their API is throwing. Reset to the adaptive cadence as soon as we
 // successfully ingest an event for that shipment again.
