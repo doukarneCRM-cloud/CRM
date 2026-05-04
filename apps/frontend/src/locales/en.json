@@ -1908,7 +1908,7 @@
       "error": "Could not load all-orders analytics.",
       "section": {
         "overview": "Overview",
-        "overviewHint": "Headline numbers for the last {{days}} days of confirmed orders",
+        "overviewHint": "Headline numbers for the last {{days}} days (all incoming orders)",
         "sources": "Sources",
         "sourcesHint": "Where the orders are coming from",
         "spotlight": "Product spotlight",
@@ -1983,7 +1983,7 @@
       "stockSuggest": {
         "title": "Stock suggestions",
         "targetLabel": "Target cover",
-        "windowHint": "Velocity computed over the last {{days}} days of confirmed orders.",
+        "windowHint": "Velocity computed over the last {{days}} days (every incoming order, regardless of confirmation status).",
         "searchPh": "Search product / color / size",
         "allRisks": "All",
         "empty": "No variants match the current filter.",

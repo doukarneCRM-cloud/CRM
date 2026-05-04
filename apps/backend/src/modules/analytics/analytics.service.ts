@@ -1352,7 +1352,7 @@ export async function computeAllOrdersTab(
     deliveredBySource,
     revenueBySource,
     trendOrders,
-    confirmedItems,
+    allItems,
     productMeta,
     variantStocks,
   ] = await Promise.all([
@@ -1386,10 +1386,15 @@ export async function computeAllOrdersTab(
       select: { createdAt: true, source: true },
       take: 50_000,
     }),
-    // Confirmed orders' items — drives velocity AND the per-product /
-    // variant aggregates. Joined to variant + product for labels.
+    // Every order's items — drives velocity, per-product / variant
+    // aggregates, and the scale-prediction calculator. Operators want
+    // velocity to reflect every order that came in regardless of
+    // confirmation status, so demand projection includes orders that
+    // haven't been called yet (pending) and even cancelled / fake ones
+    // — those still represent "people clicking buy", which is the
+    // signal we want to scale against.
     prisma.orderItem.findMany({
-      where: { order: { ...whereConfirmed, confirmationStatus: 'confirmed' } },
+      where: { order: whereCreated },
       select: {
         quantity: true,
         orderId: true,
@@ -1483,7 +1488,7 @@ export async function computeAllOrdersTab(
     orderIds: Set<string>;       // unique order count for the variant
   }
   const variantAcc = new Map<string, VariantAcc>();
-  for (const it of confirmedItems) {
+  for (const it of allItems) {
     const key = it.variant.id;
     const existing = variantAcc.get(key);
     if (existing) {

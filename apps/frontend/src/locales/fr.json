@@ -1908,7 +1908,7 @@
       "error": "Impossible de charger Toutes les commandes.",
       "section": {
         "overview": "Vue d’ensemble",
-        "overviewHint": "Chiffres clés sur les {{days}} derniers jours (commandes confirmées)",
+        "overviewHint": "Chiffres clés sur les {{days}} derniers jours (toutes les commandes entrantes)",
         "sources": "Sources",
         "sourcesHint": "D’où viennent les commandes",
         "spotlight": "Focus produit",
@@ -1983,7 +1983,7 @@
       "stockSuggest": {
         "title": "Suggestions de stock",
         "targetLabel": "Couverture cible",
-        "windowHint": "Vitesse calculée sur les {{days}} derniers jours des commandes confirmées.",
+        "windowHint": "Vitesse calculée sur les {{days}} derniers jours (toutes les commandes entrantes, peu importe le statut).",
         "searchPh": "Rechercher produit / couleur / taille",
         "allRisks": "Tous",
         "empty": "Aucune variation ne correspond.",
