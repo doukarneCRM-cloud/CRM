@@ -488,8 +488,8 @@ export interface ConfirmationKPIs {
   unreachable: number;
   pending: number;
   merged: number;             // orders absorbed into another via mergedIntoId
-  confirmationRate: number;   // confirmed / (pending+awaiting+confirmed+cancelled+unreachable+fake)
-  cancellationRate: number;
+  confirmationRate: number;   // confirmed / totalOrders (canonical, matches Dashboard)
+  cancellationRate: number;   // cancelled / totalOrders
   mergedRate: number;         // merged / (totalOrders + merged)
   avgConfirmationHours: number;
   percentageChanges: {
@@ -625,12 +625,14 @@ async function computeConfirmationCore(filters: OrderFilterParams) {
       }),
     ]);
 
-  // Rates over the decided pool (confirmed + cancelled + unreachable). Now
-  // that we count current state these are mutually exclusive — no risk of
-  // double-counting an order that flipped between buckets.
-  const decidedPool = confirmed + cancelled + unreachable;
-  const confirmationRate = safeRate(confirmed, decidedPool);
-  const cancellationRate = safeRate(cancelled, decidedPool);
+  // Confirmation / cancellation rate use total orders as the denominator
+  // — same canonical formula as kpiCalculator.ts on the Dashboard. The
+  // previous "decided pool" denominator (confirmed + cancelled + unreachable)
+  // silently excluded fake and callback orders, producing higher rates here
+  // than on the dashboard for the same agent + filters. The two pages now
+  // agree: of every order that came in, what fraction did we confirm?
+  const confirmationRate = safeRate(confirmed, total);
+  const cancellationRate = safeRate(cancelled, total);
   const mergedRate = safeRate(merged, total + merged);
 
   let avgConfirmationHours = 0;
