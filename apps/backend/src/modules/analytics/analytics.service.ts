@@ -1560,21 +1560,27 @@ export async function computeAllOrdersTab(
       orders: a.orderIds.size,
     }));
 
-  // ── Top 10 products with their variant breakdown ──────────────────────
+  // ── Per-product breakdown ─────────────────────────────────────────────
+  // Include every product that has either confirmed orders in the window
+  // OR stock on hand right now. Operators want to be able to spotlight
+  // any active product — including one with zero orders this window —
+  // to inspect its current stock and decide what to do with it. Capped
+  // at 50 so the horizontal picker stays usable even on huge catalogs.
   interface ProductAcc {
     productId: string;
     productName: string;
     imageUrl: string | null;
     orders: Set<string>;
     variantIds: Set<string>;
+    totalStock: number;
   }
   const productAcc = new Map<string, ProductAcc>();
   for (const a of variantAcc.values()) {
-    if (a.quantity === 0) continue;
     const existing = productAcc.get(a.productId);
     if (existing) {
       a.orderIds.forEach((id) => existing.orders.add(id));
       existing.variantIds.add(a.variantId);
+      existing.totalStock += a.currentStock;
     } else {
       productAcc.set(a.productId, {
         productId: a.productId,
@@ -1582,13 +1588,23 @@ export async function computeAllOrdersTab(
         imageUrl: a.imageUrl,
         orders: new Set(a.orderIds),
         variantIds: new Set([a.variantId]),
+        totalStock: a.currentStock,
       });
     }
   }
   const variantById = new Map(variantStats.map((v) => [v.variantId, v]));
   const productBreakdown: AllOrdersProductBreakdownRow[] = Array.from(productAcc.values())
-    .sort((a, b) => b.orders.size - a.orders.size)
-    .slice(0, 10)
+    .filter((p) => p.orders.size > 0 || p.totalStock > 0)
+    // Sort: products WITH orders first (by order count desc), then
+    // stock-only products (by stock desc) so the picker shows the
+    // active items first and "have stock but no demand" last.
+    .sort((a, b) => {
+      if (a.orders.size > 0 && b.orders.size === 0) return -1;
+      if (a.orders.size === 0 && b.orders.size > 0) return 1;
+      if (a.orders.size !== b.orders.size) return b.orders.size - a.orders.size;
+      return b.totalStock - a.totalStock;
+    })
+    .slice(0, 50)
     .map((p) => {
       const variants = Array.from(p.variantIds)
         .map((vid) => variantById.get(vid)!)
