@@ -253,18 +253,26 @@ export function CallCenterOrderModal() {
     return cities.some((c) => c.name.toLowerCase() === form.customerCity.toLowerCase());
   }, [form?.customerCity, cities]);
 
-  // Always surface the order's current city in the dropdown — even when it's
-  // not in the Coliix list (or differs in capitalization). Otherwise the
-  // field shows the placeholder while the saved value silently sticks
-  // around in form state, leaving agents confused. The warning below still
-  // fires when cityValid === false; the agent picks a valid city to clear it.
+  // Always surface the order's current city in the dropdown so the field
+  // never shows the placeholder while a value is silently stuck in form
+  // state. Three cases:
+  //   1. Exact match in the Coliix list → use the list as-is (no prepend).
+  //   2. Case-only mismatch (e.g. saved "casablanca", list has "Casablanca")
+  //      → prepend with the saved casing AND drop the Coliix-cased duplicate.
+  //      Otherwise CRMSelect's strict `===` lookup would fail to find the
+  //      label even though cityValid (case-insensitive) is true, so the
+  //      field would render empty with no warning — agents reported this
+  //      as "sometimes the city just doesn't show up".
+  //   3. No match at all → prepend so the saved value is visible. The
+  //      warning (cityValid === false) tells the agent to fix it.
   const cityOptions = useMemo(() => {
     const opts = cities.map((c) => ({ value: c.name, label: c.name }));
     const current = form?.customerCity?.trim();
-    if (current && !opts.some((o) => o.value.toLowerCase() === current.toLowerCase())) {
-      opts.unshift({ value: current, label: current });
-    }
-    return opts;
+    if (!current) return opts;
+    if (opts.some((o) => o.value === current)) return opts;
+    const lower = current.toLowerCase();
+    const deduped = opts.filter((o) => o.value.toLowerCase() !== lower);
+    return [{ value: current, label: current }, ...deduped];
   }, [cities, form?.customerCity]);
 
   const phoneValid = useMemo(() => {
