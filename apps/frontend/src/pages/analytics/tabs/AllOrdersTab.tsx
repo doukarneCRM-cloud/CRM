@@ -50,6 +50,7 @@ import { CRMSelect } from '@/components/ui/CRMSelect';
 import { rowsToCsv, downloadCsv } from '@/lib/csv';
 import { apiErrorMessage } from '@/lib/apiError';
 import { cn } from '@/lib/cn';
+import { compareSizes } from '@/lib/sizeOrder';
 import {
   analyticsApi,
   type AllOrdersTabPayload,
@@ -69,17 +70,6 @@ function formatDoC(d: number | null): string {
   if (d === null) return '∞';
   if (d > 999) return '999+';
   return d.toFixed(1);
-}
-
-const SIZE_ORDER = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', '4XL', '5XL'];
-function sizeRank(s: string | null): number {
-  if (!s) return 1000;
-  const idx = SIZE_ORDER.indexOf(s.toUpperCase().trim());
-  if (idx !== -1) return idx;
-  // Numeric sizes (e.g. "8 ans", "36"): sort by leading number after letters.
-  const n = Number(s.replace(/[^\d.]/g, ''));
-  if (Number.isFinite(n)) return 1100 + n;
-  return 1500;
 }
 
 const SOURCE_COLOR: Record<string, string> = {
@@ -144,7 +134,7 @@ function VariantMatrix({
   ).sort();
   const sizes = Array.from(
     new Set(variants.map((v) => v.size ?? '—')),
-  ).sort((a, b) => sizeRank(a) - sizeRank(b));
+  ).sort(compareSizes);
   const byKey = new Map(
     variants.map((v) => [`${v.color ?? '—'}|${v.size ?? '—'}`, v]),
   );

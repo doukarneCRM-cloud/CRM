@@ -4,6 +4,7 @@ import { Package } from 'lucide-react';
 import { StockCell } from './StockCell';
 import { MeasurementTable } from './MeasurementTable';
 import { resolveImageUrl } from '@/lib/imageUrl';
+import { compareSizes } from '@/lib/sizeOrder';
 import type { ProductDetail } from '@/services/productsApi';
 
 interface Props {
@@ -27,14 +28,18 @@ export function ProductStockMatrix({ product, canEdit }: Props) {
       sizeSet.add(size);
       map.set(`${color}::${size}`, v);
     }
-    const sortWithEmptyLast = (a: string, b: string) => {
+    const sortColorsEmptyLast = (a: string, b: string) => {
       if (a === '' && b !== '') return 1;
       if (b === '' && a !== '') return -1;
       return a.localeCompare(b);
     };
     return {
-      colors: [...colorSet].sort(sortWithEmptyLast),
-      sizes: [...sizeSet].sort(sortWithEmptyLast),
+      colors: [...colorSet].sort(sortColorsEmptyLast),
+      // Sizes use the canonical CRM ordering (M / L / XL / XXL first,
+      // then S / XS / XXS, then XXXL+, then numeric / measured sizes,
+      // empty strings last). Same util used by every matrix view in
+      // the app so column order stays consistent.
+      sizes: [...sizeSet].sort(compareSizes),
       variantMap: map,
     };
   }, [product.variants]);
