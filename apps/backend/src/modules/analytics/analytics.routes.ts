@@ -6,6 +6,7 @@ import {
   computeDeliveryTab,
   computeConfirmationTab,
   computeProfitTab,
+  computeAllOrdersTab,
 } from './analytics.service';
 
 function pickFilters(query: Record<string, string | undefined>): OrderFilterParams {
@@ -50,6 +51,23 @@ export async function analyticsRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const filters = pickFilters(request.query as Record<string, string | undefined>);
       const payload = await computeProfitTab(filters);
+      return reply.send(payload);
+    },
+  );
+
+  // All Orders — demand-oriented tab. Sources breakdown + variant-level
+  // velocity/coverage/suggested-reorder, all in one round-trip. Optional
+  // ?targetDays=14 query knob drives the suggested-reorder column.
+  app.get(
+    '/all-orders',
+    { preHandler: [verifyJWT, requirePermission('analytics:view')] },
+    async (request, reply) => {
+      const q = request.query as Record<string, string | undefined>;
+      const filters = pickFilters(q);
+      const targetDays = q.targetDays ? Number(q.targetDays) : undefined;
+      const payload = await computeAllOrdersTab(filters, {
+        targetDays: Number.isFinite(targetDays) ? targetDays : undefined,
+      });
       return reply.send(payload);
     },
   );

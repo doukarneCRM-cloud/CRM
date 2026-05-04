@@ -1898,6 +1898,67 @@
       "profit": {
         "label": "Profit",
         "hint": "Chiffre d’affaires moins tous les coûts"
+      },
+      "allOrders": {
+        "label": "Toutes les commandes",
+        "hint": "Sources, top variations & suggestions de stock"
+      }
+    },
+    "allOrders": {
+      "error": "Impossible de charger Toutes les commandes.",
+      "kpi": {
+        "totalOrders": "Commandes",
+        "avgItems": "Articles / commande",
+        "topSource": "Source principale",
+        "topVariant": "Variation top",
+        "stockAtRisk": "Stock à risque"
+      },
+      "sources": {
+        "donutTitle": "Commandes par source",
+        "tableTitle": "Entonnoir par source",
+        "colSource": "Source",
+        "colOrders": "Commandes",
+        "colConfirmed": "Confirmées",
+        "colDelivered": "Livrées",
+        "colRevenue": "CA",
+        "colRate": "Taux conf."
+      },
+      "trend": {
+        "title": "Commandes par jour, par source"
+      },
+      "topVariants": {
+        "title": "Top 15 variations (unités commandées)"
+      },
+      "byProduct": {
+        "title": "Top produits → variations",
+        "orders": "commandes",
+        "variants": "variations",
+        "colVariant": "Variation",
+        "colOrdered": "Commandé",
+        "colStock": "Stock",
+        "colDoC": "Couverture",
+        "colSuggest": "Suggéré +"
+      },
+      "stockSuggest": {
+        "title": "Suggestions de stock",
+        "targetLabel": "Couverture cible",
+        "windowHint": "Vitesse calculée sur les {{days}} derniers jours des commandes confirmées.",
+        "export": "Exporter CSV",
+        "colProduct": "Produit",
+        "colVariant": "Variation",
+        "colOrdered": "Commandé",
+        "colStock": "Stock",
+        "colVelocity": "Unités/j",
+        "colDoC": "Couverture",
+        "colSuggest": "Suggéré +",
+        "colRisk": "Risque"
+      },
+      "risk": {
+        "imminent": "Imminent",
+        "low": "Faible",
+        "healthy": "Sain",
+        "overstock": "Surstock",
+        "stale": "Inactif"
       }
     },
     "filters": {

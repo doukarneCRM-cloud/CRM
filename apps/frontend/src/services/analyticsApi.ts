@@ -228,6 +228,86 @@ export interface ProfitTabPayload {
   };
 }
 
+// ─── All Orders ─────────────────────────────────────────────────────────────
+export type AllOrdersRiskBand = 'imminent' | 'low' | 'healthy' | 'overstock' | 'stale';
+
+export interface AllOrdersKPIs {
+  totalOrders: number;
+  avgItemsPerOrder: number;
+  topSource: { source: string; count: number; pct: number } | null;
+  topVariant: {
+    variantId: string;
+    productName: string;
+    color: string | null;
+    size: string | null;
+    quantity: number;
+  } | null;
+  stockAtRisk: number;
+  percentageChanges: {
+    totalOrders: number;
+    avgItemsPerOrder: number;
+  };
+}
+
+export interface AllOrdersSourceRow {
+  source: string;
+  orders: number;
+  confirmed: number;
+  delivered: number;
+  revenue: number;
+  confirmationRate: number;
+}
+
+export interface AllOrdersTrendPoint {
+  date: string;
+  bySource: Record<string, number>;
+}
+
+export interface AllOrdersTopVariant {
+  variantId: string;
+  productId: string;
+  productName: string;
+  color: string | null;
+  size: string | null;
+  quantity: number;
+  orders: number;
+}
+
+export interface AllOrdersVariantStat {
+  variantId: string;
+  productId: string;
+  productName: string;
+  color: string | null;
+  size: string | null;
+  ordered: number;
+  currentStock: number;
+  velocityPerDay: number;
+  daysOfCover: number | null;
+  suggestedReorder: number;
+  risk: AllOrdersRiskBand;
+}
+
+export interface AllOrdersProductBreakdownRow {
+  productId: string;
+  productName: string;
+  imageUrl: string | null;
+  orders: number;
+  variants: AllOrdersVariantStat[];
+}
+
+export interface AllOrdersTabPayload {
+  kpis: AllOrdersKPIs;
+  sources: AllOrdersSourceRow[];
+  trendBySource: AllOrdersTrendPoint[];
+  topVariants: AllOrdersTopVariant[];
+  productBreakdown: AllOrdersProductBreakdownRow[];
+  stockSuggestions: {
+    targetDays: number;
+    variants: AllOrdersVariantStat[];
+  };
+  windowDays: number;
+}
+
 export const analyticsApi = {
   delivery: (filters: AnalyticsFilters) =>
     api.get<DeliveryTabPayload>('/analytics/delivery', { params: filters }).then((r) => r.data),
@@ -237,4 +317,9 @@ export const analyticsApi = {
 
   profit: (filters: AnalyticsFilters) =>
     api.get<ProfitTabPayload>('/analytics/profit', { params: filters }).then((r) => r.data),
+
+  allOrders: (filters: AnalyticsFilters & { targetDays?: number }) =>
+    api
+      .get<AllOrdersTabPayload>('/analytics/all-orders', { params: filters })
+      .then((r) => r.data),
 };

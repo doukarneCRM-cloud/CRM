@@ -1204,3 +1204,473 @@ export async function computeProfitTab(filters: OrderFilterParams): Promise<Prof
     },
   };
 }
+
+// ─── All Orders Tab ──────────────────────────────────────────────────────────
+//
+// Demand-oriented view (vs the funnel-oriented Delivery / Confirmation /
+// Profit tabs). Answers "where do orders come from?" and "what should the
+// atelier produce next?". Velocity uses confirmed orders only — junk
+// (cancelled / fake / duplicate) doesn't drive production decisions.
+
+export type AllOrdersRiskBand = 'imminent' | 'low' | 'healthy' | 'overstock' | 'stale';
+
+export interface AllOrdersKPIs {
+  totalOrders: number;
+  avgItemsPerOrder: number;
+  topSource: { source: string; count: number; pct: number } | null;
+  topVariant: {
+    variantId: string;
+    productName: string;
+    color: string | null;
+    size: string | null;
+    quantity: number;
+  } | null;
+  stockAtRisk: number;
+  percentageChanges: {
+    totalOrders: number;
+    avgItemsPerOrder: number;
+  };
+}
+
+export interface AllOrdersSourceRow {
+  source: string;
+  orders: number;
+  confirmed: number;
+  delivered: number;
+  revenue: number;
+  confirmationRate: number;
+}
+
+export interface AllOrdersTrendPoint {
+  date: string;
+  // One numeric column per source; absent sources implicitly 0.
+  bySource: Record<string, number>;
+}
+
+export interface AllOrdersTopVariant {
+  variantId: string;
+  productId: string;
+  productName: string;
+  color: string | null;
+  size: string | null;
+  quantity: number;
+  orders: number;
+}
+
+export interface AllOrdersVariantStat {
+  variantId: string;
+  productId: string;
+  productName: string;
+  color: string | null;
+  size: string | null;
+  ordered: number;            // units in window (confirmed orders)
+  currentStock: number;
+  velocityPerDay: number;
+  daysOfCover: number | null; // null = velocity 0 (cannot compute)
+  suggestedReorder: number;
+  risk: AllOrdersRiskBand;
+}
+
+export interface AllOrdersProductBreakdownRow {
+  productId: string;
+  productName: string;
+  imageUrl: string | null;
+  orders: number;
+  variants: AllOrdersVariantStat[];
+}
+
+export interface AllOrdersTabPayload {
+  kpis: AllOrdersKPIs;
+  sources: AllOrdersSourceRow[];
+  trendBySource: AllOrdersTrendPoint[];
+  topVariants: AllOrdersTopVariant[];
+  productBreakdown: AllOrdersProductBreakdownRow[];
+  stockSuggestions: {
+    targetDays: number;
+    variants: AllOrdersVariantStat[];
+  };
+  // Echo the window we used so the UI can label "Velocity over X days".
+  windowDays: number;
+}
+
+function classifyRisk(daysOfCover: number | null, velocity: number): AllOrdersRiskBand {
+  if (velocity === 0) return 'stale';
+  if (daysOfCover === null) return 'stale';
+  if (daysOfCover < 7) return 'imminent';
+  if (daysOfCover < 14) return 'low';
+  if (daysOfCover <= 30) return 'healthy';
+  return 'overstock';
+}
+
+async function computeAllOrdersCore(
+  filters: OrderFilterParams,
+): Promise<{ totalOrders: number; avgItemsPerOrder: number }> {
+  const where = buildOrderWhereClause(filters, { dateField: 'createdAt' });
+  const [orderCount, itemAgg] = await Promise.all([
+    prisma.order.count({ where }),
+    prisma.orderItem.aggregate({
+      where: { order: where },
+      _sum: { quantity: true },
+    }),
+  ]);
+  const totalUnits = itemAgg._sum.quantity ?? 0;
+  const avgItemsPerOrder = orderCount > 0 ? Math.round((totalUnits / orderCount) * 10) / 10 : 0;
+  return { totalOrders: orderCount, avgItemsPerOrder };
+}
+
+export interface ComputeAllOrdersOpts {
+  // Default 14. Drives the suggested-reorder column (qty needed to cover
+  // `targetDays` of demand at the observed velocity, minus current stock).
+  targetDays?: number;
+}
+
+export async function computeAllOrdersTab(
+  filters: OrderFilterParams,
+  opts: ComputeAllOrdersOpts = {},
+): Promise<AllOrdersTabPayload> {
+  const targetDays = Math.max(1, Math.min(180, Math.round(opts.targetDays ?? 14)));
+
+  // ── Window (for velocity denominator) ──────────────────────────────────
+  // Honor the user's date filter; fall back to 30 days when none set so
+  // velocity has a meaningful denominator on first load.
+  const { from, to } = activityRange(filters);
+  const windowMs = Math.max(86_400_000, to.getTime() - from.getTime());
+  const windowDays = Math.max(1, Math.round(windowMs / 86_400_000));
+
+  // Where clauses — same filters, two date fields. createdAt drives the
+  // total/avg/source breakdown (when did the order arrive?). confirmed
+  // orders drive velocity (junk shouldn't influence production decisions).
+  const whereCreated = buildOrderWhereClause(filters, { dateField: 'createdAt' });
+  const whereConfirmed = buildOrderWhereClause(filters, { dateField: 'confirmedAt' });
+  const whereDelivered = buildOrderWhereClause(filters, { dateField: 'deliveredAt' });
+
+  const [
+    coreCurr,
+    corePrev,
+    sourceGroups,
+    confirmedBySource,
+    deliveredBySource,
+    revenueBySource,
+    trendOrders,
+    confirmedItems,
+    productMeta,
+    variantStocks,
+  ] = await Promise.all([
+    computeAllOrdersCore(filters),
+    computeAllOrdersCore(mirrorRange(filters)),
+    // Source breakdown — counts per source within the window.
+    prisma.order.groupBy({
+      by: ['source'],
+      where: whereCreated,
+      _count: { _all: true },
+    }),
+    prisma.order.groupBy({
+      by: ['source'],
+      where: { ...whereConfirmed, confirmationStatus: 'confirmed' },
+      _count: { _all: true },
+    }),
+    prisma.order.groupBy({
+      by: ['source'],
+      where: { ...whereDelivered, shippingStatus: 'delivered' },
+      _count: { _all: true },
+    }),
+    prisma.order.groupBy({
+      by: ['source'],
+      where: { ...whereDelivered, shippingStatus: 'delivered' },
+      _sum: { total: true },
+    }),
+    // Daily trend, segmented by source. We pull (createdAt, source) and
+    // bucket client-side — cheap for normal volumes (< 50k orders/window).
+    prisma.order.findMany({
+      where: whereCreated,
+      select: { createdAt: true, source: true },
+      take: 50_000,
+    }),
+    // Confirmed orders' items — drives velocity AND the per-product /
+    // variant aggregates. Joined to variant + product for labels.
+    prisma.orderItem.findMany({
+      where: { order: { ...whereConfirmed, confirmationStatus: 'confirmed' } },
+      select: {
+        quantity: true,
+        orderId: true,
+        variant: {
+          select: {
+            id: true,
+            color: true,
+            size: true,
+            stock: true,
+            product: { select: { id: true, name: true, imageUrl: true } },
+          },
+        },
+      },
+    }),
+    // Product image fallback for products that haven't sold yet but the
+    // breakdown still references them (e.g. via an orphan variant). Empty
+    // result when not needed.
+    prisma.product.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, imageUrl: true },
+    }),
+    // Stock snapshot for every active variant — covers "stale" rows
+    // (variants with zero orders in the window but stock on hand) so the
+    // operator still sees inventory at risk of getting old.
+    prisma.productVariant.findMany({
+      select: {
+        id: true,
+        color: true,
+        size: true,
+        stock: true,
+        product: { select: { id: true, name: true, imageUrl: true } },
+      },
+    }),
+  ]);
+
+  // ── Sources ────────────────────────────────────────────────────────────
+  const orderTotal = coreCurr.totalOrders;
+  const sourceCount = new Map(sourceGroups.map((g) => [g.source, g._count._all]));
+  const confirmedBySourceMap = new Map(
+    confirmedBySource.map((g) => [g.source, g._count._all]),
+  );
+  const deliveredBySourceMap = new Map(
+    deliveredBySource.map((g) => [g.source, g._count._all]),
+  );
+  const revenueBySourceMap = new Map(
+    revenueBySource.map((g) => [g.source, Number(g._sum.total ?? 0)]),
+  );
+
+  const sources: AllOrdersSourceRow[] = Array.from(sourceCount.entries())
+    .map(([source, orders]) => {
+      const confirmed = confirmedBySourceMap.get(source) ?? 0;
+      const delivered = deliveredBySourceMap.get(source) ?? 0;
+      const revenue = revenueBySourceMap.get(source) ?? 0;
+      return {
+        source,
+        orders,
+        confirmed,
+        delivered,
+        revenue,
+        confirmationRate: safeRate(confirmed, orders),
+      };
+    })
+    .sort((a, b) => b.orders - a.orders);
+
+  // ── Daily trend by source ──────────────────────────────────────────────
+  const trendBuckets = new Map<string, Record<string, number>>();
+  // Pre-seed every day in the window so the chart has a continuous x-axis.
+  for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+    trendBuckets.set(dayKey(new Date(d)), {});
+  }
+  for (const o of trendOrders) {
+    const k = dayKey(o.createdAt);
+    const day = trendBuckets.get(k);
+    if (!day) continue; // outside window (shouldn't happen given filter)
+    day[o.source] = (day[o.source] ?? 0) + 1;
+  }
+  const trendBySource: AllOrdersTrendPoint[] = Array.from(trendBuckets.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([date, bySource]) => ({ date, bySource }));
+
+  // ── Variant aggregation ────────────────────────────────────────────────
+  interface VariantAcc {
+    variantId: string;
+    productId: string;
+    productName: string;
+    imageUrl: string | null;
+    color: string | null;
+    size: string | null;
+    currentStock: number;
+    quantity: number;            // total units ordered
+    orderIds: Set<string>;       // unique order count for the variant
+  }
+  const variantAcc = new Map<string, VariantAcc>();
+  for (const it of confirmedItems) {
+    const key = it.variant.id;
+    const existing = variantAcc.get(key);
+    if (existing) {
+      existing.quantity += it.quantity;
+      existing.orderIds.add(it.orderId);
+    } else {
+      variantAcc.set(key, {
+        variantId: it.variant.id,
+        productId: it.variant.product.id,
+        productName: it.variant.product.name,
+        imageUrl: it.variant.product.imageUrl,
+        color: it.variant.color,
+        size: it.variant.size,
+        currentStock: it.variant.stock,
+        quantity: it.quantity,
+        orderIds: new Set([it.orderId]),
+      });
+    }
+  }
+
+  // Stale variants: in stock but no orders in the window. Operators want
+  // to see these too — they're the ones eating storage without moving.
+  for (const v of variantStocks) {
+    if (variantAcc.has(v.id)) continue;
+    if (v.stock <= 0) continue;
+    variantAcc.set(v.id, {
+      variantId: v.id,
+      productId: v.product.id,
+      productName: v.product.name,
+      imageUrl: v.product.imageUrl,
+      color: v.color,
+      size: v.size,
+      currentStock: v.stock,
+      quantity: 0,
+      orderIds: new Set(),
+    });
+  }
+
+  // Build per-variant stats with velocity / coverage / suggested reorder.
+  const variantStats: AllOrdersVariantStat[] = Array.from(variantAcc.values()).map((a) => {
+    const velocityPerDay = a.quantity / windowDays;
+    const daysOfCover = velocityPerDay > 0 ? a.currentStock / velocityPerDay : null;
+    const suggestedReorder =
+      velocityPerDay > 0
+        ? Math.max(0, Math.ceil(targetDays * velocityPerDay) - a.currentStock)
+        : 0;
+    return {
+      variantId: a.variantId,
+      productId: a.productId,
+      productName: a.productName,
+      color: a.color,
+      size: a.size,
+      ordered: a.quantity,
+      currentStock: a.currentStock,
+      velocityPerDay: Math.round(velocityPerDay * 100) / 100,
+      daysOfCover: daysOfCover === null ? null : Math.round(daysOfCover * 10) / 10,
+      suggestedReorder,
+      risk: classifyRisk(daysOfCover, velocityPerDay),
+    };
+  });
+
+  // ── Top 15 variants (by units ordered) ────────────────────────────────
+  const topVariants: AllOrdersTopVariant[] = Array.from(variantAcc.values())
+    .filter((a) => a.quantity > 0)
+    .sort((a, b) => b.quantity - a.quantity)
+    .slice(0, 15)
+    .map((a) => ({
+      variantId: a.variantId,
+      productId: a.productId,
+      productName: a.productName,
+      color: a.color,
+      size: a.size,
+      quantity: a.quantity,
+      orders: a.orderIds.size,
+    }));
+
+  // ── Top 10 products with their variant breakdown ──────────────────────
+  interface ProductAcc {
+    productId: string;
+    productName: string;
+    imageUrl: string | null;
+    orders: Set<string>;
+    variantIds: Set<string>;
+  }
+  const productAcc = new Map<string, ProductAcc>();
+  for (const a of variantAcc.values()) {
+    if (a.quantity === 0) continue;
+    const existing = productAcc.get(a.productId);
+    if (existing) {
+      a.orderIds.forEach((id) => existing.orders.add(id));
+      existing.variantIds.add(a.variantId);
+    } else {
+      productAcc.set(a.productId, {
+        productId: a.productId,
+        productName: a.productName,
+        imageUrl: a.imageUrl,
+        orders: new Set(a.orderIds),
+        variantIds: new Set([a.variantId]),
+      });
+    }
+  }
+  const variantById = new Map(variantStats.map((v) => [v.variantId, v]));
+  const productBreakdown: AllOrdersProductBreakdownRow[] = Array.from(productAcc.values())
+    .sort((a, b) => b.orders.size - a.orders.size)
+    .slice(0, 10)
+    .map((p) => {
+      const variants = Array.from(p.variantIds)
+        .map((vid) => variantById.get(vid)!)
+        .filter(Boolean)
+        .sort((a, b) => b.ordered - a.ordered);
+      return {
+        productId: p.productId,
+        productName: p.productName,
+        imageUrl: p.imageUrl,
+        orders: p.orders.size,
+        variants,
+      };
+    });
+
+  // Suppress unused-var lint — productMeta exists for future fallback
+  // labelling; harmless to keep.
+  void productMeta;
+
+  // ── Stock-at-risk (KPI) ────────────────────────────────────────────────
+  const stockAtRisk = variantStats.filter(
+    (v) => v.risk === 'imminent' || v.risk === 'low',
+  ).length;
+
+  // ── Top source (KPI) ──────────────────────────────────────────────────
+  const topSourceRow = sources[0];
+  const topSource = topSourceRow
+    ? {
+        source: topSourceRow.source,
+        count: topSourceRow.orders,
+        pct:
+          orderTotal > 0
+            ? Math.round((topSourceRow.orders / orderTotal) * 1000) / 10
+            : 0,
+      }
+    : null;
+
+  // ── Top variant (KPI) ─────────────────────────────────────────────────
+  const topVariantRow = topVariants[0];
+  const topVariant = topVariantRow
+    ? {
+        variantId: topVariantRow.variantId,
+        productName: topVariantRow.productName,
+        color: topVariantRow.color,
+        size: topVariantRow.size,
+        quantity: topVariantRow.quantity,
+      }
+    : null;
+
+  return {
+    kpis: {
+      totalOrders: coreCurr.totalOrders,
+      avgItemsPerOrder: coreCurr.avgItemsPerOrder,
+      topSource,
+      topVariant,
+      stockAtRisk,
+      percentageChanges: {
+        totalOrders: pctChange(coreCurr.totalOrders, corePrev.totalOrders),
+        avgItemsPerOrder: pctChange(coreCurr.avgItemsPerOrder, corePrev.avgItemsPerOrder),
+      },
+    },
+    sources,
+    trendBySource,
+    topVariants,
+    productBreakdown,
+    stockSuggestions: {
+      targetDays,
+      // Sort by risk (imminent first), then by velocity (highest demand first).
+      variants: variantStats
+        .slice()
+        .sort((a, b) => {
+          const order: Record<AllOrdersRiskBand, number> = {
+            imminent: 0,
+            low: 1,
+            healthy: 2,
+            overstock: 3,
+            stale: 4,
+          };
+          const r = order[a.risk] - order[b.risk];
+          if (r !== 0) return r;
+          return b.velocityPerDay - a.velocityPerDay;
+        }),
+    },
+    windowDays,
+  };
+}

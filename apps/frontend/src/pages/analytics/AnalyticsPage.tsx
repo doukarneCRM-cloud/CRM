@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Truck, PhoneCall, TrendingUp } from 'lucide-react';
+import { Truck, PhoneCall, TrendingUp, Boxes } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { GlobalFilterBar, type FilterChipConfig } from '@/components/ui/GlobalFilterBar';
 import {
@@ -13,8 +13,9 @@ import { cn } from '@/lib/cn';
 import { DeliveryTab } from './tabs/DeliveryTab';
 import { ConfirmationTab } from './tabs/ConfirmationTab';
 import { ProfitTab } from './tabs/ProfitTab';
+import { AllOrdersTab } from './tabs/AllOrdersTab';
 
-type TabId = 'delivery' | 'confirmation' | 'profit';
+type TabId = 'delivery' | 'confirmation' | 'profit' | 'allOrders';
 
 export default function AnalyticsPage() {
   const { t } = useTranslation();
@@ -39,6 +40,12 @@ export default function AnalyticsPage() {
         label: t('analytics.tabs.profit.label'),
         icon: TrendingUp,
         hint: t('analytics.tabs.profit.hint'),
+      },
+      {
+        id: 'allOrders' as TabId,
+        label: t('analytics.tabs.allOrders.label'),
+        icon: Boxes,
+        hint: t('analytics.tabs.allOrders.hint'),
       },
     ],
     [t],
@@ -106,6 +113,7 @@ export default function AnalyticsPage() {
       {active === 'delivery' && <DeliveryTab />}
       {active === 'confirmation' && <ConfirmationTab />}
       {active === 'profit' && <ProfitTab />}
+      {active === 'allOrders' && <AllOrdersTab />}
     </div>
   );
 }

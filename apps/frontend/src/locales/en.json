@@ -1898,6 +1898,67 @@
       "profit": {
         "label": "Profit",
         "hint": "Revenue minus all costs"
+      },
+      "allOrders": {
+        "label": "All Orders",
+        "hint": "Sources, top variants & stock suggestions"
+      }
+    },
+    "allOrders": {
+      "error": "Could not load all-orders analytics.",
+      "kpi": {
+        "totalOrders": "Total orders",
+        "avgItems": "Avg items / order",
+        "topSource": "Top source",
+        "topVariant": "Top variation",
+        "stockAtRisk": "Stock at risk"
+      },
+      "sources": {
+        "donutTitle": "Orders by source",
+        "tableTitle": "Per-source funnel",
+        "colSource": "Source",
+        "colOrders": "Orders",
+        "colConfirmed": "Confirmed",
+        "colDelivered": "Delivered",
+        "colRevenue": "Revenue",
+        "colRate": "Confirm %"
+      },
+      "trend": {
+        "title": "Daily orders by source"
+      },
+      "topVariants": {
+        "title": "Top 15 variations (units ordered)"
+      },
+      "byProduct": {
+        "title": "Top products → variant breakdown",
+        "orders": "orders",
+        "variants": "variants",
+        "colVariant": "Variant",
+        "colOrdered": "Ordered",
+        "colStock": "Stock",
+        "colDoC": "Days of cover",
+        "colSuggest": "Suggested +"
+      },
+      "stockSuggest": {
+        "title": "Stock suggestions",
+        "targetLabel": "Target cover",
+        "windowHint": "Velocity computed over the last {{days}} days of confirmed orders.",
+        "export": "Export CSV",
+        "colProduct": "Product",
+        "colVariant": "Variant",
+        "colOrdered": "Ordered",
+        "colStock": "Stock",
+        "colVelocity": "Units/day",
+        "colDoC": "Days of cover",
+        "colSuggest": "Suggested +",
+        "colRisk": "Risk"
+      },
+      "risk": {
+        "imminent": "Imminent",
+        "low": "Low",
+        "healthy": "Healthy",
+        "overstock": "Overstock",
+        "stale": "Stale"
       }
     },
     "filters": {
