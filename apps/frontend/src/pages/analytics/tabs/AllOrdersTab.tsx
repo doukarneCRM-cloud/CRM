@@ -1,17 +1,17 @@
 /**
- * All Orders tab — demand-oriented analytics, reorganized.
+ * All Orders tab — demand-oriented analytics.
  *
- * The page is now split into four clearly labeled sections so the
- * operator can scan top-down without losing the thread:
- *
- *   1. OVERVIEW    — 4 headline KPIs (volume / sources / variants / risk).
- *   2. SOURCES     — donut + funnel table + daily trend, all in one card.
- *   3. SPOTLIGHT   — pick a product and see ALL its KPIs, variant grid,
- *                    days-of-cover bars, and stock suggestions in one focused
- *                    panel. Defaults to the top product so the panel is
- *                    useful on first paint.
- *   4. STOCK PLAN  — global stock-suggestions table for cross-product
- *                    decisions, with target-coverage slider + CSV export.
+ * Sections:
+ *   1. OVERVIEW    — 4 headline KPIs.
+ *   2. SOURCES     — donut + per-source funnel + daily trend.
+ *   3. SPOTLIGHT   — searchable dropdown to pick ANY product, then a
+ *                    color × size matrix view of its variants with
+ *                    stock + days-of-cover bars.
+ *   4. STOCK PLAN  — grouped by product (collapsible). Each product
+ *                    expands to show its variant matrix AND a "scale
+ *                    prediction" calculator that answers
+ *                    "if I want N more orders, how many of each
+ *                    variant should I produce?"
  *
  * Velocity uses confirmed orders only — junk doesn't drive production.
  */
@@ -25,6 +25,9 @@ import {
   Download,
   Package,
   Search as SearchIcon,
+  ChevronDown,
+  ChevronUp,
+  Calculator,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -43,6 +46,7 @@ import {
 import { GlassCard } from '@/components/ui/GlassCard';
 import { KPICard } from '@/components/ui/KPICard';
 import { CRMButton } from '@/components/ui/CRMButton';
+import { CRMSelect } from '@/components/ui/CRMSelect';
 import { rowsToCsv, downloadCsv } from '@/lib/csv';
 import { apiErrorMessage } from '@/lib/apiError';
 import { cn } from '@/lib/cn';
@@ -55,6 +59,8 @@ import {
 } from '@/services/analyticsApi';
 import { useAnalyticsFilters } from '../hooks/useAnalyticsFilters';
 
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
 function fmt(n: number): string {
   return n.toLocaleString('fr-MA');
 }
@@ -65,8 +71,15 @@ function formatDoC(d: number | null): string {
   return d.toFixed(1);
 }
 
-function variantLabel(v: { color: string | null; size: string | null }): string {
-  return [v.color, v.size].filter(Boolean).join(' / ') || '—';
+const SIZE_ORDER = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', '4XL', '5XL'];
+function sizeRank(s: string | null): number {
+  if (!s) return 1000;
+  const idx = SIZE_ORDER.indexOf(s.toUpperCase().trim());
+  if (idx !== -1) return idx;
+  // Numeric sizes (e.g. "8 ans", "36"): sort by leading number after letters.
+  const n = Number(s.replace(/[^\d.]/g, ''));
+  if (Number.isFinite(n)) return 1100 + n;
+  return 1500;
 }
 
 const SOURCE_COLOR: Record<string, string> = {
@@ -75,11 +88,12 @@ const SOURCE_COLOR: Record<string, string> = {
   instagram: '#E1306C',
   manual: '#64748B',
 };
-function sourceColor(source: string): string {
-  return SOURCE_COLOR[source] ?? '#94A3B8';
-}
+const sourceColor = (s: string) => SOURCE_COLOR[s] ?? '#94A3B8';
 
-const RISK_TONE: Record<AllOrdersRiskBand, { bg: string; text: string; bar: string; ring: string }> = {
+const RISK_TONE: Record<
+  AllOrdersRiskBand,
+  { bg: string; text: string; bar: string; ring: string }
+> = {
   imminent:  { bg: 'bg-red-50',     text: 'text-red-700',     bar: 'bg-red-500',     ring: 'ring-red-200' },
   low:       { bg: 'bg-amber-50',   text: 'text-amber-700',   bar: 'bg-amber-500',   ring: 'ring-amber-200' },
   healthy:   { bg: 'bg-emerald-50', text: 'text-emerald-700', bar: 'bg-emerald-500', ring: 'ring-emerald-200' },
@@ -87,8 +101,6 @@ const RISK_TONE: Record<AllOrdersRiskBand, { bg: string; text: string; bar: stri
   stale:     { bg: 'bg-gray-50',    text: 'text-gray-500',    bar: 'bg-gray-300',    ring: 'ring-gray-200' },
 };
 
-// ─── Section title helper — used once per section so the page reads as a
-//     scannable outline rather than a wall of cards.
 function SectionHeader({
   number,
   title,
@@ -114,6 +126,448 @@ function SectionHeader({
   );
 }
 
+// ─── Variant matrix (color × size grid) ─────────────────────────────────────
+// One cell per (color, size) combo that exists for the product. Empty
+// combos render as a faded "—" so the grid keeps a clean rectangular
+// shape. Each cell shows: ordered count, current stock, days-of-cover
+// micro-bar, and the suggested-to-produce delta as a chip.
+
+function VariantMatrix({
+  variants,
+  targetDays,
+}: {
+  variants: AllOrdersVariantStat[];
+  targetDays: number;
+}) {
+  const colors = Array.from(
+    new Set(variants.map((v) => v.color ?? '—')),
+  ).sort();
+  const sizes = Array.from(
+    new Set(variants.map((v) => v.size ?? '—')),
+  ).sort((a, b) => sizeRank(a) - sizeRank(b));
+  const byKey = new Map(
+    variants.map((v) => [`${v.color ?? '—'}|${v.size ?? '—'}`, v]),
+  );
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full border-separate" style={{ borderSpacing: 4 }}>
+        <thead>
+          <tr>
+            <th className="w-24 text-left text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+              Color \ Size
+            </th>
+            {sizes.map((s) => (
+              <th
+                key={s}
+                className="text-center text-[10px] font-semibold uppercase tracking-wide text-gray-500"
+              >
+                {s}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {colors.map((c) => (
+            <tr key={c}>
+              <td className="text-xs font-bold text-gray-700">{c}</td>
+              {sizes.map((s) => {
+                const v = byKey.get(`${c}|${s}`);
+                if (!v) {
+                  return (
+                    <td key={s}>
+                      <div className="h-[68px] rounded-md border border-dashed border-gray-200 bg-gray-50 text-center text-[10px] leading-[68px] text-gray-300">
+                        —
+                      </div>
+                    </td>
+                  );
+                }
+                const tone = RISK_TONE[v.risk];
+                const docPct =
+                  v.daysOfCover === null
+                    ? 100
+                    : Math.min(100, (v.daysOfCover / 30) * 100);
+                const suggested =
+                  v.velocityPerDay > 0
+                    ? Math.max(
+                        0,
+                        Math.ceil(targetDays * v.velocityPerDay) - v.currentStock,
+                      )
+                    : 0;
+                return (
+                  <td key={s}>
+                    <div
+                      className={cn(
+                        'flex h-[68px] flex-col justify-between rounded-md border p-1.5 transition-shadow hover:shadow-sm',
+                        tone.bg,
+                        'border-transparent ring-1',
+                        tone.ring,
+                      )}
+                    >
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="font-bold tabular-nums text-gray-900">
+                          {fmt(v.currentStock)}
+                        </span>
+                        {suggested > 0 && (
+                          <span
+                            className={cn(
+                              'rounded px-1 py-0.5 text-[9px] font-bold tabular-nums',
+                              tone.text,
+                            )}
+                          >
+                            +{fmt(suggested)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-end justify-between gap-1">
+                        <div className="flex-1">
+                          <div className="h-1 w-full overflow-hidden rounded-full bg-white/60">
+                            <div
+                              className={cn('h-full', tone.bar)}
+                              style={{ width: `${docPct}%` }}
+                            />
+                          </div>
+                        </div>
+                        <span className={cn('text-[9px] font-medium', tone.text)}>
+                          {formatDoC(v.daysOfCover)}d
+                        </span>
+                      </div>
+                      <p className="truncate text-[9px] text-gray-500">
+                        {fmt(v.ordered)} ord · {v.velocityPerDay.toFixed(2)}/d
+                      </p>
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── Scale-to-N-orders prediction ──────────────────────────────────────────
+// Given a product's variants and a target additional-order count, project
+// the demand share per variant from past order shares and compute how
+// many of each to produce. Total at the bottom is the headline answer
+// to "to get N more orders, produce M more units".
+
+function ScalePrediction({
+  variants,
+}: {
+  variants: AllOrdersVariantStat[];
+}) {
+  const { t } = useTranslation();
+  const [target, setTarget] = useState<number>(100);
+
+  const totalOrdered = variants.reduce((s, v) => s + v.ordered, 0);
+  const rows = useMemo(() => {
+    if (totalOrdered === 0) return [];
+    return variants
+      .filter((v) => v.ordered > 0)
+      .map((v) => {
+        const share = v.ordered / totalOrdered;
+        const projected = Math.ceil(share * target);
+        const toProduce = Math.max(0, projected - v.currentStock);
+        return {
+          variantId: v.variantId,
+          color: v.color,
+          size: v.size,
+          ordered: v.ordered,
+          share,
+          projected,
+          currentStock: v.currentStock,
+          toProduce,
+        };
+      })
+      .sort((a, b) => b.share - a.share);
+  }, [variants, target, totalOrdered]);
+
+  const totalToProduce = rows.reduce((s, r) => s + r.toProduce, 0);
+  const totalProjected = rows.reduce((s, r) => s + r.projected, 0);
+
+  if (totalOrdered === 0) {
+    return (
+      <div className="rounded-md bg-gray-50 px-3 py-2 text-[11px] text-gray-500">
+        {t('analytics.allOrders.scale.noHistory')}
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md border border-gray-100 bg-white p-3">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <Calculator size={14} className="text-tone-lavender-500" />
+        <span className="text-xs font-bold text-gray-900">
+          {t('analytics.allOrders.scale.title')}
+        </span>
+        <div className="ml-2 flex items-center gap-1.5">
+          <label htmlFor="scale-target" className="text-[11px] text-gray-500">
+            {t('analytics.allOrders.scale.targetLabel')}
+          </label>
+          <input
+            id="scale-target"
+            type="number"
+            min={1}
+            step={10}
+            value={target}
+            onChange={(e) => setTarget(Math.max(1, Number(e.target.value) || 1))}
+            className="w-20 rounded-btn border border-gray-200 bg-white px-2 py-0.5 text-xs tabular-nums text-gray-900 outline-none focus:border-tone-lavender-300"
+          />
+          <span className="text-[11px] text-gray-500">
+            {t('analytics.allOrders.scale.ordersUnit')}
+          </span>
+        </div>
+        <span className="ml-auto text-[11px] font-semibold text-tone-lavender-500">
+          {t('analytics.allOrders.scale.totalProduce', { count: totalToProduce })}
+        </span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-gray-100 text-left text-[10px] uppercase tracking-wide text-gray-400">
+              <th className="py-1 pr-2">{t('analytics.allOrders.scale.colVariant')}</th>
+              <th className="py-1 pr-2 text-right">{t('analytics.allOrders.scale.colShare')}</th>
+              <th className="py-1 pr-2 text-right">{t('analytics.allOrders.scale.colProjected')}</th>
+              <th className="py-1 pr-2 text-right">{t('analytics.allOrders.scale.colStock')}</th>
+              <th className="py-1 text-right">{t('analytics.allOrders.scale.colToProduce')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.variantId} className="border-b border-gray-50">
+                <td className="py-1 pr-2 text-gray-900">
+                  {[r.color, r.size].filter(Boolean).join(' / ') || '—'}
+                </td>
+                <td className="py-1 pr-2 text-right tabular-nums text-gray-500">
+                  {(r.share * 100).toFixed(1)}%
+                </td>
+                <td className="py-1 pr-2 text-right tabular-nums text-gray-700">
+                  {fmt(r.projected)}
+                </td>
+                <td className="py-1 pr-2 text-right tabular-nums text-gray-500">
+                  {fmt(r.currentStock)}
+                </td>
+                <td className="py-1 text-right">
+                  {r.toProduce > 0 ? (
+                    <span className="rounded bg-tone-lavender-50 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-tone-lavender-500">
+                      +{fmt(r.toProduce)}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-emerald-600">
+                      {t('analytics.allOrders.scale.covered')}
+                    </span>
+                  )}
+                </td>
+              </tr>
+            ))}
+            <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
+              <td className="py-1.5 pr-2 text-gray-700">
+                {t('analytics.allOrders.scale.total')}
+              </td>
+              <td className="py-1.5 pr-2 text-right text-gray-400">100.0%</td>
+              <td className="py-1.5 pr-2 text-right tabular-nums text-gray-900">
+                {fmt(totalProjected)}
+              </td>
+              <td className="py-1.5 pr-2"></td>
+              <td className="py-1.5 text-right tabular-nums text-tone-lavender-500">
+                +{fmt(totalToProduce)}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Mini-KPI tile ──────────────────────────────────────────────────────────
+
+function MiniKpi({
+  label,
+  value,
+  tone,
+  prefix,
+  small,
+}: {
+  label: string;
+  value: string;
+  tone: 'lavender' | 'sky' | 'mint' | 'rose' | 'amber' | 'peach';
+  prefix?: string;
+  small?: boolean;
+}) {
+  const TONE_BG: Record<string, string> = {
+    lavender: 'bg-tone-lavender-50',
+    sky: 'bg-tone-sky-50',
+    mint: 'bg-tone-mint-50',
+    rose: 'bg-tone-rose-50',
+    amber: 'bg-tone-amber-50',
+    peach: 'bg-tone-peach-50',
+  };
+  const TONE_TEXT: Record<string, string> = {
+    lavender: 'text-tone-lavender-500',
+    sky: 'text-tone-sky-500',
+    mint: 'text-tone-mint-500',
+    rose: 'text-tone-rose-500',
+    amber: 'text-tone-amber-500',
+    peach: 'text-tone-peach-500',
+  };
+  return (
+    <div className={cn('rounded-card p-2.5', TONE_BG[tone])}>
+      <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-wide text-gray-500">
+        {label}
+      </p>
+      <p
+        className={cn(
+          'truncate font-bold tabular-nums',
+          TONE_TEXT[tone],
+          small ? 'text-xs' : 'text-base',
+        )}
+        title={value}
+      >
+        {prefix ?? ''}
+        {value}
+      </p>
+    </div>
+  );
+}
+
+// ─── Per-product card in the Stock plan section ────────────────────────────
+// Collapsible: header row shows headline numbers, body shows the matrix
+// + scale prediction widget. Default-collapsed; first card auto-expands.
+
+function StockPlanProductCard({
+  product,
+  defaultOpen,
+  targetDays,
+  onSpotlight,
+}: {
+  product: AllOrdersProductBreakdownRow;
+  defaultOpen: boolean;
+  targetDays: number;
+  onSpotlight: () => void;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(defaultOpen);
+
+  const variants = product.variants;
+  const totalOrdered = variants.reduce((s, v) => s + v.ordered, 0);
+  const totalStock = variants.reduce((s, v) => s + v.currentStock, 0);
+  const totalSuggested = variants.reduce(
+    (s, v) =>
+      s +
+      (v.velocityPerDay > 0
+        ? Math.max(0, Math.ceil(targetDays * v.velocityPerDay) - v.currentStock)
+        : 0),
+    0,
+  );
+  const atRisk = variants.filter(
+    (v) => v.risk === 'imminent' || v.risk === 'low',
+  ).length;
+
+  return (
+    <div className="rounded-card border border-gray-100 bg-white">
+      {/* Header */}
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-gray-50"
+      >
+        {product.imageUrl ? (
+          <img
+            src={product.imageUrl}
+            alt=""
+            className="h-9 w-9 shrink-0 rounded-md object-cover ring-1 ring-gray-200"
+          />
+        ) : (
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-400">
+            <Package size={14} />
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-bold text-gray-900">
+            {product.productName}
+          </p>
+          <p className="truncate text-[10px] text-gray-500">
+            {fmt(product.orders)} {t('analytics.allOrders.byProduct.orders')}
+            {' · '}
+            {variants.length} {t('analytics.allOrders.byProduct.variants')}
+          </p>
+        </div>
+        {/* Inline summary chips */}
+        <div className="hidden shrink-0 items-center gap-1.5 sm:flex">
+          <Chip label={t('analytics.allOrders.spotlight.kpi.ordered')} value={fmt(totalOrdered)} />
+          <Chip label={t('analytics.allOrders.spotlight.kpi.stock')} value={fmt(totalStock)} />
+          {atRisk > 0 && <Chip label={t('analytics.allOrders.kpi.stockAtRisk')} value={fmt(atRisk)} tone="rose" />}
+          {totalSuggested > 0 && (
+            <Chip
+              label={t('analytics.allOrders.spotlight.kpi.suggested')}
+              value={`+${fmt(totalSuggested)}`}
+              tone="lavender"
+            />
+          )}
+        </div>
+        <span className="shrink-0 text-gray-400">
+          {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </span>
+      </button>
+
+      {/* Body */}
+      {open && (
+        <div className="border-t border-gray-100 px-3 py-3">
+          {variants.length === 0 ? (
+            <p className="text-center text-xs text-gray-400">
+              {t('analytics.allOrders.byProduct.emptyVariants')}
+            </p>
+          ) : (
+            <>
+              <VariantMatrix variants={variants} targetDays={targetDays} />
+              <div className="mt-3 flex items-center justify-between gap-2">
+                <p className="text-[10px] text-gray-400">
+                  {t('analytics.allOrders.byProduct.matrixHint')}
+                </p>
+                <button
+                  onClick={onSpotlight}
+                  className="text-[11px] font-semibold text-tone-lavender-500 hover:underline"
+                >
+                  {t('analytics.allOrders.byProduct.openSpotlight')} →
+                </button>
+              </div>
+              <div className="mt-3">
+                <ScalePrediction variants={variants} />
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Chip({
+  label,
+  value,
+  tone = 'gray',
+}: {
+  label: string;
+  value: string;
+  tone?: 'gray' | 'lavender' | 'rose';
+}) {
+  const TONE: Record<string, string> = {
+    gray: 'bg-gray-100 text-gray-700',
+    lavender: 'bg-tone-lavender-50 text-tone-lavender-500',
+    rose: 'bg-tone-rose-50 text-tone-rose-500',
+  };
+  return (
+    <span className={cn('inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px]', TONE[tone])}>
+      <span className="opacity-70">{label}:</span>
+      <span className="font-bold tabular-nums">{value}</span>
+    </span>
+  );
+}
+
+// ─── Page ───────────────────────────────────────────────────────────────────
+
 export function AllOrdersTab() {
   const { t } = useTranslation();
   const filters = useAnalyticsFilters();
@@ -122,8 +576,8 @@ export function AllOrdersTab() {
   const [error, setError] = useState<string | null>(null);
   const [targetDays, setTargetDays] = useState<number>(14);
   const [spotlightId, setSpotlightId] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [riskFilter, setRiskFilter] = useState<AllOrdersRiskBand | 'all'>('all');
+  const [stockPlanSearch, setStockPlanSearch] = useState('');
+  const [stockPlanRiskFilter, setStockPlanRiskFilter] = useState<AllOrdersRiskBand | 'all'>('all');
 
   useEffect(() => {
     let cancelled = false;
@@ -134,12 +588,12 @@ export function AllOrdersTab() {
       .then((d) => {
         if (cancelled) return;
         setData(d);
-        // Auto-spotlight the top product on first load (or when filters
-        // change and the previously-spotlighted product is no longer in
-        // the result set).
         const stillThere = d.productBreakdown.some((p) => p.productId === spotlightId);
         if (!stillThere) {
-          setSpotlightId(d.productBreakdown[0]?.productId ?? null);
+          // Pick the first product WITH orders, or the first product overall
+          // if nothing has orders, so the spotlight isn't blank on first paint.
+          const withOrders = d.productBreakdown.find((p) => p.orders > 0);
+          setSpotlightId((withOrders ?? d.productBreakdown[0])?.productId ?? null);
         }
       })
       .catch((e) => {
@@ -154,62 +608,60 @@ export function AllOrdersTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, t]);
 
-  // Recompute suggested-reorder client-side when the slider moves.
-  const stockSuggestions: AllOrdersVariantStat[] = useMemo(() => {
+  const recomputeSuggested = (v: AllOrdersVariantStat): AllOrdersVariantStat => ({
+    ...v,
+    suggestedReorder:
+      v.velocityPerDay > 0
+        ? Math.max(0, Math.ceil(targetDays * v.velocityPerDay) - v.currentStock)
+        : 0,
+  });
+
+  const productBreakdown = useMemo(() => {
     if (!data) return [];
-    return data.stockSuggestions.variants.map((v) => ({
-      ...v,
-      suggestedReorder:
-        v.velocityPerDay > 0
-          ? Math.max(0, Math.ceil(targetDays * v.velocityPerDay) - v.currentStock)
-          : 0,
+    return data.productBreakdown.map((p) => ({
+      ...p,
+      variants: p.variants.map(recomputeSuggested),
     }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, targetDays]);
 
-  const filteredSuggestions = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return stockSuggestions.filter((v) => {
-      if (riskFilter !== 'all' && v.risk !== riskFilter) return false;
-      if (!q) return true;
-      return (
-        v.productName.toLowerCase().includes(q) ||
-        (v.color ?? '').toLowerCase().includes(q) ||
-        (v.size ?? '').toLowerCase().includes(q)
-      );
-    });
-  }, [stockSuggestions, search, riskFilter]);
+  const productOptions = useMemo(
+    () =>
+      productBreakdown.map((p) => ({
+        value: p.productId,
+        // Format: "Product name · 14 orders · 5 variants"
+        label: `${p.productName}${p.orders > 0 ? ` · ${p.orders} orders` : ''}${p.variants.length > 0 ? ` · ${p.variants.length} variants` : ''}`,
+      })),
+    [productBreakdown],
+  );
 
   const spotlightProduct: AllOrdersProductBreakdownRow | null = useMemo(() => {
     if (!data || !spotlightId) return null;
-    return data.productBreakdown.find((p) => p.productId === spotlightId) ?? null;
-  }, [data, spotlightId]);
+    return productBreakdown.find((p) => p.productId === spotlightId) ?? null;
+  }, [productBreakdown, spotlightId, data]);
 
-  // Per-product KPIs derived from spotlightProduct.variants — total ordered,
-  // current stock across variants, weighted velocity, suggested production
-  // qty for the active targetDays.
   const spotlightKpis = useMemo(() => {
     if (!spotlightProduct) return null;
     const variants = spotlightProduct.variants;
     const totalOrdered = variants.reduce((s, v) => s + v.ordered, 0);
     const totalStock = variants.reduce((s, v) => s + v.currentStock, 0);
     const totalVelocity = variants.reduce((s, v) => s + v.velocityPerDay, 0);
-    const totalSuggested = variants.reduce(
-      (s, v) =>
-        s +
-        (v.velocityPerDay > 0
-          ? Math.max(0, Math.ceil(targetDays * v.velocityPerDay) - v.currentStock)
-          : 0),
-      0,
-    );
+    const totalSuggested = variants.reduce((s, v) => s + v.suggestedReorder, 0);
     const atRisk = variants.filter((v) => v.risk === 'imminent' || v.risk === 'low').length;
     const top = [...variants].sort((a, b) => b.ordered - a.ordered)[0] ?? null;
     return { totalOrdered, totalStock, totalVelocity, totalSuggested, atRisk, top };
-  }, [spotlightProduct, targetDays]);
+  }, [spotlightProduct]);
 
-  const kpis = data?.kpis;
-  const sources = data?.sources ?? [];
-  const trend = data?.trendBySource ?? [];
-  const allSources = sources.map((s) => s.source);
+  const stockPlanProducts = useMemo(() => {
+    const q = stockPlanSearch.trim().toLowerCase();
+    return productBreakdown.filter((p) => {
+      // Only include products that have variants (otherwise the card is empty).
+      if (p.variants.length === 0) return false;
+      if (q && !p.productName.toLowerCase().includes(q)) return false;
+      if (stockPlanRiskFilter === 'all') return true;
+      return p.variants.some((v) => v.risk === stockPlanRiskFilter);
+    });
+  }, [productBreakdown, stockPlanSearch, stockPlanRiskFilter]);
 
   const exportCsv = () => {
     const headers = [
@@ -222,18 +674,25 @@ export function AllOrdersTab() {
       'suggestedReorder',
       'risk',
     ];
-    const rows = filteredSuggestions.map((v) => [
-      v.productName,
-      variantLabel(v),
-      v.ordered,
-      v.currentStock,
-      v.velocityPerDay,
-      v.daysOfCover === null ? '∞' : v.daysOfCover,
-      v.suggestedReorder,
-      v.risk,
-    ]);
-    downloadCsv('stock-suggestions.csv', rowsToCsv(headers, rows));
+    const rows = productBreakdown
+      .flatMap((p) => p.variants.map((v) => ({ p, v })))
+      .map(({ p, v }) => [
+        p.productName,
+        [v.color, v.size].filter(Boolean).join(' / ') || '—',
+        v.ordered,
+        v.currentStock,
+        v.velocityPerDay,
+        v.daysOfCover === null ? '∞' : v.daysOfCover,
+        v.suggestedReorder,
+        v.risk,
+      ]);
+    downloadCsv('stock-plan.csv', rowsToCsv(headers, rows));
   };
+
+  const kpis = data?.kpis;
+  const sources = data?.sources ?? [];
+  const trend = data?.trendBySource ?? [];
+  const allSources = sources.map((s) => s.source);
 
   return (
     <div className="flex flex-col gap-6">
@@ -294,7 +753,6 @@ export function AllOrdersTab() {
           />
           <GlassCard className="p-4">
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-              {/* Donut */}
               <div className="lg:col-span-1">
                 <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
                   {t('analytics.allOrders.sources.donutTitle')}
@@ -332,7 +790,6 @@ export function AllOrdersTab() {
                 </div>
               </div>
 
-              {/* Per-source funnel table */}
               <div className="lg:col-span-2">
                 <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
                   {t('analytics.allOrders.sources.tableTitle')}
@@ -361,21 +818,11 @@ export function AllOrdersTab() {
                               <span className="font-semibold text-gray-900">{s.source}</span>
                             </span>
                           </td>
-                          <td className="py-1.5 pr-2 text-right tabular-nums text-gray-900">
-                            {fmt(s.orders)}
-                          </td>
-                          <td className="py-1.5 pr-2 text-right tabular-nums text-gray-700">
-                            {fmt(s.confirmed)}
-                          </td>
-                          <td className="py-1.5 pr-2 text-right tabular-nums text-gray-700">
-                            {fmt(s.delivered)}
-                          </td>
-                          <td className="py-1.5 pr-2 text-right tabular-nums text-gray-700">
-                            {fmt(Math.round(s.revenue))}
-                          </td>
-                          <td className="py-1.5 text-right tabular-nums text-gray-500">
-                            {s.confirmationRate.toFixed(1)}%
-                          </td>
+                          <td className="py-1.5 pr-2 text-right tabular-nums text-gray-900">{fmt(s.orders)}</td>
+                          <td className="py-1.5 pr-2 text-right tabular-nums text-gray-700">{fmt(s.confirmed)}</td>
+                          <td className="py-1.5 pr-2 text-right tabular-nums text-gray-700">{fmt(s.delivered)}</td>
+                          <td className="py-1.5 pr-2 text-right tabular-nums text-gray-700">{fmt(Math.round(s.revenue))}</td>
+                          <td className="py-1.5 text-right tabular-nums text-gray-500">{s.confirmationRate.toFixed(1)}%</td>
                         </tr>
                       ))}
                     </tbody>
@@ -384,7 +831,6 @@ export function AllOrdersTab() {
               </div>
             </div>
 
-            {/* Daily trend, stacked by source */}
             {trend.length > 0 && (
               <div className="mt-4 border-t border-gray-100 pt-3">
                 <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
@@ -425,7 +871,7 @@ export function AllOrdersTab() {
       )}
 
       {/* ═══ 3. PRODUCT SPOTLIGHT ════════════════════════════════════ */}
-      {data && data.productBreakdown.length > 0 && (
+      {productBreakdown.length > 0 && (
         <section>
           <SectionHeader
             number={3}
@@ -433,48 +879,17 @@ export function AllOrdersTab() {
             hint={t('analytics.allOrders.section.spotlightHint')}
           />
 
-          {/* Product picker — horizontal scroll list of top products */}
-          <div className="mb-3 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-            {data.productBreakdown.map((p) => {
-              const active = spotlightId === p.productId;
-              return (
-                <button
-                  key={p.productId}
-                  onClick={() => setSpotlightId(p.productId)}
-                  className={cn(
-                    'flex shrink-0 items-center gap-2 rounded-card border px-3 py-2 text-left transition-all',
-                    active
-                      ? 'border-tone-lavender-300 bg-tone-lavender-50 ring-2 ring-tone-lavender-200'
-                      : 'border-gray-100 bg-white hover:border-gray-300',
-                  )}
-                >
-                  {p.imageUrl ? (
-                    <img
-                      src={p.imageUrl}
-                      alt=""
-                      className="h-8 w-8 shrink-0 rounded object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-gray-100 text-gray-400">
-                      <Package size={14} />
-                    </div>
-                  )}
-                  <div className="min-w-0">
-                    <p className="truncate text-xs font-semibold text-gray-900">
-                      {p.productName}
-                    </p>
-                    <p className="text-[10px] text-gray-500">
-                      {fmt(p.orders)} {t('analytics.allOrders.byProduct.orders')}
-                      {' · '}
-                      {p.variants.length} {t('analytics.allOrders.byProduct.variants')}
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
+          {/* Searchable dropdown — replaces horizontal scroll list */}
+          <div className="mb-3 max-w-md">
+            <CRMSelect
+              options={productOptions}
+              value={spotlightId ?? ''}
+              onChange={(v) => setSpotlightId(typeof v === 'string' ? v : v[0] ?? null)}
+              searchable
+              placeholder={t('analytics.allOrders.spotlight.pickerPh')}
+            />
           </div>
 
-          {/* Spotlight panel */}
           {spotlightProduct && spotlightKpis && (
             <GlassCard className="p-4">
               <div className="mb-3 flex items-center gap-3">
@@ -501,130 +916,76 @@ export function AllOrdersTab() {
                 </div>
               </div>
 
-              {/* Per-product KPIs */}
-              <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6">
-                <MiniKpi
-                  label={t('analytics.allOrders.spotlight.kpi.ordered')}
-                  value={fmt(spotlightKpis.totalOrdered)}
-                  tone="lavender"
-                />
-                <MiniKpi
-                  label={t('analytics.allOrders.spotlight.kpi.stock')}
-                  value={fmt(spotlightKpis.totalStock)}
-                  tone="sky"
-                />
-                <MiniKpi
-                  label={t('analytics.allOrders.spotlight.kpi.velocity')}
-                  value={spotlightKpis.totalVelocity.toFixed(2)}
-                  tone="mint"
-                />
-                <MiniKpi
-                  label={t('analytics.allOrders.spotlight.kpi.suggested')}
-                  value={fmt(spotlightKpis.totalSuggested)}
-                  tone="amber"
-                  prefix="+"
-                />
-                <MiniKpi
-                  label={t('analytics.allOrders.spotlight.kpi.atRisk')}
-                  value={fmt(spotlightKpis.atRisk)}
-                  tone="rose"
-                />
-                <MiniKpi
-                  label={t('analytics.allOrders.spotlight.kpi.topVariant')}
-                  value={spotlightKpis.top ? variantLabel(spotlightKpis.top) : '—'}
-                  tone="peach"
-                  small
-                />
-              </div>
+              {spotlightProduct.variants.length === 0 ? (
+                <div className="rounded-md bg-gray-50 px-3 py-3 text-center text-xs text-gray-400">
+                  {t('analytics.allOrders.byProduct.emptyVariants')}
+                </div>
+              ) : (
+                <>
+                  {/* Per-product KPIs */}
+                  <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6">
+                    <MiniKpi
+                      label={t('analytics.allOrders.spotlight.kpi.ordered')}
+                      value={fmt(spotlightKpis.totalOrdered)}
+                      tone="lavender"
+                    />
+                    <MiniKpi
+                      label={t('analytics.allOrders.spotlight.kpi.stock')}
+                      value={fmt(spotlightKpis.totalStock)}
+                      tone="sky"
+                    />
+                    <MiniKpi
+                      label={t('analytics.allOrders.spotlight.kpi.velocity')}
+                      value={spotlightKpis.totalVelocity.toFixed(2)}
+                      tone="mint"
+                    />
+                    <MiniKpi
+                      label={t('analytics.allOrders.spotlight.kpi.suggested')}
+                      value={fmt(spotlightKpis.totalSuggested)}
+                      tone="amber"
+                      prefix="+"
+                    />
+                    <MiniKpi
+                      label={t('analytics.allOrders.spotlight.kpi.atRisk')}
+                      value={fmt(spotlightKpis.atRisk)}
+                      tone="rose"
+                    />
+                    <MiniKpi
+                      label={t('analytics.allOrders.spotlight.kpi.topVariant')}
+                      value={
+                        spotlightKpis.top
+                          ? [spotlightKpis.top.color, spotlightKpis.top.size]
+                              .filter(Boolean)
+                              .join(' / ') || '—'
+                          : '—'
+                      }
+                      tone="peach"
+                      small
+                    />
+                  </div>
 
-              {/* Variant grid — clean color-coded tiles */}
-              <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
-                {spotlightProduct.variants.map((v) => {
-                  const tone = RISK_TONE[v.risk];
-                  const docPct =
-                    v.daysOfCover === null
-                      ? 100
-                      : Math.min(100, (v.daysOfCover / 30) * 100);
-                  const suggested =
-                    v.velocityPerDay > 0
-                      ? Math.max(
-                          0,
-                          Math.ceil(targetDays * v.velocityPerDay) - v.currentStock,
-                        )
-                      : 0;
-                  return (
-                    <div
-                      key={v.variantId}
-                      className={cn(
-                        'rounded-card border p-3 transition-shadow hover:shadow-card',
-                        'border-gray-100 bg-white',
-                      )}
-                    >
-                      <div className="mb-2 flex items-start justify-between gap-2">
-                        <div>
-                          <p className="text-sm font-bold text-gray-900">
-                            {variantLabel(v)}
-                          </p>
-                          <p className="text-[10px] uppercase tracking-wide text-gray-400">
-                            {fmt(v.ordered)} {t('analytics.allOrders.byProduct.orders')}
-                            {' · '}
-                            {v.velocityPerDay.toFixed(2)}/d
-                          </p>
-                        </div>
-                        <span
-                          className={cn(
-                            'rounded px-1.5 py-0.5 text-[9px] font-bold uppercase',
-                            tone.bg,
-                            tone.text,
-                          )}
-                        >
-                          {t(`analytics.allOrders.risk.${v.risk}`)}
-                        </span>
-                      </div>
-                      {/* Stock + DoC bar */}
-                      <div className="space-y-1">
-                        <div className="flex items-baseline justify-between text-[11px]">
-                          <span className="text-gray-500">
-                            {t('analytics.allOrders.spotlight.kpi.stock')}
-                          </span>
-                          <span className="font-semibold tabular-nums text-gray-900">
-                            {fmt(v.currentStock)}
-                          </span>
-                        </div>
-                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
-                          <div
-                            className={cn('h-full transition-all', tone.bar)}
-                            style={{ width: `${docPct}%` }}
-                          />
-                        </div>
-                        <div className="flex items-baseline justify-between text-[10px]">
-                          <span className="text-gray-400">
-                            {formatDoC(v.daysOfCover)}d {t('analytics.allOrders.spotlight.cover')}
-                          </span>
-                          {suggested > 0 && (
-                            <span
-                              className={cn(
-                                'rounded px-1.5 py-0.5 text-[10px] font-bold tabular-nums',
-                                tone.bg,
-                                tone.text,
-                              )}
-                            >
-                              +{fmt(suggested)} {t('analytics.allOrders.spotlight.toMake')}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                  {/* Matrix view */}
+                  <div className="mt-4">
+                    <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                      {t('analytics.allOrders.spotlight.matrixTitle')}
+                    </p>
+                    <VariantMatrix
+                      variants={spotlightProduct.variants}
+                      targetDays={targetDays}
+                    />
+                    <p className="mt-1 text-[10px] text-gray-400">
+                      {t('analytics.allOrders.byProduct.matrixHint')}
+                    </p>
+                  </div>
+                </>
+              )}
             </GlassCard>
           )}
         </section>
       )}
 
-      {/* ═══ 4. STOCK PLAN — global table ═══════════════════════════════ */}
-      {stockSuggestions.length > 0 && (
+      {/* ═══ 4. STOCK PLAN — per-product cards ═══════════════════════ */}
+      {productBreakdown.length > 0 && (
         <section>
           <SectionHeader
             number={4}
@@ -641,8 +1002,9 @@ export function AllOrdersTab() {
               </CRMButton>
             }
           />
+
           <GlassCard className="p-4">
-            {/* Toolbar */}
+            {/* Toolbar: search + risk filter + targetDays slider */}
             <div className="mb-3 flex flex-wrap items-center gap-3">
               <div className="relative flex-1 min-w-[180px]">
                 <SearchIcon
@@ -652,8 +1014,8 @@ export function AllOrdersTab() {
                 <input
                   type="text"
                   placeholder={t('analytics.allOrders.stockSuggest.searchPh') as string}
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  value={stockPlanSearch}
+                  onChange={(e) => setStockPlanSearch(e.target.value)}
                   className="w-full rounded-btn border border-gray-200 bg-white py-1.5 pl-7 pr-2 text-xs text-gray-900 outline-none placeholder:text-gray-400 focus:border-tone-lavender-300"
                 />
               </div>
@@ -662,15 +1024,17 @@ export function AllOrdersTab() {
                   (r) => (
                     <button
                       key={r}
-                      onClick={() => setRiskFilter(r)}
+                      onClick={() => setStockPlanRiskFilter(r)}
                       className={cn(
                         'rounded-sm px-2 py-1 font-semibold uppercase transition-all',
-                        riskFilter === r
+                        stockPlanRiskFilter === r
                           ? 'bg-white text-gray-900 shadow-sm'
                           : 'text-gray-500 hover:text-gray-700',
                       )}
                     >
-                      {r === 'all' ? t('analytics.allOrders.stockSuggest.allRisks') : t(`analytics.allOrders.risk.${r}`)}
+                      {r === 'all'
+                        ? t('analytics.allOrders.stockSuggest.allRisks')
+                        : t(`analytics.allOrders.risk.${r}`)}
                     </button>
                   ),
                 )}
@@ -695,139 +1059,27 @@ export function AllOrdersTab() {
               </div>
             </div>
 
-            {/* Table */}
-            <div className="max-h-[420px] overflow-auto">
-              <table className="w-full text-xs">
-                <thead className="sticky top-0 bg-white">
-                  <tr className="border-b border-gray-100 text-left text-[10px] uppercase tracking-wide text-gray-400">
-                    <th className="py-1.5 pr-2">{t('analytics.allOrders.stockSuggest.colProduct')}</th>
-                    <th className="py-1.5 pr-2">{t('analytics.allOrders.stockSuggest.colVariant')}</th>
-                    <th className="py-1.5 pr-2 text-right">{t('analytics.allOrders.stockSuggest.colOrdered')}</th>
-                    <th className="py-1.5 pr-2 text-right">{t('analytics.allOrders.stockSuggest.colStock')}</th>
-                    <th className="py-1.5 pr-2 text-right">{t('analytics.allOrders.stockSuggest.colVelocity')}</th>
-                    <th className="py-1.5 pr-2 text-right">{t('analytics.allOrders.stockSuggest.colDoC')}</th>
-                    <th className="py-1.5 pr-2 text-right">{t('analytics.allOrders.stockSuggest.colSuggest')}</th>
-                    <th className="py-1.5 pr-2">{t('analytics.allOrders.stockSuggest.colRisk')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredSuggestions.map((v) => {
-                    const tone = RISK_TONE[v.risk];
-                    return (
-                      <tr key={v.variantId} className="border-b border-gray-50">
-                        <td className="py-1.5 pr-2 text-gray-700">
-                          <button
-                            onClick={() => setSpotlightId(v.productId)}
-                            className="text-left hover:text-primary hover:underline"
-                          >
-                            {v.productName}
-                          </button>
-                        </td>
-                        <td className="py-1.5 pr-2 text-gray-900">{variantLabel(v)}</td>
-                        <td className="py-1.5 pr-2 text-right tabular-nums text-gray-700">
-                          {fmt(v.ordered)}
-                        </td>
-                        <td className="py-1.5 pr-2 text-right tabular-nums text-gray-700">
-                          {fmt(v.currentStock)}
-                        </td>
-                        <td className="py-1.5 pr-2 text-right tabular-nums text-gray-500">
-                          {v.velocityPerDay.toFixed(2)}
-                        </td>
-                        <td className="py-1.5 pr-2 text-right tabular-nums text-gray-500">
-                          {formatDoC(v.daysOfCover)}
-                        </td>
-                        <td className="py-1.5 pr-2 text-right">
-                          <span
-                            className={cn(
-                              'rounded px-1.5 py-0.5 text-[10px] font-bold tabular-nums',
-                              tone.bg,
-                              tone.text,
-                            )}
-                          >
-                            {v.suggestedReorder > 0 ? `+${fmt(v.suggestedReorder)}` : '—'}
-                          </span>
-                        </td>
-                        <td className="py-1.5 pr-2">
-                          <span
-                            className={cn(
-                              'rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase',
-                              tone.bg,
-                              tone.text,
-                            )}
-                          >
-                            {t(`analytics.allOrders.risk.${v.risk}`)}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {filteredSuggestions.length === 0 && (
-                    <tr>
-                      <td
-                        colSpan={8}
-                        className="py-6 text-center text-xs text-gray-400"
-                      >
-                        {t('analytics.allOrders.stockSuggest.empty')}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+            {/* Per-product cards */}
+            {stockPlanProducts.length === 0 ? (
+              <p className="text-center text-xs text-gray-400">
+                {t('analytics.allOrders.stockSuggest.empty')}
+              </p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {stockPlanProducts.map((p, i) => (
+                  <StockPlanProductCard
+                    key={p.productId}
+                    product={p}
+                    defaultOpen={i === 0}
+                    targetDays={targetDays}
+                    onSpotlight={() => setSpotlightId(p.productId)}
+                  />
+                ))}
+              </div>
+            )}
           </GlassCard>
         </section>
       )}
-    </div>
-  );
-}
-
-// ─── Mini-KPI tile — a flatter alternative to KPICard for the dense
-//     spotlight grid where 6 metrics need to fit in one row.
-function MiniKpi({
-  label,
-  value,
-  tone,
-  prefix,
-  small,
-}: {
-  label: string;
-  value: string;
-  tone: 'lavender' | 'sky' | 'mint' | 'rose' | 'amber' | 'peach';
-  prefix?: string;
-  small?: boolean;
-}) {
-  const TONE_BG: Record<string, string> = {
-    lavender: 'bg-tone-lavender-50',
-    sky: 'bg-tone-sky-50',
-    mint: 'bg-tone-mint-50',
-    rose: 'bg-tone-rose-50',
-    amber: 'bg-tone-amber-50',
-    peach: 'bg-tone-peach-50',
-  };
-  const TONE_TEXT: Record<string, string> = {
-    lavender: 'text-tone-lavender-500',
-    sky: 'text-tone-sky-500',
-    mint: 'text-tone-mint-500',
-    rose: 'text-tone-rose-500',
-    amber: 'text-tone-amber-500',
-    peach: 'text-tone-peach-500',
-  };
-  return (
-    <div className={cn('rounded-card p-2.5', TONE_BG[tone])}>
-      <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-wide text-gray-500">
-        {label}
-      </p>
-      <p
-        className={cn(
-          'truncate font-bold tabular-nums',
-          TONE_TEXT[tone],
-          small ? 'text-xs' : 'text-base',
-        )}
-        title={value}
-      >
-        {prefix ?? ''}
-        {value}
-      </p>
     </div>
   );
 }

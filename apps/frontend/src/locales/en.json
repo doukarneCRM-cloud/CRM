@@ -1933,7 +1933,23 @@
           "topVariant": "Top variant"
         },
         "cover": "of cover",
-        "toMake": "to make"
+        "toMake": "to make",
+        "pickerPh": "Search for a product…",
+        "matrixTitle": "Variants — color × size matrix"
+      },
+      "scale": {
+        "title": "Scale prediction",
+        "targetLabel": "If I want",
+        "ordersUnit": "more orders",
+        "totalProduce": "Total to produce: +{{count}}",
+        "noHistory": "No order history yet — can't project demand for this product.",
+        "colVariant": "Variant",
+        "colShare": "Share",
+        "colProjected": "Projected demand",
+        "colStock": "In stock",
+        "colToProduce": "To produce",
+        "covered": "Covered",
+        "total": "Total"
       },
       "sources": {
         "donutTitle": "Orders by source",
@@ -1959,7 +1975,10 @@
         "colOrdered": "Ordered",
         "colStock": "Stock",
         "colDoC": "Days of cover",
-        "colSuggest": "Suggested +"
+        "colSuggest": "Suggested +",
+        "emptyVariants": "This product has no variants set up yet.",
+        "matrixHint": "Each cell shows current stock, days-of-cover bar, and the suggested + production qty for the active target window.",
+        "openSpotlight": "Open in spotlight"
       },
       "stockSuggest": {
         "title": "Stock suggestions",

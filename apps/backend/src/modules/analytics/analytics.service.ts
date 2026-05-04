@@ -1561,11 +1561,11 @@ export async function computeAllOrdersTab(
     }));
 
   // ── Per-product breakdown ─────────────────────────────────────────────
-  // Include every product that has either confirmed orders in the window
-  // OR stock on hand right now. Operators want to be able to spotlight
-  // any active product — including one with zero orders this window —
-  // to inspect its current stock and decide what to do with it. Capped
-  // at 50 so the horizontal picker stays usable even on huge catalogs.
+  // Operators want to be able to spotlight ANY product, including ones
+  // with neither stock nor orders in the window — they may want to
+  // inspect a product they're considering retiring or relaunching.
+  // We seed the breakdown from the full active-product list and merge
+  // in any orders/stock data we've already aggregated.
   interface ProductAcc {
     productId: string;
     productName: string;
@@ -1575,6 +1575,19 @@ export async function computeAllOrdersTab(
     totalStock: number;
   }
   const productAcc = new Map<string, ProductAcc>();
+  // 1. Seed from every active product so even no-order-no-stock items
+  //    show in the searchable dropdown.
+  for (const p of productMeta) {
+    productAcc.set(p.id, {
+      productId: p.id,
+      productName: p.name,
+      imageUrl: p.imageUrl,
+      orders: new Set<string>(),
+      variantIds: new Set<string>(),
+      totalStock: 0,
+    });
+  }
+  // 2. Layer in orders + stock from the variant aggregator.
   for (const a of variantAcc.values()) {
     const existing = productAcc.get(a.productId);
     if (existing) {
@@ -1594,17 +1607,16 @@ export async function computeAllOrdersTab(
   }
   const variantById = new Map(variantStats.map((v) => [v.variantId, v]));
   const productBreakdown: AllOrdersProductBreakdownRow[] = Array.from(productAcc.values())
-    .filter((p) => p.orders.size > 0 || p.totalStock > 0)
-    // Sort: products WITH orders first (by order count desc), then
-    // stock-only products (by stock desc) so the picker shows the
-    // active items first and "have stock but no demand" last.
+    // Sort: products with orders first (desc), then stock-only (desc),
+    // then alphabetical for the no-orders-no-stock long tail so the
+    // dropdown is searchable but ordered usefully.
     .sort((a, b) => {
       if (a.orders.size > 0 && b.orders.size === 0) return -1;
       if (a.orders.size === 0 && b.orders.size > 0) return 1;
       if (a.orders.size !== b.orders.size) return b.orders.size - a.orders.size;
-      return b.totalStock - a.totalStock;
+      if (a.totalStock !== b.totalStock) return b.totalStock - a.totalStock;
+      return a.productName.localeCompare(b.productName);
     })
-    .slice(0, 50)
     .map((p) => {
       const variants = Array.from(p.variantIds)
         .map((vid) => variantById.get(vid)!)

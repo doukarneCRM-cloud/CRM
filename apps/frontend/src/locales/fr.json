@@ -1933,7 +1933,23 @@
           "topVariant": "Variation top"
         },
         "cover": "de couverture",
-        "toMake": "à produire"
+        "toMake": "à produire",
+        "pickerPh": "Rechercher un produit…",
+        "matrixTitle": "Variations — matrice couleur × taille"
+      },
+      "scale": {
+        "title": "Prévision de mise à l’échelle",
+        "targetLabel": "Si je veux",
+        "ordersUnit": "commandes en plus",
+        "totalProduce": "À produire au total : +{{count}}",
+        "noHistory": "Pas d’historique de commandes — impossible de projeter la demande.",
+        "colVariant": "Variation",
+        "colShare": "Part",
+        "colProjected": "Demande projetée",
+        "colStock": "En stock",
+        "colToProduce": "À produire",
+        "covered": "Couvert",
+        "total": "Total"
       },
       "sources": {
         "donutTitle": "Commandes par source",
@@ -1959,7 +1975,10 @@
         "colOrdered": "Commandé",
         "colStock": "Stock",
         "colDoC": "Couverture",
-        "colSuggest": "Suggéré +"
+        "colSuggest": "Suggéré +",
+        "emptyVariants": "Ce produit n’a pas encore de variations.",
+        "matrixHint": "Chaque cellule indique le stock, la barre de couverture et le + à produire pour la cible active.",
+        "openSpotlight": "Ouvrir dans le focus"
       },
       "stockSuggest": {
         "title": "Suggestions de stock",
