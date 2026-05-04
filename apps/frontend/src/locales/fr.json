@@ -1906,12 +1906,34 @@
     },
     "allOrders": {
       "error": "Impossible de charger Toutes les commandes.",
+      "section": {
+        "overview": "Vue d’ensemble",
+        "overviewHint": "Chiffres clés sur les {{days}} derniers jours (commandes confirmées)",
+        "sources": "Sources",
+        "sourcesHint": "D’où viennent les commandes",
+        "spotlight": "Focus produit",
+        "spotlightHint": "Choisissez un produit pour voir tous ses KPIs et chaque variation",
+        "stockPlan": "Plan de stock",
+        "stockPlanHint": "Suggestions multi-produits sur les {{days}} derniers jours"
+      },
       "kpi": {
         "totalOrders": "Commandes",
         "avgItems": "Articles / commande",
         "topSource": "Source principale",
         "topVariant": "Variation top",
         "stockAtRisk": "Stock à risque"
+      },
+      "spotlight": {
+        "kpi": {
+          "ordered": "Unités commandées",
+          "stock": "Stock actuel",
+          "velocity": "Vitesse (u/j)",
+          "suggested": "Production suggérée",
+          "atRisk": "Variations à risque",
+          "topVariant": "Variation top"
+        },
+        "cover": "de couverture",
+        "toMake": "à produire"
       },
       "sources": {
         "donutTitle": "Commandes par source",
@@ -1943,6 +1965,9 @@
         "title": "Suggestions de stock",
         "targetLabel": "Couverture cible",
         "windowHint": "Vitesse calculée sur les {{days}} derniers jours des commandes confirmées.",
+        "searchPh": "Rechercher produit / couleur / taille",
+        "allRisks": "Tous",
+        "empty": "Aucune variation ne correspond.",
         "export": "Exporter CSV",
         "colProduct": "Produit",
         "colVariant": "Variation",
@@ -1965,7 +1990,8 @@
       "confirmation": "Confirmation",
       "shipping": "Expédition",
       "source": "Source",
-      "agent": "Agent"
+      "agent": "Agent",
+      "product": "Produit"
     },
     "common": {
       "noData": "Aucune donnée",

@@ -1906,12 +1906,34 @@
     },
     "allOrders": {
       "error": "Could not load all-orders analytics.",
+      "section": {
+        "overview": "Overview",
+        "overviewHint": "Headline numbers for the last {{days}} days of confirmed orders",
+        "sources": "Sources",
+        "sourcesHint": "Where the orders are coming from",
+        "spotlight": "Product spotlight",
+        "spotlightHint": "Pick a product to see all its KPIs and per-variant detail",
+        "stockPlan": "Stock plan",
+        "stockPlanHint": "Cross-product suggestions over the last {{days}} days"
+      },
       "kpi": {
         "totalOrders": "Total orders",
         "avgItems": "Avg items / order",
         "topSource": "Top source",
         "topVariant": "Top variation",
         "stockAtRisk": "Stock at risk"
+      },
+      "spotlight": {
+        "kpi": {
+          "ordered": "Units ordered",
+          "stock": "Current stock",
+          "velocity": "Velocity (units/day)",
+          "suggested": "Suggested production",
+          "atRisk": "Variants at risk",
+          "topVariant": "Top variant"
+        },
+        "cover": "of cover",
+        "toMake": "to make"
       },
       "sources": {
         "donutTitle": "Orders by source",
@@ -1943,6 +1965,9 @@
         "title": "Stock suggestions",
         "targetLabel": "Target cover",
         "windowHint": "Velocity computed over the last {{days}} days of confirmed orders.",
+        "searchPh": "Search product / color / size",
+        "allRisks": "All",
+        "empty": "No variants match the current filter.",
         "export": "Export CSV",
         "colProduct": "Product",
         "colVariant": "Variant",
@@ -1965,7 +1990,8 @@
       "confirmation": "Confirmation",
       "shipping": "Shipping",
       "source": "Source",
-      "agent": "Agent"
+      "agent": "Agent",
+      "product": "Product"
     },
     "common": {
       "noData": "No data",

@@ -8,7 +8,7 @@ import {
   SOURCE_OPTIONS,
 } from '@/constants/statusColors';
 import { supportApi } from '@/services/ordersApi';
-import type { AgentOption } from '@/types/orders';
+import type { AgentOption, Product } from '@/types/orders';
 import { cn } from '@/lib/cn';
 import { DeliveryTab } from './tabs/DeliveryTab';
 import { ConfirmationTab } from './tabs/ConfirmationTab';
@@ -54,28 +54,36 @@ export default function AnalyticsPage() {
   const activeMeta = TABS.find((tab) => tab.id === active)!;
 
   const [agents, setAgents] = useState<AgentOption[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   useEffect(() => {
     let cancelled = false;
     supportApi.agents().then((r) => { if (!cancelled) setAgents(r); }).catch(() => {});
+    supportApi.products().then((r) => { if (!cancelled) setProducts(r); }).catch(() => {});
     return () => { cancelled = true; };
   }, []);
 
   const filterConfigs = useMemo<FilterChipConfig[]>(() => {
-    const staticConfigs: FilterChipConfig[] = [
+    const configs: FilterChipConfig[] = [
       { key: 'confirmationStatuses', label: t('analytics.filters.confirmation'), options: CONFIRMATION_STATUS_OPTIONS },
       { key: 'shippingStatuses', label: t('analytics.filters.shipping'), options: SHIPPING_STATUS_OPTIONS },
       { key: 'sources', label: t('analytics.filters.source'), options: SOURCE_OPTIONS },
     ];
-    if (agents.length === 0) return staticConfigs;
-    return [
-      ...staticConfigs,
-      {
+    if (products.length > 0) {
+      configs.push({
+        key: 'productIds',
+        label: t('analytics.filters.product'),
+        options: products.map((p) => ({ value: p.id, label: p.name })),
+      });
+    }
+    if (agents.length > 0) {
+      configs.push({
         key: 'agentIds',
         label: t('analytics.filters.agent'),
         options: agents.map((a) => ({ value: a.id, label: a.name })),
-      },
-    ];
-  }, [agents, t]);
+      });
+    }
+    return configs;
+  }, [agents, products, t]);
 
   return (
     <div className="flex flex-col gap-4 p-4">
