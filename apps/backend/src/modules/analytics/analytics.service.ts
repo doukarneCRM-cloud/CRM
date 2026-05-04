@@ -365,7 +365,12 @@ export async function computeDeliveryTab(filters: OrderFilterParams): Promise<De
         confirmed,
         delivered,
         returned,
-        deliveryRate: safeRate(delivered, delivered + returned),
+        // Canonical formula (matches Dashboard + computeDeliveryCore):
+        // of orders this agent confirmed, what fraction got delivered?
+        // Previous denominator (delivered + returned) silently excluded
+        // in-transit orders so a busy agent's rate looked artificially
+        // high until their parcels actually landed.
+        deliveryRate: safeRate(delivered, confirmed),
         revenue: agentRevenueMap.get(g.agentId!) ?? 0,
       };
     })
