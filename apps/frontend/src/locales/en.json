@@ -1902,6 +1902,57 @@
       "allOrders": {
         "label": "All Orders",
         "hint": "Sources, top variants & stock suggestions"
+      },
+      "smartRep": {
+        "label": "Smart Répartition",
+        "hint": "Production planner — weighted demand by size & color"
+      }
+    },
+    "smartRep": {
+      "error": "Could not load smart répartition data.",
+      "section": {
+        "model": "1. Pick a model",
+        "modelHint": "Choose the product to plan production for",
+        "demand": "2. Demand analysis",
+        "demandHint": "Adjust status weights to reflect demand quality",
+        "targets": "3. Production targets & rules",
+        "targetsHint": "How many to make per color, plus business rules",
+        "result": "4. Production plan",
+        "resultHint": "Final repartition matching your targets",
+        "insights": "5. Insights",
+        "insightsHint": "Auto-generated suggestions"
+      },
+      "modelLabel": "Model",
+      "modelPh": "Search for a product…",
+      "basedOn": "Based on {{orders}} orders over the last {{days}} days",
+      "noOrders": "No orders found for this model in the selected window — try widening the date range.",
+      "statusWeights": "Status weights",
+      "demandTable": "Weighted demand (color × size)",
+      "weightedTotal": "Weighted total: {{total}}",
+      "targetsTitle": "Production target per color",
+      "rulesTitle": "Business rules",
+      "pcs": "pcs",
+      "calculate": "Calculate Smart Répartition",
+      "reset": "Reset",
+      "status": {
+        "delivered": "Delivered",
+        "shipped": "Shipped",
+        "confirmed": "Confirmed",
+        "pending": "Pending",
+        "returned": "Returned",
+        "cancelled": "Cancelled"
+      },
+      "col": {
+        "color": "Color",
+        "total": "Total",
+        "share": "Share"
+      },
+      "rules": {
+        "minXXL": "Min XXL per color",
+        "boostM": "Boost M",
+        "boostL": "Boost L",
+        "maxXXL": "Max XXL %",
+        "applyToggle": "Apply rules"
       }
     },
     "allOrders": {

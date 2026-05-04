@@ -8,6 +8,7 @@ import {
   computeProfitTab,
   computeAllOrdersTab,
 } from './analytics.service';
+import { computeSmartRepartition } from './smartRepartition.service';
 
 function pickFilters(query: Record<string, string | undefined>): OrderFilterParams {
   return {
@@ -68,6 +69,27 @@ export async function analyticsRoutes(app: FastifyInstance) {
       const payload = await computeAllOrdersTab(filters, {
         targetDays: Number.isFinite(targetDays) ? targetDays : undefined,
       });
+      return reply.send(payload);
+    },
+  );
+
+  // Smart Répartition — production planner per model. Returns raw
+  // (color, size, status) counts so the frontend can apply
+  // weights / rules / production targets without round-tripping.
+  // `modelId` is required.
+  app.get(
+    '/smart-repartition',
+    { preHandler: [verifyJWT, requirePermission('analytics:view')] },
+    async (request, reply) => {
+      const q = request.query as Record<string, string | undefined>;
+      const modelId = q.modelId;
+      if (!modelId) {
+        return reply.status(400).send({
+          error: { code: 'VALIDATION_ERROR', message: 'modelId is required' },
+        });
+      }
+      const filters = pickFilters(q);
+      const payload = await computeSmartRepartition({ ...filters, modelId });
       return reply.send(payload);
     },
   );
