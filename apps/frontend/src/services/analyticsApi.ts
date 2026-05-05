@@ -308,32 +308,6 @@ export interface AllOrdersTabPayload {
   windowDays: number;
 }
 
-// ─── Smart Répartition ──────────────────────────────────────────────────────
-export type LifecycleStatus =
-  | 'delivered'
-  | 'returned'
-  | 'shipped'
-  | 'confirmed'
-  | 'pending'
-  | 'cancelled';
-
-export interface SmartRepartitionRow {
-  color: string;
-  size: string;
-  status: LifecycleStatus;
-  count: number;
-}
-
-export interface SmartRepartitionPayload {
-  product: { id: string; name: string; imageUrl: string | null } | null;
-  rows: SmartRepartitionRow[];
-  colors: string[];
-  sizes: string[];
-  rawCounts: Record<LifecycleStatus, number>;
-  totalOrders: number;
-  windowDays: number;
-}
-
 export const analyticsApi = {
   delivery: (filters: AnalyticsFilters) =>
     api.get<DeliveryTabPayload>('/analytics/delivery', { params: filters }).then((r) => r.data),
@@ -347,10 +321,5 @@ export const analyticsApi = {
   allOrders: (filters: AnalyticsFilters & { targetDays?: number }) =>
     api
       .get<AllOrdersTabPayload>('/analytics/all-orders', { params: filters })
-      .then((r) => r.data),
-
-  smartRepartition: (params: AnalyticsFilters & { modelId: string }) =>
-    api
-      .get<SmartRepartitionPayload>('/analytics/smart-repartition', { params })
       .then((r) => r.data),
 };

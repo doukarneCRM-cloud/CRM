@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Truck, PhoneCall, TrendingUp, Boxes, Sparkles } from 'lucide-react';
+import { Truck, PhoneCall, TrendingUp, Boxes } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { GlobalFilterBar, type FilterChipConfig } from '@/components/ui/GlobalFilterBar';
 import {
@@ -14,9 +14,8 @@ import { DeliveryTab } from './tabs/DeliveryTab';
 import { ConfirmationTab } from './tabs/ConfirmationTab';
 import { ProfitTab } from './tabs/ProfitTab';
 import { AllOrdersTab } from './tabs/AllOrdersTab';
-import { SmartRepartitionTab } from './tabs/SmartRepartitionTab';
 
-type TabId = 'delivery' | 'confirmation' | 'profit' | 'allOrders' | 'smartRep';
+type TabId = 'delivery' | 'confirmation' | 'profit' | 'allOrders';
 
 export default function AnalyticsPage() {
   const { t } = useTranslation();
@@ -47,12 +46,6 @@ export default function AnalyticsPage() {
         label: t('analytics.tabs.allOrders.label'),
         icon: Boxes,
         hint: t('analytics.tabs.allOrders.hint'),
-      },
-      {
-        id: 'smartRep' as TabId,
-        label: t('analytics.tabs.smartRep.label'),
-        icon: Sparkles,
-        hint: t('analytics.tabs.smartRep.hint'),
       },
     ],
     [t],
@@ -129,7 +122,6 @@ export default function AnalyticsPage() {
       {active === 'confirmation' && <ConfirmationTab />}
       {active === 'profit' && <ProfitTab />}
       {active === 'allOrders' && <AllOrdersTab />}
-      {active === 'smartRep' && <SmartRepartitionTab />}
     </div>
   );
 }

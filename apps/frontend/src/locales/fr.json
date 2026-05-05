@@ -1902,57 +1902,6 @@
       "allOrders": {
         "label": "Toutes les commandes",
         "hint": "Sources, top variations & suggestions de stock"
-      },
-      "smartRep": {
-        "label": "Smart Répartition",
-        "hint": "Planificateur de production — demande pondérée par taille & couleur"
-      }
-    },
-    "smartRep": {
-      "error": "Impossible de charger Smart Répartition.",
-      "section": {
-        "model": "1. Choisir un modèle",
-        "modelHint": "Sélectionnez le produit à planifier",
-        "demand": "2. Analyse de la demande",
-        "demandHint": "Ajustez les poids des statuts pour refléter la qualité de la demande",
-        "targets": "3. Objectifs et règles",
-        "targetsHint": "Combien produire par couleur + règles métier",
-        "result": "4. Plan de production",
-        "resultHint": "Répartition finale qui correspond exactement à vos objectifs",
-        "insights": "5. Insights",
-        "insightsHint": "Suggestions auto-générées"
-      },
-      "modelLabel": "Modèle",
-      "modelPh": "Rechercher un produit…",
-      "basedOn": "Basé sur {{orders}} commandes des {{days}} derniers jours",
-      "noOrders": "Aucune commande pour ce modèle dans la fenêtre sélectionnée — élargissez la plage de dates.",
-      "statusWeights": "Poids par statut",
-      "demandTable": "Demande pondérée (couleur × taille)",
-      "weightedTotal": "Total pondéré : {{total}}",
-      "targetsTitle": "Objectif de production par couleur",
-      "rulesTitle": "Règles métier",
-      "pcs": "pcs",
-      "calculate": "Calculer Smart Répartition",
-      "reset": "Réinitialiser",
-      "status": {
-        "delivered": "Livré",
-        "shipped": "Expédié",
-        "confirmed": "Confirmé",
-        "pending": "En attente",
-        "returned": "Retourné",
-        "cancelled": "Annulé"
-      },
-      "col": {
-        "color": "Couleur",
-        "total": "Total",
-        "share": "Part"
-      },
-      "rules": {
-        "minXXL": "XXL min par couleur",
-        "boostM": "Boost M",
-        "boostL": "Boost L",
-        "maxXXL": "XXL max %",
-        "applyToggle": "Appliquer les règles"
       }
     },
     "allOrders": {
