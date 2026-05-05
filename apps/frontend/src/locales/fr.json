@@ -1909,10 +1909,16 @@
       "section": {
         "overview": "Vue d’ensemble",
         "overviewHint": "Chiffres clés sur les {{days}} derniers jours (toutes les commandes entrantes)",
+        "headlines": "Chiffres clés",
+        "headlinesHint": "{{days}} derniers jours · toutes les commandes",
         "sources": "Sources",
         "sourcesHint": "D’où viennent les commandes",
+        "cities": "Meilleures villes",
+        "citiesHint": "Où vos commandes sont livrées",
         "spotlight": "Focus produit",
         "spotlightHint": "Choisissez un produit pour voir tous ses KPIs et chaque variation",
+        "plan": "Plan de production (à l’échelle de N pièces)",
+        "planHint": "Répartit un objectif total entre produits + variations selon la part de la demande",
         "stockPlan": "Plan de stock",
         "stockPlanHint": "Suggestions multi-produits sur les {{days}} derniers jours"
       },
@@ -1921,7 +1927,30 @@
         "avgItems": "Articles / commande",
         "topSource": "Source principale",
         "topVariant": "Variation top",
-        "stockAtRisk": "Stock à risque"
+        "stockAtRisk": "Stock à risque",
+        "bestProduct": "Meilleur produit",
+        "bestCity": "Meilleure ville",
+        "aov": "Panier moyen",
+        "totalRevenue": "CA total",
+        "duplicates": "Commandes en doublon",
+        "window": "Période"
+      },
+      "cities": {
+        "colCity": "Ville",
+        "colOrders": "Commandes",
+        "colConfirmed": "Confirmées",
+        "colDelivered": "Livrées",
+        "colRate": "Taux conf.",
+        "colShare": "Part"
+      },
+      "plan": {
+        "intro": "Si je veux",
+        "pieces": "pièces",
+        "basedOn": "Basé sur la part des {{orders}} commandes",
+        "share": "des commandes",
+        "toMake": "À produire",
+        "total": "Total à produire",
+        "empty": "Pas assez de commandes — ajustez les filtres."
       },
       "spotlight": {
         "kpi": {

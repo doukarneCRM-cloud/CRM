@@ -1909,10 +1909,16 @@
       "section": {
         "overview": "Overview",
         "overviewHint": "Headline numbers for the last {{days}} days (all incoming orders)",
+        "headlines": "Headlines",
+        "headlinesHint": "Last {{days}} days · all incoming orders",
         "sources": "Sources",
         "sourcesHint": "Where the orders are coming from",
-        "spotlight": "Product spotlight",
+        "cities": "Best cities",
+        "citiesHint": "Where your orders ship to",
+        "spotlight": "Product focus",
         "spotlightHint": "Pick a product to see all its KPIs and per-variant detail",
+        "plan": "Production plan (scale to N pieces)",
+        "planHint": "Split a target qty across products + variants by demand share",
         "stockPlan": "Stock plan",
         "stockPlanHint": "Cross-product suggestions over the last {{days}} days"
       },
@@ -1921,7 +1927,30 @@
         "avgItems": "Avg items / order",
         "topSource": "Top source",
         "topVariant": "Top variation",
-        "stockAtRisk": "Stock at risk"
+        "stockAtRisk": "Stock at risk",
+        "bestProduct": "Best product",
+        "bestCity": "Best city",
+        "aov": "Avg order value",
+        "totalRevenue": "Total revenue",
+        "duplicates": "Duplicate orders",
+        "window": "Window"
+      },
+      "cities": {
+        "colCity": "City",
+        "colOrders": "Orders",
+        "colConfirmed": "Confirmed",
+        "colDelivered": "Delivered",
+        "colRate": "Confirm %",
+        "colShare": "Share"
+      },
+      "plan": {
+        "intro": "If I want",
+        "pieces": "pieces",
+        "basedOn": "Based on {{orders}} orders share",
+        "share": "of orders",
+        "toMake": "To make",
+        "total": "Total to produce",
+        "empty": "No orders to scale against — adjust filters or wait for demand."
       },
       "spotlight": {
         "kpi": {

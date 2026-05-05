@@ -1279,6 +1279,19 @@ export interface AllOrdersProductBreakdownRow {
   variants: AllOrdersVariantStat[];
 }
 
+export interface AllOrdersCityRow {
+  city: string;
+  orders: number;
+  confirmed: number;
+  delivered: number;
+  confirmationRate: number;
+}
+
+export interface AllOrdersDuplicates {
+  count: number;            // orders with mergedIntoId set
+  pct: number;              // % of total orders in window
+}
+
 export interface AllOrdersTabPayload {
   kpis: AllOrdersKPIs;
   sources: AllOrdersSourceRow[];
@@ -1289,6 +1302,16 @@ export interface AllOrdersTabPayload {
     targetDays: number;
     variants: AllOrdersVariantStat[];
   };
+  // ── New extensions for the redesigned tab ──────────────────────────────
+  bestCities: AllOrdersCityRow[];          // top 10 by orders
+  duplicates: AllOrdersDuplicates;
+  totalRevenue: number;                    // sum of delivered orders' total
+  avgOrderValue: number;                   // totalRevenue / totalOrders
+  bestProduct: {                           // headline KPI shortcut
+    productId: string;
+    productName: string;
+    orders: number;
+  } | null;
   // Echo the window we used so the UI can label "Velocity over X days".
   windowDays: number;
 }
@@ -1355,6 +1378,8 @@ export async function computeAllOrdersTab(
     allItems,
     productMeta,
     variantStocks,
+    cityRows,
+    duplicatesCount,
   ] = await Promise.all([
     computeAllOrdersCore(filters),
     computeAllOrdersCore(mirrorRange(filters)),
@@ -1426,6 +1451,34 @@ export async function computeAllOrdersTab(
         size: true,
         stock: true,
         product: { select: { id: true, name: true, imageUrl: true } },
+      },
+    }),
+    // City rows — pull (createdAt-window orders) with their customer
+    // city + status fields so we can group client-side. Prisma can't
+    // groupBy a relation field, and pulling a few thousand rows is
+    // cheap. We dedupe + bucket in JS below.
+    prisma.order.findMany({
+      where: whereCreated,
+      select: {
+        confirmationStatus: true,
+        shippingStatus: true,
+        customer: { select: { city: true } },
+      },
+      take: 50_000,
+    }),
+    // Duplicates — orders absorbed into another via the merge tool. The
+    // mergedIntoId column is set on the loser of a merge; counting
+    // those rows tells the operator how many duplicate-leads got
+    // dedupe'd in the window. Already excluded from the rest of the
+    // payload because mergedIntoId orders are archived, so this needs
+    // its own non-archived count.
+    prisma.order.count({
+      where: {
+        ...buildOrderWhereClause(
+          { ...filters, isArchived: 'all' },
+          { dateField: 'createdAt' },
+        ),
+        mergedIntoId: { not: null },
       },
     }),
   ]);
@@ -1670,6 +1723,62 @@ export async function computeAllOrdersTab(
       }
     : null;
 
+  // ── Best cities ────────────────────────────────────────────────────────
+  // Group the (city, status) rows we pulled and pick the top 10 by orders.
+  // City strings are normalised to trim trailing spaces — operators
+  // type cities by hand and "Casablanca " / "Casablanca" otherwise show
+  // as separate rows.
+  interface CityAcc {
+    orders: number;
+    confirmed: number;
+    delivered: number;
+  }
+  const cityAcc = new Map<string, CityAcc>();
+  for (const row of cityRows) {
+    const city = (row.customer.city ?? '').trim();
+    if (!city) continue;
+    const existing = cityAcc.get(city) ?? { orders: 0, confirmed: 0, delivered: 0 };
+    existing.orders += 1;
+    if (row.confirmationStatus === 'confirmed') existing.confirmed += 1;
+    if (row.shippingStatus === 'delivered') existing.delivered += 1;
+    cityAcc.set(city, existing);
+  }
+  const bestCities: AllOrdersCityRow[] = Array.from(cityAcc.entries())
+    .map(([city, v]) => ({
+      city,
+      orders: v.orders,
+      confirmed: v.confirmed,
+      delivered: v.delivered,
+      confirmationRate: safeRate(v.confirmed, v.orders),
+    }))
+    .sort((a, b) => b.orders - a.orders)
+    .slice(0, 10);
+
+  // ── Headline derived numbers (revenue / AOV / best product / dupes) ─
+  const totalRevenue = sources.reduce((s, src) => s + src.revenue, 0);
+  const avgOrderValue =
+    coreCurr.totalOrders > 0
+      ? Math.round((totalRevenue / coreCurr.totalOrders) * 100) / 100
+      : 0;
+  const bestProductRow = productBreakdown.find((p) => p.orders > 0) ?? null;
+  const bestProduct = bestProductRow
+    ? {
+        productId: bestProductRow.productId,
+        productName: bestProductRow.productName,
+        orders: bestProductRow.orders,
+      }
+    : null;
+  const duplicates: AllOrdersDuplicates = {
+    count: duplicatesCount,
+    pct:
+      coreCurr.totalOrders + duplicatesCount > 0
+        ? Math.round(
+            (duplicatesCount / (coreCurr.totalOrders + duplicatesCount)) *
+              1000,
+          ) / 10
+        : 0,
+  };
+
   return {
     kpis: {
       totalOrders: coreCurr.totalOrders,
@@ -1704,6 +1813,11 @@ export async function computeAllOrdersTab(
           return b.velocityPerDay - a.velocityPerDay;
         }),
     },
+    bestCities,
+    duplicates,
+    totalRevenue,
+    avgOrderValue,
+    bestProduct,
     windowDays,
   };
 }

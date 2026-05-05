@@ -1,19 +1,22 @@
 /**
- * All Orders tab — demand-oriented analytics.
+ * All Orders tab — demand-oriented analytics, redesigned for at-a-glance
+ * decisions. Six numbered sections so the operator scans top-down:
  *
- * Sections:
- *   1. OVERVIEW    — 4 headline KPIs.
- *   2. SOURCES     — donut + per-source funnel + daily trend.
- *   3. SPOTLIGHT   — searchable dropdown to pick ANY product, then a
- *                    color × size matrix view of its variants with
- *                    stock + days-of-cover bars.
- *   4. STOCK PLAN  — grouped by product (collapsible). Each product
- *                    expands to show its variant matrix AND a "scale
- *                    prediction" calculator that answers
- *                    "if I want N more orders, how many of each
- *                    variant should I produce?"
+ *   1. HEADLINES       — 8 KPI cards (orders / AOV / best product /
+ *                        best variant / best city / top source /
+ *                        revenue / duplicates).
+ *   2. SOURCES         — donut + per-source funnel + daily trend.
+ *   3. BEST CITIES     — top 10 list with orders + confirmation rate.
+ *   4. PRODUCT FOCUS   — searchable picker → matrix view of variants
+ *                        for the selected product, plus per-product KPIs.
+ *   5. PRODUCTION PLAN — global "scale to N pieces" calculator. Splits
+ *                        the target across products by their order
+ *                        share, then per-color × size by variant share.
+ *   6. STOCK PLAN      — collapsible per-product cards with
+ *                        days-of-cover bars + suggested reorder qty.
  *
- * Velocity uses confirmed orders only — junk doesn't drive production.
+ * Velocity counts EVERY incoming order (any confirmation status) since
+ * pending orders still represent real demand.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -21,13 +24,17 @@ import {
   ShoppingBag,
   TrendingUp,
   Layers,
-  AlertTriangle,
   Download,
   Package,
   Search as SearchIcon,
   ChevronDown,
   ChevronUp,
+  Star,
+  MapPin,
+  Copy as CopyIcon,
+  Wallet,
   Calculator,
+  Sparkles,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -65,13 +72,14 @@ import { useAnalyticsFilters } from '../hooks/useAnalyticsFilters';
 function fmt(n: number): string {
   return n.toLocaleString('fr-MA');
 }
-
 function formatDoC(d: number | null): string {
   if (d === null) return '∞';
   if (d > 999) return '999+';
   return d.toFixed(1);
 }
-
+function variantLabel(v: { color: string | null; size: string | null }): string {
+  return [v.color, v.size].filter(Boolean).join(' / ') || '—';
+}
 const SOURCE_COLOR: Record<string, string> = {
   youcan: '#7C5CFF',
   whatsapp: '#25D366',
@@ -117,10 +125,6 @@ function SectionHeader({
 }
 
 // ─── Variant matrix (color × size grid) ─────────────────────────────────────
-// One cell per (color, size) combo that exists for the product. Empty
-// combos render as a faded "—" so the grid keeps a clean rectangular
-// shape. Each cell shows: ordered count, current stock, days-of-cover
-// micro-bar, and the suggested-to-produce delta as a chip.
 
 function VariantMatrix({
   variants,
@@ -129,16 +133,11 @@ function VariantMatrix({
   variants: AllOrdersVariantStat[];
   targetDays: number;
 }) {
-  const colors = Array.from(
-    new Set(variants.map((v) => v.color ?? '—')),
-  ).sort();
-  const sizes = Array.from(
-    new Set(variants.map((v) => v.size ?? '—')),
-  ).sort(compareSizes);
+  const colors = Array.from(new Set(variants.map((v) => v.color ?? '—'))).sort();
+  const sizes = Array.from(new Set(variants.map((v) => v.size ?? '—'))).sort(compareSizes);
   const byKey = new Map(
     variants.map((v) => [`${v.color ?? '—'}|${v.size ?? '—'}`, v]),
   );
-
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-separate" style={{ borderSpacing: 4 }}>
@@ -198,16 +197,9 @@ function VariantMatrix({
                         <span className="font-bold tabular-nums text-gray-900">
                           {fmt(v.currentStock)}
                         </span>
-                        {suggested > 0 && (
-                          <span
-                            className={cn(
-                              'rounded px-1 py-0.5 text-[9px] font-bold tabular-nums',
-                              tone.text,
-                            )}
-                          >
-                            +{fmt(suggested)}
-                          </span>
-                        )}
+                        <span className="font-bold tabular-nums text-tone-lavender-500">
+                          {fmt(v.ordered)} ord
+                        </span>
                       </div>
                       <div className="flex items-end justify-between gap-1">
                         <div className="flex-1">
@@ -223,7 +215,8 @@ function VariantMatrix({
                         </span>
                       </div>
                       <p className="truncate text-[9px] text-gray-500">
-                        {fmt(v.ordered)} ord · {v.velocityPerDay.toFixed(2)}/d
+                        {v.velocityPerDay.toFixed(2)}/d
+                        {suggested > 0 ? ` · +${fmt(suggested)} make` : ''}
                       </p>
                     </div>
                   </td>
@@ -233,141 +226,6 @@ function VariantMatrix({
           ))}
         </tbody>
       </table>
-    </div>
-  );
-}
-
-// ─── Scale-to-N-orders prediction ──────────────────────────────────────────
-// Given a product's variants and a target additional-order count, project
-// the demand share per variant from past order shares and compute how
-// many of each to produce. Total at the bottom is the headline answer
-// to "to get N more orders, produce M more units".
-
-function ScalePrediction({
-  variants,
-}: {
-  variants: AllOrdersVariantStat[];
-}) {
-  const { t } = useTranslation();
-  const [target, setTarget] = useState<number>(100);
-
-  const totalOrdered = variants.reduce((s, v) => s + v.ordered, 0);
-  const rows = useMemo(() => {
-    if (totalOrdered === 0) return [];
-    return variants
-      .filter((v) => v.ordered > 0)
-      .map((v) => {
-        const share = v.ordered / totalOrdered;
-        const projected = Math.ceil(share * target);
-        const toProduce = Math.max(0, projected - v.currentStock);
-        return {
-          variantId: v.variantId,
-          color: v.color,
-          size: v.size,
-          ordered: v.ordered,
-          share,
-          projected,
-          currentStock: v.currentStock,
-          toProduce,
-        };
-      })
-      .sort((a, b) => b.share - a.share);
-  }, [variants, target, totalOrdered]);
-
-  const totalToProduce = rows.reduce((s, r) => s + r.toProduce, 0);
-  const totalProjected = rows.reduce((s, r) => s + r.projected, 0);
-
-  if (totalOrdered === 0) {
-    return (
-      <div className="rounded-md bg-gray-50 px-3 py-2 text-[11px] text-gray-500">
-        {t('analytics.allOrders.scale.noHistory')}
-      </div>
-    );
-  }
-
-  return (
-    <div className="rounded-md border border-gray-100 bg-white p-3">
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <Calculator size={14} className="text-tone-lavender-500" />
-        <span className="text-xs font-bold text-gray-900">
-          {t('analytics.allOrders.scale.title')}
-        </span>
-        <div className="ml-2 flex items-center gap-1.5">
-          <label htmlFor="scale-target" className="text-[11px] text-gray-500">
-            {t('analytics.allOrders.scale.targetLabel')}
-          </label>
-          <input
-            id="scale-target"
-            type="number"
-            min={1}
-            step={10}
-            value={target}
-            onChange={(e) => setTarget(Math.max(1, Number(e.target.value) || 1))}
-            className="w-20 rounded-btn border border-gray-200 bg-white px-2 py-0.5 text-xs tabular-nums text-gray-900 outline-none focus:border-tone-lavender-300"
-          />
-          <span className="text-[11px] text-gray-500">
-            {t('analytics.allOrders.scale.ordersUnit')}
-          </span>
-        </div>
-        <span className="ml-auto text-[11px] font-semibold text-tone-lavender-500">
-          {t('analytics.allOrders.scale.totalProduce', { count: totalToProduce })}
-        </span>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="border-b border-gray-100 text-left text-[10px] uppercase tracking-wide text-gray-400">
-              <th className="py-1 pr-2">{t('analytics.allOrders.scale.colVariant')}</th>
-              <th className="py-1 pr-2 text-right">{t('analytics.allOrders.scale.colShare')}</th>
-              <th className="py-1 pr-2 text-right">{t('analytics.allOrders.scale.colProjected')}</th>
-              <th className="py-1 pr-2 text-right">{t('analytics.allOrders.scale.colStock')}</th>
-              <th className="py-1 text-right">{t('analytics.allOrders.scale.colToProduce')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.variantId} className="border-b border-gray-50">
-                <td className="py-1 pr-2 text-gray-900">
-                  {[r.color, r.size].filter(Boolean).join(' / ') || '—'}
-                </td>
-                <td className="py-1 pr-2 text-right tabular-nums text-gray-500">
-                  {(r.share * 100).toFixed(1)}%
-                </td>
-                <td className="py-1 pr-2 text-right tabular-nums text-gray-700">
-                  {fmt(r.projected)}
-                </td>
-                <td className="py-1 pr-2 text-right tabular-nums text-gray-500">
-                  {fmt(r.currentStock)}
-                </td>
-                <td className="py-1 text-right">
-                  {r.toProduce > 0 ? (
-                    <span className="rounded bg-tone-lavender-50 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-tone-lavender-500">
-                      +{fmt(r.toProduce)}
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-emerald-600">
-                      {t('analytics.allOrders.scale.covered')}
-                    </span>
-                  )}
-                </td>
-              </tr>
-            ))}
-            <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
-              <td className="py-1.5 pr-2 text-gray-700">
-                {t('analytics.allOrders.scale.total')}
-              </td>
-              <td className="py-1.5 pr-2 text-right text-gray-400">100.0%</td>
-              <td className="py-1.5 pr-2 text-right tabular-nums text-gray-900">
-                {fmt(totalProjected)}
-              </td>
-              <td className="py-1.5 pr-2"></td>
-              <td className="py-1.5 text-right tabular-nums text-tone-lavender-500">
-                +{fmt(totalToProduce)}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
     </div>
   );
 }
@@ -423,9 +281,7 @@ function MiniKpi({
   );
 }
 
-// ─── Per-product card in the Stock plan section ────────────────────────────
-// Collapsible: header row shows headline numbers, body shows the matrix
-// + scale prediction widget. Default-collapsed; first card auto-expands.
+// ─── Stock plan per-product card ───────────────────────────────────────────
 
 function StockPlanProductCard({
   product,
@@ -440,7 +296,6 @@ function StockPlanProductCard({
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(defaultOpen);
-
   const variants = product.variants;
   const totalOrdered = variants.reduce((s, v) => s + v.ordered, 0);
   const totalStock = variants.reduce((s, v) => s + v.currentStock, 0);
@@ -455,10 +310,8 @@ function StockPlanProductCard({
   const atRisk = variants.filter(
     (v) => v.risk === 'imminent' || v.risk === 'low',
   ).length;
-
   return (
     <div className="rounded-card border border-gray-100 bg-white">
-      {/* Header */}
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-gray-50"
@@ -484,11 +337,22 @@ function StockPlanProductCard({
             {variants.length} {t('analytics.allOrders.byProduct.variants')}
           </p>
         </div>
-        {/* Inline summary chips */}
         <div className="hidden shrink-0 items-center gap-1.5 sm:flex">
-          <Chip label={t('analytics.allOrders.spotlight.kpi.ordered')} value={fmt(totalOrdered)} />
-          <Chip label={t('analytics.allOrders.spotlight.kpi.stock')} value={fmt(totalStock)} />
-          {atRisk > 0 && <Chip label={t('analytics.allOrders.kpi.stockAtRisk')} value={fmt(atRisk)} tone="rose" />}
+          <Chip
+            label={t('analytics.allOrders.spotlight.kpi.ordered')}
+            value={fmt(totalOrdered)}
+          />
+          <Chip
+            label={t('analytics.allOrders.spotlight.kpi.stock')}
+            value={fmt(totalStock)}
+          />
+          {atRisk > 0 && (
+            <Chip
+              label={t('analytics.allOrders.kpi.stockAtRisk')}
+              value={fmt(atRisk)}
+              tone="rose"
+            />
+          )}
           {totalSuggested > 0 && (
             <Chip
               label={t('analytics.allOrders.spotlight.kpi.suggested')}
@@ -501,8 +365,6 @@ function StockPlanProductCard({
           {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </span>
       </button>
-
-      {/* Body */}
       {open && (
         <div className="border-t border-gray-100 px-3 py-3">
           {variants.length === 0 ? (
@@ -522,9 +384,6 @@ function StockPlanProductCard({
                 >
                   {t('analytics.allOrders.byProduct.openSpotlight')} →
                 </button>
-              </div>
-              <div className="mt-3">
-                <ScalePrediction variants={variants} />
               </div>
             </>
           )}
@@ -556,6 +415,119 @@ function Chip({
   );
 }
 
+// ─── Global production planner ──────────────────────────────────────────────
+// "I want to make N total pieces — how do I split them across products
+// and variants so the mix tracks real demand?"
+// Per-product share = product.orders / totalOrders. Per-variant share
+// (within a product) = variant.ordered / sum(variant.ordered for product).
+
+interface PlanRow {
+  productId: string;
+  productName: string;
+  imageUrl: string | null;
+  orders: number;
+  share: number;        // 0–1
+  productQty: number;
+  variants: Array<{ variantId: string; color: string | null; size: string | null; share: number; qty: number }>;
+}
+
+function buildGlobalPlan({
+  products,
+  totalOrders,
+  target,
+}: {
+  products: AllOrdersProductBreakdownRow[];
+  totalOrders: number;
+  target: number;
+}): PlanRow[] {
+  const eligible = products.filter((p) => p.orders > 0);
+  if (eligible.length === 0 || totalOrders === 0 || target <= 0) return [];
+
+  // Step 1 — share per product.
+  const totalShareOrders = eligible.reduce((s, p) => s + p.orders, 0);
+  const rawQtys = eligible.map((p) => ({
+    p,
+    share: p.orders / totalShareOrders,
+    qty: 0,
+  }));
+  // Allocate quantities + fix rounding so sum == target.
+  let allocated = 0;
+  rawQtys.forEach((r) => {
+    r.qty = Math.round(target * r.share);
+    allocated += r.qty;
+  });
+  let diff = target - allocated;
+  let safety = rawQtys.length * 4;
+  while (diff !== 0 && safety-- > 0) {
+    const sorted = rawQtys.slice().sort((a, b) =>
+      diff > 0 ? b.qty - a.qty : a.qty - b.qty,
+    );
+    const item = sorted[0];
+    if (!item) break;
+    if (diff > 0) {
+      item.qty += 1;
+      diff -= 1;
+    } else if (item.qty > 0) {
+      item.qty -= 1;
+      diff += 1;
+    } else break;
+  }
+
+  // Step 2 — within each product, split across variants by share of ordered.
+  return rawQtys.map(({ p, share, qty }) => {
+    const orderedVariants = p.variants.filter((v) => v.ordered > 0);
+    const variantTotal = orderedVariants.reduce((s, v) => s + v.ordered, 0);
+    const subRows = orderedVariants.map((v) => ({
+      variantId: v.variantId,
+      color: v.color,
+      size: v.size,
+      share: variantTotal > 0 ? v.ordered / variantTotal : 0,
+      qty: 0,
+    }));
+    if (subRows.length === 0) {
+      return {
+        productId: p.productId,
+        productName: p.productName,
+        imageUrl: p.imageUrl,
+        orders: p.orders,
+        share,
+        productQty: qty,
+        variants: subRows,
+      };
+    }
+    let sub = 0;
+    subRows.forEach((r) => {
+      r.qty = Math.round(qty * r.share);
+      sub += r.qty;
+    });
+    let subDiff = qty - sub;
+    let subSafety = subRows.length * 4;
+    while (subDiff !== 0 && subSafety-- > 0) {
+      const sorted = subRows.slice().sort((a, b) =>
+        subDiff > 0 ? b.qty - a.qty : a.qty - b.qty,
+      );
+      const item = sorted[0];
+      if (!item) break;
+      if (subDiff > 0) {
+        item.qty += 1;
+        subDiff -= 1;
+      } else if (item.qty > 0) {
+        item.qty -= 1;
+        subDiff += 1;
+      } else break;
+    }
+    return {
+      productId: p.productId,
+      productName: p.productName,
+      imageUrl: p.imageUrl,
+      orders: p.orders,
+      share,
+      productQty: qty,
+      variants: subRows.sort((a, b) => b.qty - a.qty),
+    };
+  });
+}
+
 // ─── Page ───────────────────────────────────────────────────────────────────
 
 export function AllOrdersTab() {
@@ -568,6 +540,7 @@ export function AllOrdersTab() {
   const [spotlightId, setSpotlightId] = useState<string | null>(null);
   const [stockPlanSearch, setStockPlanSearch] = useState('');
   const [stockPlanRiskFilter, setStockPlanRiskFilter] = useState<AllOrdersRiskBand | 'all'>('all');
+  const [planTarget, setPlanTarget] = useState<number>(200);
 
   useEffect(() => {
     let cancelled = false;
@@ -580,8 +553,6 @@ export function AllOrdersTab() {
         setData(d);
         const stillThere = d.productBreakdown.some((p) => p.productId === spotlightId);
         if (!stillThere) {
-          // Pick the first product WITH orders, or the first product overall
-          // if nothing has orders, so the spotlight isn't blank on first paint.
           const withOrders = d.productBreakdown.find((p) => p.orders > 0);
           setSpotlightId((withOrders ?? d.productBreakdown[0])?.productId ?? null);
         }
@@ -619,7 +590,6 @@ export function AllOrdersTab() {
     () =>
       productBreakdown.map((p) => ({
         value: p.productId,
-        // Format: "Product name · 14 orders · 5 variants"
         label: `${p.productName}${p.orders > 0 ? ` · ${p.orders} orders` : ''}${p.variants.length > 0 ? ` · ${p.variants.length} variants` : ''}`,
       })),
     [productBreakdown],
@@ -645,13 +615,22 @@ export function AllOrdersTab() {
   const stockPlanProducts = useMemo(() => {
     const q = stockPlanSearch.trim().toLowerCase();
     return productBreakdown.filter((p) => {
-      // Only include products that have variants (otherwise the card is empty).
       if (p.variants.length === 0) return false;
       if (q && !p.productName.toLowerCase().includes(q)) return false;
       if (stockPlanRiskFilter === 'all') return true;
       return p.variants.some((v) => v.risk === stockPlanRiskFilter);
     });
   }, [productBreakdown, stockPlanSearch, stockPlanRiskFilter]);
+
+  const globalPlan = useMemo(
+    () =>
+      buildGlobalPlan({
+        products: productBreakdown,
+        totalOrders: data?.kpis.totalOrders ?? 0,
+        target: planTarget,
+      }),
+    [productBreakdown, data, planTarget],
+  );
 
   const exportCsv = () => {
     const headers = [
@@ -668,7 +647,7 @@ export function AllOrdersTab() {
       .flatMap((p) => p.variants.map((v) => ({ p, v })))
       .map(({ p, v }) => [
         p.productName,
-        [v.color, v.size].filter(Boolean).join(' / ') || '—',
+        variantLabel(v),
         v.ordered,
         v.currentStock,
         v.velocityPerDay,
@@ -683,6 +662,8 @@ export function AllOrdersTab() {
   const sources = data?.sources ?? [];
   const trend = data?.trendBySource ?? [];
   const allSources = sources.map((s) => s.source);
+  const bestCities = data?.bestCities ?? [];
+  const bestCity = bestCities[0];
 
   return (
     <div className="flex flex-col gap-6">
@@ -695,12 +676,12 @@ export function AllOrdersTab() {
         <p className="text-center text-xs text-gray-400">{t('common.loading')}</p>
       )}
 
-      {/* ═══ 1. OVERVIEW ═══════════════════════════════════════════════ */}
+      {/* ═══ 1. HEADLINES ═══════════════════════════════════════════════ */}
       <section>
         <SectionHeader
           number={1}
-          title={t('analytics.allOrders.section.overview')}
-          hint={t('analytics.allOrders.section.overviewHint', { days: data?.windowDays ?? 30 })}
+          title={t('analytics.allOrders.section.headlines')}
+          hint={t('analytics.allOrders.section.headlinesHint', { days: data?.windowDays ?? 30 })}
         />
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <KPICard
@@ -718,17 +699,68 @@ export function AllOrdersTab() {
             percentageChange={kpis?.percentageChanges.avgItemsPerOrder}
           />
           <KPICard
+            title={t('analytics.allOrders.kpi.bestProduct')}
+            value={data?.bestProduct ? data.bestProduct.productName : '—'}
+            unit={data?.bestProduct ? `× ${fmt(data.bestProduct.orders)}` : ''}
+            icon={Star}
+            tone="amber"
+          />
+          <KPICard
+            title={t('analytics.allOrders.kpi.topVariant')}
+            value={
+              kpis?.topVariant
+                ? `${kpis.topVariant.productName} · ${variantLabel(kpis.topVariant)}`
+                : '—'
+            }
+            unit={kpis?.topVariant ? `× ${fmt(kpis.topVariant.quantity)}` : ''}
+            icon={Sparkles}
+            tone="peach"
+          />
+          <KPICard
+            title={t('analytics.allOrders.kpi.bestCity')}
+            value={bestCity ? bestCity.city : '—'}
+            unit={bestCity ? `× ${fmt(bestCity.orders)}` : ''}
+            icon={MapPin}
+            tone="mint"
+          />
+          <KPICard
             title={t('analytics.allOrders.kpi.topSource')}
             value={kpis?.topSource ? kpis.topSource.source : '—'}
             unit={kpis?.topSource ? `${kpis.topSource.pct.toFixed(1)}%` : ''}
             icon={TrendingUp}
-            tone="mint"
+            tone="sky"
           />
           <KPICard
-            title={t('analytics.allOrders.kpi.stockAtRisk')}
-            value={fmt(kpis?.stockAtRisk ?? 0)}
-            icon={AlertTriangle}
+            title={t('analytics.allOrders.kpi.aov')}
+            value={kpis ? fmt(Math.round(data?.avgOrderValue ?? 0)) : '0'}
+            unit="MAD"
+            icon={Wallet}
+            tone="lavender"
+          />
+          <KPICard
+            title={t('analytics.allOrders.kpi.duplicates')}
+            value={fmt(data?.duplicates.count ?? 0)}
+            unit={data?.duplicates.pct ? `${data.duplicates.pct.toFixed(1)}%` : ''}
+            icon={CopyIcon}
             tone="rose"
+          />
+        </div>
+        {/* Secondary row — revenue + stock at risk + window */}
+        <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
+          <MiniKpi
+            label={t('analytics.allOrders.kpi.totalRevenue')}
+            value={`${fmt(Math.round(data?.totalRevenue ?? 0))} MAD`}
+            tone="mint"
+          />
+          <MiniKpi
+            label={t('analytics.allOrders.kpi.stockAtRisk')}
+            value={fmt(kpis?.stockAtRisk ?? 0)}
+            tone="rose"
+          />
+          <MiniKpi
+            label={t('analytics.allOrders.kpi.window')}
+            value={`${data?.windowDays ?? 30}d`}
+            tone="lavender"
           />
         </div>
       </section>
@@ -764,9 +796,7 @@ export function AllOrdersTab() {
                           <Cell key={s.source} fill={sourceColor(s.source)} />
                         ))}
                       </Pie>
-                      <Tooltip
-                        formatter={(value: number, name: string) => [fmt(value), name]}
-                      />
+                      <Tooltip formatter={(value: number, name: string) => [fmt(value), name]} />
                       <Legend
                         verticalAlign="bottom"
                         height={28}
@@ -779,7 +809,6 @@ export function AllOrdersTab() {
                   </ResponsiveContainer>
                 </div>
               </div>
-
               <div className="lg:col-span-2">
                 <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
                   {t('analytics.allOrders.sources.tableTitle')}
@@ -820,7 +849,6 @@ export function AllOrdersTab() {
                 </div>
               </div>
             </div>
-
             {trend.length > 0 && (
               <div className="mt-4 border-t border-gray-100 pt-3">
                 <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
@@ -860,16 +888,67 @@ export function AllOrdersTab() {
         </section>
       )}
 
-      {/* ═══ 3. PRODUCT SPOTLIGHT ════════════════════════════════════ */}
-      {productBreakdown.length > 0 && (
+      {/* ═══ 3. BEST CITIES ═══════════════════════════════════════════ */}
+      {bestCities.length > 0 && (
         <section>
           <SectionHeader
             number={3}
+            title={t('analytics.allOrders.section.cities')}
+            hint={t('analytics.allOrders.section.citiesHint')}
+          />
+          <GlassCard className="p-4">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-gray-100 text-left text-[10px] uppercase tracking-wide text-gray-400">
+                    <th className="py-1.5 pr-2 w-8">#</th>
+                    <th className="py-1.5 pr-2">{t('analytics.allOrders.cities.colCity')}</th>
+                    <th className="py-1.5 pr-2 text-right">{t('analytics.allOrders.cities.colOrders')}</th>
+                    <th className="py-1.5 pr-2 text-right">{t('analytics.allOrders.cities.colConfirmed')}</th>
+                    <th className="py-1.5 pr-2 text-right">{t('analytics.allOrders.cities.colDelivered')}</th>
+                    <th className="py-1.5 pr-2 text-right">{t('analytics.allOrders.cities.colRate')}</th>
+                    <th className="py-1.5">{t('analytics.allOrders.cities.colShare')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const max = Math.max(1, ...bestCities.map((c) => c.orders));
+                    return bestCities.map((c, i) => (
+                      <tr key={c.city} className="border-b border-gray-50">
+                        <td className="py-1.5 pr-2 text-gray-400">{i + 1}</td>
+                        <td className="py-1.5 pr-2 font-semibold text-gray-900">{c.city}</td>
+                        <td className="py-1.5 pr-2 text-right tabular-nums text-gray-900">{fmt(c.orders)}</td>
+                        <td className="py-1.5 pr-2 text-right tabular-nums text-gray-700">{fmt(c.confirmed)}</td>
+                        <td className="py-1.5 pr-2 text-right tabular-nums text-gray-700">{fmt(c.delivered)}</td>
+                        <td className="py-1.5 pr-2 text-right tabular-nums text-gray-500">
+                          {c.confirmationRate.toFixed(1)}%
+                        </td>
+                        <td className="py-1.5">
+                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+                            <div
+                              className="h-full bg-gradient-to-r from-tone-mint-300 to-tone-mint-500"
+                              style={{ width: `${(c.orders / max) * 100}%` }}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    ));
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          </GlassCard>
+        </section>
+      )}
+
+      {/* ═══ 4. PRODUCT FOCUS ════════════════════════════════════════ */}
+      {productBreakdown.length > 0 && (
+        <section>
+          <SectionHeader
+            number={4}
             title={t('analytics.allOrders.section.spotlight')}
             hint={t('analytics.allOrders.section.spotlightHint')}
           />
-
-          {/* Searchable dropdown — replaces horizontal scroll list */}
           <div className="mb-3 max-w-md">
             <CRMSelect
               options={productOptions}
@@ -879,7 +958,6 @@ export function AllOrdersTab() {
               placeholder={t('analytics.allOrders.spotlight.pickerPh')}
             />
           </div>
-
           {spotlightProduct && spotlightKpis && (
             <GlassCard className="p-4">
               <div className="mb-3 flex items-center gap-3">
@@ -912,7 +990,6 @@ export function AllOrdersTab() {
                 </div>
               ) : (
                 <>
-                  {/* Per-product KPIs */}
                   <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6">
                     <MiniKpi
                       label={t('analytics.allOrders.spotlight.kpi.ordered')}
@@ -944,17 +1021,13 @@ export function AllOrdersTab() {
                       label={t('analytics.allOrders.spotlight.kpi.topVariant')}
                       value={
                         spotlightKpis.top
-                          ? [spotlightKpis.top.color, spotlightKpis.top.size]
-                              .filter(Boolean)
-                              .join(' / ') || '—'
+                          ? variantLabel(spotlightKpis.top)
                           : '—'
                       }
                       tone="peach"
                       small
                     />
                   </div>
-
-                  {/* Matrix view */}
                   <div className="mt-4">
                     <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
                       {t('analytics.allOrders.spotlight.matrixTitle')}
@@ -974,11 +1047,119 @@ export function AllOrdersTab() {
         </section>
       )}
 
-      {/* ═══ 4. STOCK PLAN — per-product cards ═══════════════════════ */}
+      {/* ═══ 5. GLOBAL PRODUCTION PLANNER ═══════════════════════════ */}
+      {productBreakdown.length > 0 && (data?.kpis.totalOrders ?? 0) > 0 && (
+        <section>
+          <SectionHeader
+            number={5}
+            title={t('analytics.allOrders.section.plan')}
+            hint={t('analytics.allOrders.section.planHint')}
+          />
+          <GlassCard className="p-4">
+            <div className="mb-3 flex flex-wrap items-center gap-3 text-xs">
+              <Calculator size={14} className="text-tone-lavender-500" />
+              <span className="font-semibold text-gray-900">
+                {t('analytics.allOrders.plan.intro')}
+              </span>
+              <input
+                type="number"
+                min={1}
+                step={10}
+                value={planTarget}
+                onChange={(e) => setPlanTarget(Math.max(1, Number(e.target.value) || 1))}
+                className="w-24 rounded-btn border border-gray-200 bg-white px-2 py-1 text-right tabular-nums text-gray-900 outline-none focus:border-tone-lavender-300"
+              />
+              <span className="text-gray-500">{t('analytics.allOrders.plan.pieces')}</span>
+              <span className="ml-auto text-[11px] text-gray-400">
+                {t('analytics.allOrders.plan.basedOn', { orders: fmt(data?.kpis.totalOrders ?? 0) })}
+              </span>
+            </div>
+
+            {globalPlan.length === 0 ? (
+              <p className="text-center text-xs text-gray-400">
+                {t('analytics.allOrders.plan.empty')}
+              </p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {globalPlan.map((p) => (
+                  <div
+                    key={p.productId}
+                    className="rounded-card border border-gray-100 bg-white p-3"
+                  >
+                    <div className="mb-2 flex items-center gap-3">
+                      {p.imageUrl ? (
+                        <img
+                          src={p.imageUrl}
+                          alt=""
+                          className="h-9 w-9 shrink-0 rounded-md object-cover ring-1 ring-gray-200"
+                        />
+                      ) : (
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-400">
+                          <Package size={14} />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-bold text-gray-900">
+                          {p.productName}
+                        </p>
+                        <p className="text-[10px] text-gray-500">
+                          {fmt(p.orders)} {t('analytics.allOrders.byProduct.orders')}
+                          {' · '}
+                          {(p.share * 100).toFixed(1)}% {t('analytics.allOrders.plan.share')}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-[10px] uppercase tracking-wide text-gray-400">
+                          {t('analytics.allOrders.plan.toMake')}
+                        </p>
+                        <p className="text-base font-bold tabular-nums text-tone-lavender-500">
+                          +{fmt(p.productQty)}
+                        </p>
+                      </div>
+                    </div>
+                    {p.variants.length > 0 && (
+                      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+                        {p.variants.map((v) => (
+                          <div
+                            key={v.variantId}
+                            className="rounded-btn border border-gray-100 bg-tone-lavender-50/40 px-2 py-1.5"
+                          >
+                            <p className="truncate text-[10px] text-gray-700">
+                              {variantLabel(v)}
+                            </p>
+                            <div className="flex items-baseline justify-between">
+                              <span className="text-[9px] text-gray-400">
+                                {(v.share * 100).toFixed(0)}%
+                              </span>
+                              <span className="font-bold tabular-nums text-tone-lavender-500">
+                                +{fmt(v.qty)}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <div className="mt-2 flex items-center justify-between rounded-card border-2 border-tone-lavender-200 bg-tone-lavender-50 px-3 py-2 text-xs">
+                  <span className="font-bold text-gray-900">
+                    {t('analytics.allOrders.plan.total')}
+                  </span>
+                  <span className="text-base font-bold tabular-nums text-tone-lavender-500">
+                    +{fmt(globalPlan.reduce((s, p) => s + p.productQty, 0))} {t('analytics.allOrders.plan.pieces')}
+                  </span>
+                </div>
+              </div>
+            )}
+          </GlassCard>
+        </section>
+      )}
+
+      {/* ═══ 6. STOCK PLAN ════════════════════════════════════════ */}
       {productBreakdown.length > 0 && (
         <section>
           <SectionHeader
-            number={4}
+            number={6}
             title={t('analytics.allOrders.section.stockPlan')}
             hint={t('analytics.allOrders.section.stockPlanHint', { days: data?.windowDays ?? 30 })}
             right={
@@ -992,9 +1173,7 @@ export function AllOrdersTab() {
               </CRMButton>
             }
           />
-
           <GlassCard className="p-4">
-            {/* Toolbar: search + risk filter + targetDays slider */}
             <div className="mb-3 flex flex-wrap items-center gap-3">
               <div className="relative flex-1 min-w-[180px]">
                 <SearchIcon
@@ -1010,24 +1189,22 @@ export function AllOrdersTab() {
                 />
               </div>
               <div className="flex items-center gap-1 rounded-btn bg-gray-100 p-0.5 text-[10px]">
-                {(['all', 'imminent', 'low', 'healthy', 'overstock', 'stale'] as const).map(
-                  (r) => (
-                    <button
-                      key={r}
-                      onClick={() => setStockPlanRiskFilter(r)}
-                      className={cn(
-                        'rounded-sm px-2 py-1 font-semibold uppercase transition-all',
-                        stockPlanRiskFilter === r
-                          ? 'bg-white text-gray-900 shadow-sm'
-                          : 'text-gray-500 hover:text-gray-700',
-                      )}
-                    >
-                      {r === 'all'
-                        ? t('analytics.allOrders.stockSuggest.allRisks')
-                        : t(`analytics.allOrders.risk.${r}`)}
-                    </button>
-                  ),
-                )}
+                {(['all', 'imminent', 'low', 'healthy', 'overstock', 'stale'] as const).map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => setStockPlanRiskFilter(r)}
+                    className={cn(
+                      'rounded-sm px-2 py-1 font-semibold uppercase transition-all',
+                      stockPlanRiskFilter === r
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-500 hover:text-gray-700',
+                    )}
+                  >
+                    {r === 'all'
+                      ? t('analytics.allOrders.stockSuggest.allRisks')
+                      : t(`analytics.allOrders.risk.${r}`)}
+                  </button>
+                ))}
               </div>
               <div className="ml-auto flex items-center gap-2 text-xs">
                 <label className="text-gray-500" htmlFor="targetDays">
@@ -1048,8 +1225,6 @@ export function AllOrdersTab() {
                 </span>
               </div>
             </div>
-
-            {/* Per-product cards */}
             {stockPlanProducts.length === 0 ? (
               <p className="text-center text-xs text-gray-400">
                 {t('analytics.allOrders.stockSuggest.empty')}
@@ -1073,3 +1248,4 @@ export function AllOrdersTab() {
     </div>
   );
 }
+

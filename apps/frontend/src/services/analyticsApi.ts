@@ -295,6 +295,19 @@ export interface AllOrdersProductBreakdownRow {
   variants: AllOrdersVariantStat[];
 }
 
+export interface AllOrdersCityRow {
+  city: string;
+  orders: number;
+  confirmed: number;
+  delivered: number;
+  confirmationRate: number;
+}
+
+export interface AllOrdersDuplicates {
+  count: number;
+  pct: number;
+}
+
 export interface AllOrdersTabPayload {
   kpis: AllOrdersKPIs;
   sources: AllOrdersSourceRow[];
@@ -305,6 +318,11 @@ export interface AllOrdersTabPayload {
     targetDays: number;
     variants: AllOrdersVariantStat[];
   };
+  bestCities: AllOrdersCityRow[];
+  duplicates: AllOrdersDuplicates;
+  totalRevenue: number;
+  avgOrderValue: number;
+  bestProduct: { productId: string; productName: string; orders: number } | null;
   windowDays: number;
 }
 
