@@ -10,7 +10,14 @@ import { ordersApi, supportApi, customersApi, type ClientListItem } from '@/serv
 import { useDebounce } from '@/hooks/useDebounce';
 import { useClickOutside } from '@/hooks/useClickOutside';
 import { cn } from '@/lib/cn';
-import type { Product, ShippingCity } from '@/types/orders';
+import { SOURCE_OPTIONS } from '@/constants/statusColors';
+import type { Product, ShippingCity, OrderSource } from '@/types/orders';
+
+// YouCan orders are imported via OAuth — they can never be CREATED
+// manually, so the create modal hides 'youcan' from the source dropdown.
+// (Source is fixed to 'youcan' on those orders by the import service and
+// locked in the edit modal.)
+const MANUAL_SOURCE_OPTIONS = SOURCE_OPTIONS.filter((s) => s.value !== 'youcan');
 
 interface Props {
   open: boolean;
@@ -137,6 +144,10 @@ export function OrderCreateModal({ open, onClose, onCreated }: Props) {
   const [discountType, setDiscountType] = useState<'' | 'fixed' | 'percentage'>('');
   const [discountAmount, setDiscountAmount] = useState('');
   const [confirmationNote, setConfirmationNote] = useState('');
+  // Source defaults to manual (most common for hand-entered orders). YouCan
+  // is filtered out of the picker because YouCan orders only enter the CRM
+  // via the OAuth import path — never manually.
+  const [source, setSource] = useState<OrderSource>('manual');
 
   // Load supporting data each time modal opens; reset form state
   useEffect(() => {
@@ -153,6 +164,7 @@ export function OrderCreateModal({ open, onClose, onCreated }: Props) {
     setDiscountType('');
     setDiscountAmount('');
     setConfirmationNote('');
+    setSource('manual');
 
     setLoadingData(true);
     Promise.all([supportApi.products(), supportApi.shippingCities()])
@@ -245,7 +257,7 @@ export function OrderCreateModal({ open, onClose, onCreated }: Props) {
     setError(null);
     try {
       await ordersApi.create({
-        source: 'manual',
+        source,
         ...(selectedCustomerId
           ? { customerId: selectedCustomerId }
           : {
@@ -450,6 +462,14 @@ export function OrderCreateModal({ open, onClose, onCreated }: Props) {
                   if (selectedCustomerId) setSelectedCustomerId(null);
                 }}
                 placeholder={t('orders.create.addressPlaceholder')}
+              />
+
+              <CRMSelect
+                label={t('orders.create.source')}
+                options={MANUAL_SOURCE_OPTIONS}
+                value={source}
+                onChange={(v) => setSource((typeof v === 'string' ? v : v[0]) as OrderSource)}
+                placeholder={t('orders.create.sourcePlaceholder')}
               />
             </div>
           </section>

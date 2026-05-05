@@ -510,6 +510,8 @@
       "cityNotInShipping": "⚠ Ville hors liste de livraison",
       "cityWithPrice": "{{name}} ({{price}} MAD)",
       "addressPlaceholder": "Rue, immeuble, etc. (facultatif)",
+      "source": "Source de la commande",
+      "sourcePlaceholder": "D’où vient cette commande ?",
       "noActiveProducts": "Aucun produit actif. Créez d'abord un produit avant d'ajouter des commandes manuelles.",
       "productLabel": "Produit",
       "itemCount_one": "{{count}} article",
