@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScanLine, Package, Keyboard, AlertTriangle, MapPin, User as UserIcon, Hash } from 'lucide-react';
+import { ScanLine, Package, AlertTriangle, MapPin, User as UserIcon, Hash, QrCode } from 'lucide-react';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { useToastStore } from '@/store/toastStore';
 import { ordersApi } from '@/services/ordersApi';
@@ -11,6 +11,29 @@ import type { Order } from '@/types/orders';
 
 const READER_ID = 'pickup-qr-reader';
 const DEDUPE_MS = 1500;
+
+// Best-effort mapping of free-text variant colors → CSS swatch.
+// Covers the colors the catalog actually uses; falls back to neutral gray.
+const COLOR_MAP: Record<string, string> = {
+  noir: '#111827', black: '#111827',
+  blanc: '#f8fafc', white: '#f8fafc', cassé: '#f5f5dc', cassée: '#f5f5dc',
+  gris: '#9ca3af', grey: '#9ca3af', gray: '#9ca3af',
+  beige: '#d6c4a8', sable: '#d6c4a8',
+  rouge: '#dc2626', red: '#dc2626',
+  bleu: '#2563eb', blue: '#2563eb', marine: '#1e3a8a', navy: '#1e3a8a',
+  vert: '#16a34a', green: '#16a34a',
+  rose: '#ec4899', pink: '#ec4899',
+  jaune: '#facc15', yellow: '#facc15',
+  marron: '#78350f', brown: '#78350f',
+  violet: '#7c3aed', purple: '#7c3aed',
+  orange: '#f97316',
+};
+
+function cssColorFor(name: string | null | undefined): string {
+  if (!name) return '#9ca3af';
+  const key = name.trim().toLowerCase();
+  return COLOR_MAP[key] || COLOR_MAP[key.split(/\s+/)[0]] || '#9ca3af';
+}
 
 function playBeep(kind: 'success' | 'error') {
   try {
@@ -161,11 +184,6 @@ export default function PickupPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const totalItems = useMemo(
-    () => (order ? order.items.reduce((s, it) => s + it.quantity, 0) : 0),
-    [order],
-  );
-
   const submitManual = () => {
     const v = manual.trim();
     if (v.length === 0) return;
@@ -174,56 +192,61 @@ export default function PickupPage() {
   };
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-4 p-4">
-      {/* Header row: title + small camera tile + manual input — single line */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <h1 className="flex items-center gap-2 text-xl font-bold text-gray-900">
-            <ScanLine size={20} /> {t('pickup.title')}
-          </h1>
-          <p className="text-sm text-gray-500">{t('pickup.subtitle')}</p>
-          <div className="mt-2 flex items-end gap-2">
-            <div className="flex-1">
-              <CRMInput
-                placeholder={t('pickup.trackingPlaceholder')}
-                value={manual}
-                onChange={(e) => setManual(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') submitManual();
-                }}
-                leftIcon={<Keyboard size={14} />}
-              />
-            </div>
-            <CRMButton onClick={submitManual} disabled={manual.trim().length === 0 || busy}>
-              {t('pickup.lookup')}
-            </CRMButton>
-          </div>
-          {cameraErr && (
-            <div className="mt-1 flex items-start gap-2 rounded-card border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-              <span>{cameraErr}</span>
-            </div>
-          )}
-        </div>
+    <div className="mx-auto flex max-w-5xl flex-col gap-4 p-4">
+      <h1 className="flex items-center gap-2 text-xl font-bold text-tone-lavender-500">
+        <ScanLine size={20} /> {t('pickup.title')}
+      </h1>
 
-        {/* Minimized scanner tile */}
-        <div className="relative shrink-0">
-          <div
-            id={READER_ID}
-            className={[
-              'h-32 w-32 overflow-hidden rounded-card border-2 bg-black transition-colors duration-200 sm:h-40 sm:w-40',
-              flash === 'success'
-                ? 'border-emerald-400'
-                : flash === 'error'
-                  ? 'border-rose-400'
-                  : 'border-gray-200',
-            ].join(' ')}
-          />
-          <div className="pointer-events-none absolute inset-x-1 bottom-1 text-center">
-            <span className="rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-medium text-white">
-              {t('pickup.scanLabel')}
-            </span>
+      {/* Stylized scanner panel — readable from across the room */}
+      <div className="rounded-card border border-gray-100 bg-white p-6 shadow-sm">
+        <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:justify-center">
+          <div className="relative shrink-0">
+            <div
+              id={READER_ID}
+              className={[
+                'h-40 w-40 overflow-hidden rounded-card border-4 bg-black transition-colors duration-200',
+                flash === 'success'
+                  ? 'border-emerald-400'
+                  : flash === 'error'
+                    ? 'border-rose-400'
+                    : 'border-gray-200',
+              ].join(' ')}
+            />
+            {cameraErr && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/60">
+                <QrCode size={64} className="text-white/80" />
+              </div>
+            )}
           </div>
+          <div className="flex flex-col items-center sm:items-start">
+            <p className="text-2xl font-bold text-gray-900">{t('pickup.scanQrTitle')}</p>
+            <p className="mt-1 text-sm text-gray-500">{t('pickup.scanQrSubtitle')}</p>
+            {cameraErr && (
+              <div className="mt-3 flex items-start gap-2 rounded-card border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                <span>{cameraErr}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Tracking input — centered */}
+      <div className="flex justify-center">
+        <div className="flex w-full max-w-xl gap-2">
+          <div className="flex-1">
+            <CRMInput
+              placeholder={t('pickup.trackingPlaceholderAlt')}
+              value={manual}
+              onChange={(e) => setManual(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') submitManual();
+              }}
+            />
+          </div>
+          <CRMButton onClick={submitManual} disabled={manual.trim().length === 0 || busy}>
+            {t('pickup.lookup')}
+          </CRMButton>
         </div>
       </div>
 
@@ -235,54 +258,82 @@ export default function PickupPage() {
           <p className="mt-1 text-sm text-gray-500">{t('pickup.emptyHint')}</p>
         </div>
       ) : (
-        <div className="rounded-card border border-gray-100 bg-white shadow-sm">
-          <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 p-4">
-            <span className="inline-flex items-center gap-1 rounded-btn bg-tone-lavender-50 px-2.5 py-1 text-sm font-semibold text-tone-lavender-500">
-              <Hash size={13} /> {order.reference}
-            </span>
-            <span className="inline-flex items-center gap-1.5 text-base font-semibold text-gray-800">
-              <UserIcon size={16} className="text-gray-400" /> {order.customer.fullName}
-            </span>
-            <span className="inline-flex items-center gap-1.5 text-base text-gray-600">
-              <MapPin size={16} className="text-gray-400" /> {order.customer.city}
-            </span>
-            <span className="ml-auto rounded-full bg-tone-lavender-500 px-3 py-1.5 text-sm font-bold text-white">
-              {t('pickup.itemCount', { count: totalItems })}
-            </span>
+        <div className="overflow-hidden rounded-card border border-gray-100 bg-white shadow-sm">
+          {/* Order header — 3 prominent columns */}
+          <div className="grid grid-cols-1 divide-y divide-gray-100 border-b border-gray-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+            <div className="flex flex-col gap-1 p-4">
+              <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                <Hash size={12} /> {t('pickup.orderId')}
+              </span>
+              <span className="text-2xl font-bold text-gray-900">#{order.reference}</span>
+            </div>
+            <div className="flex flex-col gap-1 p-4">
+              <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                <MapPin size={12} /> {t('pickup.pickupLocation')}
+              </span>
+              <span className="text-2xl font-bold uppercase text-gray-900">
+                {order.customer.city}
+              </span>
+            </div>
+            <div className="flex flex-col gap-1 p-4">
+              <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                <UserIcon size={12} /> {t('pickup.customerInfo')}
+              </span>
+              <span className="truncate text-2xl font-bold text-gray-900">
+                {order.customer.fullName}
+              </span>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Items — one big readable row each */}
+          <div className="divide-y divide-gray-100">
             {order.items.map((it) => {
               const photo = resolveImageUrl(it.variant.product.imageUrl);
-              const variantLabel = [it.variant.color, it.variant.size].filter(Boolean).join(' · ');
               return (
                 <div
                   key={it.id}
-                  className="relative flex flex-col overflow-hidden rounded-card border border-gray-100 bg-white shadow-sm"
+                  className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:gap-6 sm:p-6"
                 >
-                  <div className="relative aspect-square w-full overflow-hidden bg-gray-50">
+                  <div className="relative h-56 w-full overflow-hidden rounded-card bg-gray-50 sm:h-64 sm:w-64 sm:shrink-0">
                     {photo ? (
                       <img src={photo} alt="" className="h-full w-full object-cover" />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-gray-300">
-                        <Package size={80} />
+                        <Package size={96} />
                       </div>
                     )}
-                    {it.quantity > 1 && (
-                      <span className="absolute right-3 top-3 rounded-full bg-tone-lavender-500 px-4 py-1.5 text-2xl font-bold text-white shadow-[0_6px_20px_rgba(124,92,255,0.55)]">
-                        ×{it.quantity}
-                      </span>
-                    )}
                   </div>
-                  <div className="flex flex-col gap-2 p-4">
-                    <p className="text-base font-semibold text-gray-900">
+                  <div className="flex min-w-0 flex-1 flex-col gap-3">
+                    <p className="text-3xl font-extrabold leading-tight text-gray-900 sm:text-4xl">
                       {it.variant.product.name}
                     </p>
-                    {variantLabel && (
-                      <span className="inline-flex w-fit items-center rounded-btn bg-gray-100 px-2.5 py-1 text-sm font-medium text-gray-700">
-                        {variantLabel}
-                      </span>
+                    {it.variant.size && (
+                      <p className="text-xl font-bold text-gray-900 sm:text-2xl">
+                        <span className="text-gray-500">{t('pickup.size')}:</span>{' '}
+                        <span>{it.variant.size}</span>
+                      </p>
                     )}
+                    {it.variant.color && (
+                      <p className="flex items-center gap-2 text-xl font-bold text-gray-900 sm:text-2xl">
+                        <span className="text-gray-500">{t('pickup.color')}:</span>
+                        <span
+                          aria-hidden
+                          className="inline-block h-5 w-5 rounded-sm border border-gray-200"
+                          style={{ background: cssColorFor(it.variant.color) }}
+                        />
+                        <span className="uppercase">{it.variant.color}</span>
+                      </p>
+                    )}
+                    <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2">
+                      <p className="text-xl font-bold text-gray-900 sm:text-2xl">
+                        <span className="text-gray-500">{t('pickup.qtyToPick')}:</span>{' '}
+                        <span className="text-tone-lavender-500">{it.quantity}</span>
+                      </p>
+                      <p className="text-xl font-bold text-gray-900 sm:text-2xl">
+                        <span className="text-gray-500">{t('pickup.price')}:</span>{' '}
+                        <span>{it.unitPrice.toLocaleString('fr-MA')} MAD</span>
+                      </p>
+                    </div>
                   </div>
                 </div>
               );
