@@ -262,16 +262,16 @@ export default function PickupPage() {
             </div>
           </div>
 
-          {/* Items — one big readable row each */}
-          <div className="divide-y divide-gray-100">
+          {/* Items — 2 per row on wide screens, 1 per row on mobile */}
+          <div className="grid grid-cols-1 gap-4 p-4 lg:grid-cols-2 lg:gap-5 lg:p-5">
             {order.items.map((it) => {
               const photo = resolveImageUrl(it.variant.product.imageUrl);
               return (
                 <div
                   key={it.id}
-                  className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:gap-6 sm:p-6"
+                  className="flex flex-col overflow-hidden rounded-card border border-gray-100 bg-white shadow-sm"
                 >
-                  <div className="relative h-56 w-full overflow-hidden rounded-card bg-gray-50 sm:h-64 sm:w-64 sm:shrink-0">
+                  <div className="relative aspect-square w-full overflow-hidden bg-gray-50">
                     {photo ? (
                       <img src={photo} alt="" className="h-full w-full object-cover" />
                     ) : (
@@ -280,41 +280,41 @@ export default function PickupPage() {
                       </div>
                     )}
                   </div>
-                  <div className="flex min-w-0 flex-1 flex-col gap-4">
-                    <p className="text-3xl font-extrabold leading-tight text-gray-900 sm:text-4xl">
+                  <div className="flex flex-1 flex-col gap-4 p-4">
+                    <p className="text-2xl font-extrabold leading-tight text-gray-900 sm:text-3xl">
                       {it.variant.product.name}
                     </p>
-                    <table className="w-full max-w-md table-fixed border-collapse overflow-hidden rounded-card border border-gray-200 text-left">
+                    <table className="w-full table-fixed border-collapse overflow-hidden rounded-card border border-gray-200 text-left">
                       <tbody>
                         <tr className="border-b border-gray-200">
-                          <th className="w-1/3 bg-gray-50 px-4 py-3 text-base font-semibold uppercase tracking-wide text-gray-500 sm:text-lg">
+                          <th className="w-2/5 bg-gray-50 px-3 py-2.5 text-sm font-semibold uppercase tracking-wide text-gray-500 sm:text-base">
                             {t('pickup.size')}
                           </th>
-                          <td className="px-4 py-3 text-xl font-bold text-gray-900 sm:text-2xl">
+                          <td className="px-3 py-2.5 text-lg font-bold text-gray-900 sm:text-xl">
                             {it.variant.size || '—'}
                           </td>
                         </tr>
                         <tr className="border-b border-gray-200">
-                          <th className="w-1/3 bg-gray-50 px-4 py-3 text-base font-semibold uppercase tracking-wide text-gray-500 sm:text-lg">
+                          <th className="w-2/5 bg-gray-50 px-3 py-2.5 text-sm font-semibold uppercase tracking-wide text-gray-500 sm:text-base">
                             {t('pickup.color')}
                           </th>
-                          <td className="px-4 py-3 text-xl font-bold uppercase text-gray-900 sm:text-2xl">
+                          <td className="px-3 py-2.5 text-lg font-bold uppercase text-gray-900 sm:text-xl">
                             {it.variant.color || '—'}
                           </td>
                         </tr>
                         <tr className="border-b border-gray-200">
-                          <th className="w-1/3 bg-gray-50 px-4 py-3 text-base font-semibold uppercase tracking-wide text-gray-500 sm:text-lg">
+                          <th className="w-2/5 bg-gray-50 px-3 py-2.5 text-sm font-semibold uppercase tracking-wide text-gray-500 sm:text-base">
                             {t('pickup.qtyToPick')}
                           </th>
-                          <td className="px-4 py-3 text-xl font-bold text-tone-lavender-500 sm:text-2xl">
+                          <td className="px-3 py-2.5 text-lg font-bold text-tone-lavender-500 sm:text-xl">
                             {it.quantity}
                           </td>
                         </tr>
                         <tr>
-                          <th className="w-1/3 bg-gray-50 px-4 py-3 text-base font-semibold uppercase tracking-wide text-gray-500 sm:text-lg">
+                          <th className="w-2/5 bg-gray-50 px-3 py-2.5 text-sm font-semibold uppercase tracking-wide text-gray-500 sm:text-base">
                             {t('pickup.price')}
                           </th>
-                          <td className="px-4 py-3 text-xl font-bold text-gray-900 sm:text-2xl">
+                          <td className="px-3 py-2.5 text-lg font-bold text-gray-900 sm:text-xl">
                             {it.unitPrice.toLocaleString('fr-MA')} MAD
                           </td>
                         </tr>
