@@ -1461,6 +1461,7 @@
     "title": "Scan to Pick Up",
     "subtitle": "Scan a Coliix shipping label to verify exactly what should be inside the parcel before packing.",
     "cameraPlaceholder": "Point your camera at a Coliix label",
+    "scanLabel": "Scan label",
     "cameraDenied": "Camera permission denied. Use manual entry below.",
     "cameraErrorGeneric": "Couldn't start the camera on this device.",
     "manualEntry": "Manual entry:",
