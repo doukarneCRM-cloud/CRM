@@ -163,7 +163,43 @@ export interface CreateShipmentResult {
   trackingCode: string;
 }
 
+// ── Per-order mutex ──────────────────────────────────────────────────────────
+// A double-clicked "Send to Coliix" button (or any race that fires two
+// concurrent POSTs for the same order) used to slip past the re-link
+// guard below: both requests read `order.shipment = null` before either
+// transaction had committed, both then POSTed to Coliix, and Coliix
+// happily created two parcels — the second insert into our `Shipment`
+// table failed silently on the `idempotencyKey` unique constraint, so
+// we'd never notice on our side.
+//
+// Serialize concurrent createShipment calls per orderId in-process: the
+// second caller waits for the first to finish, then re-runs and finds
+// the shipment row already linked → throws ALREADY_LINKED without
+// touching Coliix. Single-instance backend, so an in-memory map is
+// sufficient; a multi-instance deployment would need a distributed lock
+// (e.g. Postgres advisory lock keyed on order id).
+const shipmentLocks = new Map<string, Promise<unknown>>();
+
 export async function createShipment(input: CreateShipmentInput): Promise<CreateShipmentResult> {
+  const inflight = shipmentLocks.get(input.orderId);
+  if (inflight) {
+    // Wait for the in-flight call to settle (success OR failure), then fall
+    // through and re-run normally. The re-link guard will catch us if the
+    // first call linked a shipment.
+    await inflight.catch(() => undefined);
+  }
+  const promise = doCreateShipment(input);
+  shipmentLocks.set(input.orderId, promise);
+  try {
+    return await promise;
+  } finally {
+    if (shipmentLocks.get(input.orderId) === promise) {
+      shipmentLocks.delete(input.orderId);
+    }
+  }
+}
+
+async function doCreateShipment(input: CreateShipmentInput): Promise<CreateShipmentResult> {
   // ── 1. Load order + carrier account ──────────────────────────────────
   const [order, account] = await Promise.all([
     prisma.order.findUnique({

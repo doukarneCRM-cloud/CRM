@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { UserPlus, ArchiveX, X, GitMerge, Plus, Search, Send } from 'lucide-react';
 import { GlobalFilterBar, type FilterChipConfig } from '@/components/ui/GlobalFilterBar';
@@ -164,6 +164,11 @@ export default function OrdersPage() {
   // We let multiple sends fire concurrently — Bull serialises the
   // backend side, the UI just shows which rows are in flight.
   const [sendingIds, setSendingIds] = useState<string[]>([]);
+  // Synchronous mirror of sendingIds for the click handler — React state
+  // updates are async, so a fast double-click can fire two POSTs before
+  // setSendingIds has flushed. The ref lets the handler short-circuit
+  // immediately on the second click.
+  const sendingIdsRef = useRef<Set<string>>(new Set());
   // Latest unresolved Coliix error per orderId. The Send column reads
   // from here to render the red retry-flavoured button + hover tooltip.
   const [coliixErrorByOrder, setColiixErrorByOrder] = useState<Record<string, OrderColiixError>>({});
@@ -359,6 +364,12 @@ export default function OrdersPage() {
   // row patches in place to its new "Sent" badge.
   const handleSendColiix = useCallback(
     async (order: Order) => {
+      // Guard: a rapid double-click used to fire two POSTs to Coliix
+      // before sendingIds had flushed → two parcels created on Coliix's
+      // side. The ref tracks in-flight ids synchronously so the second
+      // click no-ops immediately.
+      if (sendingIdsRef.current.has(order.id)) return;
+      sendingIdsRef.current.add(order.id);
       setSendingIds((prev) => (prev.includes(order.id) ? prev : [...prev, order.id]));
       try {
         const res = await coliixApi.createShipment(order.id);
@@ -378,6 +389,7 @@ export default function OrdersPage() {
           durationMs: 12_000,
         });
       } finally {
+        sendingIdsRef.current.delete(order.id);
         setSendingIds((prev) => prev.filter((id) => id !== order.id));
       }
     },
@@ -416,6 +428,7 @@ export default function OrdersPage() {
     if (selectedIds.length === 0) return;
     if (!window.confirm(t('orders.confirmSendColiix', { count: selectedIds.length }))) return;
     setBulkLoading(true);
+    selectedIds.forEach((id) => sendingIdsRef.current.add(id));
     setSendingIds((prev) => Array.from(new Set([...prev, ...selectedIds])));
     let ok = 0;
     let failed = 0;
@@ -446,6 +459,7 @@ export default function OrdersPage() {
       setSelectedIds([]);
       refresh();
     } finally {
+      selectedIds.forEach((id) => sendingIdsRef.current.delete(id));
       setSendingIds((prev) => prev.filter((id) => !selectedIds.includes(id)));
       setBulkLoading(false);
     }

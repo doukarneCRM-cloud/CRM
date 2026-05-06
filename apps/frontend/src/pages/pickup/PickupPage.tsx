@@ -12,29 +12,6 @@ import type { Order } from '@/types/orders';
 const READER_ID = 'pickup-qr-reader';
 const DEDUPE_MS = 1500;
 
-// Best-effort mapping of free-text variant colors → CSS swatch.
-// Covers the colors the catalog actually uses; falls back to neutral gray.
-const COLOR_MAP: Record<string, string> = {
-  noir: '#111827', black: '#111827',
-  blanc: '#f8fafc', white: '#f8fafc', cassé: '#f5f5dc', cassée: '#f5f5dc',
-  gris: '#9ca3af', grey: '#9ca3af', gray: '#9ca3af',
-  beige: '#d6c4a8', sable: '#d6c4a8',
-  rouge: '#dc2626', red: '#dc2626',
-  bleu: '#2563eb', blue: '#2563eb', marine: '#1e3a8a', navy: '#1e3a8a',
-  vert: '#16a34a', green: '#16a34a',
-  rose: '#ec4899', pink: '#ec4899',
-  jaune: '#facc15', yellow: '#facc15',
-  marron: '#78350f', brown: '#78350f',
-  violet: '#7c3aed', purple: '#7c3aed',
-  orange: '#f97316',
-};
-
-function cssColorFor(name: string | null | undefined): string {
-  if (!name) return '#9ca3af';
-  const key = name.trim().toLowerCase();
-  return COLOR_MAP[key] || COLOR_MAP[key.split(/\s+/)[0]] || '#9ca3af';
-}
-
 function playBeep(kind: 'success' | 'error') {
   try {
     const AudioCtx =
@@ -303,37 +280,46 @@ export default function PickupPage() {
                       </div>
                     )}
                   </div>
-                  <div className="flex min-w-0 flex-1 flex-col gap-3">
+                  <div className="flex min-w-0 flex-1 flex-col gap-4">
                     <p className="text-3xl font-extrabold leading-tight text-gray-900 sm:text-4xl">
                       {it.variant.product.name}
                     </p>
-                    {it.variant.size && (
-                      <p className="text-xl font-bold text-gray-900 sm:text-2xl">
-                        <span className="text-gray-500">{t('pickup.size')}:</span>{' '}
-                        <span>{it.variant.size}</span>
-                      </p>
-                    )}
-                    {it.variant.color && (
-                      <p className="flex items-center gap-2 text-xl font-bold text-gray-900 sm:text-2xl">
-                        <span className="text-gray-500">{t('pickup.color')}:</span>
-                        <span
-                          aria-hidden
-                          className="inline-block h-5 w-5 rounded-sm border border-gray-200"
-                          style={{ background: cssColorFor(it.variant.color) }}
-                        />
-                        <span className="uppercase">{it.variant.color}</span>
-                      </p>
-                    )}
-                    <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2">
-                      <p className="text-xl font-bold text-gray-900 sm:text-2xl">
-                        <span className="text-gray-500">{t('pickup.qtyToPick')}:</span>{' '}
-                        <span className="text-tone-lavender-500">{it.quantity}</span>
-                      </p>
-                      <p className="text-xl font-bold text-gray-900 sm:text-2xl">
-                        <span className="text-gray-500">{t('pickup.price')}:</span>{' '}
-                        <span>{it.unitPrice.toLocaleString('fr-MA')} MAD</span>
-                      </p>
-                    </div>
+                    <table className="w-full max-w-md table-fixed border-collapse overflow-hidden rounded-card border border-gray-200 text-left">
+                      <tbody>
+                        <tr className="border-b border-gray-200">
+                          <th className="w-1/3 bg-gray-50 px-4 py-3 text-base font-semibold uppercase tracking-wide text-gray-500 sm:text-lg">
+                            {t('pickup.size')}
+                          </th>
+                          <td className="px-4 py-3 text-xl font-bold text-gray-900 sm:text-2xl">
+                            {it.variant.size || '—'}
+                          </td>
+                        </tr>
+                        <tr className="border-b border-gray-200">
+                          <th className="w-1/3 bg-gray-50 px-4 py-3 text-base font-semibold uppercase tracking-wide text-gray-500 sm:text-lg">
+                            {t('pickup.color')}
+                          </th>
+                          <td className="px-4 py-3 text-xl font-bold uppercase text-gray-900 sm:text-2xl">
+                            {it.variant.color || '—'}
+                          </td>
+                        </tr>
+                        <tr className="border-b border-gray-200">
+                          <th className="w-1/3 bg-gray-50 px-4 py-3 text-base font-semibold uppercase tracking-wide text-gray-500 sm:text-lg">
+                            {t('pickup.qtyToPick')}
+                          </th>
+                          <td className="px-4 py-3 text-xl font-bold text-tone-lavender-500 sm:text-2xl">
+                            {it.quantity}
+                          </td>
+                        </tr>
+                        <tr>
+                          <th className="w-1/3 bg-gray-50 px-4 py-3 text-base font-semibold uppercase tracking-wide text-gray-500 sm:text-lg">
+                            {t('pickup.price')}
+                          </th>
+                          <td className="px-4 py-3 text-xl font-bold text-gray-900 sm:text-2xl">
+                            {it.unitPrice.toLocaleString('fr-MA')} MAD
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               );
