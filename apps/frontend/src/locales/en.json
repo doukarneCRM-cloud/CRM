@@ -2,6 +2,7 @@
   "nav": {
     "dashboard": "Dashboard",
     "orders": "Orders",
+    "pickup": "Pickup",
     "callCenter": "Call Center",
     "products": "Products",
     "stockMatrix": "Stock Matrix",
@@ -1455,6 +1456,24 @@
         "statusPending": "Pending"
       }
     }
+  },
+  "pickup": {
+    "title": "Scan to Pick Up",
+    "subtitle": "Scan a Coliix shipping label to verify exactly what should be inside the parcel before packing.",
+    "cameraPlaceholder": "Point your camera at a Coliix label",
+    "cameraDenied": "Camera permission denied. Use manual entry below.",
+    "cameraErrorGeneric": "Couldn't start the camera on this device.",
+    "manualEntry": "Manual entry:",
+    "manualHint": "Type the tracking code manually below.",
+    "trackingPlaceholder": "Enter tracking code…",
+    "lookup": "Look up",
+    "emptyTitle": "Waiting for a scan…",
+    "emptyHint": "The order's items will appear here as soon as you scan a label.",
+    "itemCount_one": "{{count}} item",
+    "itemCount_other": "{{count}} items",
+    "lastScan": "Last scan:",
+    "notFound": "Tracking not found: {{code}}",
+    "lookupFailed": "Couldn't look up that tracking code."
   },
   "returns": {
     "title": "Return Verification",

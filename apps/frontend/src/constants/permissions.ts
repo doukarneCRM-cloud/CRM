@@ -17,6 +17,9 @@ export const PERMISSIONS = {
   SHIPPING_PUSH: 'shipping:push',
   SHIPPING_RETURN_VALIDATE: 'shipping:return_validate',
 
+  // Pickup — scan parcel labels to verify contents before packing
+  PICKUP_SCAN: 'pickup:scan',
+
   // Products
   PRODUCTS_VIEW: 'products:view',
   PRODUCTS_CREATE: 'products:create',

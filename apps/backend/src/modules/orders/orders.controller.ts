@@ -62,6 +62,17 @@ export async function showOrder(
   }
 }
 
+export async function showOrderByTracking(
+  request: FastifyRequest<{ Params: { code: string } }>,
+  reply: FastifyReply,
+) {
+  try {
+    return reply.send(await svc.findOrderByTrackingCode(request.params.code));
+  } catch (err) {
+    return replyError(reply, err);
+  }
+}
+
 export async function showOrderLogs(
   request: FastifyRequest<{ Params: { id: string } }>,
   reply: FastifyReply,

@@ -296,6 +296,39 @@ export async function getOrderById(id: string) {
   return withStockWarning(order);
 }
 
+/**
+ * Resolve a Coliix tracking code → linked Order with full payload.
+ *
+ * Used by the Scan to Pick Up flow: stock agent scans the parcel's
+ * shipping label, the CRM looks up the unique Shipment.trackingCode,
+ * and returns the order's items + variant + product details so the
+ * agent can verify what should be inside the parcel before packing.
+ *
+ * Throws 404 if no shipment matches — bad scans (random QR codes,
+ * other vendors' barcodes) hit this path. The frontend handles the
+ * 404 with a soft error beep + toast and keeps the previous order
+ * card visible so the agent doesn't lose state mid-pack.
+ */
+export async function findOrderByTrackingCode(trackingCode: string) {
+  const shipment = await prisma.shipment.findUnique({
+    where: { trackingCode: trackingCode.trim() },
+    select: { orderId: true },
+  });
+  if (!shipment) {
+    throw { statusCode: 404, code: 'NOT_FOUND', message: 'Tracking code not found' };
+  }
+  const order = await prisma.order.findUnique({
+    where: { id: shipment.orderId },
+    include: ORDER_FULL_INCLUDE,
+  });
+  if (!order) {
+    // Shipment row exists but the order has been hard-deleted — treat as not
+    // found so the UI shows the same toast as an unknown QR.
+    throw { statusCode: 404, code: 'NOT_FOUND', message: 'Order not found' };
+  }
+  return withStockWarning(order);
+}
+
 export async function getOrderLogs(orderId: string, includeSystem: boolean) {
   const exists = await prisma.order.findUnique({ where: { id: orderId }, select: { id: true } });
   if (!exists) throw { statusCode: 404, code: 'NOT_FOUND', message: 'Order not found' };

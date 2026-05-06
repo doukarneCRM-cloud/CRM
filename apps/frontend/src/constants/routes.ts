@@ -34,6 +34,9 @@ export const ROUTES = {
   RETURNS: '/returns',
   RETURNS_PHONE_SCAN: '/returns/phone-scan',
 
+  // Pickup (scan-to-verify before packing)
+  PICKUP: '/pickup',
+
   // Integrations
   INTEGRATIONS_STORE: '/integrations/store',
   INTEGRATIONS_STORE_CALLBACK: '/integrations/store/callback',

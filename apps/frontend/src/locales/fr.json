@@ -2,6 +2,7 @@
   "nav": {
     "dashboard": "Tableau de bord",
     "orders": "Commandes",
+    "pickup": "Préparation",
     "callCenter": "Centre d'appels",
     "products": "Produits",
     "stockMatrix": "Stock",
@@ -1455,6 +1456,24 @@
         "statusPending": "En attente"
       }
     }
+  },
+  "pickup": {
+    "title": "Scanner pour préparer",
+    "subtitle": "Scannez une étiquette Coliix pour vérifier exactement ce que doit contenir le colis avant l’emballage.",
+    "cameraPlaceholder": "Pointez la caméra vers une étiquette Coliix",
+    "cameraDenied": "Accès à la caméra refusé. Utilisez la saisie manuelle ci-dessous.",
+    "cameraErrorGeneric": "Impossible de démarrer la caméra sur cet appareil.",
+    "manualEntry": "Saisie manuelle :",
+    "manualHint": "Saisissez le code de suivi manuellement ci-dessous.",
+    "trackingPlaceholder": "Saisir le code de suivi…",
+    "lookup": "Rechercher",
+    "emptyTitle": "En attente d’un scan…",
+    "emptyHint": "Les articles de la commande s’afficheront ici dès que vous scannerez une étiquette.",
+    "itemCount_one": "{{count}} article",
+    "itemCount_other": "{{count}} articles",
+    "lastScan": "Dernier scan :",
+    "notFound": "Suivi introuvable : {{code}}",
+    "lookupFailed": "Impossible de rechercher ce code de suivi."
   },
   "returns": {
     "title": "Vérification des retours",

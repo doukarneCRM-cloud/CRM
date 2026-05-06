@@ -17,6 +17,7 @@ const CANONICAL_PERMISSIONS: Array<{ key: string; label: string }> = [
   { key: 'shipping:view', label: 'View Shipping' },
   { key: 'shipping:push', label: 'Push to Shipping' },
   { key: 'shipping:return_validate', label: 'Validate Return' },
+  { key: 'pickup:scan', label: 'Scan to Pick Up (verify parcel contents before packing)' },
   { key: 'products:view', label: 'View Products' },
   { key: 'products:create', label: 'Create Products' },
   { key: 'products:edit', label: 'Edit Products' },

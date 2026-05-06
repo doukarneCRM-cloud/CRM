@@ -31,6 +31,18 @@ export async function ordersRoutes(app: FastifyInstance) {
     ctrl.mergeOrders,
   );
 
+  // ── GET /api/v1/orders/by-tracking/:code — MUST be before /:id ─────────
+  // Resolves a Coliix tracking code to the linked Order. Powers the
+  // Scan to Pick Up flow: stock agents scan the shipping label QR and
+  // get a full payload (items + variants + photos) so they can verify
+  // the parcel contents before packing. Permission isolated from
+  // orders:view so a stock agent can do nothing else with order data.
+  app.get<{ Params: { code: string } }>(
+    '/by-tracking/:code',
+    { preHandler: [verifyJWT, requirePermission('pickup:scan')] },
+    ctrl.showOrderByTracking,
+  );
+
   // ── GET /api/v1/orders/:id ──────────────────────────────────────────────
   app.get<WithId>('/:id', { preHandler: [verifyJWT, requireAnyPermission('orders:view', 'call_center:view')] }, ctrl.showOrder);
 

@@ -26,6 +26,7 @@ import BroadcastsPage from '@/pages/team/BroadcastsPage';
 import AnalyticsPage from '@/pages/analytics/AnalyticsPage';
 import MoneyPage from '@/pages/money/MoneyPage';
 import ReturnsPage from '@/pages/returns/ReturnsPage';
+import PickupPage from '@/pages/pickup/PickupPage';
 import PhoneScanPage from '@/pages/returns/PhoneScanPage';
 import IntegrationsPage from '@/pages/integrations/IntegrationsPage';
 import OAuthCallbackPage from '@/pages/integrations/OAuthCallbackPage';
@@ -179,6 +180,15 @@ export default function App() {
             element={
               <PermissionGuard requires={PERMISSIONS.RETURNS_VERIFY}>
                 <ReturnsPage />
+              </PermissionGuard>
+            }
+          />
+
+          <Route
+            path={ROUTES.PICKUP}
+            element={
+              <PermissionGuard requires={PERMISSIONS.PICKUP_SCAN}>
+                <PickupPage />
               </PermissionGuard>
             }
           />

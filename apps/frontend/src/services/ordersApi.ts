@@ -23,6 +23,14 @@ export const ordersApi = {
   getById: (id: string) =>
     api.get<Order>(`/orders/${id}`).then((r) => r.data),
 
+  // Resolve a Coliix tracking code to its linked order with full
+  // payload (items + variant + product + customer). Powers the
+  // Scan to Pick Up flow — gated by `pickup:scan` server-side.
+  byTracking: (code: string) =>
+    api
+      .get<Order>(`/orders/by-tracking/${encodeURIComponent(code.trim())}`)
+      .then((r) => r.data),
+
   getLogs: (id: string) =>
     api.get<{ data: OrderLog[] }>(`/orders/${id}/logs`).then((r) => r.data.data),
 

@@ -16,6 +16,7 @@ const ALL_PERMISSIONS = [
   { key: 'shipping:view', label: 'View Shipping' },
   { key: 'shipping:push', label: 'Push to Shipping' },
   { key: 'shipping:return_validate', label: 'Validate Return' },
+  { key: 'pickup:scan', label: 'Scan to Pick Up (verify parcel contents before packing)' },
   { key: 'products:view', label: 'View Products' },
   { key: 'products:create', label: 'Create Products' },
   { key: 'products:edit', label: 'Edit Products' },
@@ -78,6 +79,7 @@ const ROLE_PERMISSION_MAP: Record<string, string[]> = {
   shipping: [
     'shipping:view', 'shipping:push', 'shipping:return_validate',
     'orders:view', 'products:view', 'returns:verify',
+    'pickup:scan',
   ],
   atelie: [
     'atelie:view',

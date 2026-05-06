@@ -15,6 +15,7 @@ import {
   PackageSearch,
   Scissors,
   MessageCircle,
+  ScanLine,
   ChevronLeft,
   LogOut,
   X,
@@ -50,6 +51,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { labelKey: 'nav.dashboard', icon: LayoutDashboard, to: ROUTES.DASHBOARD, permission: PERMISSIONS.DASHBOARD_VIEW },
       { labelKey: 'nav.orders', icon: Package, to: ROUTES.ORDERS, permission: PERMISSIONS.ORDERS_VIEW },
+      { labelKey: 'nav.pickup', icon: ScanLine, to: ROUTES.PICKUP, permission: PERMISSIONS.PICKUP_SCAN },
       { labelKey: 'nav.callCenter', icon: Phone, to: ROUTES.CALL_CENTER, permission: PERMISSIONS.CALL_CENTER_VIEW },
       { labelKey: 'nav.products', icon: ShoppingBag, to: ROUTES.PRODUCTS_LIST, permission: PERMISSIONS.PRODUCTS_VIEW },
       { labelKey: 'nav.clients', icon: Users, to: ROUTES.CLIENTS, permission: PERMISSIONS.CLIENTS_VIEW },
