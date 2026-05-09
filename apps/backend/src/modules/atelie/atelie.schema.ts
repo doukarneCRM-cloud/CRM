@@ -30,6 +30,7 @@ export type PaySalaryInput = z.infer<typeof PaySalarySchema>;
 export const UpdateSalaryExtrasSchema = z.object({
   commission: z.number().nonnegative().max(1_000_000).optional(),
   supplementHours: z.number().nonnegative().max(200).optional(),
+  supplementHourRate: z.number().nonnegative().max(10_000).optional(),
   notes: z.string().max(500).nullable().optional(),
 });
 export type UpdateSalaryExtrasInput = z.infer<typeof UpdateSalaryExtrasSchema>;

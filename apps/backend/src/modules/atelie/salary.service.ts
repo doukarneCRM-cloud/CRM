@@ -46,6 +46,7 @@ export async function listWeekSalaries(weekStartISO: string) {
       notes: s.notes,
       commission: Number(s.commission),
       supplementHours: Number(s.supplementHours),
+      supplementHourRate: Number(s.supplementHourRate),
       daysWorked,
     };
   });
@@ -78,6 +79,7 @@ export async function updateSalaryExtras(id: string, input: UpdateSalaryExtrasIn
     data: {
       ...(input.commission !== undefined ? { commission: input.commission } : {}),
       ...(input.supplementHours !== undefined ? { supplementHours: input.supplementHours } : {}),
+      ...(input.supplementHourRate !== undefined ? { supplementHourRate: input.supplementHourRate } : {}),
       ...(input.notes !== undefined ? { notes: input.notes } : {}),
     },
   });

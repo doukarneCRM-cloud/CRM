@@ -34,9 +34,17 @@ export function printSalaryLabel(
       return c;
     });
 
-  const total = row.amount + (row.commission || 0);
+  const supplementHours = row.supplementHours || 0;
+  const supplementHourRate = row.supplementHourRate || 0;
+  const supplementPay = supplementHours * supplementHourRate;
+  const total = row.amount + (row.commission || 0) + supplementPay;
   const week = formatWeekRange(weekStartISO);
   const note = row.notes && row.notes.trim().length > 0 ? row.notes.trim() : '';
+
+  const supplementCell =
+    supplementHourRate > 0 && supplementHours > 0
+      ? `${supplementHours} × ${supplementHourRate.toFixed(0)} = ${supplementPay.toFixed(0)} MAD`
+      : `${supplementHours}`;
 
   const html = `<!doctype html>
 <html lang="en">
@@ -138,7 +146,7 @@ export function printSalaryLabel(
       </tr>
       <tr>
         <th>${escape(t('atelie.salary.supplementHours'))}</th>
-        <td>${row.supplementHours || 0}</td>
+        <td>${escape(supplementCell)}</td>
       </tr>
       <tr class="total">
         <th>${escape(t('atelie.salary.totalDue'))}</th>

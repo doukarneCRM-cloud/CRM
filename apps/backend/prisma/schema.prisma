@@ -520,11 +520,13 @@ model SalaryPayment {
   paidById   String?
   notes      String?
   // Pay-envelope extras: commission added on top of the computed amount,
-  // optional supplement hours worked beyond the regular schedule. Both are
-  // edited via the (+) button on the salary row and printed onto the
-  // 100×100mm label that gets stuck to the envelope.
-  commission       Decimal @default(0) @db.Decimal(12, 2)
-  supplementHours  Float   @default(0)
+  // optional supplement hours worked beyond the regular schedule, and the
+  // MAD rate paid per supplement hour (so the label can print
+  // `4h × 50 MAD = 200 MAD`). Edited via the (+) button on the salary
+  // row and printed onto the 100×100mm envelope label.
+  commission         Decimal @default(0) @db.Decimal(12, 2)
+  supplementHours    Float   @default(0)
+  supplementHourRate Decimal @default(0) @db.Decimal(12, 2)
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 

@@ -83,6 +83,8 @@ export interface SalaryRow {
   commission: number;
   /** Supplement hours worked beyond the regular schedule. */
   supplementHours: number;
+  /** MAD paid per supplement hour. Total supplement pay = hours × rate. */
+  supplementHourRate: number;
   /** Days worked this week (full=1, half=0.5) — pulled from WeeklyAttendance. */
   daysWorked: number;
   employee: { id: string; name: string; role: string };
@@ -92,6 +94,7 @@ export interface SalaryRow {
 export interface UpdateSalaryExtrasPayload {
   commission?: number;
   supplementHours?: number;
+  supplementHourRate?: number;
   notes?: string | null;
 }
 

@@ -25,8 +25,14 @@ function normalizeRow(r: SalaryRow): SalaryRow {
     paidAmount: num(r.paidAmount),
     commission: num(r.commission),
     supplementHours: num(r.supplementHours),
+    supplementHourRate: num(r.supplementHourRate),
     daysWorked: num(r.daysWorked),
   };
+}
+
+/** Pay total = base salary + commission + (supplement hours × rate). */
+function rowTotal(r: SalaryRow): number {
+  return r.amount + r.commission + r.supplementHours * r.supplementHourRate;
 }
 
 export function SalaryTab() {
@@ -63,9 +69,10 @@ export function SalaryTab() {
 
   const totals = rows.reduce(
     (acc, r) => {
-      acc.earned += r.amount + r.commission;
+      const total = rowTotal(r);
+      acc.earned += total;
       if (r.isPaid) acc.paid += r.paidAmount || r.amount;
-      else acc.unpaid += r.amount + r.commission;
+      else acc.unpaid += total;
       return acc;
     },
     { earned: 0, paid: 0, unpaid: 0 },
@@ -152,20 +159,23 @@ export function SalaryTab() {
               </tr>
             )}
             {rows.map((r) => {
+              const supplementPay = r.supplementHours * r.supplementHourRate;
               const hasExtras =
                 r.commission > 0 ||
                 r.supplementHours > 0 ||
+                supplementPay > 0 ||
                 (r.notes && r.notes.trim().length > 0);
-              const total = r.amount + r.commission;
+              const extrasTotal = r.commission + supplementPay;
+              const total = r.amount + extrasTotal;
               return (
                 <tr key={r.id} className="border-t border-gray-100">
                   <td className="px-4 py-2.5 font-medium text-gray-900">{r.employee.name}</td>
                   <td className="px-3 py-2.5 capitalize text-gray-500">{r.employee.role}</td>
                   <td className="px-3 py-2.5 text-right font-semibold text-gray-900">
                     {total.toFixed(0)} MAD
-                    {r.commission > 0 && (
+                    {extrasTotal > 0 && (
                       <span className="ml-1 text-[10px] font-normal text-tone-lavender-500">
-                        +{r.commission.toFixed(0)}
+                        +{extrasTotal.toFixed(0)}
                       </span>
                     )}
                   </td>
@@ -294,7 +304,7 @@ function IconButton({
 
 function PayModal({ row, onClose, onSaved }: { row: SalaryRow; onClose: () => void; onSaved: () => void }) {
   const { t } = useTranslation();
-  const total = row.amount + (row.commission || 0);
+  const total = rowTotal(row);
   const [paidAmount, setPaidAmount] = useState<number>(total);
   const [notes, setNotes] = useState(row.notes ?? '');
   const [saving, setSaving] = useState(false);
@@ -359,8 +369,12 @@ function ExtrasModal({
   const { t } = useTranslation();
   const [commission, setCommission] = useState<number>(row.commission || 0);
   const [supplementHours, setSupplementHours] = useState<number>(row.supplementHours || 0);
+  const [supplementHourRate, setSupplementHourRate] = useState<number>(row.supplementHourRate || 0);
   const [notes, setNotes] = useState(row.notes ?? '');
   const [saving, setSaving] = useState(false);
+
+  const supplementPay = supplementHours * supplementHourRate;
+  const newTotal = row.amount + commission + supplementPay;
 
   async function save() {
     setSaving(true);
@@ -368,6 +382,7 @@ function ExtrasModal({
       await atelieApi.updateSalaryExtras(row.id, {
         commission,
         supplementHours,
+        supplementHourRate,
         notes: notes.trim() ? notes.trim() : null,
       });
       onSaved();
@@ -404,21 +419,47 @@ function ExtrasModal({
           onChange={(e) => setCommission(Number(e.target.value) || 0)}
           hint={t('atelie.salary.commissionHint')}
         />
-        <CRMInput
-          label={t('atelie.salary.supplementHours')}
-          type="number"
-          min={0}
-          step={0.5}
-          value={supplementHours}
-          onChange={(e) => setSupplementHours(Number(e.target.value) || 0)}
-          hint={t('atelie.salary.supplementHoursHint')}
-        />
+        <div className="grid grid-cols-2 gap-2">
+          <CRMInput
+            label={t('atelie.salary.supplementHours')}
+            type="number"
+            min={0}
+            step={0.5}
+            value={supplementHours}
+            onChange={(e) => setSupplementHours(Number(e.target.value) || 0)}
+            hint={t('atelie.salary.supplementHoursHint')}
+          />
+          <CRMInput
+            label={t('atelie.salary.supplementHourRate')}
+            type="number"
+            min={0}
+            step={5}
+            value={supplementHourRate}
+            onChange={(e) => setSupplementHourRate(Number(e.target.value) || 0)}
+            hint={t('atelie.salary.supplementHourRateHint')}
+          />
+        </div>
+        {supplementPay > 0 && (
+          <div className="rounded-card border border-tone-lavender-200 bg-tone-lavender-50 px-3 py-2 text-xs text-tone-lavender-700">
+            {t('atelie.salary.supplementPayLine', {
+              hours: supplementHours,
+              rate: supplementHourRate.toFixed(0),
+              pay: supplementPay.toFixed(0),
+            })}
+          </div>
+        )}
         <CRMInput
           label={t('atelie.salary.note')}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           hint={t('atelie.salary.noteHint')}
         />
+        <div className="mt-1 flex items-center justify-between rounded-card bg-gray-50 px-3 py-2 text-sm">
+          <span className="font-semibold uppercase tracking-wide text-gray-500">
+            {t('atelie.salary.totalDue')}
+          </span>
+          <span className="text-base font-bold text-gray-900">{newTotal.toFixed(0)} MAD</span>
+        </div>
       </div>
     </GlassModal>
   );
@@ -426,10 +467,12 @@ function ExtrasModal({
 
 function ViewExtrasModal({ row, onClose }: { row: SalaryRow; onClose: () => void }) {
   const { t } = useTranslation();
-  const total = row.amount + (row.commission || 0);
+  const supplementPay = row.supplementHours * row.supplementHourRate;
+  const total = rowTotal(row);
   const empty =
-    (!row.commission || row.commission === 0) &&
-    (!row.supplementHours || row.supplementHours === 0) &&
+    row.commission === 0 &&
+    row.supplementHours === 0 &&
+    supplementPay === 0 &&
     (!row.notes || row.notes.trim().length === 0);
 
   return (
@@ -455,11 +498,15 @@ function ViewExtrasModal({ row, onClose }: { row: SalaryRow; onClose: () => void
             <Row label={t('atelie.salary.baseAmount')} value={`${row.amount.toFixed(0)} MAD`} />
             <Row
               label={t('atelie.salary.commission')}
-              value={`${(row.commission || 0).toFixed(0)} MAD`}
+              value={`${row.commission.toFixed(0)} MAD`}
             />
             <Row
               label={t('atelie.salary.supplementHours')}
-              value={`${row.supplementHours || 0}`}
+              value={
+                row.supplementHourRate > 0 && row.supplementHours > 0
+                  ? `${row.supplementHours} × ${row.supplementHourRate.toFixed(0)} = ${supplementPay.toFixed(0)} MAD`
+                  : `${row.supplementHours}`
+              }
             />
             <Row
               label={t('atelie.salary.totalDue')}
