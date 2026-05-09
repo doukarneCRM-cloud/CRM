@@ -30,19 +30,22 @@ export async function listWeekSalaries(weekStartISO: string) {
   return salaries.map((s) => {
     const att = attMap.get(s.employeeId);
     const daysWorked = att ? computeDaysWorked(att.daysMask, att.halfDaysMask) : 0;
+    // Prisma's Decimal type serializes to string in JSON. Coerce to number
+    // here so the frontend can do arithmetic without a Number() boundary
+    // wrapper everywhere.
     return {
       id: s.id,
       employeeId: s.employeeId,
       employee: s.employee,
       weekStart: s.weekStart.toISOString(),
-      amount: s.amount,
-      paidAmount: s.paidAmount,
+      amount: Number(s.amount),
+      paidAmount: Number(s.paidAmount),
       isPaid: s.isPaid,
       paidAt: s.paidAt?.toISOString() ?? null,
       paidBy: s.paidBy,
       notes: s.notes,
-      commission: s.commission,
-      supplementHours: s.supplementHours,
+      commission: Number(s.commission),
+      supplementHours: Number(s.supplementHours),
       daysWorked,
     };
   });

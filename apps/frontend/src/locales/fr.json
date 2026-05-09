@@ -2302,6 +2302,8 @@
       "extrasTitle": "Extras pour {{name}}",
       "viewTitle": "Détail du paiement — {{name}}",
       "noExtras": "Aucun extra pour le moment.",
+      "loadFailed": "Impossible de charger la paie de cette semaine.",
+      "loadFailedHint": "Si la base de données n’a pas encore été migrée, lancez `prisma migrate deploy` puis rafraîchissez.",
       "commission": "Commission",
       "commissionHint": "MAD ajoutés au montant hebdomadaire.",
       "supplementHours": "Heures sup.",

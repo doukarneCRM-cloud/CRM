@@ -1,25 +1,57 @@
 import { useEffect, useState, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Check, RotateCcw, Plus, Eye, Printer } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, RotateCcw, Plus, Eye, Printer, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { GlassCard, CRMButton, GlassModal, CRMInput } from '@/components/ui';
 import { atelieApi, type SalaryRow } from '@/services/atelieApi';
 import { mondayOfWeekUTC, addWeeks, formatWeekRange } from '../utils/weekMath';
 import { printSalaryLabel } from '../utils/printSalaryLabel';
 
+// Prisma Decimal columns serialize to string in JSON responses. Coerce
+// every numeric field at the boundary so downstream `.toFixed()`,
+// arithmetic, and totals can't trip over a stray "500.00" string.
+function num(v: unknown): number {
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  if (typeof v === 'string') {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
+function normalizeRow(r: SalaryRow): SalaryRow {
+  return {
+    ...r,
+    amount: num(r.amount),
+    paidAmount: num(r.paidAmount),
+    commission: num(r.commission),
+    supplementHours: num(r.supplementHours),
+    daysWorked: num(r.daysWorked),
+  };
+}
+
 export function SalaryTab() {
   const { t } = useTranslation();
   const [weekStart, setWeekStart] = useState<Date>(() => mondayOfWeekUTC());
   const [rows, setRows] = useState<SalaryRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [paying, setPaying] = useState<SalaryRow | null>(null);
   const [editingExtras, setEditingExtras] = useState<SalaryRow | null>(null);
   const [viewingExtras, setViewingExtras] = useState<SalaryRow | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await atelieApi.listWeekSalaries(weekStart.toISOString());
-      setRows(res.data);
+      setRows((res.data ?? []).map(normalizeRow));
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { error?: { message?: string } }; status?: number } };
+      const msg =
+        err?.response?.data?.error?.message ||
+        (err?.response?.status ? `HTTP ${err.response.status}` : 'Failed to load salaries');
+      setLoadError(msg);
+      setRows([]);
     } finally {
       setLoading(false);
     }
@@ -31,9 +63,9 @@ export function SalaryTab() {
 
   const totals = rows.reduce(
     (acc, r) => {
-      acc.earned += r.amount + (r.commission || 0);
+      acc.earned += r.amount + r.commission;
       if (r.isPaid) acc.paid += r.paidAmount || r.amount;
-      else acc.unpaid += r.amount + (r.commission || 0);
+      else acc.unpaid += r.amount + r.commission;
       return acc;
     },
     { earned: 0, paid: 0, unpaid: 0 },
@@ -78,6 +110,19 @@ export function SalaryTab() {
         </div>
       </div>
 
+      {loadError && (
+        <div className="flex items-start gap-2 rounded-card border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+          <div>
+            <p className="font-semibold">{t('atelie.salary.loadFailed')}</p>
+            <p className="text-xs text-amber-700">{loadError}</p>
+            <p className="mt-1 text-xs text-amber-700">
+              {t('atelie.salary.loadFailedHint')}
+            </p>
+          </div>
+        </div>
+      )}
+
       <GlassCard padding="none" className="overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50/70 text-xs text-gray-500">
@@ -108,10 +153,10 @@ export function SalaryTab() {
             )}
             {rows.map((r) => {
               const hasExtras =
-                (r.commission && r.commission > 0) ||
-                (r.supplementHours && r.supplementHours > 0) ||
+                r.commission > 0 ||
+                r.supplementHours > 0 ||
                 (r.notes && r.notes.trim().length > 0);
-              const total = r.amount + (r.commission || 0);
+              const total = r.amount + r.commission;
               return (
                 <tr key={r.id} className="border-t border-gray-100">
                   <td className="px-4 py-2.5 font-medium text-gray-900">{r.employee.name}</td>

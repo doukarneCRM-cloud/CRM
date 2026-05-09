@@ -2302,6 +2302,8 @@
       "extrasTitle": "Extras for {{name}}",
       "viewTitle": "Pay details — {{name}}",
       "noExtras": "No extras yet.",
+      "loadFailed": "Couldn't load this week's payroll.",
+      "loadFailedHint": "If your database hasn't been migrated yet, run `prisma migrate deploy` and refresh.",
       "commission": "Commission",
       "commissionHint": "Extra MAD added on top of the weekly amount.",
       "supplementHours": "Supplement hours",
