@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { GlassCard, CRMButton, GlassModal, CRMInput } from '@/components/ui';
 import { atelieApi, type SalaryRow } from '@/services/atelieApi';
 import { mondayOfWeekUTC, addWeeks, formatWeekRange } from '../utils/weekMath';
-import { printSalaryLabel } from '../utils/printSalaryLabel';
+import { printSalaryLabel, printAllSalaryLabels } from '../utils/printSalaryLabel';
 
 // Prisma Decimal columns serialize to string in JSON responses. Coerce
 // every numeric field at the boundary so downstream `.toFixed()`,
@@ -44,6 +44,7 @@ export function SalaryTab() {
   const [paying, setPaying] = useState<SalaryRow | null>(null);
   const [editingExtras, setEditingExtras] = useState<SalaryRow | null>(null);
   const [viewingExtras, setViewingExtras] = useState<SalaryRow | null>(null);
+  const [viewingAll, setViewingAll] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -110,10 +111,30 @@ export function SalaryTab() {
           </CRMButton>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <Pill label={t('atelie.salary.pillEarned')} value={totals.earned} tone="neutral" />
           <Pill label={t('atelie.salary.pillPaid')} value={totals.paid} tone="green" />
           <Pill label={t('atelie.salary.pillOutstanding')} value={totals.unpaid} tone="amber" />
+          <div className="ml-2 inline-flex items-center gap-1">
+            <IconButton
+              onClick={() => setViewingAll(true)}
+              ariaLabel={t('atelie.salary.viewAll')}
+              title={t('atelie.salary.viewAll')}
+              size="md"
+              disabled={rows.length === 0}
+            >
+              <Eye size={15} />
+            </IconButton>
+            <IconButton
+              onClick={() => printAllSalaryLabels(rows, weekStart.toISOString(), t)}
+              ariaLabel={t('atelie.salary.printAll')}
+              title={t('atelie.salary.printAll')}
+              size="md"
+              disabled={rows.length === 0}
+            >
+              <Printer size={15} />
+            </IconButton>
+          </div>
         </div>
       </div>
 
@@ -255,6 +276,13 @@ export function SalaryTab() {
       {viewingExtras && (
         <ViewExtrasModal row={viewingExtras} onClose={() => setViewingExtras(null)} />
       )}
+      {viewingAll && (
+        <ViewAllModal
+          rows={rows}
+          weekLabel={formatWeekRange(weekStart.toISOString())}
+          onClose={() => setViewingAll(false)}
+        />
+      )}
     </div>
   );
 }
@@ -279,23 +307,29 @@ function IconButton({
   ariaLabel,
   title,
   highlight,
+  size = 'sm',
+  disabled,
 }: {
   children: React.ReactNode;
   onClick: () => void;
   ariaLabel: string;
   title: string;
   highlight?: boolean;
+  size?: 'sm' | 'md';
+  disabled?: boolean;
 }) {
+  const sizeCls = size === 'md' ? 'h-8 w-8' : 'h-7 w-7';
+  const toneCls = highlight
+    ? 'border-tone-lavender-200 bg-tone-lavender-50 text-tone-lavender-500 hover:bg-tone-lavender-100'
+    : 'border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700';
+  const disabledCls = disabled ? 'cursor-not-allowed opacity-40 hover:bg-transparent' : '';
   return (
     <button
       onClick={onClick}
       aria-label={ariaLabel}
       title={title}
-      className={
-        highlight
-          ? 'flex h-7 w-7 items-center justify-center rounded-btn border border-tone-lavender-200 bg-tone-lavender-50 text-tone-lavender-500 hover:bg-tone-lavender-100'
-          : 'flex h-7 w-7 items-center justify-center rounded-btn border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700'
-      }
+      disabled={disabled}
+      className={`flex ${sizeCls} items-center justify-center rounded-btn border ${toneCls} ${disabledCls}`}
     >
       {children}
     </button>
@@ -518,6 +552,144 @@ function ViewExtrasModal({ row, onClose }: { row: SalaryRow; onClose: () => void
             )}
           </tbody>
         </table>
+      )}
+    </GlassModal>
+  );
+}
+
+function ViewAllModal({
+  rows,
+  weekLabel,
+  onClose,
+}: {
+  rows: SalaryRow[];
+  weekLabel: string;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+
+  const totals = rows.reduce(
+    (acc, r) => {
+      const supplementPay = r.supplementHours * r.supplementHourRate;
+      acc.base += r.amount;
+      acc.commission += r.commission;
+      acc.supplement += supplementPay;
+      acc.total += rowTotal(r);
+      return acc;
+    },
+    { base: 0, commission: 0, supplement: 0, total: 0 },
+  );
+
+  return (
+    <GlassModal
+      open
+      onClose={onClose}
+      title={t('atelie.salary.viewAllTitle', { week: weekLabel })}
+      size="3xl"
+      footer={
+        <div className="flex justify-end">
+          <CRMButton variant="ghost" onClick={onClose}>
+            {t('common.close')}
+          </CRMButton>
+        </div>
+      }
+    >
+      {rows.length === 0 ? (
+        <p className="py-6 text-center text-sm text-gray-400">{t('atelie.salary.empty')}</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+              <tr>
+                <th className="px-3 py-2 text-left font-semibold">
+                  {t('atelie.salary.columns.employee')}
+                </th>
+                <th className="px-3 py-2 text-right font-semibold">
+                  {t('atelie.salary.daysWorked')}
+                </th>
+                <th className="px-3 py-2 text-right font-semibold">
+                  {t('atelie.salary.baseAmount')}
+                </th>
+                <th className="px-3 py-2 text-right font-semibold">
+                  {t('atelie.salary.commission')}
+                </th>
+                <th className="px-3 py-2 text-right font-semibold">
+                  {t('atelie.salary.supplementHours')}
+                </th>
+                <th className="px-3 py-2 text-right font-semibold">
+                  {t('atelie.salary.totalDue')}
+                </th>
+                <th className="px-3 py-2 text-center font-semibold">
+                  {t('atelie.salary.columns.status')}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => {
+                const supplementPay = r.supplementHours * r.supplementHourRate;
+                const total = rowTotal(r);
+                const supplementText =
+                  r.supplementHourRate > 0 && r.supplementHours > 0
+                    ? `${r.supplementHours} × ${r.supplementHourRate.toFixed(0)} = ${supplementPay.toFixed(0)} MAD`
+                    : r.supplementHours > 0
+                    ? `${r.supplementHours} h`
+                    : '—';
+                return (
+                  <tr key={r.id} className="border-t border-gray-100 align-top">
+                    <td className="px-3 py-2">
+                      <div className="font-semibold text-gray-900">{r.employee.name}</div>
+                      <div className="text-[11px] capitalize text-gray-400">
+                        {r.employee.role}
+                      </div>
+                      {r.notes && r.notes.trim().length > 0 && (
+                        <div className="mt-1 text-[11px] italic text-gray-500">
+                          {r.notes}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right text-gray-700">{r.daysWorked}</td>
+                    <td className="px-3 py-2 text-right text-gray-700">
+                      {r.amount.toFixed(0)} MAD
+                    </td>
+                    <td className="px-3 py-2 text-right text-gray-700">
+                      {r.commission > 0 ? `${r.commission.toFixed(0)} MAD` : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-right text-gray-700">{supplementText}</td>
+                    <td className="px-3 py-2 text-right font-bold text-gray-900">
+                      {total.toFixed(0)} MAD
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <span
+                        className={
+                          r.isPaid
+                            ? 'rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-semibold text-green-600'
+                            : 'rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-600'
+                        }
+                      >
+                        {r.isPaid ? t('atelie.salary.paid') : t('atelie.salary.unpaid')}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot className="bg-gray-50/70 text-sm font-bold text-gray-900">
+              <tr className="border-t-2 border-gray-200">
+                <td className="px-3 py-3 text-right uppercase text-gray-500">
+                  {t('atelie.salary.viewAllTotal')}
+                </td>
+                <td className="px-3 py-3 text-right">—</td>
+                <td className="px-3 py-3 text-right">{totals.base.toFixed(0)} MAD</td>
+                <td className="px-3 py-3 text-right">{totals.commission.toFixed(0)} MAD</td>
+                <td className="px-3 py-3 text-right">{totals.supplement.toFixed(0)} MAD</td>
+                <td className="px-3 py-3 text-right text-tone-lavender-500">
+                  {totals.total.toFixed(0)} MAD
+                </td>
+                <td className="px-3 py-3"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
       )}
     </GlassModal>
   );

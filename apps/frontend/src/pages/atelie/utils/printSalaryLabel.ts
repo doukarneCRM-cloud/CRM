@@ -8,56 +8,37 @@ import { formatWeekRange } from './weekMath';
  * CSS, no JS, no fonts loaded from the network) so it prints reliably
  * even on slow thermal-label printers.
  *
- * Layout: employee name at the top, then a compact table of (week,
- * days worked, base, commission, supplement hours, total) and the
- * freeform note at the bottom.
+ * Two flavours:
+ *  - `printSalaryLabel(row, ...)` prints one label.
+ *  - `printAllSalaryLabels(rows, ...)` prints every row in the same
+ *    print job — each label gets its own 100×100mm page via
+ *    `page-break-after: always`, so a thermal printer feeds one
+ *    envelope-sized label per employee without manual intervention.
  */
-export function printSalaryLabel(
-  row: SalaryRow,
-  weekStartISO: string,
-  t: TFunction,
-): void {
-  const escape = (s: string): string =>
-    s.replace(/[&<>"']/g, (c) => {
-      switch (c) {
-        case '&':
-          return '&amp;';
-        case '<':
-          return '&lt;';
-        case '>':
-          return '&gt;';
-        case '"':
-          return '&quot;';
-        case "'":
-          return '&#39;';
-      }
-      return c;
-    });
 
-  const supplementHours = row.supplementHours || 0;
-  const supplementHourRate = row.supplementHourRate || 0;
-  const supplementPay = supplementHours * supplementHourRate;
-  const total = row.amount + (row.commission || 0) + supplementPay;
-  const week = formatWeekRange(weekStartISO);
-  const note = row.notes && row.notes.trim().length > 0 ? row.notes.trim() : '';
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => {
+    switch (c) {
+      case '&':
+        return '&amp;';
+      case '<':
+        return '&lt;';
+      case '>':
+        return '&gt;';
+      case '"':
+        return '&quot;';
+      case "'":
+        return '&#39;';
+    }
+    return c;
+  });
+}
 
-  const supplementCell =
-    supplementHourRate > 0 && supplementHours > 0
-      ? `${supplementHours} × ${supplementHourRate.toFixed(0)} = ${supplementPay.toFixed(0)} MAD`
-      : `${supplementHours}`;
-
-  const html = `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<title>${escape(row.employee.name)} — ${escape(week)}</title>
-<style>
+const LABEL_STYLES = `
   @page { size: 100mm 100mm; margin: 0; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body {
-    width: 100mm;
-    height: 100mm;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     color: #111;
     -webkit-print-color-adjust: exact;
@@ -70,7 +51,11 @@ export function printSalaryLabel(
     display: flex;
     flex-direction: column;
     gap: 2mm;
+    page-break-after: always;
+    break-after: page;
+    overflow: hidden;
   }
+  .label:last-child { page-break-after: auto; break-after: auto; }
   .name {
     font-size: 14pt;
     font-weight: 800;
@@ -122,54 +107,76 @@ export function printSalaryLabel(
     max-height: 18mm;
   }
   .note strong { color: #555; font-weight: 600; }
-  @media print {
-    body { width: 100mm; height: 100mm; }
-  }
-</style>
-</head>
-<body>
+`;
+
+function buildLabelHtml(row: SalaryRow, weekStartISO: string, t: TFunction): string {
+  const supplementHours = row.supplementHours || 0;
+  const supplementHourRate = row.supplementHourRate || 0;
+  const supplementPay = supplementHours * supplementHourRate;
+  const total = row.amount + (row.commission || 0) + supplementPay;
+  const week = formatWeekRange(weekStartISO);
+  const note = row.notes && row.notes.trim().length > 0 ? row.notes.trim() : '';
+
+  const supplementCell =
+    supplementHourRate > 0 && supplementHours > 0
+      ? `${supplementHours} × ${supplementHourRate.toFixed(0)} = ${supplementPay.toFixed(0)} MAD`
+      : `${supplementHours}`;
+
+  return `
   <div class="label">
-    <div class="name">${escape(row.employee.name)}</div>
-    <div class="meta">${escape(row.employee.role)} · ${escape(week)}</div>
+    <div class="name">${escapeHtml(row.employee.name)}</div>
+    <div class="meta">${escapeHtml(row.employee.role)} · ${escapeHtml(week)}</div>
     <table>
       <tr>
-        <th>${escape(t('atelie.salary.daysWorked'))}</th>
+        <th>${escapeHtml(t('atelie.salary.daysWorked'))}</th>
         <td>${row.daysWorked}</td>
       </tr>
       <tr>
-        <th>${escape(t('atelie.salary.baseAmount'))}</th>
+        <th>${escapeHtml(t('atelie.salary.baseAmount'))}</th>
         <td>${row.amount.toFixed(0)} MAD</td>
       </tr>
       <tr>
-        <th>${escape(t('atelie.salary.commission'))}</th>
+        <th>${escapeHtml(t('atelie.salary.commission'))}</th>
         <td>${(row.commission || 0).toFixed(0)} MAD</td>
       </tr>
       <tr>
-        <th>${escape(t('atelie.salary.supplementHours'))}</th>
-        <td>${escape(supplementCell)}</td>
+        <th>${escapeHtml(t('atelie.salary.supplementHours'))}</th>
+        <td>${escapeHtml(supplementCell)}</td>
       </tr>
       <tr class="total">
-        <th>${escape(t('atelie.salary.totalDue'))}</th>
+        <th>${escapeHtml(t('atelie.salary.totalDue'))}</th>
         <td>${total.toFixed(0)} MAD</td>
       </tr>
     </table>
     ${
       note
-        ? `<div class="note"><strong>${escape(t('atelie.salary.note'))}:</strong> ${escape(note)}</div>`
+        ? `<div class="note"><strong>${escapeHtml(t('atelie.salary.note'))}:</strong> ${escapeHtml(note)}</div>`
         : ''
     }
-  </div>
-  <script>
-    window.addEventListener('load', function () {
-      setTimeout(function () {
-        window.focus();
-        window.print();
-      }, 100);
-    });
-    window.addEventListener('afterprint', function () {
-      window.close();
-    });
-  </script>
+  </div>`;
+}
+
+function openPrintWindow(title: string, bodyHtml: string): void {
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>${escapeHtml(title)}</title>
+<style>${LABEL_STYLES}</style>
+</head>
+<body>
+${bodyHtml}
+<script>
+  window.addEventListener('load', function () {
+    setTimeout(function () {
+      window.focus();
+      window.print();
+    }, 100);
+  });
+  window.addEventListener('afterprint', function () {
+    window.close();
+  });
+</script>
 </body>
 </html>`;
 
@@ -185,4 +192,27 @@ export function printSalaryLabel(
   win.document.open();
   win.document.write(html);
   win.document.close();
+}
+
+export function printSalaryLabel(
+  row: SalaryRow,
+  weekStartISO: string,
+  t: TFunction,
+): void {
+  const week = formatWeekRange(weekStartISO);
+  openPrintWindow(
+    `${row.employee.name} — ${week}`,
+    buildLabelHtml(row, weekStartISO, t),
+  );
+}
+
+export function printAllSalaryLabels(
+  rows: SalaryRow[],
+  weekStartISO: string,
+  t: TFunction,
+): void {
+  if (rows.length === 0) return;
+  const week = formatWeekRange(weekStartISO);
+  const body = rows.map((r) => buildLabelHtml(r, weekStartISO, t)).join('\n');
+  openPrintWindow(`${t('atelie.salary.printAllTitle')} — ${week}`, body);
 }
