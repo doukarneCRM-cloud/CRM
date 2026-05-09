@@ -6,6 +6,7 @@ import {
   UpdateEmployeeSchema,
   ToggleDaySchema,
   PaySalarySchema,
+  UpdateSalaryExtrasSchema,
 } from './atelie.schema';
 import * as employees from './employees.service';
 import * as attendance from './attendance.service';
@@ -111,6 +112,19 @@ export async function atelieRoutes(app: FastifyInstance) {
     { preHandler: [verifyJWT, requirePermission('atelie:manage')] },
     async (req, reply) => {
       const updated = await salary.unpaySalary(req.params.id);
+      return reply.send(updated);
+    },
+  );
+
+  // Pay-envelope extras: commission, supplement hours, freeform note. The
+  // (+) button on each row opens a modal that posts here. Editable any
+  // time, regardless of paid state — the label printer reads these too.
+  app.patch<{ Params: { id: string } }>(
+    '/salary/:id/extras',
+    { preHandler: [verifyJWT, requirePermission('atelie:manage')] },
+    async (req, reply) => {
+      const input = UpdateSalaryExtrasSchema.parse(req.body);
+      const updated = await salary.updateSalaryExtras(req.params.id, input);
       return reply.send(updated);
     },
   );

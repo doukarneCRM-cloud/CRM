@@ -7,31 +7,45 @@
  */
 
 import { prisma } from '../../shared/prisma';
-import { mondayOfWeekUTC } from './atelie.utils';
-import type { PaySalaryInput } from './atelie.schema';
+import { computeDaysWorked, mondayOfWeekUTC } from './atelie.utils';
+import type { PaySalaryInput, UpdateSalaryExtrasInput } from './atelie.schema';
 
 export async function listWeekSalaries(weekStartISO: string) {
   const weekStart = mondayOfWeekUTC(new Date(weekStartISO));
-  const salaries = await prisma.salaryPayment.findMany({
-    where: { weekStart },
-    include: {
-      employee: { select: { id: true, name: true, role: true, baseSalary: true, workingDays: true } },
-      paidBy: { select: { id: true, name: true } },
-    },
-    orderBy: { employee: { name: 'asc' } },
+  const [salaries, attendance] = await Promise.all([
+    prisma.salaryPayment.findMany({
+      where: { weekStart },
+      include: {
+        employee: { select: { id: true, name: true, role: true, baseSalary: true, workingDays: true } },
+        paidBy: { select: { id: true, name: true } },
+      },
+      orderBy: { employee: { name: 'asc' } },
+    }),
+    prisma.weeklyAttendance.findMany({
+      where: { weekStart },
+      select: { employeeId: true, daysMask: true, halfDaysMask: true },
+    }),
+  ]);
+  const attMap = new Map(attendance.map((a) => [a.employeeId, a]));
+  return salaries.map((s) => {
+    const att = attMap.get(s.employeeId);
+    const daysWorked = att ? computeDaysWorked(att.daysMask, att.halfDaysMask) : 0;
+    return {
+      id: s.id,
+      employeeId: s.employeeId,
+      employee: s.employee,
+      weekStart: s.weekStart.toISOString(),
+      amount: s.amount,
+      paidAmount: s.paidAmount,
+      isPaid: s.isPaid,
+      paidAt: s.paidAt?.toISOString() ?? null,
+      paidBy: s.paidBy,
+      notes: s.notes,
+      commission: s.commission,
+      supplementHours: s.supplementHours,
+      daysWorked,
+    };
   });
-  return salaries.map((s) => ({
-    id: s.id,
-    employeeId: s.employeeId,
-    employee: s.employee,
-    weekStart: s.weekStart.toISOString(),
-    amount: s.amount,
-    paidAmount: s.paidAmount,
-    isPaid: s.isPaid,
-    paidAt: s.paidAt?.toISOString() ?? null,
-    paidBy: s.paidBy,
-    notes: s.notes,
-  }));
 }
 
 export async function paySalary(
@@ -49,6 +63,19 @@ export async function paySalary(
       paidAt: new Date(),
       paidById,
       notes: input.notes ?? existing.notes,
+    },
+  });
+}
+
+export async function updateSalaryExtras(id: string, input: UpdateSalaryExtrasInput) {
+  const existing = await prisma.salaryPayment.findUnique({ where: { id } });
+  if (!existing) throw new Error('Salary record not found');
+  return prisma.salaryPayment.update({
+    where: { id },
+    data: {
+      ...(input.commission !== undefined ? { commission: input.commission } : {}),
+      ...(input.supplementHours !== undefined ? { supplementHours: input.supplementHours } : {}),
+      ...(input.notes !== undefined ? { notes: input.notes } : {}),
     },
   });
 }

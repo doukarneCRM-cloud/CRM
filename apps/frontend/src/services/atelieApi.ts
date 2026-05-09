@@ -79,8 +79,20 @@ export interface SalaryRow {
   isPaid: boolean;
   paidAt: string | null;
   notes: string | null;
+  /** Extra commission added on top of the computed weekly amount. */
+  commission: number;
+  /** Supplement hours worked beyond the regular schedule. */
+  supplementHours: number;
+  /** Days worked this week (full=1, half=0.5) — pulled from WeeklyAttendance. */
+  daysWorked: number;
   employee: { id: string; name: string; role: string };
   paidBy: { id: string; name: string } | null;
+}
+
+export interface UpdateSalaryExtrasPayload {
+  commission?: number;
+  supplementHours?: number;
+  notes?: string | null;
 }
 
 // ─── Materials ──────────────────────────────────────────────────────────────
@@ -282,6 +294,9 @@ export const atelieApi = {
 
   unpaySalary: (id: string) =>
     api.post<SalaryRow>(`/atelie/salary/${id}/unpay`).then((r) => r.data),
+
+  updateSalaryExtras: (id: string, payload: UpdateSalaryExtrasPayload) =>
+    api.patch<SalaryRow>(`/atelie/salary/${id}/extras`, payload).then((r) => r.data),
 
   getEmployeeSalaryHistory: (employeeId: string, limit = 12) =>
     api

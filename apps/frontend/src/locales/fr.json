@@ -2295,7 +2295,22 @@
       "payAmount": "Montant payé (MAD)",
       "payHint": "Salaire dû : {{amount}} MAD",
       "payNotes": "Notes (facultatif)",
-      "confirmPayment": "Confirmer le paiement"
+      "confirmPayment": "Confirmer le paiement",
+      "editExtras": "Ajouter commission · heures sup. · note",
+      "viewExtras": "Voir les détails",
+      "printLabel": "Imprimer l’étiquette",
+      "extrasTitle": "Extras pour {{name}}",
+      "viewTitle": "Détail du paiement — {{name}}",
+      "noExtras": "Aucun extra pour le moment.",
+      "commission": "Commission",
+      "commissionHint": "MAD ajoutés au montant hebdomadaire.",
+      "supplementHours": "Heures sup.",
+      "supplementHoursHint": "Heures effectuées au-delà du planning.",
+      "note": "Note",
+      "noteHint": "À retenir (imprimé sur l’étiquette de l’enveloppe).",
+      "daysWorked": "Jours travaillés",
+      "baseAmount": "Salaire de base",
+      "totalDue": "Total à payer"
     },
     "stock": {
       "fabricRolls": "Rouleaux de tissu",

@@ -2295,7 +2295,22 @@
       "payAmount": "Amount paid (MAD)",
       "payHint": "Salary due: {{amount}} MAD",
       "payNotes": "Notes (optional)",
-      "confirmPayment": "Confirm payment"
+      "confirmPayment": "Confirm payment",
+      "editExtras": "Add commission · supplement hours · note",
+      "viewExtras": "View extras",
+      "printLabel": "Print envelope label",
+      "extrasTitle": "Extras for {{name}}",
+      "viewTitle": "Pay details — {{name}}",
+      "noExtras": "No extras yet.",
+      "commission": "Commission",
+      "commissionHint": "Extra MAD added on top of the weekly amount.",
+      "supplementHours": "Supplement hours",
+      "supplementHoursHint": "Hours worked beyond the regular schedule.",
+      "note": "Note",
+      "noteHint": "Anything to remember (printed on the envelope label).",
+      "daysWorked": "Days worked",
+      "baseAmount": "Base salary",
+      "totalDue": "Total to pay"
     },
     "stock": {
       "fabricRolls": "Fabric rolls",

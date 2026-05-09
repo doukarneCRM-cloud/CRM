@@ -1,0 +1,180 @@
+import type { TFunction } from 'i18next';
+import type { SalaryRow } from '@/services/atelieApi';
+import { formatWeekRange } from './weekMath';
+
+/**
+ * Open a 100×100mm printable label in a popup window so the operator can
+ * stick it onto the pay envelope. The label is self-contained (inline
+ * CSS, no JS, no fonts loaded from the network) so it prints reliably
+ * even on slow thermal-label printers.
+ *
+ * Layout: employee name at the top, then a compact table of (week,
+ * days worked, base, commission, supplement hours, total) and the
+ * freeform note at the bottom.
+ */
+export function printSalaryLabel(
+  row: SalaryRow,
+  weekStartISO: string,
+  t: TFunction,
+): void {
+  const escape = (s: string): string =>
+    s.replace(/[&<>"']/g, (c) => {
+      switch (c) {
+        case '&':
+          return '&amp;';
+        case '<':
+          return '&lt;';
+        case '>':
+          return '&gt;';
+        case '"':
+          return '&quot;';
+        case "'":
+          return '&#39;';
+      }
+      return c;
+    });
+
+  const total = row.amount + (row.commission || 0);
+  const week = formatWeekRange(weekStartISO);
+  const note = row.notes && row.notes.trim().length > 0 ? row.notes.trim() : '';
+
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>${escape(row.employee.name)} — ${escape(week)}</title>
+<style>
+  @page { size: 100mm 100mm; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    width: 100mm;
+    height: 100mm;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #111;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .label {
+    width: 100mm;
+    height: 100mm;
+    padding: 4mm 5mm;
+    display: flex;
+    flex-direction: column;
+    gap: 2mm;
+  }
+  .name {
+    font-size: 14pt;
+    font-weight: 800;
+    line-height: 1.1;
+    text-transform: uppercase;
+    letter-spacing: 0.3pt;
+  }
+  .meta {
+    font-size: 8pt;
+    color: #555;
+    line-height: 1.2;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 9pt;
+  }
+  th, td {
+    padding: 1.2mm 1.5mm;
+    text-align: left;
+    border-bottom: 0.3mm solid #ddd;
+  }
+  th {
+    background: #f3f4f6;
+    font-weight: 600;
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.2pt;
+    color: #555;
+    width: 45%;
+  }
+  td { font-weight: 600; text-align: right; }
+  tr.total th, tr.total td {
+    font-size: 11pt;
+    font-weight: 800;
+    color: #111;
+    background: #ede9fe;
+    border-bottom: none;
+  }
+  .note {
+    margin-top: auto;
+    font-size: 8pt;
+    color: #333;
+    line-height: 1.25;
+    border-top: 0.3mm dashed #999;
+    padding-top: 1.5mm;
+    word-break: break-word;
+    overflow: hidden;
+    max-height: 18mm;
+  }
+  .note strong { color: #555; font-weight: 600; }
+  @media print {
+    body { width: 100mm; height: 100mm; }
+  }
+</style>
+</head>
+<body>
+  <div class="label">
+    <div class="name">${escape(row.employee.name)}</div>
+    <div class="meta">${escape(row.employee.role)} · ${escape(week)}</div>
+    <table>
+      <tr>
+        <th>${escape(t('atelie.salary.daysWorked'))}</th>
+        <td>${row.daysWorked}</td>
+      </tr>
+      <tr>
+        <th>${escape(t('atelie.salary.baseAmount'))}</th>
+        <td>${row.amount.toFixed(0)} MAD</td>
+      </tr>
+      <tr>
+        <th>${escape(t('atelie.salary.commission'))}</th>
+        <td>${(row.commission || 0).toFixed(0)} MAD</td>
+      </tr>
+      <tr>
+        <th>${escape(t('atelie.salary.supplementHours'))}</th>
+        <td>${row.supplementHours || 0}</td>
+      </tr>
+      <tr class="total">
+        <th>${escape(t('atelie.salary.totalDue'))}</th>
+        <td>${total.toFixed(0)} MAD</td>
+      </tr>
+    </table>
+    ${
+      note
+        ? `<div class="note"><strong>${escape(t('atelie.salary.note'))}:</strong> ${escape(note)}</div>`
+        : ''
+    }
+  </div>
+  <script>
+    window.addEventListener('load', function () {
+      setTimeout(function () {
+        window.focus();
+        window.print();
+      }, 100);
+    });
+    window.addEventListener('afterprint', function () {
+      window.close();
+    });
+  </script>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank', 'width=420,height=480');
+  if (!win) {
+    // Popup blocked — fall back to a Blob URL the user can open in a new tab.
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    return;
+  }
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+}
