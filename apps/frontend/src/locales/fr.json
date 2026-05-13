@@ -1790,6 +1790,18 @@
         "gte": "≥",
         "lte": "≤",
         "contains": "contient"
+      },
+      "fields": {
+        "customer.city": "Ville du client",
+        "customer.tag": "Tag du client",
+        "order.total": "Total commande",
+        "order.itemCount": "Nombre d’articles",
+        "order.shippingPrice": "Frais de livraison",
+        "order.confirmationStatus": "Statut de confirmation",
+        "order.shippingStatus": "Statut de livraison",
+        "order.source": "Source de la commande",
+        "product.name": "Nom du produit",
+        "agent.id": "Agent"
       }
     },
     "templates": {

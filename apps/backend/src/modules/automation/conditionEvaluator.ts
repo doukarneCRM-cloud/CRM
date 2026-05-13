@@ -10,6 +10,14 @@ export const ALLOWED_FIELDS = [
   'order.total',
   'order.itemCount',
   'order.shippingPrice',
+  // Order statuses — the canonical enums also used everywhere else in
+  // the CRM. The rule UI auto-renders a dropdown of valid values for
+  // these fields, so an operator can write "send a WhatsApp when
+  // order.confirmationStatus = confirmed AND order.shippingStatus =
+  // not_shipped" without typo'ing the enum string.
+  'order.confirmationStatus',
+  'order.shippingStatus',
+  'order.source',
   'product.name',
   'agent.id',
 ] as const;
@@ -29,7 +37,14 @@ export interface RuleConditions {
 
 export interface EvalContext {
   customer?: { city?: string; tag?: string };
-  order?: { total?: number; itemCount?: number; shippingPrice?: number };
+  order?: {
+    total?: number;
+    itemCount?: number;
+    shippingPrice?: number;
+    confirmationStatus?: string;
+    shippingStatus?: string;
+    source?: string;
+  };
   product?: { name?: string };
   agent?: { id?: string };
 }
@@ -46,6 +61,12 @@ function resolve(field: AllowedField, ctx: EvalContext): unknown {
       return ctx.order?.itemCount;
     case 'order.shippingPrice':
       return ctx.order?.shippingPrice;
+    case 'order.confirmationStatus':
+      return ctx.order?.confirmationStatus;
+    case 'order.shippingStatus':
+      return ctx.order?.shippingStatus;
+    case 'order.source':
+      return ctx.order?.source;
     case 'product.name':
       return ctx.product?.name;
     case 'agent.id':

@@ -15,6 +15,11 @@ import {
   type ConditionOp,
   type MessageTemplate,
 } from '@/services/automationApi';
+import {
+  CONFIRMATION_STATUS_OPTIONS,
+  SHIPPING_STATUS_OPTIONS,
+  SOURCE_OPTIONS,
+} from '@/constants/statusColors';
 
 const TRIGGER_KEYS: AutomationTrigger[] = [
   'confirmation_confirmed',
@@ -40,11 +45,23 @@ const DEFAULT_FIELDS = [
   'order.total',
   'order.itemCount',
   'order.shippingPrice',
+  'order.confirmationStatus',
+  'order.shippingStatus',
+  'order.source',
   'product.name',
   'agent.id',
 ];
 
 const OP_KEYS: ConditionOp[] = ['eq', 'neq', 'in', 'not_in', 'gte', 'lte', 'contains'];
+
+// Fields whose values come from a closed enum — the rule UI renders a
+// proper dropdown of valid options so the operator can't typo
+// "confirmd" and silently never match anything.
+const ENUM_FIELD_OPTIONS: Record<string, { value: string; label: string }[]> = {
+  'order.confirmationStatus': CONFIRMATION_STATUS_OPTIONS,
+  'order.shippingStatus': SHIPPING_STATUS_OPTIONS,
+  'order.source': SOURCE_OPTIONS,
+};
 
 function ConditionRow({
   cond,
@@ -61,28 +78,75 @@ function ConditionRow({
 }) {
   const { t } = useTranslation();
   const isList = cond.op === 'in' || cond.op === 'not_in';
+  const enumOptions = ENUM_FIELD_OPTIONS[cond.field];
+
+  // When the field is a closed enum, force the value into a known
+  // option as the operator switches fields (so a leftover "casa" from a
+  // city condition doesn't silently linger as the value when they
+  // switch to confirmationStatus).
+  const onFieldChange = (nextField: string) => {
+    const nextEnum = ENUM_FIELD_OPTIONS[nextField];
+    if (nextEnum && nextEnum.length > 0) {
+      const isSingle = cond.op !== 'in' && cond.op !== 'not_in';
+      onChange({
+        ...cond,
+        field: nextField,
+        value: isSingle ? nextEnum[0].value : [nextEnum[0].value],
+      });
+    } else {
+      onChange({ ...cond, field: nextField });
+    }
+  };
+
+  // Same idea for op changes — flipping eq <-> in needs the value
+  // shape (scalar vs array) to follow.
+  const onOpChange = (nextOp: ConditionOp) => {
+    const nextIsList = nextOp === 'in' || nextOp === 'not_in';
+    if (nextIsList && !Array.isArray(cond.value)) {
+      const seed: string[] | number[] =
+        typeof cond.value === 'number'
+          ? [cond.value]
+          : cond.value
+            ? [String(cond.value)]
+            : [];
+      onChange({ ...cond, op: nextOp, value: seed });
+    } else if (!nextIsList && Array.isArray(cond.value)) {
+      const first = (cond.value as (string | number)[])[0] ?? '';
+      onChange({ ...cond, op: nextOp, value: first });
+    } else {
+      onChange({ ...cond, op: nextOp });
+    }
+  };
+
   const valueStr = Array.isArray(cond.value)
     ? (cond.value as (string | number)[]).join(', ')
     : String(cond.value ?? '');
+
+  const fieldLabel = (f: string): string => {
+    // Pretty key if a translation exists, else fall back to the dotted path.
+    const key = `automation.rules.fields.${f}`;
+    const translated = t(key);
+    return translated === key ? f : translated;
+  };
 
   return (
     <div className="flex flex-wrap items-center gap-2">
       <select
         disabled={disabled}
         value={cond.field}
-        onChange={(e) => onChange({ ...cond, field: e.target.value })}
+        onChange={(e) => onFieldChange(e.target.value)}
         className="rounded-btn border border-gray-200 bg-white px-2 py-1.5 text-xs"
       >
         {fields.map((f) => (
           <option key={f} value={f}>
-            {f}
+            {fieldLabel(f)}
           </option>
         ))}
       </select>
       <select
         disabled={disabled}
         value={cond.op}
-        onChange={(e) => onChange({ ...cond, op: e.target.value as ConditionOp })}
+        onChange={(e) => onOpChange(e.target.value as ConditionOp)}
         className="rounded-btn border border-gray-200 bg-white px-2 py-1.5 text-xs"
       >
         {OP_KEYS.map((op) => (
@@ -91,24 +155,76 @@ function ConditionRow({
           </option>
         ))}
       </select>
-      <input
-        disabled={disabled}
-        value={valueStr}
-        onChange={(e) => {
-          const raw = e.target.value;
-          if (isList) {
-            const parts = raw.split(',').map((x) => x.trim()).filter(Boolean);
-            onChange({ ...cond, value: parts });
-          } else if (cond.op === 'gte' || cond.op === 'lte') {
-            const n = Number(raw);
-            onChange({ ...cond, value: Number.isFinite(n) ? n : raw });
-          } else {
-            onChange({ ...cond, value: raw });
-          }
-        }}
-        placeholder={isList ? t('automation.rules.listPlaceholder') : t('automation.rules.valuePlaceholder')}
-        className="min-w-[140px] flex-1 rounded-btn border border-gray-200 bg-white px-2 py-1.5 text-xs"
-      />
+
+      {enumOptions && !isList ? (
+        // Single-pick status dropdown.
+        <select
+          disabled={disabled}
+          value={String(cond.value ?? '')}
+          onChange={(e) => onChange({ ...cond, value: e.target.value })}
+          className="min-w-[140px] flex-1 rounded-btn border border-gray-200 bg-white px-2 py-1.5 text-xs"
+        >
+          {enumOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      ) : enumOptions && isList ? (
+        // Multi-pick checkbox-style chips for `in`/`not_in`.
+        <div className="flex min-w-[200px] flex-1 flex-wrap items-center gap-1 rounded-btn border border-gray-200 bg-white px-2 py-1.5">
+          {enumOptions.map((opt) => {
+            const arr = Array.isArray(cond.value) ? (cond.value as string[]) : [];
+            const checked = arr.includes(opt.value);
+            return (
+              <label
+                key={opt.value}
+                className={[
+                  'inline-flex cursor-pointer items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors',
+                  checked
+                    ? 'bg-tone-lavender-500 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+                  disabled ? 'cursor-not-allowed opacity-40' : '',
+                ].join(' ')}
+              >
+                <input
+                  type="checkbox"
+                  className="hidden"
+                  disabled={disabled}
+                  checked={checked}
+                  onChange={() => {
+                    const next = checked
+                      ? arr.filter((v) => v !== opt.value)
+                      : [...arr, opt.value];
+                    onChange({ ...cond, value: next });
+                  }}
+                />
+                {opt.label}
+              </label>
+            );
+          })}
+        </div>
+      ) : (
+        <input
+          disabled={disabled}
+          value={valueStr}
+          onChange={(e) => {
+            const raw = e.target.value;
+            if (isList) {
+              const parts = raw.split(',').map((x) => x.trim()).filter(Boolean);
+              onChange({ ...cond, value: parts });
+            } else if (cond.op === 'gte' || cond.op === 'lte') {
+              const n = Number(raw);
+              onChange({ ...cond, value: Number.isFinite(n) ? n : raw });
+            } else {
+              onChange({ ...cond, value: raw });
+            }
+          }}
+          placeholder={isList ? t('automation.rules.listPlaceholder') : t('automation.rules.valuePlaceholder')}
+          className="min-w-[140px] flex-1 rounded-btn border border-gray-200 bg-white px-2 py-1.5 text-xs"
+        />
+      )}
+
       <button
         disabled={disabled}
         onClick={onRemove}

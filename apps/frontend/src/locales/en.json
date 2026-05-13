@@ -1790,6 +1790,18 @@
         "gte": "≥",
         "lte": "≤",
         "contains": "contains"
+      },
+      "fields": {
+        "customer.city": "Customer city",
+        "customer.tag": "Customer tag",
+        "order.total": "Order total",
+        "order.itemCount": "Item count",
+        "order.shippingPrice": "Shipping price",
+        "order.confirmationStatus": "Confirmation status",
+        "order.shippingStatus": "Shipping status",
+        "order.source": "Order source",
+        "product.name": "Product name",
+        "agent.id": "Agent"
       }
     },
     "templates": {
