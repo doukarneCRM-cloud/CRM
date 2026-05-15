@@ -120,6 +120,7 @@ export interface RecordPaymentInput {
   fileUrl?: string | null;
   periodFrom?: string | null;
   periodTo?: string | null;
+  method?: 'cash' | 'bank_transfer' | 'card' | 'other' | null;
 }
 
 /**
@@ -186,6 +187,7 @@ export async function recordCommissionPayment(
         fileUrl: input.fileUrl ?? null,
         periodFrom: input.periodFrom ? new Date(input.periodFrom) : null,
         periodTo: input.periodTo ? new Date(input.periodTo) : null,
+        method: input.method ?? null,
         recordedById: recordedById ?? null,
       },
       include: {

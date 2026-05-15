@@ -1382,6 +1382,13 @@
         },
         "amountToPay": "Montant à verser",
         "confirmPayment": "Confirmer le versement",
+        "methodLabel": "Mode de paiement",
+        "method": {
+          "cash": "Espèces",
+          "bank_transfer": "Virement",
+          "card": "Carte",
+          "other": "Autre"
+        },
         "noteLabel": "Note (facultatif)",
         "notePlaceholder": "ex. Payé par virement le 2026-04-18",
         "proofLabel": "Justificatif de paiement (facultatif)",

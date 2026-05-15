@@ -28,6 +28,7 @@ import {
   type AgentCommissionRow,
   type AgentPendingOrder,
   type CommissionPayment,
+  type PaymentMethod,
 } from '@/services/moneyApi';
 import { getSocket } from '@/services/socket';
 
@@ -226,7 +227,11 @@ function AgentDrawer({
   onPaymentRecorded: () => void;
 }) {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<'pending' | 'history'>('pending');
+  // Default to history when the agent has nothing pending — operators
+  // open the drawer mostly to consult what they've already paid out.
+  const [tab, setTab] = useState<'pending' | 'history'>(
+    agent.pendingCount === 0 && agent.paidCount > 0 ? 'history' : 'pending',
+  );
   const [showPayForm, setShowPayForm] = useState(false);
 
   return (
@@ -257,6 +262,16 @@ function AgentDrawer({
             </TabBtn>
             <TabBtn active={tab === 'history'} onClick={() => setTab('history')}>
               <History size={13} /> {t('money.commission.drawer.history')}
+              {agent.paidCount > 0 && (
+                <span
+                  className={cn(
+                    'inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold',
+                    tab === 'history' ? 'bg-white/25 text-white' : 'bg-emerald-100 text-emerald-700',
+                  )}
+                >
+                  {agent.paidCount}
+                </span>
+              )}
             </TabBtn>
           </div>
 
@@ -454,10 +469,17 @@ function PaymentHistory({
                 <span className="text-sm font-bold text-emerald-700">{fmtMAD(p.amount)}</span>
                 <span className="text-[11px] text-gray-400">{fmtDate(p.paidAt)}</span>
               </div>
-              <p className="mt-0.5 text-[11px] text-gray-500">
-                {t('money.commission.history.orders', { count: p.orderIds.length })}
-                {p.recordedBy && ` · ${t('money.commission.history.by', { name: p.recordedBy.name })}`}
-              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-gray-500">
+                {p.method && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-tone-lavender-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-tone-lavender-600">
+                    {t(`money.commission.recordModal.method.${p.method}`)}
+                  </span>
+                )}
+                <span>{t('money.commission.history.orders', { count: p.orderIds.length })}</span>
+                {p.recordedBy && (
+                  <span>· {t('money.commission.history.by', { name: p.recordedBy.name })}</span>
+                )}
+              </div>
               {p.notes && (
                 <p className="mt-1 rounded-btn bg-gray-50 px-2 py-1 text-[11px] italic text-gray-600">
                   {p.notes}
@@ -512,6 +534,7 @@ function RecordPaymentModal({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [notes, setNotes] = useState('');
   const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [method, setMethod] = useState<PaymentMethod>('cash');
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -566,6 +589,7 @@ function RecordPaymentModal({
         orderIds: Array.from(selectedIds),
         notes: notes.trim() || null,
         fileUrl,
+        method,
       });
       onSaved();
     } catch (e) {
@@ -684,6 +708,29 @@ function RecordPaymentModal({
               </table>
             </div>
           )}
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-gray-700">
+            {t('money.commission.recordModal.methodLabel')}
+          </label>
+          <div className="flex flex-wrap gap-1">
+            {(['cash', 'bank_transfer', 'card', 'other'] as PaymentMethod[]).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMethod(m)}
+                className={cn(
+                  'rounded-btn border px-3 py-1.5 text-xs font-semibold transition-colors',
+                  method === m
+                    ? 'border-primary bg-primary text-white shadow-sm'
+                    : 'border-gray-200 bg-white text-gray-600 hover:border-primary/40 hover:text-primary',
+                )}
+              >
+                {t(`money.commission.recordModal.method.${m}`)}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="flex flex-col gap-1.5">

@@ -1057,6 +1057,11 @@ model CommissionPayment {
   notes        String?
   fileUrl      String?
   orderIds     String[] // order IDs cleared by this payment
+  // How the cash was actually delivered to the agent — recorded by the
+  // operator at pay time so the history reads as a useful audit log
+  // ("520 MAD · via cash · by Admin · 7 May"). Free-form string for
+  // future-proofing (cash / bank_transfer / card / other / …).
+  method       String?
   recordedById String?
   createdAt    DateTime  @default(now())
 

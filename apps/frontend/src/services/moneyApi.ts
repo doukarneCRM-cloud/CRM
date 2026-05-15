@@ -55,6 +55,8 @@ export interface AgentPendingOrder {
   customer: { fullName: string; city: string };
 }
 
+export type PaymentMethod = 'cash' | 'bank_transfer' | 'card' | 'other';
+
 export interface CommissionPayment {
   id: string;
   agentId: string;
@@ -65,6 +67,7 @@ export interface CommissionPayment {
   paidAt: string;
   periodFrom: string | null;
   periodTo: string | null;
+  method: PaymentMethod | null;
   agent: { id: string; name: string; email: string };
   recordedBy: { id: string; name: string } | null;
 }
@@ -77,6 +80,7 @@ export interface RecordPaymentInput {
   fileUrl?: string | null;
   periodFrom?: string | null;
   periodTo?: string | null;
+  method?: PaymentMethod | null;
 }
 
 // ─── API ────────────────────────────────────────────────────────────────────

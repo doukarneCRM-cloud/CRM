@@ -1382,6 +1382,13 @@
         },
         "amountToPay": "Amount to pay",
         "confirmPayment": "Confirm payment",
+        "methodLabel": "Payment method",
+        "method": {
+          "cash": "Cash",
+          "bank_transfer": "Bank transfer",
+          "card": "Card",
+          "other": "Other"
+        },
         "noteLabel": "Note (optional)",
         "notePlaceholder": "e.g. Paid by bank transfer on 2026-04-18",
         "proofLabel": "Proof of payment (optional)",

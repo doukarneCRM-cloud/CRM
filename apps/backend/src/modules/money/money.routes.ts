@@ -49,6 +49,9 @@ const RecordPaymentSchema = z.object({
   fileUrl: z.string().nullable().optional(),
   periodFrom: z.string().nullable().optional(),
   periodTo: z.string().nullable().optional(),
+  // Closed list keeps the history audit-log tidy; new options can be
+  // added without a migration (column is plain TEXT).
+  method: z.enum(['cash', 'bank_transfer', 'card', 'other']).nullable().optional(),
 });
 
 function replyError(reply: FastifyReply, err: unknown): FastifyReply {
