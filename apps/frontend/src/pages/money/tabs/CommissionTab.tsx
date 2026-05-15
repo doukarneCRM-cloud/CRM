@@ -606,20 +606,30 @@ function RecordPaymentModal({
         )}
 
         <div>
-          <div className="mb-2 flex items-center justify-between">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-semibold text-gray-800">{t('money.commission.recordModal.ordersToSettle')}</p>
             {orders && orders.length > 0 && (
-              <button
-                type="button"
-                className="text-[11px] font-semibold text-primary hover:underline"
-                onClick={() =>
-                  setSelectedIds(
-                    selectedIds.size === orders.length ? new Set() : new Set(orders.map((o) => o.id)),
-                  )
-                }
-              >
-                {selectedIds.size === orders.length ? t('money.commission.recordModal.deselectAll') : t('money.commission.recordModal.selectAll')}
-              </button>
+              <div className="flex items-center gap-3">
+                <PayFirstNPicker
+                  maxCount={orders.length}
+                  selectedCount={selectedIds.size}
+                  onApply={(n) => {
+                    if (!orders) return;
+                    setSelectedIds(new Set(orders.slice(0, n).map((o) => o.id)));
+                  }}
+                />
+                <button
+                  type="button"
+                  className="text-[11px] font-semibold text-primary hover:underline"
+                  onClick={() =>
+                    setSelectedIds(
+                      selectedIds.size === orders.length ? new Set() : new Set(orders.map((o) => o.id)),
+                    )
+                  }
+                >
+                  {selectedIds.size === orders.length ? t('money.commission.recordModal.deselectAll') : t('money.commission.recordModal.selectAll')}
+                </button>
+              </div>
             )}
           </div>
           {!orders ? (
@@ -735,5 +745,66 @@ function RecordPaymentModal({
         </div>
       </div>
     </GlassModal>
+  );
+}
+
+// Inline quick-pick for the "pay first N orders" UX — the agent's
+// pending list is ordered oldest-first, so typing 10 + Apply selects
+// exactly the 10 oldest unpaid orders. Saves the operator from
+// individually unchecking 20 boxes when they only want to settle part
+// of the agent's tab.
+function PayFirstNPicker({
+  maxCount,
+  selectedCount,
+  onApply,
+}: {
+  maxCount: number;
+  selectedCount: number;
+  onApply: (n: number) => void;
+}) {
+  const { t } = useTranslation();
+  const [val, setVal] = useState<string>('');
+
+  const apply = () => {
+    const n = Math.max(0, Math.min(maxCount, Math.floor(Number(val) || 0)));
+    if (n > 0) onApply(n);
+  };
+
+  return (
+    <div className="flex items-center gap-1.5 rounded-btn border border-gray-200 bg-gray-50 px-2 py-1">
+      <label className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+        {t('money.commission.recordModal.payFirstN')}
+      </label>
+      <input
+        type="number"
+        min={1}
+        max={maxCount}
+        step={1}
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            apply();
+          }
+        }}
+        placeholder={String(maxCount)}
+        className="w-14 rounded-btn border border-gray-200 bg-white px-1.5 py-0.5 text-center text-xs text-gray-900 focus:border-primary focus:outline-none"
+      />
+      <button
+        type="button"
+        onClick={apply}
+        disabled={!val || Number(val) <= 0}
+        className="rounded-btn bg-primary px-2 py-0.5 text-[11px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        {t('money.commission.recordModal.apply')}
+      </button>
+      <span className="text-[10px] text-gray-400">
+        {t('money.commission.recordModal.payFirstNHint', {
+          selected: selectedCount,
+          total: maxCount,
+        })}
+      </span>
+    </div>
   );
 }

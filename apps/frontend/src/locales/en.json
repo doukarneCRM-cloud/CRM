@@ -1371,6 +1371,9 @@
         "ordersToSettle": "Orders to settle",
         "deselectAll": "Deselect all",
         "selectAll": "Select all",
+        "payFirstN": "Pay first",
+        "payFirstNHint": "{{selected}}/{{total}} selected",
+        "apply": "Apply",
         "nothingPending": "Nothing pending.",
         "columns": {
           "order": "Order",

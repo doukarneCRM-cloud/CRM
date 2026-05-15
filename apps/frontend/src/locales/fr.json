@@ -1371,6 +1371,9 @@
         "ordersToSettle": "Commandes à régler",
         "deselectAll": "Tout désélectionner",
         "selectAll": "Tout sélectionner",
+        "payFirstN": "Payer les premières",
+        "payFirstNHint": "{{selected}}/{{total}} sélectionnées",
+        "apply": "Appliquer",
         "nothingPending": "Rien en attente.",
         "columns": {
           "order": "Commande",
