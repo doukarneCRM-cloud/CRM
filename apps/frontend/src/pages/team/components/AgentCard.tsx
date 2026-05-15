@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Edit2, Power, Mail, Phone as PhoneIcon, Wallet, CheckCircle2, Clock, Truck } from 'lucide-react';
 import { AvatarChip } from '@/components/ui/AvatarChip';
-import { teamApi, type TeamUser } from '@/services/teamApi';
+import { type TeamUser } from '@/services/teamApi';
 import { cn } from '@/lib/cn';
+import { RecordPaymentModal } from '@/pages/money/components/RecordPaymentModal';
 
 interface Props {
   user: TeamUser;
@@ -37,27 +38,11 @@ function formatMAD(n: number): string {
 export function AgentCard({ user, canEdit, onEdit, onToggleActive, onChanged }: Props) {
   const { t } = useTranslation();
   const roleClass = ROLE_COLORS[user.role.name] ?? 'bg-gray-100 text-gray-700';
-  const [payingOut, setPayingOut] = useState(false);
-
-  const handlePayout = async () => {
-    if (user.commission.unpaid <= 0) return;
-    const ok = window.confirm(
-      t('team.agentCard.payoutConfirm', {
-        amount: formatMAD(user.commission.unpaid),
-        name: user.name,
-      }),
-    );
-    if (!ok) return;
-    setPayingOut(true);
-    try {
-      await teamApi.payoutCommission(user.id);
-      onChanged?.();
-    } catch {
-      window.alert(t('team.agentCard.payoutFailed'));
-    } finally {
-      setPayingOut(false);
-    }
-  };
+  // Open the shared Money › Commission payment modal so the Team page
+  // speaks the same UX: selectable orders, "Pay first N" quick-picker,
+  // payment method, notes, proof upload — instead of the old
+  // pay-everything-at-once RPC.
+  const [payModalOpen, setPayModalOpen] = useState(false);
 
   return (
     <div
@@ -157,16 +142,26 @@ export function AgentCard({ user, canEdit, onEdit, onToggleActive, onChanged }: 
         </div>
         {canEdit && user.commission.unpaid > 0 && (
           <button
-            onClick={handlePayout}
-            disabled={payingOut}
-            className="mt-2 flex w-full items-center justify-center gap-1 rounded-btn bg-gradient-to-br from-tone-lavender-500 to-[#5E3FE6] px-3 py-1.5 text-[11px] font-semibold text-white shadow-[0_3px_10px_rgba(124,92,255,0.30)] transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={() => setPayModalOpen(true)}
+            className="mt-2 flex w-full items-center justify-center gap-1 rounded-btn bg-gradient-to-br from-tone-lavender-500 to-[#5E3FE6] px-3 py-1.5 text-[11px] font-semibold text-white shadow-[0_3px_10px_rgba(124,92,255,0.30)] transition-all hover:brightness-110"
           >
-            {payingOut
-              ? t('team.agentCard.commission.processing')
-              : t('team.agentCard.commission.payoutButton', { amount: formatMAD(user.commission.unpaid) })}
+            {t('team.agentCard.commission.payoutButton', {
+              amount: formatMAD(user.commission.unpaid),
+            })}
           </button>
         )}
       </div>
+
+      {payModalOpen && (
+        <RecordPaymentModal
+          agent={{ agentId: user.id, name: user.name }}
+          onClose={() => setPayModalOpen(false)}
+          onSaved={() => {
+            setPayModalOpen(false);
+            onChanged?.();
+          }}
+        />
+      )}
 
       {/* Actions */}
       {canEdit && (
