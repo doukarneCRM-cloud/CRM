@@ -305,6 +305,13 @@ export const coliixApi = {
     api.get<ListErrorsResponse>('/coliix/errors', { params }).then((r) => r.data),
   resolveError: (id: string) =>
     api.post<ColiixIntegrationError>(`/coliix/errors/${id}/resolve`).then((r) => r.data),
+  // Bulk-resolve every unresolved error (optionally narrowed to a type).
+  resolveAllErrors: (type?: ColiixErrorType) =>
+    api
+      .post<{ count: number }>('/coliix/errors/resolve-all', null, {
+        params: type ? { type } : undefined,
+      })
+      .then((r) => r.data),
   unresolvedCount: () =>
     api.get<{ count: number }>('/coliix/errors/unresolved-count').then((r) => r.data.count),
 };

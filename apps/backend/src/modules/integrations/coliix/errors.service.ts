@@ -87,3 +87,29 @@ export async function resolveError(id: string, actorId: string) {
 export async function unresolvedCount(): Promise<number> {
   return prisma.coliixIntegrationError.count({ where: { resolved: false } });
 }
+
+/**
+ * Bulk-resolve every still-unresolved error, optionally narrowed to a
+ * single type (so the "Clear all" toolbar button can either nuke
+ * everything or wipe just the noisy bucket the admin is filtering on).
+ * Emits a single socket event so every connected admin's Errors tab
+ * resets its counters without re-fetching.
+ */
+export async function resolveAllErrors(
+  actorId: string,
+  opts: { type?: ColiixErrorType } = {},
+): Promise<{ count: number }> {
+  const result = await prisma.coliixIntegrationError.updateMany({
+    where: {
+      resolved: false,
+      ...(opts.type ? { type: opts.type } : {}),
+    },
+    data: { resolved: true, resolvedAt: new Date(), resolvedById: actorId },
+  });
+  emitToRoom('admin', 'coliix:error:bulk_resolved', {
+    count: result.count,
+    type: opts.type ?? null,
+    ts: Date.now(),
+  });
+  return { count: result.count };
+}

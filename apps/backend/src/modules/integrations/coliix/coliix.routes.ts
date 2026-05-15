@@ -452,6 +452,20 @@ export async function coliixRoutes(app: FastifyInstance) {
     async (req, reply) => reply.send(await errors.resolveError(req.params.id, req.user.sub)),
   );
 
+  // Bulk-resolve every unresolved error (optionally narrowed to a single
+  // type via ?type=…). Powers the "Clear all" toolbar button.
+  app.post(
+    '/errors/resolve-all',
+    { preHandler: [verifyJWT, requirePermission('integrations:manage')] },
+    async (req, reply) => {
+      const q = req.query as { type?: string };
+      const result = await errors.resolveAllErrors(req.user.sub, {
+        type: (q.type as never) || undefined,
+      });
+      return reply.send(result);
+    },
+  );
+
   app.get(
     '/errors/unresolved-count',
     { preHandler: [verifyJWT, requirePermission('integrations:view')] },

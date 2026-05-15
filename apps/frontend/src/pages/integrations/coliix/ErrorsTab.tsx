@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Filter as FilterIcon,
   RefreshCw,
+  Trash2,
   X,
 } from 'lucide-react';
 import { CRMButton } from '@/components/ui/CRMButton';
@@ -64,6 +65,7 @@ export function ErrorsTab() {
   const [resolvedFilter, setResolvedFilter] = useState<ResolvedFilter>('unresolved');
   const [typeFilter, setTypeFilter] = useState<ColiixErrorType | 'all'>('all');
   const [drawerError, setDrawerError] = useState<ColiixIntegrationError | null>(null);
+  const [clearing, setClearing] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -145,13 +147,75 @@ export function ErrorsTab() {
       setUnresolvedTotal((n) => Math.max(0, n - 1));
     };
 
+    // Another admin hit "Clear all" → reset counters here too, and drop
+    // unresolved rows from the visible page if we're filtering to them.
+    const onBulkResolved = (payload: unknown) => {
+      const { count, type } = (payload as { count?: number; type?: string | null }) ?? {};
+      if (typeof count !== 'number') return;
+      setUnresolvedTotal((n) => Math.max(0, n - count));
+      setRows((prev) =>
+        prev.map((r) =>
+          !r.resolved && (!type || r.type === type)
+            ? { ...r, resolved: true, resolvedAt: new Date().toISOString() }
+            : r,
+        ),
+      );
+      if (resolvedFilter === 'unresolved') refresh();
+    };
+
     socket.on('coliix:error', handler);
     socket.on('coliix:error:resolved', onResolved);
+    socket.on('coliix:error:bulk_resolved', onBulkResolved);
     return () => {
       socket?.off('coliix:error', handler);
       socket?.off('coliix:error:resolved', onResolved);
+      socket?.off('coliix:error:bulk_resolved', onBulkResolved);
     };
-  }, [page, resolvedFilter, typeFilter]);
+  }, [page, resolvedFilter, typeFilter, refresh]);
+
+  const clearAll = async () => {
+    if (unresolvedTotal === 0 || clearing) return;
+    if (
+      !window.confirm(
+        t('coliix.errors.clearAllConfirm', {
+          count: unresolvedTotal,
+          scope:
+            typeFilter !== 'all'
+              ? t(`coliix.errors.types.${typeFilter}`)
+              : t('coliix.errors.clearAllScopeAll'),
+        }),
+      )
+    ) {
+      return;
+    }
+    setClearing(true);
+    try {
+      const result = await coliixApi.resolveAllErrors(
+        typeFilter === 'all' ? undefined : typeFilter,
+      );
+      toast({
+        kind: 'success',
+        title: t('coliix.errors.clearAllDone', { count: result.count }),
+      });
+      // Local optimistic patch — the socket event will also reset counters
+      // for any other open Errors tab, this just keeps the current tab snappy.
+      setUnresolvedTotal(0);
+      setRows((prev) =>
+        prev.map((r) =>
+          !r.resolved && (typeFilter === 'all' || r.type === typeFilter)
+            ? { ...r, resolved: true, resolvedAt: new Date().toISOString() }
+            : r,
+        ),
+      );
+      // If the user was filtering to "unresolved", everything just left the
+      // page — refetch so the list shows what's actually there now.
+      if (resolvedFilter === 'unresolved') refresh();
+    } catch {
+      toast({ kind: 'error', title: t('coliix.errors.clearAllFailed') });
+    } finally {
+      setClearing(false);
+    }
+  };
 
   const resolve = async (id: string) => {
     try {
@@ -184,15 +248,31 @@ export function ErrorsTab() {
           <h2 className="text-base font-bold text-gray-900">{t('coliix.errors.title')}</h2>
           <p className="text-xs text-gray-500">{t('coliix.errors.subtitle')}</p>
         </div>
-        <CRMButton
-          variant="ghost"
-          size="sm"
-          leftIcon={<RefreshCw size={12} />}
-          onClick={refresh}
-          loading={loading}
-        >
-          {t('common.refresh')}
-        </CRMButton>
+        <div className="flex items-center gap-2">
+          {unresolvedTotal > 0 && (
+            <CRMButton
+              variant="ghost"
+              size="sm"
+              leftIcon={<Trash2 size={12} />}
+              onClick={clearAll}
+              loading={clearing}
+              className="text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+            >
+              {typeFilter === 'all'
+                ? t('coliix.errors.clearAll', { count: unresolvedTotal })
+                : t('coliix.errors.clearAllFiltered', { count: unresolvedTotal })}
+            </CRMButton>
+          )}
+          <CRMButton
+            variant="ghost"
+            size="sm"
+            leftIcon={<RefreshCw size={12} />}
+            onClick={refresh}
+            loading={loading}
+          >
+            {t('common.refresh')}
+          </CRMButton>
+        </div>
       </div>
 
       {/* Stats strip */}
