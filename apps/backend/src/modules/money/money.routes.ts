@@ -22,6 +22,7 @@ import {
   recordCommissionPayment,
   listPaymentHistory,
   deletePayment,
+  seedDeliveredForAgent,
 } from './commission.service';
 import { uploadMoneyFile } from './money.upload';
 
@@ -185,6 +186,25 @@ export async function moneyRoutes(app: FastifyInstance) {
       try {
         const payment = await recordCommissionPayment(parsed.data, request.user.sub);
         return reply.status(201).send(payment);
+      } catch (err) {
+        return replyError(reply, err);
+      }
+    },
+  );
+
+  // Test-data button: seed N pending-commission delivered orders for
+  // the given agent. Idempotent. Gated on money:manage so only admins
+  // see/use it.
+  app.post(
+    '/commission/dev/seed-delivered',
+    { preHandler: [verifyJWT, requirePermission('money:manage')] },
+    async (request, reply) => {
+      const body = (request.body ?? {}) as { agentId?: string; count?: number };
+      const agentId = body.agentId ?? request.user.sub;
+      const count = Math.max(1, Math.min(50, Number(body.count) || 9));
+      try {
+        const result = await seedDeliveredForAgent(agentId, count);
+        return reply.send(result);
       } catch (err) {
         return replyError(reply, err);
       }

@@ -1354,6 +1354,12 @@
           "commission": "Commission"
         }
       },
+      "devSeed": "Créer 9 commandes livrées pour moi",
+      "devSeeding": "En cours…",
+      "devSeedTitle": "Helper de test : passe 9 commandes confirmées en livrées pour l'utilisateur actuel afin de tester le flux de commission.",
+      "devSeedConfirm": "Passer jusqu'à {{count}} commandes confirmées en livrées sur votre compte pour tester le flux ? Idempotent — ré-exécuter n'en crée pas en double.",
+      "devSeedResult": "{{flipped}} commande(s) traitée(s). Vous avez maintenant {{pending}} commande(s) livrées avec commission en attente à {{rate}} MAD chacune.",
+      "devSeedFailed": "Échec de la création des données de test.",
       "history": {
         "loadFailed": "Échec du chargement de l'historique",
         "empty": "Aucun versement enregistré pour l'instant.",

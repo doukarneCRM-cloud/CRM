@@ -145,4 +145,18 @@ export const moneyApi = {
       })
       .then((r) => r.data);
   },
+
+  // Test-data helper: flips N confirmed orders to delivered for the given
+  // (or current) agent so the operator can test the commission flow
+  // without manually walking through 9 orders. Idempotent server-side.
+  seedDelivered: (payload: { agentId?: string; count?: number } = {}) =>
+    api
+      .post<{
+        agent: string;
+        perOrderRate: number;
+        alreadyPending: number;
+        flipped: number;
+        references?: string[];
+      }>('/money/commission/dev/seed-delivered', payload)
+      .then((r) => r.data),
 };
