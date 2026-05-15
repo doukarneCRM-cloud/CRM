@@ -4,9 +4,15 @@ import { formatWeekRange } from './weekMath';
 
 /**
  * Open a 100×100mm printable label in a popup window so the operator can
- * stick it onto the pay envelope. The label is self-contained (inline
- * CSS, no JS, no fonts loaded from the network) so it prints reliably
- * even on slow thermal-label printers.
+ * stick it onto the pay envelope. Black-and-white only — no coloured
+ * fills or accents — so the label prints crisply on monochrome
+ * thermal printers and stays legible after a few weeks taped to a
+ * cardboard envelope.
+ *
+ * Layout fills the full 100×100mm page: large name + meta header, the
+ * note (if any) sits directly under the meta (not pushed to the
+ * bottom), then the breakdown table, with a double-ruled TOTAL row at
+ * the bottom that's the largest thing on the label.
  *
  * Two flavours:
  *  - `printSalaryLabel(row, ...)` prints one label.
@@ -34,79 +40,98 @@ function escapeHtml(s: string): string {
   });
 }
 
+// Strictly black-and-white. The whole page is one solid `flex` column
+// scaled to fill 100×100mm — every section sized so the total row
+// lands snug against the bottom edge without leaving whitespace.
 const LABEL_STYLES = `
   @page { size: 100mm 100mm; margin: 0; }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    color: #111;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+    color: #000;
+    background: #fff;
   }
   .label {
     width: 100mm;
     height: 100mm;
-    padding: 4mm 5mm;
+    padding: 5mm 5.5mm;
     display: flex;
     flex-direction: column;
-    gap: 2mm;
     page-break-after: always;
     break-after: page;
     overflow: hidden;
+    color: #000;
+    background: #fff;
   }
   .label:last-child { page-break-after: auto; break-after: auto; }
+
+  /* Header */
   .name {
-    font-size: 14pt;
-    font-weight: 800;
-    line-height: 1.1;
+    font-size: 18pt;
+    font-weight: 900;
+    line-height: 1.05;
     text-transform: uppercase;
-    letter-spacing: 0.3pt;
+    letter-spacing: 0.4pt;
+    color: #000;
   }
   .meta {
-    font-size: 8pt;
-    color: #555;
+    margin-top: 1mm;
+    font-size: 9pt;
+    color: #000;
     line-height: 1.2;
+    padding-bottom: 2mm;
+    border-bottom: 0.35mm solid #000;
   }
+
+  /* Note — directly under the header so it's the first thing the
+     employee reads, not buried at the bottom. */
+  .note {
+    margin-top: 2.5mm;
+    margin-bottom: 1mm;
+    font-size: 9pt;
+    color: #000;
+    line-height: 1.3;
+    font-style: italic;
+    word-break: break-word;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .note strong { font-style: normal; font-weight: 700; }
+
+  /* Breakdown table */
   table {
+    margin-top: 3mm;
     border-collapse: collapse;
     width: 100%;
-    font-size: 9pt;
+    font-size: 11pt;
+    color: #000;
   }
   th, td {
-    padding: 1.2mm 1.5mm;
+    padding: 1.8mm 1.5mm;
     text-align: left;
-    border-bottom: 0.3mm solid #ddd;
+    border-bottom: 0.25mm solid #000;
+    color: #000;
   }
   th {
-    background: #f3f4f6;
     font-weight: 600;
-    font-size: 8pt;
+    font-size: 10pt;
     text-transform: uppercase;
     letter-spacing: 0.2pt;
-    color: #555;
-    width: 45%;
+    width: 50%;
   }
-  td { font-weight: 600; text-align: right; }
+  td { font-weight: 700; text-align: right; }
+
+  /* Total — biggest, double-ruled, anchored to the bottom edge. */
   tr.total th, tr.total td {
-    font-size: 11pt;
-    font-weight: 800;
-    color: #111;
-    background: #ede9fe;
+    font-size: 15pt;
+    font-weight: 900;
+    border-top: 0.6mm double #000;
     border-bottom: none;
+    padding-top: 3mm;
   }
-  .note {
-    margin-top: auto;
-    font-size: 8pt;
-    color: #333;
-    line-height: 1.25;
-    border-top: 0.3mm dashed #999;
-    padding-top: 1.5mm;
-    word-break: break-word;
-    overflow: hidden;
-    max-height: 18mm;
-  }
-  .note strong { color: #555; font-weight: 600; }
 `;
 
 function buildLabelHtml(row: SalaryRow, weekStartISO: string, t: TFunction): string {
@@ -126,6 +151,11 @@ function buildLabelHtml(row: SalaryRow, weekStartISO: string, t: TFunction): str
   <div class="label">
     <div class="name">${escapeHtml(row.employee.name)}</div>
     <div class="meta">${escapeHtml(row.employee.role)} · ${escapeHtml(week)}</div>
+    ${
+      note
+        ? `<div class="note"><strong>${escapeHtml(t('atelie.salary.note'))}:</strong> ${escapeHtml(note)}</div>`
+        : ''
+    }
     <table>
       <tr>
         <th>${escapeHtml(t('atelie.salary.daysWorked'))}</th>
@@ -148,11 +178,6 @@ function buildLabelHtml(row: SalaryRow, weekStartISO: string, t: TFunction): str
         <td>${total.toFixed(0)} MAD</td>
       </tr>
     </table>
-    ${
-      note
-        ? `<div class="note"><strong>${escapeHtml(t('atelie.salary.note'))}:</strong> ${escapeHtml(note)}</div>`
-        : ''
-    }
   </div>`;
 }
 

@@ -1354,12 +1354,6 @@
           "commission": "Commission"
         }
       },
-      "devSeed": "Seed 9 delivered orders for me",
-      "devSeeding": "Seeding…",
-      "devSeedTitle": "Test helper: flip 9 confirmed orders to delivered for the current user so the commission flow can be exercised.",
-      "devSeedConfirm": "Flip up to {{count}} confirmed orders to delivered for your account so you can test the commission flow? Idempotent — running again won't duplicate.",
-      "devSeedResult": "Flipped {{flipped}} order(s). You now have {{pending}} pending-commission delivered order(s) at {{rate}} MAD each.",
-      "devSeedFailed": "Couldn't seed test data.",
       "history": {
         "loadFailed": "Failed to load history",
         "empty": "No payments recorded yet.",

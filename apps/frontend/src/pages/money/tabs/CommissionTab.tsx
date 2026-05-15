@@ -104,48 +104,11 @@ export function CommissionTab() {
     );
   }, [rows]);
 
-  const [seeding, setSeeding] = useState(false);
-
-  const handleSeedDelivered = async () => {
-    if (seeding) return;
-    if (!window.confirm(t('money.commission.devSeedConfirm', { count: 9 }))) return;
-    setSeeding(true);
-    try {
-      const result = await moneyApi.seedDelivered({ count: 9 });
-      const msg = t('money.commission.devSeedResult', {
-        flipped: result.flipped,
-        pending: result.alreadyPending + result.flipped,
-        rate: result.perOrderRate,
-      });
-      window.alert(msg);
-      setReloadKey((k) => k + 1);
-    } catch (e) {
-      window.alert(apiErrorMessage(e, t('money.commission.devSeedFailed')));
-    } finally {
-      setSeeding(false);
-    }
-  };
-
   return (
     <div className="flex flex-col gap-4">
       {error && (
         <div className="rounded-card border border-red-100 bg-red-50 px-4 py-2 text-sm text-red-700">
           {error}
-        </div>
-      )}
-
-      {canManage && (
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={handleSeedDelivered}
-            disabled={seeding}
-            className="inline-flex items-center gap-1.5 rounded-btn border border-dashed border-tone-lavender-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-tone-lavender-600 transition-colors hover:bg-tone-lavender-50 disabled:cursor-not-allowed disabled:opacity-50"
-            title={t('money.commission.devSeedTitle')}
-          >
-            <Wallet size={11} />
-            {seeding ? t('money.commission.devSeeding') : t('money.commission.devSeed')}
-          </button>
         </div>
       )}
 
