@@ -265,12 +265,11 @@ function AgentDrawer({
               {agent.paidCount > 0 && (
                 <span
                   className={cn(
-                    'inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold',
-                    tab === 'history' ? 'bg-white/25 text-white' : 'bg-emerald-100 text-emerald-700',
+                    'h-1.5 w-1.5 rounded-full',
+                    tab === 'history' ? 'bg-white' : 'bg-emerald-500',
                   )}
-                >
-                  {agent.paidCount}
-                </span>
+                  aria-hidden
+                />
               )}
             </TabBtn>
           </div>
@@ -287,7 +286,7 @@ function AgentDrawer({
 
         {tab === 'pending' && <PendingOrders agentId={agent.agentId} />}
         {tab === 'history' && (
-          <PaymentHistory agentId={agent.agentId} canManage={canManage} onChange={onPaymentRecorded} />
+          <PaymentHistory agent={agent} canManage={canManage} onChange={onPaymentRecorded} />
         )}
 
         {showPayForm && (
@@ -407,15 +406,16 @@ function PendingOrders({ agentId }: { agentId: string }) {
 // ─── Payment history ────────────────────────────────────────────────────────
 
 function PaymentHistory({
-  agentId,
+  agent,
   canManage,
   onChange,
 }: {
-  agentId: string;
+  agent: AgentCommissionRow;
   canManage: boolean;
   onChange: () => void;
 }) {
   const { t } = useTranslation();
+  const agentId = agent.agentId;
   const [rows, setRows] = useState<CommissionPayment[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
@@ -431,6 +431,20 @@ function PaymentHistory({
       cancelled = true;
     };
   }, [agentId, reload, t]);
+
+  // Detect "legacy" paid orders — those marked commissionPaid=true on the
+  // Order rows before this CommissionPayment audit table was introduced
+  // (or set by an out-of-band DB write). They show up in the agent's
+  // paidCount/paidTotal but have no row in `rows`. Surface them as a
+  // synthetic info card so the history tab is never silently empty when
+  // the operator clearly remembers paying.
+  const trackedOrderIds = new Set<string>();
+  (rows ?? []).forEach((p) => p.orderIds.forEach((id) => trackedOrderIds.add(id)));
+  const legacyCount = Math.max(0, agent.paidCount - trackedOrderIds.size);
+  const legacyAmount = Math.max(
+    0,
+    agent.paidTotal - (rows ?? []).reduce((s, p) => s + p.amount, 0),
+  );
 
   const handleDelete = async (id: string) => {
     if (!confirm(t('money.commission.history.reverseConfirm'))) return;
@@ -450,7 +464,7 @@ function PaymentHistory({
       </div>
     );
   if (!rows) return <div className="skeleton h-[200px] rounded-card" />;
-  if (rows.length === 0)
+  if (rows.length === 0 && legacyCount === 0)
     return (
       <div className="flex h-[160px] flex-col items-center justify-center gap-1 text-gray-400">
         <History size={22} className="text-gray-300" />
@@ -461,6 +475,26 @@ function PaymentHistory({
   return (
     <>
     <div className="flex max-h-[45vh] flex-col gap-2 overflow-y-auto">
+      {legacyCount > 0 && (
+        <div className="rounded-card border border-dashed border-amber-200 bg-amber-50/60 px-3 py-2.5">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-sm font-bold text-amber-700">{fmtMAD(legacyAmount)}</span>
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+                  {t('money.commission.history.legacyTag')}
+                </span>
+              </div>
+              <p className="mt-0.5 text-[11px] text-gray-600">
+                {t('money.commission.history.orders', { count: legacyCount })}
+              </p>
+              <p className="mt-1 text-[11px] italic text-gray-500">
+                {t('money.commission.history.legacyHint')}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       {rows.map((p) => (
         <div key={p.id} className="rounded-card border border-gray-100 bg-white px-3 py-2.5">
           <div className="flex items-start justify-between gap-2">

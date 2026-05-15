@@ -1364,7 +1364,9 @@
         "by": "by {{name}}",
         "proof": "Proof",
         "reverseAria": "Reverse",
-        "proofPreviewTitle": "Commission proof"
+        "proofPreviewTitle": "Commission proof",
+        "legacyTag": "Legacy",
+        "legacyHint": "Marked as paid before the audit history was added — no proof or method recorded."
       },
       "recordModal": {
         "title": "Record payment · {{name}}",

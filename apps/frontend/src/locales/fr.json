@@ -1364,7 +1364,9 @@
         "by": "par {{name}}",
         "proof": "Justificatif",
         "reverseAria": "Annuler",
-        "proofPreviewTitle": "Justificatif de commission"
+        "proofPreviewTitle": "Justificatif de commission",
+        "legacyTag": "Hérité",
+        "legacyHint": "Marqué payé avant l’ajout de l’historique — aucun justificatif ni mode enregistré."
       },
       "recordModal": {
         "title": "Enregistrer un versement · {{name}}",
